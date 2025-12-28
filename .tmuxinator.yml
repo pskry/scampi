@@ -1,0 +1,12 @@
+---
+name: doit
+root: ./
+
+windows:
+  - "nvim  ":
+      layout: main-vertical
+      panes:
+        - nvim:
+            - nvim
+        - run:
+  - "git  ": lazygit

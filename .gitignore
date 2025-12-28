@@ -1,0 +1,7 @@
+# Dotfiles
+.*
+!.gitignore
+!.tmuxinator.yml
+
+# Build and debug artifacts
+/build/
