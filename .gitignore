@@ -8,4 +8,5 @@
 
 # Build and debug artifacts
 /build/
+__debug*
 *.zip

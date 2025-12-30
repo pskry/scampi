@@ -3,6 +3,9 @@ package engine
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
+	"sync"
 	"time"
 
 	"cuelang.org/go/cue/errors"
@@ -11,6 +14,15 @@ import (
 )
 
 const taskTimeout = 5 * time.Second
+
+type opNode struct {
+	op         spec.Op
+	deps       []*opNode
+	dependents []*opNode
+
+	indegree int // original dependency count
+	pending  int // runtime counter
+}
 
 func Apply(ctx context.Context, cfgPath string) error {
 	reg, err := NewRegistry()
@@ -81,24 +93,50 @@ func executeTask(ctx context.Context, task spec.RtTask) error {
 }
 
 func runTask(ctx context.Context, task spec.RtTask) (spec.Result, error) {
+	nodes, err := buildPlan(task.Ops())
+	if err != nil {
+		return spec.Result{}, err
+	}
+
+	var (
+		mu      sync.Mutex
+		results []spec.Result
+	)
+
 	grp, ctx := errgroup.WithContext(ctx)
-	taskName := task.Name()
-	ops := task.Ops()
 
-	results := make([]spec.Result, len(ops))
-
-	for i, op := range ops {
-		fmt.Printf("Starting %s op: %s\n", taskName, op.Name())
+	var schedule func(*opNode)
+	schedule = func(n *opNode) {
 		grp.Go(func() error {
-			res, err := op.Execute(ctx)
+			fmt.Printf("Start op %s\n", n.op.Name())
+
+			res, err := n.op.Execute(ctx)
 			if err != nil {
 				return err
 			}
 
-			results[i] = res
-			fmt.Printf("Finished %s op: %s\n", taskName, op.Name())
+			fmt.Printf("Finished op %s\n", n.op.Name())
+
+			mu.Lock()
+			results = append(results, res)
+
+			// NOW — and only now — unblock dependents
+			for _, d := range n.dependents {
+				d.pending--
+				if d.pending == 0 {
+					schedule(d)
+				}
+			}
+			mu.Unlock()
+
 			return nil
 		})
+	}
+
+	for _, n := range nodes {
+		if n.pending == 0 {
+			schedule(n)
+		}
 	}
 
 	if err := grp.Wait(); err != nil {
@@ -114,4 +152,64 @@ func runTask(ctx context.Context, task spec.RtTask) (spec.Result, error) {
 	}
 
 	return spec.Result{Changed: changed}, nil
+}
+
+func buildPlan(ops []spec.Op) ([]*opNode, error) {
+	nodes := map[spec.Op]*opNode{}
+
+	for _, op := range ops {
+		nodes[op] = &opNode{op: op}
+	}
+
+	for _, n := range nodes {
+		for _, dep := range n.op.DependsOn() {
+			dn, ok := nodes[dep]
+			if !ok {
+				return nil, fmt.Errorf(
+					"op %q depends on unknown op %q",
+					n.op.Name(), dep.Name(),
+				)
+			}
+
+			n.deps = append(n.deps, dn)
+			dn.dependents = append(dn.dependents, n)
+			n.indegree++
+		}
+	}
+
+	tmp := make(map[*opNode]int)
+	for _, n := range nodes {
+		tmp[n] = n.indegree
+	}
+
+	var queue []*opNode
+	for n, deg := range tmp {
+		if deg == 0 {
+			queue = append(queue, n)
+		}
+	}
+
+	visited := 0
+	for len(queue) > 0 {
+		n := queue[0]
+		queue = queue[1:]
+		visited++
+
+		for _, d := range n.dependents {
+			tmp[d]--
+			if tmp[d] == 0 {
+				queue = append(queue, d)
+			}
+		}
+	}
+
+	if visited != len(nodes) {
+		return nil, fmt.Errorf("cycle detected in op graph")
+	}
+
+	for _, n := range nodes {
+		n.pending = n.indegree
+	}
+
+	return slices.Collect(maps.Values(nodes)), nil
 }

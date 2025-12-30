@@ -27,7 +27,9 @@ type (
 	}
 	Op interface {
 		Name() string
+		Check(ctx context.Context) (bool, error)
 		Execute(ctx context.Context) (Result, error)
+		DependsOn() []Op
 	}
 	Result struct {
 		Changed bool
