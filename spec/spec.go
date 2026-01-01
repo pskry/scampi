@@ -14,7 +14,6 @@ type (
 
 	Spec interface {
 		Kind() string
-		Schema() string
 		NewConfig() any
 		Plan(idx int, cfg any) (RtTask, error)
 	}

@@ -35,29 +35,8 @@ type (
 	}
 )
 
-func (CopySpec) Kind() string { return "copy" }
-func (CopySpec) Schema() string {
-	return `
-package doit
-
-#Task: {
-  kind: string
-
-  if kind == "copy" {
-    copy: {
-      src: string
-      dest: string
-      perm: string
-      owner: string
-      group: string
-    }
-  }
-}`
-}
-
-func (CopySpec) NewConfig() any {
-	return &CopyConfig{}
-}
+func (CopySpec) Kind() string   { return "copy" }
+func (CopySpec) NewConfig() any { return &CopyConfig{} }
 
 func (CopySpec) Plan(idx int, config any) (spec.RtTask, error) {
 	cfg, ok := config.(*CopyConfig)
