@@ -8,6 +8,7 @@ type (
 	}
 	CfgTask struct {
 		Kind   string
+		Name   string
 		Spec   Spec
 		Config any
 	}

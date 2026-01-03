@@ -58,7 +58,8 @@ func loadConfig(ctx *cue.Context, path string) (cue.Value, error) {
 		return cue.Value{}, err
 	}
 
-	cfg := &load.Config{
+	// One loader config for both schema and user config
+	loaderCfg := &load.Config{
 		FS: overlayFS{
 			Embedded: emb,
 			Host:     os.DirFS(cwd),
@@ -66,16 +67,35 @@ func loadConfig(ctx *cue.Context, path string) (cue.Value, error) {
 		Dir: ".",
 	}
 
-	instances := load.Instances([]string{path}, cfg)
-	if len(instances) == 0 {
-		return cue.Value{}, fmt.Errorf("no CUE instances loaded")
+	// --- load user config ---
+	userInstances := load.Instances([]string{path}, loaderCfg)
+	if len(userInstances) == 0 {
+		return cue.Value{}, fmt.Errorf("no user config instances loaded")
 	}
-
-	if err := instances[0].Err; err != nil {
+	if err := userInstances[0].Err; err != nil {
 		return cue.Value{}, err
 	}
 
-	val := ctx.BuildInstance(instances[0])
+	userVal := ctx.BuildInstance(userInstances[0])
+	if err := userVal.Err(); err != nil {
+		return cue.Value{}, err
+	}
+
+	schemaInstances := load.Instances([]string{"godoit.dev/doit/core"}, loaderCfg)
+	if len(schemaInstances) == 0 {
+		return cue.Value{}, fmt.Errorf("no schema instances loaded")
+	}
+	if err := schemaInstances[0].Err; err != nil {
+		return cue.Value{}, err
+	}
+
+	schemaPkg := ctx.BuildInstance(schemaInstances[0])
+	if err := schemaPkg.Err(); err != nil {
+		return cue.Value{}, err
+	}
+
+	// --- apply schema ---
+	val := schemaPkg.Value().Unify(userVal)
 	if err := val.Err(); err != nil {
 		return cue.Value{}, err
 	}
@@ -84,61 +104,57 @@ func loadConfig(ctx *cue.Context, path string) (cue.Value, error) {
 }
 
 func decodeConfig(configVal cue.Value, reg *Registry) (spec.Config, error) {
-	tasksVal := configVal.LookupPath(cue.ParsePath("playbook.tasks"))
+	tasksVal := configVal.LookupPath(cue.ParsePath("tasks"))
 	if err := tasksVal.Err(); err != nil {
 		return spec.Config{}, err
 	}
 
-	iter, err := tasksVal.List()
+	iter, err := tasksVal.Fields()
 	if err != nil {
 		return spec.Config{}, err
 	}
 
 	cfg := spec.Config{}
 	for iter.Next() {
+		name := iter.Selector().String()
 		taskVal := iter.Value()
 
-		var kind string
-		if err := taskVal.LookupPath(cue.ParsePath("kind")).Decode(&kind); err != nil {
+		metaVal := taskVal.LookupPath(cue.ParsePath("meta"))
+		if err := metaVal.Err(); err != nil {
+			return spec.Config{}, err
+		}
+
+		kindVal := metaVal.LookupPath(cue.ParsePath("kind"))
+		if err := kindVal.Err(); err != nil {
+			return spec.Config{}, err
+		}
+
+		kind, err := kindVal.String()
+		if err != nil {
 			return spec.Config{}, err
 		}
 
 		s, ok := reg.SpecForKind(kind)
 		if !ok {
-			return spec.Config{}, fmt.Errorf("task kind %s not found in schema", kind)
+			return spec.Config{}, fmt.Errorf("unknown task kind %q", kind)
+		}
+		c := s.NewConfig()
+		if !isPointer(c) {
+			return spec.Config{}, fmt.Errorf("spec['%s'].NewConfig must return a pointer. Got %T", s.Kind(), c)
 		}
 
-		out := s.NewConfig()
-
-		if !isPointer(out) {
-			return spec.Config{}, fmt.Errorf("spec['%s'].NewConfig must return a pointer. Got %T", kind, out)
-		}
-
-		if err := decodeTask(taskVal, kind, out); err != nil {
+		if err := taskVal.Decode(c); err != nil {
 			return spec.Config{}, err
 		}
 
 		cfg.Tasks = append(cfg.Tasks, spec.CfgTask{
-			Kind:   kind,
+			Name:   name,
 			Spec:   s,
-			Config: out,
+			Config: c,
 		})
 	}
 
 	return cfg, nil
-}
-
-func decodeTask(taskVal cue.Value, kind string, out any) error {
-	specVal := taskVal.LookupPath(cue.ParsePath(kind))
-	if !specVal.Exists() {
-		return fmt.Errorf("task of kind %q is missing required %q block", kind, kind)
-	}
-
-	if err := specVal.Decode(out); err != nil {
-		return fmt.Errorf("failed to decode %q task config: %w", kind, err)
-	}
-
-	return nil
 }
 
 func isPointer(i any) bool {

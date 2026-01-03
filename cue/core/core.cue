@@ -1,7 +1,17 @@
 package core
 
-playbook: {
-	tasks: [...#Task]
+{
+	tasks: #TaskMap
 }
 
-#Task: _
+#TaskMap: {
+	[string]: #Task
+}
+
+#Task: {
+	meta: {
+		kind: string
+	}
+
+	...
+}
