@@ -1,8 +1,8 @@
 package core
 
-{
+close({
 	tasks: #TaskMap
-}
+})
 
 #TaskMap: {
 	[string]: #Task
