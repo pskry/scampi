@@ -101,14 +101,14 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 		return spec.Config{}, err
 	}
 
-	iter, err := tasksVal.Fields()
+	iter, err := tasksVal.List()
 	if err != nil {
 		return spec.Config{}, err
 	}
 
 	cfg := spec.Config{}
 	for iter.Next() {
-		name := iter.Selector().String()
+		idx := iter.Selector().Index()
 		taskVal := iter.Value()
 
 		metaVal := taskVal.LookupPath(cue.ParsePath("meta"))
@@ -124,6 +124,12 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 		kind, err := kindVal.String()
 		if err != nil {
 			return spec.Config{}, err
+		}
+
+		nameVal := taskVal.LookupPath(cue.ParsePath("name"))
+		name, err := nameVal.String()
+		if err != nil {
+			name = fmt.Sprintf("%s[%d]", kind, idx)
 		}
 
 		s, ok := reg.SpecForKind(kind)

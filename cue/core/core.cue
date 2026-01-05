@@ -1,17 +1,12 @@
 package core
 
-close({
-	tasks: #TaskMap
-})
-
-#TaskMap: {
-	[string]: #Task
-}
+tasks: [...close(#AnyTask)]
 
 #Task: {
 	meta: {
 		kind: string
 	}
 
+	name?: string
 	...
 }

@@ -19,6 +19,7 @@ import (
 type (
 	CopySpec   struct{}
 	CopyConfig struct {
+		Name  string
 		Src   string
 		Dest  string
 		Perm  string
@@ -27,6 +28,7 @@ type (
 	}
 	copyRtTask struct {
 		idx   int
+		name  string
 		src   string
 		dest  string
 		mode  fs.FileMode
@@ -51,6 +53,7 @@ func (CopySpec) Plan(idx int, config any) (spec.RtTask, error) {
 
 	return &copyRtTask{
 		idx:   idx,
+		name:  cfg.Name,
 		src:   cfg.Src,
 		dest:  cfg.Dest,
 		mode:  mode,
@@ -60,7 +63,7 @@ func (CopySpec) Plan(idx int, config any) (spec.RtTask, error) {
 }
 
 func (c *copyRtTask) Name() string {
-	return fmt.Sprintf("copy[%d]", c.idx)
+	return fmt.Sprintf(`"%s" (copy, idx=%d)`, c.name, c.idx)
 }
 
 func (c *copyRtTask) Ops() []spec.Op {
