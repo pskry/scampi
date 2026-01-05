@@ -8,5 +8,6 @@ windows:
       panes:
         - nvim:
             - nvim
-        - run:
+        - shell:
+            - clear
   - "git  ": lazygit
