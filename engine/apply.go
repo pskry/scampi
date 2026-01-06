@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const taskTimeout = 5 * time.Second
+const actionTimeout = 5 * time.Second
 
 type opNode struct {
 	op         spec.Op
@@ -50,19 +50,19 @@ func plan(cfg spec.Config) (spec.RtPlan, error) {
 	p := spec.RtPlan{}
 
 	for i, t := range cfg.Tasks {
-		rt, err := t.Spec.Plan(i, t.Config)
+		act, err := t.Spec.Plan(i, t.Config)
 		if err != nil {
 			return spec.RtPlan{}, err
 		}
-		p.Tasks = append(p.Tasks, rt)
+		p.Actions = append(p.Actions, act)
 	}
 
 	return p, nil
 }
 
 func executePlan(ctx context.Context, plan spec.RtPlan) error {
-	for _, task := range plan.Tasks {
-		if err := executeTask(ctx, task); err != nil {
+	for _, act := range plan.Actions {
+		if err := executeAction(ctx, act); err != nil {
 			return err
 		}
 	}
@@ -70,21 +70,21 @@ func executePlan(ctx context.Context, plan spec.RtPlan) error {
 	return nil
 }
 
-func executeTask(ctx context.Context, task spec.RtTask) error {
-	fmt.Printf("Running task: %s\n", task.Name())
+func executeAction(ctx context.Context, act spec.Action) error {
+	fmt.Printf("Running action: %s\n", act.Name())
 
-	taskCtx, cancel := context.WithTimeout(ctx, taskTimeout)
+	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
-	res, err := runTask(taskCtx, task)
+	res, err := runAction(actCtx, act)
 	if err != nil {
-		return fmt.Errorf("task %s failed: %w", task.Name(), err)
+		return fmt.Errorf("action %s failed: %w", act.Name(), err)
 	}
 
 	if res.Changed {
-		fmt.Printf("Task %s changed state\n", task.Name())
+		fmt.Printf("Action %s changed state\n", act.Name())
 	} else {
-		fmt.Printf("Task %s already in desired state\n", task.Name())
+		fmt.Printf("Action %s already in desired state\n", act.Name())
 	}
 
 	return nil
@@ -170,8 +170,8 @@ func (s *scheduler) initPending(nodes []*opNode) {
 	}
 }
 
-func runTask(ctx context.Context, task spec.RtTask) (spec.Result, error) {
-	nodes, err := buildPlan(task.Ops())
+func runAction(ctx context.Context, act spec.Action) (spec.Result, error) {
+	nodes, err := buildPlan(act.Ops())
 	tgt := target.LocalPosixTarget{}
 
 	if err != nil {

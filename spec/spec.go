@@ -20,12 +20,12 @@ type (
 	Spec interface {
 		Kind() string
 		NewConfig() any
-		Plan(idx int, cfg any) (RtTask, error)
+		Plan(idx int, cfg any) (Action, error)
 	}
 	RtPlan struct {
-		Tasks []RtTask
+		Actions []Action
 	}
-	RtTask interface {
+	Action interface {
 		Name() string
 		Ops() []Op
 	}

@@ -26,7 +26,7 @@ type (
 		Owner string
 		Group string
 	}
-	copyRtTask struct {
+	copyAction struct {
 		idx   int
 		name  string
 		src   string
@@ -40,7 +40,7 @@ type (
 func (CopySpec) Kind() string   { return "copy" }
 func (CopySpec) NewConfig() any { return &CopyConfig{} }
 
-func (CopySpec) Plan(idx int, config any) (spec.RtTask, error) {
+func (CopySpec) Plan(idx int, config any) (spec.Action, error) {
 	cfg, ok := config.(*CopyConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected %T got %T", &CopyConfig{}, config)
@@ -51,7 +51,7 @@ func (CopySpec) Plan(idx int, config any) (spec.RtTask, error) {
 		return nil, err
 	}
 
-	return &copyRtTask{
+	return &copyAction{
 		idx:   idx,
 		name:  cfg.Name,
 		src:   cfg.Src,
@@ -62,11 +62,11 @@ func (CopySpec) Plan(idx int, config any) (spec.RtTask, error) {
 	}, nil
 }
 
-func (c *copyRtTask) Name() string {
+func (c *copyAction) Name() string {
 	return fmt.Sprintf(`"%s" (copy, idx=%d)`, c.name, c.idx)
 }
 
-func (c *copyRtTask) Ops() []spec.Op {
+func (c *copyAction) Ops() []spec.Op {
 	cp := &copyFileOp{
 		src:  c.src,
 		dest: c.dest,
