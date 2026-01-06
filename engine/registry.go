@@ -4,8 +4,8 @@ import (
 	"maps"
 	"slices"
 
+	"godoit.dev/doit/kinds"
 	"godoit.dev/doit/spec"
-	"godoit.dev/doit/tasks"
 )
 
 type Registry struct {
@@ -17,7 +17,7 @@ func NewRegistry() (*Registry, error) {
 	// also: this would be where we need to put extensions
 	// for now (probably a while) this is just a manual list
 	specs := []spec.Spec{
-		tasks.CopySpec{},
+		kinds.CopySpec{},
 	}
 
 	r := &Registry{}

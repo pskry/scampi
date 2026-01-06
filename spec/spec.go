@@ -8,9 +8,9 @@ import (
 
 type (
 	Config struct {
-		Tasks []CfgTask
+		Units []CfgUnit
 	}
-	CfgTask struct {
+	CfgUnit struct {
 		Kind   string
 		Name   string
 		Spec   Spec

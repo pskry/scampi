@@ -96,12 +96,12 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 		return spec.Config{}, err
 	}
 
-	tasksVal := cfgVal.LookupPath(cue.ParsePath("tasks"))
-	if err := tasksVal.Err(); err != nil {
+	unitsVal := cfgVal.LookupPath(cue.ParsePath("units"))
+	if err := unitsVal.Err(); err != nil {
 		return spec.Config{}, err
 	}
 
-	iter, err := tasksVal.List()
+	iter, err := unitsVal.List()
 	if err != nil {
 		return spec.Config{}, err
 	}
@@ -109,9 +109,9 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 	cfg := spec.Config{}
 	for iter.Next() {
 		idx := iter.Selector().Index()
-		taskVal := iter.Value()
+		unitVal := iter.Value()
 
-		metaVal := taskVal.LookupPath(cue.ParsePath("meta"))
+		metaVal := unitVal.LookupPath(cue.ParsePath("meta"))
 		if err := metaVal.Err(); err != nil {
 			return spec.Config{}, err
 		}
@@ -126,14 +126,14 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 			return spec.Config{}, err
 		}
 
-		name, err := taskVal.LookupPath(cue.ParsePath("name")).String()
+		name, err := unitVal.LookupPath(cue.ParsePath("name")).String()
 		if err != nil {
 			name = fmt.Sprintf("%s[%d]", kind, idx)
 		}
 
 		s, ok := reg.SpecForKind(kind)
 		if !ok {
-			return spec.Config{}, fmt.Errorf("unknown task kind %q", kind)
+			return spec.Config{}, fmt.Errorf("unknown unit kind %q", kind)
 		}
 
 		c := s.NewConfig()
@@ -143,11 +143,11 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 			return spec.Config{}, fmt.Errorf("spec['%s'].NewConfig must return a pointer. Got %T", s.Kind(), c)
 		}
 
-		if err := taskVal.Decode(c); err != nil {
+		if err := unitVal.Decode(c); err != nil {
 			return spec.Config{}, err
 		}
 
-		cfg.Tasks = append(cfg.Tasks, spec.CfgTask{
+		cfg.Units = append(cfg.Units, spec.CfgUnit{
 			Name:   name,
 			Spec:   s,
 			Config: c,

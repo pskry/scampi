@@ -49,8 +49,8 @@ func Apply(ctx context.Context, cfgPath string) error {
 func plan(cfg spec.Config) (spec.RtPlan, error) {
 	p := spec.RtPlan{}
 
-	for i, t := range cfg.Tasks {
-		act, err := t.Spec.Plan(i, t.Config)
+	for i, u := range cfg.Units {
+		act, err := u.Spec.Plan(i, u.Config)
 		if err != nil {
 			return spec.RtPlan{}, err
 		}

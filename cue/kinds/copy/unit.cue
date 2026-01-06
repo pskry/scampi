@@ -1,6 +1,6 @@
 package copy
 
-#Task: close({
+#Unit: close({
 	meta: {
 		kind: "copy"
 	}
