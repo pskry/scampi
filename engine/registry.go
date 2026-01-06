@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"godoit.dev/doit/kinds"
 	"godoit.dev/doit/spec"
+	"godoit.dev/doit/unit/copy"
 )
 
 type Registry struct {
@@ -14,7 +14,7 @@ func NewRegistry() (*Registry, error) {
 	// also: this would be where we need to put extensions
 	// for now (probably a while) this is just a manual list
 	types := []spec.UnitType{
-		kinds.CopySpec{},
+		copy.Copy{},
 	}
 
 	r := &Registry{}

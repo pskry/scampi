@@ -1,4 +1,4 @@
-package kinds
+package copy
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 )
 
 type (
-	CopySpec   struct{}
+	Copy       struct{}
 	CopyConfig struct {
 		Name  string
 		Src   string
@@ -37,10 +37,10 @@ type (
 	}
 )
 
-func (CopySpec) Kind() string   { return "copy" }
-func (CopySpec) NewConfig() any { return &CopyConfig{} }
+func (Copy) Kind() string   { return "copy" }
+func (Copy) NewConfig() any { return &CopyConfig{} }
 
-func (CopySpec) Plan(idx int, config any) (spec.Action, error) {
+func (Copy) Plan(idx int, config any) (spec.Action, error) {
 	cfg, ok := config.(*CopyConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected %T got %T", &CopyConfig{}, config)
