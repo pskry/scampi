@@ -46,13 +46,13 @@ func Apply(ctx context.Context, cfgPath string) error {
 	return executePlan(ctx, p)
 }
 
-func plan(cfg spec.Config) (spec.RtPlan, error) {
-	p := spec.RtPlan{}
+func plan(cfg spec.Config) (spec.Plan, error) {
+	p := spec.Plan{}
 
 	for i, u := range cfg.Units {
 		act, err := u.Impl.Plan(i, u.Config)
 		if err != nil {
-			return spec.RtPlan{}, err
+			return spec.Plan{}, err
 		}
 		p.Actions = append(p.Actions, act)
 	}
@@ -60,7 +60,7 @@ func plan(cfg spec.Config) (spec.RtPlan, error) {
 	return p, nil
 }
 
-func executePlan(ctx context.Context, plan spec.RtPlan) error {
+func executePlan(ctx context.Context, plan spec.Plan) error {
 	for _, act := range plan.Actions {
 		if err := executeAction(ctx, act); err != nil {
 			return err

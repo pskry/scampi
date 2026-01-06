@@ -22,7 +22,7 @@ type (
 		NewConfig() any
 		Plan(idx int, cfg any) (Action, error)
 	}
-	RtPlan struct {
+	Plan struct {
 		Actions []Action
 	}
 	Action interface {
