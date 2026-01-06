@@ -13,11 +13,11 @@ type (
 	CfgUnit struct {
 		Kind   string
 		Name   string
-		Spec   Spec
+		Impl   KindImpl
 		Config any
 	}
 
-	Spec interface {
+	KindImpl interface {
 		Kind() string
 		NewConfig() any
 		Plan(idx int, cfg any) (Action, error)

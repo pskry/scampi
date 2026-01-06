@@ -50,7 +50,7 @@ func plan(cfg spec.Config) (spec.RtPlan, error) {
 	p := spec.RtPlan{}
 
 	for i, u := range cfg.Units {
-		act, err := u.Spec.Plan(i, u.Config)
+		act, err := u.Impl.Plan(i, u.Config)
 		if err != nil {
 			return spec.RtPlan{}, err
 		}

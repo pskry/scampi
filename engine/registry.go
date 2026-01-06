@@ -9,31 +9,31 @@ import (
 )
 
 type Registry struct {
-	specs map[string]spec.Spec
+	impls map[string]spec.KindImpl
 }
 
 func NewRegistry() (*Registry, error) {
 	// TODO: this probably needs to be automatic at some point
 	// also: this would be where we need to put extensions
 	// for now (probably a while) this is just a manual list
-	specs := []spec.Spec{
+	impls := []spec.KindImpl{
 		kinds.CopySpec{},
 	}
 
 	r := &Registry{}
-	r.specs = make(map[string]spec.Spec)
-	for _, spec := range specs {
-		r.specs[spec.Kind()] = spec
+	r.impls = make(map[string]spec.KindImpl)
+	for _, spec := range impls {
+		r.impls[spec.Kind()] = spec
 	}
 
 	return r, nil
 }
 
-func (r *Registry) Specs() []spec.Spec {
-	return slices.Collect(maps.Values(r.specs))
+func (r *Registry) Impls() []spec.KindImpl {
+	return slices.Collect(maps.Values(r.impls))
 }
 
-func (r *Registry) SpecForKind(kind string) (spec.Spec, bool) {
-	spec, ok := r.specs[kind]
+func (r *Registry) ImplForKind(kind string) (spec.KindImpl, bool) {
+	spec, ok := r.impls[kind]
 	return spec, ok
 }
