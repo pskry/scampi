@@ -53,10 +53,10 @@ type Displayer interface {
 	InternalError(s signal.Severity, message string, err error)
 }
 
-func pluralS(n int, singular string) string {
+func s(n int) string {
 	if n == 1 {
-		return singular
+		return ""
 	}
 
-	return singular + "s"
+	return "s"
 }
