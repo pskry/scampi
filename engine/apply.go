@@ -17,16 +17,22 @@ import (
 
 const actionTimeout = 5 * time.Second
 
-type opNode struct {
-	op         spec.Op
-	deps       []*opNode
-	dependents []*opNode
+type (
+	execResult struct {
+		res spec.Result
+		err error
+	}
+	opNode struct {
+		op         spec.Op
+		deps       []*opNode
+		dependents []*opNode
 
-	indegree int // original dependency count
-	pending  int // runtime counter
+		indegree int // original dependency count
+		pending  int // runtime counter
 
-	satisfied bool
-}
+		satisfied bool
+	}
+)
 
 func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string) error {
 	start := time.Now()
@@ -53,14 +59,20 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string) error {
 		// FIXME: diagnostic
 	}
 
-	ttl := len(results)
-	changed := 0
+	rs := diagnostic.RunSummary{
+		ChangedCount: 0,
+		FailedCount:  0,
+		TotalCount:   len(results),
+	}
 	for _, res := range results {
-		if res.Changed {
-			changed++
+		if res.res.Changed {
+			rs.ChangedCount++
+		}
+		if res.err != nil {
+			rs.FailedCount++
 		}
 	}
-	em.EngineFinish(changed, ttl, time.Since(start))
+	em.EngineFinish(rs, time.Since(start))
 
 	return err
 }
@@ -84,16 +96,16 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 	return p, nil
 }
 
-func executePlan(ctx context.Context, em diagnostic.Emitter, plan spec.Plan) ([]spec.Result, error) {
-	var results []spec.Result
+func executePlan(ctx context.Context, em diagnostic.Emitter, plan spec.Plan) ([]execResult, error) {
+	var results []execResult
 
 	for _, act := range plan.Actions {
 		res, err := executeAction(ctx, em, act)
 		if err != nil {
-			return []spec.Result{}, err
+			return []execResult{}, err
 		}
 
-		results = append(results, res)
+		results = append(results, execResult{res, err})
 	}
 
 	return results, nil

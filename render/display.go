@@ -6,50 +6,52 @@ import (
 	"godoit.dev/doit/signal"
 )
 
+type RunSummary struct {
+	ChangedCount int
+	FailedCount  int
+	TotalCount   int
+}
+
 type Displayer interface {
 	// Engine lifecycle
-	// =============================================
+	// ===============================================
 
 	EngineStart(s signal.Severity)
-	EngineFinish(s signal.Severity, changed, ttl int, duration time.Duration)
+	EngineFinish(s signal.Severity, rs RunSummary, dur time.Duration)
 
-	// Config / planning phase
-	// =============================================
+	// Planning lifecycle
+	// ===============================================
 
 	PlanStart(s signal.Severity)
 	UnitPlanned(s signal.Severity, index int, name string, kind string)
-	PlanFinish(s signal.Severity, unitCount int, duration time.Duration)
+	PlanFinish(s signal.Severity, unitCount int, dur time.Duration)
 
 	// Action lifecycle
-	// =============================================
+	// ===============================================
 
 	ActionStart(s signal.Severity, name string)
-	ActionFinish(s signal.Severity, name string, changed bool, duration time.Duration)
+	ActionFinish(s signal.Severity, name string, changed bool, dur time.Duration)
 	ActionError(s signal.Severity, name string, err error)
 
-	// Ops checks
-	// =============================================
+	// OpCheck lifecycle
+	// ===============================================
 
 	OpCheckStart(s signal.Severity, action string, op string)
 	OpCheckSatisfied(s signal.Severity, action string, op string)
 	OpCheckUnsatisfied(s signal.Severity, action string, op string)
 	OpCheckUnknown(s signal.Severity, action string, op string, err error)
 
-	// Ops execute
-	// =============================================
+	// OpExecute lifecycle
+	// ===============================================
 
 	OpExecuteStart(s signal.Severity, action string, op string)
-	OpExecuteFinish(s signal.Severity, action string, op string, changed bool, duration time.Duration)
+	OpExecuteFinish(s signal.Severity, action string, op string, changed bool, dur time.Duration)
 	OpExecuteError(s signal.Severity, action string, op string, err error)
 
-	// User-visible errors (s signal.Severity,expected, actionable)
-	// =============================================
+	// Errors
+	// ===============================================
 
 	UserError(s signal.Severity, message string)
-
-	// Internal errors (s signal.Severity,bugs, invariants violated)
-	// =============================================
-
 	InternalError(s signal.Severity, message string, err error)
 }
 

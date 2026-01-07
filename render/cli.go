@@ -2,8 +2,10 @@ package render
 
 import (
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +19,7 @@ type (
 		ColorMode signal.ColorMode
 		Verbosity signal.Verbosity
 	}
+
 	cli struct {
 		opts CLIOptions
 
@@ -25,13 +28,27 @@ type (
 		err io.Writer
 
 		isTTY   bool
-		actions sync.Map // map[string]*actionRenderState
+		actions sync.Map // map[string]*actionState
 	}
-	actionRenderState struct {
-		mu            sync.Mutex
-		headerPrinted bool
-		finished      bool
+
+	actionState struct {
+		id       string
+		finished bool
 	}
+)
+
+// Nerdfont symbols
+// ===============================================
+
+const (
+	symStart  = "" // nf-fa-play
+	symFinish = "" // nf-fa-stop
+	symChange = "󰆓" // nf-md-pencil
+	symOK     = "󰄬" // nf-md-check
+	symNoop   = "󰄫" // nf-md-refresh
+	symExec   = "󰇚" // nf-md-cog
+	symWarn   = "󰀪" // nf-md-alert
+	symFail   = "󰅚" // nf-md-close
 )
 
 func NewCLI(opts CLIOptions) Displayer {
@@ -50,35 +67,41 @@ func (c *cli) EngineStart(_ signal.Severity) {
 	if c.v() >= signal.VV {
 		c.outln(
 			ansi.Green.Dim,
-			`[engine] starting`,
+			"%s [engine] starting",
+			symStart,
 		)
 	}
 }
 
-func (c *cli) EngineFinish(_ signal.Severity, changed, units int, dur time.Duration) {
-	if changed > 0 {
-		c.outln(
-			ansi.Yellow.Bold,
-			`[engine] finished (%d change%s, %d unit%s, %s)`,
-			changed, s(changed), units, s(units), dur,
-		)
-	} else {
-		c.outln(
-			ansi.Green.Reg,
-			`[engine] finished (no changes, %d unit%s, %s)`,
-			units, s(units), dur,
-		)
+func (c *cli) EngineFinish(_ signal.Severity, rs RunSummary, dur time.Duration) {
+	color := ansi.Green.Reg
+	if rs.ChangedCount > 0 {
+		color = ansi.Yellow.Reg
 	}
+	if rs.FailedCount > 0 {
+		color = ansi.Red.Reg
+	}
+
+	c.outln(
+		color,
+		"%s [engine] finished (%d change%s, %d failure%s, %d unit%s, %s)",
+		symFinish,
+		rs.ChangedCount, s(rs.ChangedCount),
+		rs.FailedCount, s(rs.FailedCount),
+		rs.TotalCount, s(rs.TotalCount),
+		dur,
+	)
 }
 
-// Planning
+// Planning lifecycle
 // ===============================================
 
 func (c *cli) PlanStart(_ signal.Severity) {
 	if c.v() >= signal.VV {
 		c.outln(
 			ansi.Blue.Reg,
-			`[plan] start`,
+			"%s [plan] start",
+			symStart,
 		)
 	}
 }
@@ -87,70 +110,66 @@ func (c *cli) UnitPlanned(_ signal.Severity, index int, name, kind string) {
 	if c.v() >= signal.VVV {
 		c.outln(
 			ansi.BrightBlack.Dim,
-			`  [unit] #%d %s (%s)`,
-			index, name, kind,
+			"  %s [unit] #%d %s (%s)",
+			symOK, index, name, kind,
 		)
 	}
 }
 
-func (c *cli) PlanFinish(_ signal.Severity, units int, dur time.Duration) {
+func (c *cli) PlanFinish(_ signal.Severity, unitCount int, dur time.Duration) {
 	if c.v() >= signal.VV {
 		c.outln(
 			ansi.Blue.Dim,
-			`[plan] %d unit%s (%s)`,
-			units, s(units), dur,
+			"%s [plan] %d unit%s (%s)",
+			symFinish, unitCount, s(unitCount), dur,
 		)
 	}
 }
 
-// Actions
+// Action lifecycle
 // ===============================================
 
 func (c *cli) ActionStart(_ signal.Severity, name string) {
-	_ = c.actionState(name)
+	_ = c.ensureAction(name)
 }
 
 func (c *cli) ActionFinish(_ signal.Severity, name string, changed bool, dur time.Duration) {
-	st := c.actionState(name)
-
-	st.mu.Lock()
-	defer st.mu.Unlock()
-
+	st := c.ensureAction(name)
 	st.finished = true
 
 	if changed {
-		// Changed actions always print, even at verbosity 0
 		c.outln(
 			ansi.Yellow.Reg,
-			`[action] %s changed (%s)`,
-			name, dur,
+			"%s [%s] %s changed (%s)",
+			symChange, st.id, name, dur,
 		)
 		return
 	}
 
-	// No changes
 	if c.v() >= signal.V {
 		c.outln(
 			ansi.Green.Dim,
-			`[action] %s up-to-date`,
-			name,
+			"%s [%s] %s up-to-date",
+			symNoop, st.id, name,
 		)
 	}
 }
 
 func (c *cli) ActionError(_ signal.Severity, name string, err error) {
+	st := c.ensureAction(name)
+
 	c.errln(
-		ansi.Red.Bold,
-		`[action] %s failed: %v`,
-		name, err,
+		ansi.Red.Reg,
+		"%s [%s] action %s failed: %v",
+		symFail, st.id, name, err,
 	)
 }
 
-// Checks (collapsed semantics)
+// OpCheck lifecycle
 // ===============================================
 
-func (c *cli) OpCheckStart(_ signal.Severity, action, op string) {
-	// silent by design
+func (c *cli) OpCheckStart(_ signal.Severity, _, _ string) {
+	// intentionally silent
 }
 
 func (c *cli) OpCheckUnsatisfied(_ signal.Severity, action, op string) {
@@ -158,11 +177,11 @@ func (c *cli) OpCheckUnsatisfied(_ signal.Severity, action, op string) {
 		return
 	}
 
-	c.ensureActionHeader(action)
+	st := c.ensureAction(action)
 	c.outln(
 		ansi.BrightBlack.Dim,
-		`  needs change: %s`,
-		op,
+		"%s [%s] needs change: %s",
+		symChange, st.id, op,
 	)
 }
 
@@ -171,26 +190,27 @@ func (c *cli) OpCheckSatisfied(_ signal.Severity, action, op string) {
 		return
 	}
 
-	c.ensureActionHeader(action)
+	st := c.ensureAction(action)
 	c.outln(
 		ansi.BrightBlack.Dim,
-		`    ✓ %s`,
-		op,
+		"%s [%s] %s",
+		symOK, st.id, op,
 	)
 }
 
-func (c *cli) OpCheckUnknown(_ signal.Severity, _, op string, err error) {
+func (c *cli) OpCheckUnknown(_ signal.Severity, action, op string, err error) {
+	st := c.ensureAction(action)
 	c.errln(
-		ansi.Yellow.Bold,
-		`  check %s unknown: %v`,
-		op, err,
+		ansi.Yellow.Reg,
+		"%s [%s] check %s unknown: %v",
+		symWarn, st.id, op, err,
 	)
 }
 
-// Execution
+// OpExecute lifecycle
 // ===============================================
 
-func (c *cli) OpExecuteStart(_ signal.Severity, action, op string) {
+func (c *cli) OpExecuteStart(_ signal.Severity, _, _ string) {
 	// intentionally silent
 }
 
@@ -199,86 +219,71 @@ func (c *cli) OpExecuteFinish(_ signal.Severity, action, op string, changed bool
 		return
 	}
 
-	c.ensureActionHeader(action)
+	st := c.ensureAction(action)
 	c.outln(
 		ansi.BrightBlack.Reg,
-		`  exec %s changed (%s)`,
-		op, dur,
+		"%s [%s] exec %s changed (%s)",
+		symExec, st.id, op, dur,
 	)
 }
 
 func (c *cli) OpExecuteError(_ signal.Severity, action, op string, err error) {
+	st := c.ensureAction(action)
 	c.errln(
-		ansi.Red.Bold,
-		`  exec %s failed: %v`,
-		op, err,
+		ansi.Red.Reg,
+		"%s [%s] exec %s failed: %v",
+		symFail, st.id, op, err,
 	)
 }
 
-// User-facing errors
+// Errors
 // ===============================================
 
 func (c *cli) UserError(_ signal.Severity, message string) {
 	c.errln(
 		ansi.Red.Reg,
-		`[error] %s`,
-		message,
+		"%s [error] %s",
+		symFail, message,
 	)
 }
-
-// Internal errors
-// ===============================================
 
 func (c *cli) InternalError(_ signal.Severity, message string, err error) {
 	if err != nil {
-		c.errln(
-			ansi.BrightRed.Bold,
-			`[fatal] %s: %v`,
-			message, err,
-		)
+		c.errln(ansi.BrightRed.Bold, "%s [fatal] %s: %v", symFail, message, err)
 		return
 	}
-	c.errln(
-		ansi.BrightRed.Bold,
-		`[fatal] %s`,
-		message,
-	)
+	c.errln(ansi.BrightRed.Bold, "%s [fatal] %s", symFail, message)
 }
 
-// Internal helpers
+// Helpers
 // ===============================================
 
 func (c *cli) v() signal.Verbosity {
 	return c.opts.Verbosity
 }
 
-func (c *cli) actionState(name string) *actionRenderState {
-	st, _ := c.actions.LoadOrStore(name, &actionRenderState{})
-	return st.(*actionRenderState)
+func (c *cli) ensureAction(name string) *actionState {
+	stAny, _ := c.actions.LoadOrStore(name, &actionState{
+		id: makeID(name),
+	})
+	return stAny.(*actionState)
 }
 
-func (c *cli) ensureActionHeader(name string) {
-	// Headers only exist at -v and above
-	if c.v() < signal.V {
-		return
-	}
+// makeID produces a short, stable, human-readable identifier
+func makeID(name string) string {
+	base := strings.ToLower(name)
+	base = strings.ReplaceAll(base, `"`, "")
+	base = strings.Fields(base)[0]
 
-	st := c.actionState(name)
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(name))
+	suffix := h.Sum32() & 0xff
 
-	st.mu.Lock()
-	defer st.mu.Unlock()
-
-	if st.headerPrinted || st.finished {
-		return
-	}
-
-	c.outln(
-		ansi.Blue.Reg,
-		`[action] %s`,
-		name,
-	)
-	st.headerPrinted = true
+	return fmt.Sprintf("%s:%02x", base, suffix)
 }
+
+// Output helpers
+// ===============================================
 
 func (c *cli) outln(color ansi.Code, format string, args ...any) {
 	c.println(c.out, color, format, args...)

@@ -46,8 +46,13 @@ func (e *policyEmitter) EngineStart() {
 	}
 }
 
-func (e *policyEmitter) EngineFinish(nChanged, nUnits int, duration time.Duration) {
-	e.out.EngineFinish(e.pol.apply(signal.Important), nChanged, nUnits, duration)
+func (e *policyEmitter) EngineFinish(rs RunSummary, duration time.Duration) {
+	drs := render.RunSummary{
+		ChangedCount: rs.ChangedCount,
+		FailedCount:  rs.FailedCount,
+		TotalCount:   rs.TotalCount,
+	}
+	e.out.EngineFinish(e.pol.apply(signal.Important), drs, duration)
 }
 
 // Config / planning phase
