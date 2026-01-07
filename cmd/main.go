@@ -11,6 +11,7 @@ import (
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/engine"
 	"godoit.dev/doit/render"
+	"godoit.dev/doit/signal"
 )
 
 func main() {
@@ -73,13 +74,16 @@ changes when the current state differs from the declared state.`,
 				return err
 			}
 
+			v := mapVerbosity(verbosity)
+
 			pol := diagnostic.Policy{
 				WarningsAsErrors: false,
-				Verbosity:        mapVerbosity(verbosity),
+				Verbosity:        v,
 			}
 
 			displ := render.NewCLI(render.CLIOptions{
 				ColorMode: colorMode,
+				Verbosity: v,
 			})
 
 			em := diagnostic.NewEmitter(pol, displ)
@@ -114,15 +118,15 @@ func parseColorMode(s string) (render.ColorMode, error) {
 	}
 }
 
-func mapVerbosity(v int) diagnostic.Verbosity {
+func mapVerbosity(v int) signal.Verbosity {
 	switch {
 	case v >= 3:
-		return diagnostic.VVVerbose
+		return signal.VVV
 	case v == 2:
-		return diagnostic.VVerbose
+		return signal.VV
 	case v == 1:
-		return diagnostic.Verbose
+		return signal.V
 	default:
-		return diagnostic.Quiet
+		return signal.Quiet
 	}
 }

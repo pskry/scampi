@@ -10,7 +10,7 @@ import (
 type (
 	Policy struct {
 		WarningsAsErrors bool
-		Verbosity        Verbosity
+		Verbosity        signal.Verbosity
 	}
 	Decision struct {
 		Severity signal.Severity
@@ -41,7 +41,7 @@ func (p Policy) apply(s signal.Severity) signal.Severity {
 // =============================================
 
 func (e *policyEmitter) EngineStart() {
-	if e.pol.Verbosity >= VVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.EngineStart(e.pol.apply(signal.Info))
 	}
 }
@@ -54,19 +54,19 @@ func (e *policyEmitter) EngineFinish(nChanged, nUnits int, duration time.Duratio
 // =============================================
 
 func (e *policyEmitter) PlanStart() {
-	if e.pol.Verbosity >= VVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.PlanStart(e.pol.apply(signal.Info))
 	}
 }
 
 func (e *policyEmitter) UnitPlanned(index int, name, kind string) {
-	if e.pol.Verbosity >= VVVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.UnitPlanned(e.pol.apply(signal.Debug), index, name, kind)
 	}
 }
 
 func (e *policyEmitter) PlanFinish(unitCount int, duration time.Duration) {
-	if e.pol.Verbosity >= VVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.PlanFinish(e.pol.apply(signal.Info), unitCount, duration)
 	}
 }
@@ -75,7 +75,7 @@ func (e *policyEmitter) PlanFinish(unitCount int, duration time.Duration) {
 // =============================================
 
 func (e *policyEmitter) ActionStart(name string) {
-	if e.pol.Verbosity >= Verbose {
+	if e.pol.Verbosity >= signal.V {
 		e.out.ActionStart(e.pol.apply(signal.Notice), name)
 	}
 }
@@ -86,7 +86,7 @@ func (e *policyEmitter) ActionFinish(name string, changed bool, duration time.Du
 		return
 	}
 
-	if e.pol.Verbosity >= Verbose {
+	if e.pol.Verbosity >= signal.V {
 		e.out.ActionFinish(e.pol.apply(signal.Info), name, changed, duration)
 	}
 }
@@ -99,19 +99,19 @@ func (e *policyEmitter) ActionError(name string, err error) {
 // =============================================
 
 func (e *policyEmitter) OpCheckStart(action, op string) {
-	if e.pol.Verbosity >= VVVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.OpCheckStart(e.pol.apply(signal.Debug), action, op)
 	}
 }
 
 func (e *policyEmitter) OpCheckSatisfied(action, op string) {
-	if e.pol.Verbosity >= VVVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.OpCheckSatisfied(e.pol.apply(signal.Debug), action, op)
 	}
 }
 
 func (e *policyEmitter) OpCheckUnsatisfied(action, op string) {
-	if e.pol.Verbosity >= Verbose {
+	if e.pol.Verbosity >= signal.V {
 		e.out.OpCheckUnsatisfied(e.pol.apply(signal.Notice), action, op)
 	}
 }
@@ -121,20 +121,20 @@ func (e *policyEmitter) OpCheckUnknown(action, op string, err error) {
 }
 
 func (e *policyEmitter) OpExecuteStart(action, op string) {
-	if e.pol.Verbosity >= VVVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.OpExecuteStart(e.pol.apply(signal.Debug), action, op)
 	}
 }
 
 func (e *policyEmitter) OpExecuteFinish(action, op string, changed bool, duration time.Duration) {
 	if changed {
-		if e.pol.Verbosity >= VVerbose {
+		if e.pol.Verbosity >= signal.VV {
 			e.out.OpExecuteFinish(e.pol.apply(signal.Info), action, op, changed, duration)
 		}
 		return
 	}
 
-	if e.pol.Verbosity >= VVVerbose {
+	if e.pol.Verbosity >= signal.VV {
 		e.out.OpExecuteFinish(e.pol.apply(signal.Debug), action, op, changed, duration)
 	}
 }

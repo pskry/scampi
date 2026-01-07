@@ -48,6 +48,25 @@ type SeverityColors struct {
 	Dimmed    Color
 }
 
+var (
+	ColorEngine = SeverityColors{Highlight: ImportantHighlight, Normal: ImportantNormal, Dimmed: ImportantDimmed}
+	ColorPlan   = SeverityColors{Highlight: InfoHighlight, Normal: InfoNormal, Dimmed: InfoDimmed}
+	ColorAction = SeverityColors{Highlight: NoticeHighlight, Normal: NoticeNormal, Dimmed: NoticeDimmed}
+
+	ColorChanged  = SeverityColors{Highlight: ImportantHighlight, Normal: ImportantNormal, Dimmed: ImportantDimmed}
+	ColorUpToDate = SeverityColors{Highlight: DebugHighlight, Normal: DebugNormal, Dimmed: DebugDimmed}
+
+	ColorCheckNeed = SeverityColors{Highlight: NoticeHighlight, Normal: NoticeNormal, Dimmed: NoticeDimmed}
+	ColorCheckOK   = SeverityColors{Highlight: DebugHighlight, Normal: DebugNormal, Dimmed: DebugDimmed}
+
+	ColorExecChange = SeverityColors{Highlight: InfoHighlight, Normal: InfoNormal, Dimmed: InfoDimmed}
+	ColorExecNoop   = SeverityColors{Highlight: DebugHighlight, Normal: DebugNormal, Dimmed: DebugDimmed}
+
+	ColorWarning = SeverityColors{Highlight: WarningHighlight, Normal: WarningNormal, Dimmed: WarningDimmed}
+	ColorError   = SeverityColors{Highlight: ErrorHighlight, Normal: ErrorNormal, Dimmed: ErrorDimmed}
+	ColorFatal   = SeverityColors{Highlight: FatalHighlight, Normal: FatalNormal, Dimmed: FatalDimmed}
+)
+
 func ColorsForSeverity(s signal.Severity) SeverityColors {
 	switch s {
 	case signal.Debug:

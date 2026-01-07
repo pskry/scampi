@@ -1,10 +1,10 @@
-package diagnostic
+package signal
 
 type Verbosity uint8
 
 const (
 	Quiet Verbosity = iota // default
-	Verbose
-	VVerbose
-	VVVerbose
+	V
+	VV
+	VVV
 )

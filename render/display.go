@@ -27,13 +27,16 @@ type Displayer interface {
 	ActionFinish(s signal.Severity, name string, changed bool, duration time.Duration)
 	ActionError(s signal.Severity, name string, err error)
 
-	// Ops signals
+	// Ops checks
 	// =============================================
 
 	OpCheckStart(s signal.Severity, action string, op string)
 	OpCheckSatisfied(s signal.Severity, action string, op string)
 	OpCheckUnsatisfied(s signal.Severity, action string, op string)
 	OpCheckUnknown(s signal.Severity, action string, op string, err error)
+
+	// Ops execute
+	// =============================================
 
 	OpExecuteStart(s signal.Severity, action string, op string)
 	OpExecuteFinish(s signal.Severity, action string, op string, changed bool, duration time.Duration)
