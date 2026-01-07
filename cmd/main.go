@@ -117,9 +117,9 @@ func parseColorMode(s string) (render.ColorMode, error) {
 func mapVerbosity(v int) diagnostic.Verbosity {
 	switch {
 	case v >= 3:
-		return diagnostic.DebugVerbose
+		return diagnostic.VVVerbose
 	case v == 2:
-		return diagnostic.VeryVerbose
+		return diagnostic.VVerbose
 	case v == 1:
 		return diagnostic.Verbose
 	default:
