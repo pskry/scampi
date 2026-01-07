@@ -62,116 +62,142 @@ func NewCLI(opts CLIOptions) Displayer {
 // Engine lifecycle
 // =============================================
 
-func (c *cli) EngineStart(s signal.Severity) {
-	col := ColorsForSeverity(s)
+func (c *cli) EngineStart(_ signal.Severity) {
+	// Always Info / Normal
+	col := ColorsForSeverity(signal.Info)
 	c.outln(col.Normal, "[engine] starting")
 }
 
-func (c *cli) EngineFinish(s signal.Severity, nChanged, nUnits int, duration time.Duration) {
-	col := ColorsForSeverity(s)
+func (c *cli) EngineFinish(_ signal.Severity, nChanged, nUnits int, duration time.Duration) {
 	units := pluralS(nUnits, "unit")
+
 	if nChanged > 0 {
-		c.outln(col.Highlight, "[engine] finished (%s, %d %s, %d %s)", duration, nChanged, pluralS(nChanged, "change"), nUnits, units)
+		// Important + Highlight
+		col := ColorsForSeverity(signal.Important)
+		c.outln(
+			col.Highlight,
+			"[engine] finished (%s, %d %s, %d %s)",
+			duration,
+			nChanged,
+			pluralS(nChanged, "change"),
+			nUnits,
+			units,
+		)
 	} else {
-		c.outln(col.Dimmed, "[engine] finished (%s, no changes, %d %s)", duration, nUnits, units)
+		// Info + Dimmed
+		col := ColorsForSeverity(signal.Info)
+		c.outln(
+			col.Dimmed,
+			"[engine] finished (%s, no changes, %d %s)",
+			duration,
+			nUnits,
+			units,
+		)
 	}
 }
 
 // Config / planning phase
 // =============================================
 
-func (c *cli) PlanStart(s signal.Severity) {
-	col := ColorsForSeverity(s)
+func (c *cli) PlanStart(_ signal.Severity) {
+	col := ColorsForSeverity(signal.Info)
 	c.outln(col.Normal, "[plan] start")
 }
 
-func (c *cli) UnitPlanned(s signal.Severity, index int, name, kind string) {
-	col := ColorsForSeverity(s)
+func (c *cli) UnitPlanned(_ signal.Severity, index int, name, kind string) {
+	col := ColorsForSeverity(signal.Debug)
 	c.outln(col.Dimmed, "  [unit] #%d %s (%s)", index, name, kind)
 }
 
-func (c *cli) PlanFinish(s signal.Severity, unitCount int, duration time.Duration) {
-	col := ColorsForSeverity(s)
+func (c *cli) PlanFinish(_ signal.Severity, unitCount int, duration time.Duration) {
+	col := ColorsForSeverity(signal.Info)
 	c.outln(col.Dimmed, "[plan] %d %s (%s)", unitCount, pluralS(unitCount, "unit"), duration)
 }
 
 // Action lifecycle
 // =============================================
 
-func (c *cli) ActionStart(s signal.Severity, name string) {
-	col := ColorsForSeverity(s)
+func (c *cli) ActionStart(_ signal.Severity, name string) {
+	// Always Notice / Normal
+	col := ColorsForSeverity(signal.Notice)
 	c.outln(col.Normal, "[action] %s", name)
 }
 
-func (c *cli) ActionFinish(s signal.Severity, name string, changed bool, duration time.Duration) {
-	col := ColorsForSeverity(s)
+func (c *cli) ActionFinish(_ signal.Severity, name string, changed bool, duration time.Duration) {
 	if changed {
+		// Important + Highlight
+		col := ColorsForSeverity(signal.Important)
 		c.outln(col.Highlight, "[action] %s changed (%s)", name, duration)
 	} else {
+		// Info + Dimmed (never green)
+		col := ColorsForSeverity(signal.Info)
 		c.outln(col.Dimmed, "[action] %s up-to-date", name)
 	}
 }
 
-func (c *cli) ActionError(s signal.Severity, name string, err error) {
-	col := ColorsForSeverity(s)
-	c.errln(col.Highlight, "  [action] %s failed: %v", name, err)
+func (c *cli) ActionError(_ signal.Severity, name string, err error) {
+	col := ColorsForSeverity(signal.Error)
+	c.errln(col.Highlight, "[action] %s failed: %v", name, err)
 }
 
 // Ops signals
 // =============================================
 
-func (c *cli) OpCheckStart(s signal.Severity, action, op string) {
-	col := ColorsForSeverity(s)
+func (c *cli) OpCheckStart(_ signal.Severity, action, op string) {
+	col := ColorsForSeverity(signal.Debug)
 	c.outln(col.Dimmed, "  [check] %s/%s", action, op)
 }
 
-func (c *cli) OpCheckSatisfied(s signal.Severity, action, op string) {
-	col := ColorsForSeverity(s)
+func (c *cli) OpCheckSatisfied(_ signal.Severity, action, op string) {
+	col := ColorsForSeverity(signal.Debug)
 	c.outln(col.Dimmed, "  [check] %s/%s ✓", action, op)
 }
 
-func (c *cli) OpCheckUnsatisfied(s signal.Severity, action, op string) {
-	col := ColorsForSeverity(s)
+func (c *cli) OpCheckUnsatisfied(_ signal.Severity, action, op string) {
+	// Notice / Normal (never Highlight)
+	col := ColorsForSeverity(signal.Notice)
 	c.outln(col.Normal, "  [check] %s/%s needs change", action, op)
 }
 
-func (c *cli) OpCheckUnknown(s signal.Severity, action, op string, err error) {
-	col := ColorsForSeverity(s)
-	c.errln(col.Highlight, "  [check] %s/%s unknown: %v", action, op, err)
+func (c *cli) OpCheckUnknown(_ signal.Severity, action, op string, err error) {
+	col := ColorsForSeverity(signal.Warning)
+	c.errln(col.Normal, "  [check] %s/%s unknown: %v", action, op, err)
 }
 
-func (c *cli) OpExecuteStart(s signal.Severity, action, op string) {
-	col := ColorsForSeverity(s)
+func (c *cli) OpExecuteStart(_ signal.Severity, action, op string) {
+	col := ColorsForSeverity(signal.Debug)
 	c.outln(col.Dimmed, "  [exec] %s/%s", action, op)
 }
 
-func (c *cli) OpExecuteFinish(s signal.Severity, action, op string, changed bool, d time.Duration) {
-	col := ColorsForSeverity(s)
+func (c *cli) OpExecuteFinish(_ signal.Severity, action, op string, changed bool, d time.Duration) {
 	if changed {
+		// Info / Normal (not Important!)
+		col := ColorsForSeverity(signal.Info)
 		c.outln(col.Normal, "  [exec] %s/%s changed (%s)", action, op, d)
 	} else {
+		col := ColorsForSeverity(signal.Debug)
 		c.outln(col.Dimmed, "  [exec] %s/%s no-op", action, op)
 	}
 }
 
-func (c *cli) OpExecuteError(s signal.Severity, action, op string, err error) {
-	col := ColorsForSeverity(s)
+func (c *cli) OpExecuteError(_ signal.Severity, action, op string, err error) {
+	col := ColorsForSeverity(signal.Error)
 	c.errln(col.Highlight, "  [exec] %s/%s failed: %v", action, op, err)
 }
 
 // User-visible errors (expected, actionable)
 // =============================================
 
-func (c *cli) UserError(s signal.Severity, message string) {
-	col := ColorsForSeverity(s)
+func (c *cli) UserError(_ signal.Severity, message string) {
+	col := ColorsForSeverity(signal.Error)
 	c.errln(col.Normal, "[error] %s", message)
 }
 
 // Internal errors (bugs, invariants violated)
 // =============================================
 
-func (c *cli) InternalError(s signal.Severity, message string, err error) {
-	col := ColorsForSeverity(s)
+func (c *cli) InternalError(_ signal.Severity, message string, err error) {
+	col := ColorsForSeverity(signal.Fatal)
 	if err != nil {
 		c.errln(col.Highlight, "[fatal] %s: %v", message, err)
 	} else {
