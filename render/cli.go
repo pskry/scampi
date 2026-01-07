@@ -49,7 +49,7 @@ func NewCLI(opts CLIOptions) Displayer {
 func (c *cli) EngineStart(_ signal.Severity) {
 	if c.v() >= signal.VV {
 		c.outln(
-			ansi.Green.Reg,
+			ansi.Green.Dim,
 			`[engine] starting`,
 		)
 	}
@@ -58,13 +58,13 @@ func (c *cli) EngineStart(_ signal.Severity) {
 func (c *cli) EngineFinish(_ signal.Severity, changed, units int, dur time.Duration) {
 	if changed > 0 {
 		c.outln(
-			ansi.Green.Bold,
+			ansi.Yellow.Bold,
 			`[engine] finished (%d change%s, %d unit%s, %s)`,
 			changed, s(changed), units, s(units), dur,
 		)
 	} else {
 		c.outln(
-			ansi.Green.Dim,
+			ansi.Green.Reg,
 			`[engine] finished (no changes, %d unit%s, %s)`,
 			units, s(units), dur,
 		)
@@ -120,18 +120,30 @@ func (c *cli) ActionFinish(_ signal.Severity, name string, changed bool, dur tim
 
 	if changed {
 		// Changed actions always print, even at verbosity 0
-		c.outln(ansi.Green.Bold, `[action] %s changed (%s)`, name, dur)
+		c.outln(
+			ansi.Yellow.Reg,
+			`[action] %s changed (%s)`,
+			name, dur,
+		)
 		return
 	}
 
 	// No changes
 	if c.v() >= signal.V {
-		c.outln(ansi.Blue.Dim, `[action] %s up-to-date`, name)
+		c.outln(
+			ansi.Green.Dim,
+			`[action] %s up-to-date`,
+			name,
+		)
 	}
 }
 
 func (c *cli) ActionError(_ signal.Severity, name string, err error) {
-	c.errln(ansi.Red.Bold, `[action] %s failed: %v`, name, err)
+	c.errln(
+		ansi.Red.Bold,
+		`[action] %s failed: %v`,
+		name, err,
+	)
 }
 
 // Checks (collapsed semantics)
@@ -147,7 +159,11 @@ func (c *cli) OpCheckUnsatisfied(_ signal.Severity, action, op string) {
 	}
 
 	c.ensureActionHeader(action)
-	c.outln(ansi.Cyan.Reg, `  needs change: %s`, op)
+	c.outln(
+		ansi.BrightBlack.Dim,
+		`  needs change: %s`,
+		op,
+	)
 }
 
 func (c *cli) OpCheckSatisfied(_ signal.Severity, action, op string) {
@@ -164,7 +180,11 @@ func (c *cli) OpCheckSatisfied(_ signal.Severity, action, op string) {
 }
 
 func (c *cli) OpCheckUnknown(_ signal.Severity, _, op string, err error) {
-	c.errln(ansi.Yellow.Bold, `  check %s unknown: %v`, op, err)
+	c.errln(
+		ansi.Yellow.Bold,
+		`  check %s unknown: %v`,
+		op, err,
+	)
 }
 
 // Execution
@@ -180,7 +200,11 @@ func (c *cli) OpExecuteFinish(_ signal.Severity, action, op string, changed bool
 	}
 
 	c.ensureActionHeader(action)
-	c.outln(ansi.Cyan.Reg, `  exec %s changed (%s)`, op, dur)
+	c.outln(
+		ansi.BrightBlack.Reg,
+		`  exec %s changed (%s)`,
+		op, dur,
+	)
 }
 
 func (c *cli) OpExecuteError(_ signal.Severity, action, op string, err error) {
@@ -195,7 +219,11 @@ func (c *cli) OpExecuteError(_ signal.Severity, action, op string, err error) {
 // ===============================================
 
 func (c *cli) UserError(_ signal.Severity, message string) {
-	c.errln(ansi.Red.Reg, `[error] %s`, message)
+	c.errln(
+		ansi.Red.Reg,
+		`[error] %s`,
+		message,
+	)
 }
 
 // Internal errors
@@ -203,10 +231,18 @@ func (c *cli) UserError(_ signal.Severity, message string) {
 
 func (c *cli) InternalError(_ signal.Severity, message string, err error) {
 	if err != nil {
-		c.errln(ansi.BrightRed.Bold, `[fatal] %s: %v`, message, err)
+		c.errln(
+			ansi.BrightRed.Bold,
+			`[fatal] %s: %v`,
+			message, err,
+		)
 		return
 	}
-	c.errln(ansi.BrightRed.Bold, `[fatal] %s`, message)
+	c.errln(
+		ansi.BrightRed.Bold,
+		`[fatal] %s`,
+		message,
+	)
 }
 
 // Internal helpers
@@ -236,7 +272,11 @@ func (c *cli) ensureActionHeader(name string) {
 		return
 	}
 
-	c.outln(ansi.Blue.Reg, `[action] %s`, name)
+	c.outln(
+		ansi.Blue.Reg,
+		`[action] %s`,
+		name,
+	)
 	st.headerPrinted = true
 }
 

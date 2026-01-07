@@ -43,11 +43,11 @@ const (
 	blueDim  = "\x1b[2;34m"
 	blueUl   = "\x1b[4;34m"
 
-	// purple (magenta)
-	purpleReg  = "\x1b[0;35m"
-	purpleBold = "\x1b[1;35m"
-	purpleDim  = "\x1b[2;35m"
-	purpleUl   = "\x1b[4;35m"
+	// magenta
+	magentaReg  = "\x1b[0;35m"
+	magentaBold = "\x1b[1;35m"
+	magentaDim  = "\x1b[2;35m"
+	magentaUl   = "\x1b[4;35m"
 
 	// cyan
 	cyanReg  = "\x1b[0;36m"
@@ -91,11 +91,11 @@ const (
 	brightBlueDim  = "\x1b[2;94m"
 	brightBlueUl   = "\x1b[4;94m"
 
-	// bright purple (magenta)
-	brightPurpleReg  = "\x1b[0;95m"
-	brightPurpleBold = "\x1b[1;95m"
-	brightPurpleDim  = "\x1b[2;95m"
-	brightPurpleUl   = "\x1b[4;95m"
+	// bright magenta
+	brightMagentaReg  = "\x1b[0;95m"
+	brightMagentaBold = "\x1b[1;95m"
+	brightMagentaDim  = "\x1b[2;95m"
+	brightMagentaUl   = "\x1b[4;95m"
 
 	// bright cyan
 	brightCyanReg  = "\x1b[0;96m"
@@ -111,20 +111,20 @@ const (
 )
 
 var (
-	Black        = ANSI{Reg: blackReg, Bold: blackBold, Dim: blackDim, Ul: blackUl}
-	Red          = ANSI{Reg: redReg, Bold: redBold, Dim: redDim, Ul: redUl}
-	Green        = ANSI{Reg: greenReg, Bold: greenBold, Dim: greenDim, Ul: greenUl}
-	Yellow       = ANSI{Reg: yellowReg, Bold: yellowBold, Dim: yellowDim, Ul: yellowUl}
-	Blue         = ANSI{Reg: blueReg, Bold: blueBold, Dim: blueDim, Ul: blueUl}
-	Purple       = ANSI{Reg: purpleReg, Bold: purpleBold, Dim: purpleDim, Ul: purpleUl}
-	Cyan         = ANSI{Reg: cyanReg, Bold: cyanBold, Dim: cyanDim, Ul: cyanUl}
-	White        = ANSI{Reg: whiteReg, Bold: whiteBold, Dim: whiteDim, Ul: whiteUl}
-	BrightBlack  = ANSI{Reg: brightBlackReg, Bold: brightBlackBold, Dim: brightBlackDim, Ul: brightBlackUl}
-	BrightRed    = ANSI{Reg: brightRedReg, Bold: brightRedBold, Dim: brightRedDim, Ul: brightRedUl}
-	BrightGreen  = ANSI{Reg: brightGreenReg, Bold: brightGreenBold, Dim: brightGreenDim, Ul: brightGreenUl}
-	BrightYellow = ANSI{Reg: brightYellowReg, Bold: brightYellowBold, Dim: brightYellowDim, Ul: brightYellowUl}
-	BrightBlue   = ANSI{Reg: brightBlueReg, Bold: brightBlueBold, Dim: brightBlueDim, Ul: brightBlueUl}
-	BrightPurple = ANSI{Reg: brightPurpleReg, Bold: brightPurpleBold, Dim: brightPurpleDim, Ul: brightPurpleUl}
-	BrightCyan   = ANSI{Reg: brightCyanReg, Bold: brightCyanBold, Dim: brightCyanDim, Ul: brightCyanUl}
-	BrightWhite  = ANSI{Reg: brightWhiteReg, Bold: brightWhiteBold, Dim: brightWhiteDim, Ul: brightWhiteUl}
+	Black         = ANSI{Reg: blackReg, Bold: blackBold, Dim: blackDim, Ul: blackUl}
+	Red           = ANSI{Reg: redReg, Bold: redBold, Dim: redDim, Ul: redUl}
+	Green         = ANSI{Reg: greenReg, Bold: greenBold, Dim: greenDim, Ul: greenUl}
+	Yellow        = ANSI{Reg: yellowReg, Bold: yellowBold, Dim: yellowDim, Ul: yellowUl}
+	Blue          = ANSI{Reg: blueReg, Bold: blueBold, Dim: blueDim, Ul: blueUl}
+	Magenta       = ANSI{Reg: magentaReg, Bold: magentaBold, Dim: magentaDim, Ul: magentaUl}
+	Cyan          = ANSI{Reg: cyanReg, Bold: cyanBold, Dim: cyanDim, Ul: cyanUl}
+	White         = ANSI{Reg: whiteReg, Bold: whiteBold, Dim: whiteDim, Ul: whiteUl}
+	BrightBlack   = ANSI{Reg: brightBlackReg, Bold: brightBlackBold, Dim: brightBlackDim, Ul: brightBlackUl}
+	BrightRed     = ANSI{Reg: brightRedReg, Bold: brightRedBold, Dim: brightRedDim, Ul: brightRedUl}
+	BrightGreen   = ANSI{Reg: brightGreenReg, Bold: brightGreenBold, Dim: brightGreenDim, Ul: brightGreenUl}
+	BrightYellow  = ANSI{Reg: brightYellowReg, Bold: brightYellowBold, Dim: brightYellowDim, Ul: brightYellowUl}
+	BrightBlue    = ANSI{Reg: brightBlueReg, Bold: brightBlueBold, Dim: brightBlueDim, Ul: brightBlueUl}
+	BrightMagenta = ANSI{Reg: brightMagentaReg, Bold: brightMagentaBold, Dim: brightMagentaDim, Ul: brightMagentaUl}
+	BrightCyan    = ANSI{Reg: brightCyanReg, Bold: brightCyanBold, Dim: brightCyanDim, Ul: brightCyanUl}
+	BrightWhite   = ANSI{Reg: brightWhiteReg, Bold: brightWhiteBold, Dim: brightWhiteDim, Ul: brightWhiteUl}
 )
