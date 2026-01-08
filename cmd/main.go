@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	ossig "os/signal"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/engine"
+	"godoit.dev/doit/osutil"
 	"godoit.dev/doit/render"
 	"godoit.dev/doit/signal"
 )
 
 func main() {
-	ctx := context.Background()
-
 	doit := &cli.Command{
 		Name:  "doit",
 		Usage: "Declarative task execution for local and remote systems",
@@ -24,6 +24,12 @@ func main() {
 			applyCmd(),
 		},
 	}
+
+	ctx, stop := ossig.NotifyContext(
+		context.Background(),
+		osutil.MainContextSignals...,
+	)
+	defer stop()
 
 	if err := doit.Run(ctx, os.Args); err != nil {
 		log.Fatal(err)

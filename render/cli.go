@@ -21,14 +21,21 @@ type (
 	}
 
 	cli struct {
-		opts CLIOptions
-
-		mu  sync.Mutex
-		out io.Writer
-		err io.Writer
-
-		isTTY   bool
+		opts    CLIOptions
+		render  *renderer
 		actions sync.Map // map[string]*actionState
+	}
+	renderEvent struct {
+		toErr bool
+		line  string
+	}
+	renderer struct {
+		out   io.Writer
+		err   io.Writer
+		isTTY bool
+
+		ch   chan renderEvent
+		done chan struct{}
 	}
 
 	actionState struct {
@@ -50,10 +57,54 @@ const (
 
 func NewCLI(opts CLIOptions) Displayer {
 	return &cli{
-		opts:  opts,
-		out:   os.Stdout,
-		err:   os.Stderr,
-		isTTY: term.IsTerminal(os.Stdout.Fd()),
+		opts: opts,
+		render: newRenderer(
+			os.Stdout,
+			os.Stderr,
+			term.IsTerminal(os.Stdout.Fd()),
+		),
+	}
+}
+
+func newRenderer(out, err io.Writer, isTTY bool) *renderer {
+	r := &renderer{
+		out:   out,
+		err:   err,
+		isTTY: isTTY,
+		ch:    make(chan renderEvent, 256),
+		done:  make(chan struct{}),
+	}
+
+	go r.loop()
+	return r
+}
+
+func (r *renderer) stop() {
+	close(r.ch)
+	<-r.done
+}
+
+func (r *renderer) loop() {
+	for ev := range r.ch {
+		w := r.out
+		if ev.toErr {
+			w = r.err
+		}
+		_, _ = fmt.Fprintln(w, ev.line)
+	}
+
+	// signal renderer to exit
+	close(r.done)
+}
+
+func (r *renderer) emit(toErr bool, line string) {
+	select {
+	case r.ch <- renderEvent{
+		toErr: toErr,
+		line:  line,
+	}:
+	case <-r.done:
+		// renderer is shutting down, drop message
 	}
 }
 
@@ -85,6 +136,8 @@ func (c *cli) EngineFinish(_ signal.Severity, rs RunSummary, dur time.Duration) 
 		rs.TotalCount, s(rs.TotalCount),
 		dur,
 	)
+
+	c.render.stop()
 }
 
 // Planning lifecycle
@@ -279,19 +332,11 @@ func makeID(name string) string {
 // ===============================================
 
 func (c *cli) outln(color ansi.Code, format string, args ...any) {
-	c.println(c.out, color, format, args...)
+	c.render.emit(false, c.paint(color, format, args...))
 }
 
 func (c *cli) errln(color ansi.Code, format string, args ...any) {
-	c.println(c.err, color, format, args...)
-}
-
-func (c *cli) println(w io.Writer, color ansi.Code, format string, args ...any) {
-	msg := c.paint(color, format, args...)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	_, _ = fmt.Fprintln(w, msg)
+	c.render.emit(true, c.paint(color, format, args...))
 }
 
 func (c *cli) paint(color ansi.Code, format string, args ...any) string {
@@ -308,7 +353,7 @@ func (c *cli) shouldUseColor() bool {
 	case signal.ColorNever:
 		return false
 	case signal.ColorAuto:
-		return c.isTTY
+		return c.render.isTTY
 	default:
 		return false
 	}
