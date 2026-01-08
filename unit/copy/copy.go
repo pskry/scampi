@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
@@ -35,6 +36,8 @@ type (
 		group string
 	}
 )
+
+const SleepEach = 2000 * time.Millisecond
 
 func (Copy) Kind() string   { return "copy" }
 func (Copy) NewConfig() any { return &CopyConfig{} }
@@ -125,6 +128,7 @@ func (op *baseOp) setAction(action string)   { op.action = action }
 
 func (op *copyFileOp) Name() string { return "copyFileOp" }
 func (op *copyFileOp) Check(ctx context.Context, tgt target.Target) (spec.CheckResult, error) {
+	sleep()
 	srcData, err := os.ReadFile(op.src)
 	if err != nil {
 		// fail if src file does not exist or is unreadable or whatever
@@ -143,6 +147,7 @@ func (op *copyFileOp) Check(ctx context.Context, tgt target.Target) (spec.CheckR
 }
 
 func (op *copyFileOp) Execute(ctx context.Context, tgt target.Target) (spec.Result, error) {
+	sleep()
 	srcData, err := os.ReadFile(op.src)
 	if err != nil {
 		return spec.Result{}, err
@@ -162,6 +167,7 @@ func (op *copyFileOp) Execute(ctx context.Context, tgt target.Target) (spec.Resu
 
 func (op *ensureOwnerOp) Name() string { return "ensureOwnerOp" }
 func (op *ensureOwnerOp) Check(ctx context.Context, tgt target.Target) (spec.CheckResult, error) {
+	sleep()
 	haveOwner, err := tgt.GetOwner(ctx, op.path)
 	if err != nil {
 		return spec.CheckUnknown, err
@@ -177,6 +183,7 @@ func (op *ensureOwnerOp) Check(ctx context.Context, tgt target.Target) (spec.Che
 }
 
 func (op *ensureOwnerOp) Execute(ctx context.Context, tgt target.Target) (spec.Result, error) {
+	sleep()
 	if err := tgt.Chown(ctx, op.path, target.Owner{User: op.owner, Group: op.group}); err != nil {
 		return spec.Result{}, err
 	}
@@ -185,6 +192,7 @@ func (op *ensureOwnerOp) Execute(ctx context.Context, tgt target.Target) (spec.R
 }
 func (op *ensureModeOp) Name() string { return "ensureModeOp" }
 func (op *ensureModeOp) Check(ctx context.Context, tgt target.Target) (spec.CheckResult, error) {
+	sleep()
 	info, err := tgt.Stat(ctx, op.path)
 	if err != nil {
 		return spec.CheckUnsatisfied, nil
@@ -199,6 +207,7 @@ func (op *ensureModeOp) Check(ctx context.Context, tgt target.Target) (spec.Chec
 }
 
 func (op *ensureModeOp) Execute(ctx context.Context, tgt target.Target) (spec.Result, error) {
+	sleep()
 	if err := tgt.Chmod(ctx, op.path, op.mode); err != nil {
 		return spec.Result{}, err
 	}
@@ -314,4 +323,8 @@ func parsePosixAbsolute(s string) (fs.FileMode, error) {
 	}
 
 	return mode & fs.ModePerm, nil
+}
+
+func sleep() {
+	time.Sleep(SleepEach)
 }
