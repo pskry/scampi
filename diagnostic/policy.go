@@ -181,9 +181,9 @@ func (p *policyEmitter) InternalError(message string, err error) {
 }
 
 func toRenderTempl(diag Diagnostic) render.Template {
-	t := diag.Template()
+	t := diag.EventTemplate()
 	return render.Template{
-		Name: t.Name,
+		Name: "NO MORE NAME?",
 		Text: t.Text,
 		Hint: t.Hint,
 		Help: t.Help,

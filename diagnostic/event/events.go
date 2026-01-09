@@ -42,3 +42,7 @@ type OpExecuteDetail struct {
 	Duration time.Duration
 	Err      error
 }
+
+type DiagnosticDetail struct {
+	Template Template
+}

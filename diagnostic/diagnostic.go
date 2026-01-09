@@ -261,6 +261,33 @@ func OpExecuted(action, op string, changed bool, dur time.Duration, err error) e
 	return e
 }
 
+// Diagnostics
+// ===============================================
+
+func DiagnosticRaised(subject event.Subject, d Diagnostic) event.Event {
+	var scope event.Scope
+	switch {
+	case subject.Op != "":
+		scope = event.ScopeOp
+	case subject.Action != "":
+		scope = event.ScopeAction
+	default:
+		scope = event.ScopePlan
+	}
+
+	return event.Event{
+		Time:    time.Now(),
+		Kind:    event.DiagnosticRaised,
+		Scope:   scope,
+		Subject: subject,
+		Detail: event.DiagnosticDetail{
+			Template: d.EventTemplate(),
+		},
+		Severity:   d.Severity(),
+		Chattiness: event.Normal,
+	}
+}
+
 type (
 	RunSummary struct {
 		ChangedCount int
@@ -276,7 +303,7 @@ type (
 )
 
 type Diagnostic interface {
-	Template() Template
+	EventTemplate() event.Template
 	Severity() signal.Severity
 }
 

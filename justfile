@@ -24,15 +24,15 @@ install-prereqs:
   go build -o {{bin_path}} ./cmd
 
 [doc("Build and run doit locally")]
-@doit *args: generate
+@doit *args:
   go run ./cmd {{args}}
 
 [doc("Format all go code")]
-@fmt: generate
+@fmt:
   go fmt ./...
 
 [doc("Lint project")]
-@lint: generate
+@lint:
   golangci-lint run
 
 [doc("Clean project")]

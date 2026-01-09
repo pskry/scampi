@@ -104,6 +104,15 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 
 			switch d := err.(type) {
 			case diagnostic.Diagnostic:
+				em.Emit(diagnostic.DiagnosticRaised(
+					event.Subject{
+						Index: i,
+						Name:  unit.Name,
+						Kind:  unit.Type.Kind(),
+					},
+					d,
+				))
+
 				em.PlanError(i, "TODO: PLACEHOLDER", unit.Type.Kind(), d)
 			default:
 				em.InternalError("unhandled error in planning-phase", err)

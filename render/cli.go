@@ -329,12 +329,51 @@ func (c *cli) Emit(e event.Event) {
 			// no-op execution; intentionally quiet for now
 		}
 
+	case event.DiagnosticRaised:
+		d := e.Detail.(event.DiagnosticDetail)
+		sub := e.Subject
+
+		switch e.Scope {
+		// case event.ScopeEngine:
+		case event.ScopePlan:
+			c.emitTmpl(
+				toRenderTempl(sub, d),
+				"plan.error",
+				fmt.Sprintf(` in unit [%d|%s] '%s'`, sub.Index, sub.Kind, sub.Name),
+				symErr,
+				ansi.Red.Reg,
+				ansi.Cyan.Reg,
+			)
+		// case event.ScopeAction:
+		// case event.ScopeOp:
+		default:
+			c.emitTmpl(
+				toRenderTempl(sub, d),
+				fmt.Sprintf("%s.error", e.Scope),
+				fmt.Sprintf("\n    -- DEFAULT SCOPE_BRANCH PROBABLY BUG --\n%#v\n\n", e),
+				symErr,
+				ansi.Red.Reg,
+				ansi.Cyan.Reg,
+			)
+		}
+
 	default:
 		c.errln(
 			ansi.Red.Reg,
 			"[unknown]%s unknown event kind '%s': %+v",
 			c.glyph(symWarn), e.Kind, e,
 		)
+	}
+}
+
+func toRenderTempl(sub event.Subject, diag event.DiagnosticDetail) Template {
+	t := diag.Template
+	return Template{
+		Name: sub.Name,
+		Text: t.Text,
+		Hint: t.Hint,
+		Help: t.Help,
+		Data: t.Data,
 	}
 }
 
@@ -564,7 +603,7 @@ func (c *cli) emitTmpl(tmpl Template, prefix, msg string, glyph rune, txtCol, he
 	text := c.paint(
 		txtCol,
 		"[%s]%s %s%s",
-		prefix, c.glyph(glyph), msg, inst.text,
+		prefix, c.glyph(glyph), inst.text, msg,
 	)
 
 	var hint string

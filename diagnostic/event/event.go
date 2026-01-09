@@ -1,4 +1,5 @@
 //go:generate stringer -type=Kind
+//go:generate stringer -type=Scope
 //go:generate stringer -type=Chattiness
 package event
 
@@ -81,4 +82,11 @@ type Event struct {
 	Detail     any
 	Severity   signal.Severity
 	Chattiness Chattiness
+}
+
+type Template struct {
+	Data any
+	Text string
+	Hint string
+	Help string
 }
