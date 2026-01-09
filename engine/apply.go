@@ -10,6 +10,7 @@ import (
 
 	"cuelang.org/go/cue/errors"
 	"godoit.dev/doit/diagnostic"
+	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
 	"golang.org/x/sync/errgroup"
@@ -39,6 +40,7 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string) error {
 
 	start := time.Now()
 	em.EngineStart()
+	em.Emit(diagnostic.EngineStarted())
 
 	cfg, err := loadConfig(cfgPath)
 	if err != nil {
@@ -75,6 +77,8 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string) error {
 			rs.FailedCount++
 		}
 	}
+
+	em.Emit(diagnostic.EngineFinished(rs, time.Since(start), err))
 	em.EngineFinish(rs, time.Since(start))
 
 	return err
@@ -83,11 +87,21 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string) error {
 func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 	start := time.Now()
 	em.PlanStart()
+	em.Emit(diagnostic.PlanStarted())
 	p := spec.Plan{}
+
+	var problems []event.PlanProblem
 
 	for i, unit := range cfg.Units {
 		act, err := unit.Type.Plan(i, unit.Config)
 		if err != nil {
+			problems = append(problems, event.PlanProblem{
+				Index: i,
+				Name:  unit.Name,
+				Kind:  unit.Type.Kind(),
+				Err:   err,
+			})
+
 			switch d := err.(type) {
 			case diagnostic.Diagnostic:
 				em.PlanError(i, "TODO: PLACEHOLDER", unit.Type.Kind(), d)
@@ -98,8 +112,10 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 		}
 		p.Actions = append(p.Actions, act)
 		em.UnitPlanned(i, act.Name(), unit.Type.Kind())
+		em.Emit(diagnostic.UnitPlanned(i, act.Name(), unit.Type.Kind()))
 	}
 
+	em.Emit(diagnostic.PlanFinished(len(p.Actions), time.Since(start), problems))
 	em.PlanFinish(len(p.Actions), time.Since(start))
 	return p, nil
 }
@@ -123,11 +139,13 @@ func executeAction(ctx context.Context, em diagnostic.Emitter, act spec.Action) 
 	start := time.Now()
 	name := act.Name()
 	em.ActionStart(name)
+	em.Emit(diagnostic.ActionStarted(name))
 
 	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
 	res, err := runAction(actCtx, em, act)
+	em.Emit(diagnostic.ActionFinished(name, res.Changed, time.Since(start), err))
 	if err != nil {
 		em.ActionError(name, err)
 		return spec.Result{}, fmt.Errorf("action %s failed: %w", name, err)
@@ -156,8 +174,11 @@ func (s *scheduler) schedule(n *opNode, em diagnostic.Emitter, tgt target.Target
 		opName := n.op.Name()
 
 		em.OpExecuteStart(actionName, opName)
+		em.Emit(diagnostic.OpExecuteStarted(actionName, opName))
 
 		res, err := n.op.Execute(s.ctx, tgt)
+
+		em.Emit(diagnostic.OpExecuted(actionName, opName, res.Changed, time.Since(start), err))
 		if err != nil {
 			em.OpExecuteError(actionName, opName, err)
 			return err
@@ -196,8 +217,10 @@ func (s *scheduler) runChecks(nodes []*opNode, em diagnostic.Emitter, tgt target
 			actionName := n.op.Action()
 			opName := n.op.Name()
 			em.OpCheckStart(actionName, opName)
+			em.Emit(diagnostic.OpCheckStarted(actionName, opName))
 
 			res, err := n.op.Check(ctx, tgt)
+			em.Emit(diagnostic.OpChecked(actionName, opName, res, err))
 			if err != nil {
 				em.OpCheckUnknown(actionName, opName, err)
 				return err

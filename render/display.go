@@ -3,6 +3,7 @@ package render
 import (
 	"time"
 
+	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/signal"
 )
 
@@ -22,6 +23,8 @@ type RunSummary struct {
 }
 
 type Displayer interface {
+	Emit(e event.Event)
+
 	// Engine lifecycle
 	// ===============================================
 

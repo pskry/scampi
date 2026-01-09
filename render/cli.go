@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/term"
+	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/render/ansi"
 	"godoit.dev/doit/signal"
+	"godoit.dev/doit/spec"
 )
 
 type (
@@ -61,6 +63,7 @@ const (
 	// '󰗠' nf-md-check_circle
 	// '󰒓' nf-md-cog
 	// '󰼛' nf-md-play_outline
+	// '󰐊' nf-md-play
 	// '󰀦' nf-md-alert
 	// '󰀪' nf-md-alert_outline
 	// '󰈅' nf-md-exclamation
@@ -77,11 +80,11 @@ const (
 
 	symChange = '󰏫'
 	symOK     = '󰄬'
-	symExec   = '󰼛'
-	symWarn   = '󰈅'
-	symErr    = '󰯈'
+	symExec   = '󰐊'
+	symWarn   = '󰀦'
+	symErr    = '󰅖'
 	symFatal  = '󰚌'
-	symHint   = '󰌶'
+	symHint   = '󰌵'
 	symHelp   = '󰋖'
 )
 
@@ -134,6 +137,219 @@ func (r *renderer) emit(toErr bool, line string) {
 	}:
 	case <-r.done:
 		// renderer is shutting down, drop message
+	}
+}
+
+func (c *cli) Emit(e event.Event) {
+	if !c.shouldRender(e) {
+		return
+	}
+
+	sub := e.Subject
+
+	switch e.Kind {
+
+	// Engine lifecycle
+	// ===============================================
+
+	case event.EngineStarted:
+		c.outln(
+			ansi.Green.Dim,
+			"[engine] started (NEW)",
+		)
+
+	case event.EngineFinished:
+		d := e.Detail.(event.EngineDetail)
+
+		switch {
+		case d.Err != nil:
+			c.errln(
+				ansi.BrightRed.Bold,
+				"[engine]%s failed: %v (NEW)",
+				c.glyph(symFatal),
+				d.Err,
+			)
+
+		default:
+			color := ansi.Green.Reg
+
+			if d.FailedCount > 0 {
+				color = ansi.Red.Reg
+			} else if d.ChangedCount > 0 {
+				color = ansi.Yellow.Reg
+			}
+
+			c.outln(
+				color,
+				"[engine] finished (%d change%s, %d failure%s, %d unit%s, %s) (NEW)",
+				d.ChangedCount, s(d.ChangedCount),
+				d.FailedCount, s(d.FailedCount),
+				d.TotalCount, s(d.TotalCount),
+				d.Duration,
+			)
+		}
+
+		// Plan lifecycle
+		// ===============================================
+
+	case event.PlanStarted:
+		c.outln(
+			ansi.Blue.Reg,
+			"[plan] started (NEW)",
+		)
+
+	case event.PlanFinished:
+		d := e.Detail.(event.PlanDetail)
+
+		for _, p := range d.Problems {
+			c.errln(
+				ansi.Red.Reg,
+				"[plan]%s [%d|%s] '%s': %v (NEW)",
+				c.glyph(symFatal),
+				p.Index,
+				p.Kind,
+				p.Name,
+				p.Err,
+			)
+		}
+
+		c.outln(
+			ansi.Blue.Dim,
+			"[plan] finished: %d unit%s planned (%s) (NEW)",
+			d.UnitCount,
+			s(d.UnitCount),
+			d.Duration,
+		)
+
+	case event.UnitPlanned:
+		c.outln(
+			ansi.BrightBlack.Dim,
+			"[plan.unit] #%d %s '%s' (NEW)",
+			e.Subject.Index,
+			e.Subject.Kind,
+			e.Subject.Name,
+		)
+
+	// Action lifecycle
+	// ===============================================
+
+	case event.ActionStarted:
+		// intentionally ignored for now
+
+	case event.ActionFinished:
+		d := e.Detail.(event.ActionDetail)
+		st := c.ensureAction(e.Subject.Action)
+
+		switch {
+		case d.Err != nil:
+			c.errln(
+				ansi.Red.Reg,
+				"[%s]%s '%s' failed: %v (NEW)",
+				st.id,
+				c.glyph(symFatal),
+				e.Subject.Action,
+				d.Err,
+			)
+
+		case d.Changed:
+			c.outln(
+				ansi.Yellow.Reg,
+				"[%s]%s '%s' changed (%s) (NEW)",
+				st.id,
+				c.glyph(symChange),
+				e.Subject.Action,
+				d.Duration,
+			)
+
+		default:
+			c.outln(
+				ansi.Green.Dim,
+				"[%s]%s '%s' up-to-date (NEW)",
+				st.id,
+				c.glyph(symOK),
+				e.Subject.Action,
+			)
+		}
+
+	// Op lifecycle
+	// ===============================================
+
+	case event.OpCheckStarted:
+		// intentionally ignored for now
+
+	case event.OpChecked:
+		d := e.Detail.(event.OpCheckDetail)
+		st := c.ensureAction(sub.Action)
+
+		switch d.Result {
+		case spec.CheckSatisfied:
+			c.outln(
+				ansi.BrightBlack.Dim,
+				"[%s]%s '%s' up-to-date (NEW)",
+				st.id, c.glyph(symOK), sub.Op,
+			)
+
+		case spec.CheckUnsatisfied:
+			c.outln(
+				ansi.BrightBlack.Dim,
+				"[%s]%s '%s' needs change (NEW)",
+				st.id, c.glyph(symChange), sub.Op,
+			)
+
+		case spec.CheckUnknown:
+			c.errln(
+				ansi.Yellow.Reg,
+				"[%s]%s check %s unknown: %v (NEW)",
+				st.id, c.glyph(symWarn), sub.Op, d.Err,
+			)
+		}
+	case event.OpExecuteStarted:
+		// intentionally ignored for now
+
+	case event.OpExecuted:
+		d := e.Detail.(event.OpExecuteDetail)
+		st := c.ensureAction(sub.Action)
+
+		switch {
+		case d.Err != nil:
+			c.errln(
+				ansi.Red.Reg,
+				"[%s]%s '%s' failed: %v (NEW)",
+				st.id, c.glyph(symFatal), sub.Op, d.Err,
+			)
+
+		case d.Changed:
+			c.outln(
+				ansi.BrightBlack.Reg,
+				"[%s]%s '%s' changed (%s) (NEW)",
+				st.id, c.glyph(symExec), sub.Op, d.Duration,
+			)
+
+		default:
+			// no-op execution; intentionally quiet for now
+		}
+
+	default:
+		c.errln(
+			ansi.Red.Reg,
+			"[unknown]%s unknown event kind '%s': %+v",
+			c.glyph(symWarn), e.Kind, e,
+		)
+	}
+}
+
+func (c *cli) shouldRender(e event.Event) bool {
+	switch e.Chattiness {
+	case event.Yappy:
+		return c.v() >= signal.VVV
+	case event.Chatty:
+		return c.v() >= signal.VV
+	case event.Normal:
+		return c.v() >= signal.V
+	case event.Reserved, event.Subtle:
+		return true
+	default:
+		return true
 	}
 }
 

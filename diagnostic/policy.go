@@ -3,6 +3,7 @@ package diagnostic
 import (
 	"time"
 
+	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/render"
 	"godoit.dev/doit/signal"
 )
@@ -37,137 +38,142 @@ func (p Policy) apply(s signal.Severity) signal.Severity {
 	return s
 }
 
+func (p *policyEmitter) Emit(ev event.Event) {
+	ev.Severity = p.pol.apply(ev.Severity)
+	p.out.Emit(ev)
+}
+
 // Engine lifecycle
 // ===============================================
 
-func (e *policyEmitter) EngineStart() {
-	if e.pol.Verbosity >= signal.VV {
-		e.out.EngineStart(e.pol.apply(signal.Info))
+func (p *policyEmitter) EngineStart() {
+	if p.pol.Verbosity >= signal.VV {
+		p.out.EngineStart(p.pol.apply(signal.Info))
 	}
 }
 
-func (e *policyEmitter) EngineFinish(rs RunSummary, duration time.Duration) {
+func (p *policyEmitter) EngineFinish(rs RunSummary, duration time.Duration) {
 	drs := render.RunSummary{
 		ChangedCount: rs.ChangedCount,
 		FailedCount:  rs.FailedCount,
 		TotalCount:   rs.TotalCount,
 	}
-	e.out.EngineFinish(e.pol.apply(signal.Important), drs, duration)
+	p.out.EngineFinish(p.pol.apply(signal.Important), drs, duration)
 }
 
 // Planning lifecycle
 // ===============================================
 
-func (e *policyEmitter) PlanStart() {
-	if e.pol.Verbosity >= signal.VV {
-		e.out.PlanStart(e.pol.apply(signal.Info))
+func (p *policyEmitter) PlanStart() {
+	if p.pol.Verbosity >= signal.VV {
+		p.out.PlanStart(p.pol.apply(signal.Info))
 	}
 }
 
-func (e *policyEmitter) UnitPlanned(index int, name, kind string) {
-	if e.pol.Verbosity >= signal.VV {
-		e.out.UnitPlanned(e.pol.apply(signal.Debug), index, name, kind)
+func (p *policyEmitter) UnitPlanned(index int, name, kind string) {
+	if p.pol.Verbosity >= signal.VV {
+		p.out.UnitPlanned(p.pol.apply(signal.Debug), index, name, kind)
 	}
 }
 
-func (e *policyEmitter) PlanFinish(unitCount int, duration time.Duration) {
-	if e.pol.Verbosity >= signal.VV {
-		e.out.PlanFinish(e.pol.apply(signal.Info), unitCount, duration)
+func (p *policyEmitter) PlanFinish(unitCount int, duration time.Duration) {
+	if p.pol.Verbosity >= signal.VV {
+		p.out.PlanFinish(p.pol.apply(signal.Info), unitCount, duration)
 	}
 }
 
-func (e *policyEmitter) PlanError(index int, name, kind string, diag Diagnostic) {
-	e.out.PlanError(e.pol.apply(signal.Error), index, name, kind, toRenderTempl(diag))
+func (p *policyEmitter) PlanError(index int, name, kind string, diag Diagnostic) {
+	p.out.PlanError(p.pol.apply(signal.Error), index, name, kind, toRenderTempl(diag))
 }
 
 // Action lifecycle
 // ===============================================
 
-func (e *policyEmitter) ActionStart(name string) {
-	if e.pol.Verbosity >= signal.V {
-		e.out.ActionStart(e.pol.apply(signal.Notice), name)
+func (p *policyEmitter) ActionStart(name string) {
+	if p.pol.Verbosity >= signal.V {
+		p.out.ActionStart(p.pol.apply(signal.Notice), name)
 	}
 }
 
-func (e *policyEmitter) ActionFinish(name string, changed bool, duration time.Duration) {
+func (p *policyEmitter) ActionFinish(name string, changed bool, duration time.Duration) {
 	if changed {
-		e.out.ActionFinish(e.pol.apply(signal.Important), name, changed, duration)
+		p.out.ActionFinish(p.pol.apply(signal.Important), name, changed, duration)
 		return
 	}
 
-	if e.pol.Verbosity >= signal.V {
-		e.out.ActionFinish(e.pol.apply(signal.Info), name, changed, duration)
+	if p.pol.Verbosity >= signal.V {
+		p.out.ActionFinish(p.pol.apply(signal.Info), name, changed, duration)
 	}
 }
 
-func (e *policyEmitter) ActionError(name string, err error) {
-	e.out.ActionError(e.pol.apply(signal.Error), name, err)
+func (p *policyEmitter) ActionError(name string, err error) {
+	p.out.ActionError(p.pol.apply(signal.Error), name, err)
 }
 
 // OpCheck lifecycle
 // ===============================================
 
-func (e *policyEmitter) OpCheckStart(action, op string) {
-	if e.pol.Verbosity >= signal.VV {
-		e.out.OpCheckStart(e.pol.apply(signal.Debug), action, op)
+func (p *policyEmitter) OpCheckStart(action, op string) {
+	if p.pol.Verbosity >= signal.VV {
+		p.out.OpCheckStart(p.pol.apply(signal.Debug), action, op)
 	}
 }
 
-func (e *policyEmitter) OpCheckSatisfied(action, op string) {
-	if e.pol.Verbosity >= signal.VV {
-		e.out.OpCheckSatisfied(e.pol.apply(signal.Debug), action, op)
+func (p *policyEmitter) OpCheckSatisfied(action, op string) {
+	if p.pol.Verbosity >= signal.VV {
+		p.out.OpCheckSatisfied(p.pol.apply(signal.Debug), action, op)
 	}
 }
 
-func (e *policyEmitter) OpCheckUnsatisfied(action, op string) {
-	if e.pol.Verbosity >= signal.V {
-		e.out.OpCheckUnsatisfied(e.pol.apply(signal.Notice), action, op)
+func (p *policyEmitter) OpCheckUnsatisfied(action, op string) {
+	if p.pol.Verbosity >= signal.V {
+		p.out.OpCheckUnsatisfied(p.pol.apply(signal.Notice), action, op)
 	}
 }
 
-func (e *policyEmitter) OpCheckUnknown(action, op string, err error) {
-	e.out.OpCheckUnknown(e.pol.apply(signal.Warning), action, op, err)
+func (p *policyEmitter) OpCheckUnknown(action, op string, err error) {
+	p.out.OpCheckUnknown(p.pol.apply(signal.Warning), action, op, err)
 }
 
 // OpExecute lifecycle
 // ===============================================
 
-func (e *policyEmitter) OpExecuteStart(action, op string) {
-	if e.pol.Verbosity >= signal.VV {
-		e.out.OpExecuteStart(e.pol.apply(signal.Debug), action, op)
+func (p *policyEmitter) OpExecuteStart(action, op string) {
+	if p.pol.Verbosity >= signal.VV {
+		p.out.OpExecuteStart(p.pol.apply(signal.Debug), action, op)
 	}
 }
 
-func (e *policyEmitter) OpExecuteFinish(action, op string, changed bool, duration time.Duration) {
+func (p *policyEmitter) OpExecuteFinish(action, op string, changed bool, duration time.Duration) {
 	if changed {
-		if e.pol.Verbosity >= signal.VV {
-			e.out.OpExecuteFinish(e.pol.apply(signal.Info), action, op, changed, duration)
+		if p.pol.Verbosity >= signal.VV {
+			p.out.OpExecuteFinish(p.pol.apply(signal.Info), action, op, changed, duration)
 		}
 		return
 	}
 
-	if e.pol.Verbosity >= signal.VV {
-		e.out.OpExecuteFinish(e.pol.apply(signal.Debug), action, op, changed, duration)
+	if p.pol.Verbosity >= signal.VV {
+		p.out.OpExecuteFinish(p.pol.apply(signal.Debug), action, op, changed, duration)
 	}
 }
 
-func (e *policyEmitter) OpExecuteError(action, op string, err error) {
-	e.out.OpExecuteError(e.pol.apply(signal.Error), action, op, err)
+func (p *policyEmitter) OpExecuteError(action, op string, err error) {
+	p.out.OpExecuteError(p.pol.apply(signal.Error), action, op, err)
 }
 
 // Errors
 // ===============================================
 
-func (e *policyEmitter) UserError(diag Diagnostic) {
-	e.out.UserError(
-		e.pol.apply(signal.Error),
+func (p *policyEmitter) UserError(diag Diagnostic) {
+	p.out.UserError(
+		p.pol.apply(signal.Error),
 		toRenderTempl(diag),
 	)
 }
 
-func (e *policyEmitter) InternalError(message string, err error) {
-	e.out.InternalError(
-		e.pol.apply(signal.Error),
+func (p *policyEmitter) InternalError(message string, err error) {
+	p.out.InternalError(
+		p.pol.apply(signal.Error),
 		render.Template{
 			Text: "legacy.message",
 		},

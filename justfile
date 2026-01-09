@@ -14,21 +14,25 @@ bin_path  := f"{{bin_dir}}/doit"
 install-prereqs:
   go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{GOLANGCI_LINT_VERSION}}
 
+[doc("Run code generation")]
+@generate:
+  go generate ./...
+
 [doc("Build the doit CLI binary")]
-@build:
+@build: generate
   mkdir -p {{bin_dir}}
   go build -o {{bin_path}} ./cmd
 
 [doc("Build and run doit locally")]
-@doit *args:
+@doit *args: generate
   go run ./cmd {{args}}
 
 [doc("Format all go code")]
-@fmt:
+@fmt: generate
   go fmt ./...
 
 [doc("Lint project")]
-@lint:
+@lint: generate
   golangci-lint run
 
 [doc("Clean project")]

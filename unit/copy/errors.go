@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"godoit.dev/doit/diagnostic"
+	"godoit.dev/doit/signal"
 )
 
 type (
@@ -23,3 +24,4 @@ func (e InvalidOctal) Template() diagnostic.Template {
 		Hint: `valid regex '{{.Regex}}', i.e. {{join ", " .Examples}}`,
 	}
 }
+func (e InvalidOctal) Severity() signal.Severity { return signal.Error }
