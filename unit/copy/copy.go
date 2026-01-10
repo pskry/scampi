@@ -234,11 +234,13 @@ func isNumeric(s string) bool {
 }
 
 func parseOctal(s string, src spec.SourceSpan) (fs.FileMode, error) {
+	const re = `^0[0-7]{3}$`
+	octRe := regexp.MustCompile(re)
 	v, err := strconv.ParseUint(s, 8, 32)
-	if err != nil {
+	if err != nil || !octRe.MatchString(s) {
 		return 0, InvalidOctal{
 			Value:    s,
-			Regex:    `^0[0-7]{3}$`,
+			Regex:    re,
 			Examples: []string{"0600", "0644", "0755"},
 			Source:   src,
 			Err:      err,

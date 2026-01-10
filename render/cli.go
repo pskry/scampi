@@ -578,8 +578,11 @@ func (c *cli) renderSourceHeader(w io.Writer, v sourceLine) {
 }
 
 func (c *cli) renderSourceBody(w io.Writer, v sourceLine) {
+	gutterCol := ansi.BrightBlack.Reg
+	gutter := c.fmtfMsg(gutterCol, "|")
+
 	if !v.ok {
-		fprint(w, "   | <source unavailable>")
+		fprintf(w, "   %s <source unavailable>", gutter)
 		return
 	}
 
@@ -587,17 +590,18 @@ func (c *cli) renderSourceBody(w io.Writer, v sourceLine) {
 	pad := strings.Repeat(" ", len(lineNo))
 
 	// empty gutter line
-	fprintf(w, "  %s |\n", pad)
+	fprintf(w, "  %s %s\n", pad, gutter)
 
 	// source line
-	fprintf(w, "  %s%s%s | %s\n", ansi.BrightBlack.Reg, lineNo, ansi.Reset, v.text)
+	fprintf(w, "  %s%s%s %s %s\n", gutterCol, lineNo, ansi.Reset, gutter, v.text)
 
 	// caret line
 	if v.startCol > 0 {
 		fprintf(
 			w,
-			"  %s | %s",
+			"  %s %s %s",
 			pad,
+			gutter,
 			caretPadding(v.text, v.startCol),
 		)
 		c.fmtMsgTo(w, ansi.Red.Reg, underlineRange(v.text, v.startCol, v.endCol))
