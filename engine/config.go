@@ -211,75 +211,89 @@ func spanFromPos(pos token.Pos) spec.SourceSpan {
 	return spec.SourceSpan{
 		Filename: normalizeVirtualPath(p.Filename),
 		Line:     p.Line,
-		Column:   p.Column,
+		StartCol: p.Column,
+		EndCol:   p.Column,
 	}
 }
 
-func extractFieldSpansFromFile(
-	f *ast.File,
-	unitIndex int,
-) map[string]spec.FieldSpan {
+func spanFromNode(n ast.Node) spec.SourceSpan {
+	if n == nil {
+		return spec.SourceSpan{}
+	}
+	return spanFromPosRange(n.Pos(), n.End())
+}
+
+func spanFromPosRange(start, end token.Pos) spec.SourceSpan {
+	if !start.IsValid() || !end.IsValid() {
+		return spec.SourceSpan{}
+	}
+
+	tf := start.File()
+	if tf == nil {
+		return spec.SourceSpan{}
+	}
+
+	sp := tf.Position(start)
+	ep := tf.Position(end)
+
+	return spec.SourceSpan{
+		Filename: normalizeVirtualPath(sp.Filename),
+		Line:     sp.Line,
+		StartCol: sp.Column,
+		EndCol:   ep.Column,
+	}
+}
+
+func extractFieldSpansFromFile(f *ast.File, unitIndex int) map[string]spec.FieldSpan {
 	fields := make(map[string]spec.FieldSpan)
 
-	// 1. Find the `units: [...]` field at top level
-	var unitsList *ast.ListLit
+	// 1. locate `units: [...]`
+	var units *ast.ListLit
 
-	for _, decl := range f.Decls {
-		fd, ok := decl.(*ast.Field)
+	for _, d := range f.Decls {
+		fd, ok := d.(*ast.Field)
 		if !ok {
 			continue
 		}
-
-		label, ok := fd.Label.(*ast.Ident)
-		if !ok || label.Name != "units" {
+		id, ok := fd.Label.(*ast.Ident)
+		if !ok || id.Name != "units" {
 			continue
 		}
-
 		list, ok := fd.Value.(*ast.ListLit)
 		if !ok {
 			return fields
 		}
-
-		unitsList = list
+		units = list
 		break
 	}
 
-	if unitsList == nil {
+	if units == nil || unitIndex >= len(units.Elts) {
 		return fields
 	}
 
-	// 2. Select the unit by index
-	if unitIndex < 0 || unitIndex >= len(unitsList.Elts) {
-		return fields
-	}
+	// 2. pick the unit expr
+	unitExpr := units.Elts[unitIndex]
 
-	unitExpr := unitsList.Elts[unitIndex]
-
-	// 3. We expect either:
-	//    - a struct literal
-	//    - or a binary expr like `builtin.copy & { ... }`
-	var structLit *ast.StructLit
+	// units may be:
+	//   { ... }
+	//   builtin.copy & { ... }
+	var st *ast.StructLit
 
 	switch e := unitExpr.(type) {
 	case *ast.StructLit:
-		structLit = e
-
+		st = e
 	case *ast.BinaryExpr:
-		// match `X & { ... }`
 		if rhs, ok := e.Y.(*ast.StructLit); ok {
-			structLit = rhs
+			st = rhs
 		}
+	}
 
-	default:
+	if st == nil {
 		return fields
 	}
 
-	if structLit == nil {
-		return fields
-	}
-
-	// 4. Extract field + value spans from the struct
-	for _, elt := range structLit.Elts {
+	// 3. extract field + value spans
+	for _, elt := range st.Elts {
 		fd, ok := elt.(*ast.Field)
 		if !ok {
 			continue
@@ -291,8 +305,8 @@ func extractFieldSpansFromFile(
 		}
 
 		fields[label.Name] = spec.FieldSpan{
-			Field: spanFromPos(label.Pos()),
-			Value: spanFromPos(fd.Value.Pos()),
+			Field: spanFromNode(label),
+			Value: spanFromNode(fd.Value),
 		}
 	}
 

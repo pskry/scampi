@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"unicode"
 
 	"github.com/charmbracelet/x/term"
 	"godoit.dev/doit/diagnostic/event"
@@ -37,7 +36,8 @@ type (
 	sourceLine struct {
 		filename string
 		line     int
-		column   int
+		startCol int
+		endCol   int
 		text     string
 		ok       bool
 	}
@@ -173,7 +173,7 @@ func (c *cli) toRenderEvents(e event.Event) []renderEvent {
 func (c *cli) renderEngineStarted(_ event.Event) []renderEvent {
 	return []renderEvent{{
 		stream: streamOut,
-		line: c.fmtMsg(
+		line: c.fmtfMsg(
 			ansi.Green.Dim,
 			"[engine] started",
 		),
@@ -186,7 +186,7 @@ func (c *cli) renderEngineFinished(e event.Event) []renderEvent {
 	if d.Err != nil {
 		return []renderEvent{{
 			stream: streamErr,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.BrightRed.Bold,
 				"[engine]%s failed: %v",
 				glyphr(symFatal),
@@ -204,7 +204,7 @@ func (c *cli) renderEngineFinished(e event.Event) []renderEvent {
 
 	return []renderEvent{{
 		stream: streamOut,
-		line: c.fmtMsg(
+		line: c.fmtfMsg(
 			color,
 			"[engine] finished (%d change%s, %d failure%s, %d unit%s, %s)",
 			d.ChangedCount, s(d.ChangedCount),
@@ -221,7 +221,7 @@ func (c *cli) renderEngineFinished(e event.Event) []renderEvent {
 func (c *cli) renderPlanStarted(_ event.Event) []renderEvent {
 	return []renderEvent{{
 		stream: streamOut,
-		line: c.fmtMsg(
+		line: c.fmtfMsg(
 			ansi.Blue.Reg,
 			"[plan] started",
 		),
@@ -237,7 +237,7 @@ func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
 	if d.FailedUnits > 0 {
 		events = append(events, renderEvent{
 			stream: streamOut,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.Red.Reg,
 				"[plan]%s aborted: %d/%d unit%s planned, %d/%d unit%s failed (%s)",
 				glyphr(symFatal),
@@ -253,7 +253,7 @@ func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
 	} else {
 		events = append(events, renderEvent{
 			stream: streamOut,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.Blue.Dim,
 				"[plan] finished: %d unit%s planned (%s)",
 				d.SuccessfulUnits,
@@ -269,7 +269,7 @@ func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
 func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 	return []renderEvent{{
 		stream: streamOut,
-		line: c.fmtMsg(
+		line: c.fmtfMsg(
 			ansi.BrightBlack.Dim,
 			"[plan.unit]%s #%d %s '%s'",
 			glyphr(symOK),
@@ -291,7 +291,7 @@ func (c *cli) renderActionFinished(e event.Event) []renderEvent {
 	case d.Err != nil:
 		return []renderEvent{{
 			stream: streamErr,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.Red.Reg,
 				"[%s]%s '%s' failed: %v",
 				st.id,
@@ -304,7 +304,7 @@ func (c *cli) renderActionFinished(e event.Event) []renderEvent {
 	case d.Changed:
 		return []renderEvent{{
 			stream: streamOut,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.Yellow.Reg,
 				"[%s]%s '%s' changed (%s)",
 				st.id,
@@ -317,7 +317,7 @@ func (c *cli) renderActionFinished(e event.Event) []renderEvent {
 	default:
 		return []renderEvent{{
 			stream: streamOut,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.Green.Dim,
 				"[%s]%s '%s' up-to-date",
 				st.id,
@@ -339,7 +339,7 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 	case spec.CheckSatisfied:
 		return []renderEvent{{
 			stream: streamOut,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.BrightBlack.Dim,
 				"[%s]%s '%s' up-to-date",
 				st.id, glyphr(symOK), e.Subject.Op,
@@ -349,7 +349,7 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 	case spec.CheckUnsatisfied:
 		return []renderEvent{{
 			stream: streamOut,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.BrightBlack.Dim,
 				"[%s]%s '%s' needs change",
 				st.id, glyphr(symChange), e.Subject.Op,
@@ -359,7 +359,7 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 	case spec.CheckUnknown:
 		return []renderEvent{{
 			stream: streamErr,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.Yellow.Reg,
 				"[%s]%s check %s unknown: %v",
 				st.id, glyphr(symWarn), e.Subject.Op, d.Err,
@@ -378,7 +378,7 @@ func (c *cli) renderOpExecuted(e event.Event) []renderEvent {
 	case d.Err != nil:
 		return []renderEvent{{
 			stream: streamErr,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.Red.Reg,
 				"[%s]%s '%s' failed: %v",
 				st.id, glyphr(symFatal), e.Subject.Op, d.Err,
@@ -388,7 +388,7 @@ func (c *cli) renderOpExecuted(e event.Event) []renderEvent {
 	case d.Changed:
 		return []renderEvent{{
 			stream: streamOut,
-			line: c.fmtMsg(
+			line: c.fmtfMsg(
 				ansi.BrightBlack.Reg,
 				"[%s]%s '%s' changed (%s)",
 				st.id, glyphr(symExec), e.Subject.Op, d.Duration,
@@ -439,7 +439,7 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 func (c *cli) renderUnknownEvent(e event.Event) []renderEvent {
 	return []renderEvent{{
 		stream: streamErr,
-		line: c.fmtMsg(
+		line: c.fmtfMsg(
 			ansi.Red.Reg,
 			"[unknown]%s unknown event kind '%s': %+v",
 			glyphr(symWarn), e.Kind, e,
@@ -473,13 +473,24 @@ func makeID(name string) string {
 // Message formatting
 // ===============================================
 
-func (c *cli) fmtMsg(color ansi.Code, format string, args ...any) string {
+func (c *cli) fmtfMsg(color ansi.Code, format string, args ...any) string {
 	var buf strings.Builder
-	c.fmtMsgTo(&buf, color, format, args...)
+	c.fmtfMsgTo(&buf, color, format, args...)
 	return buf.String()
 }
 
-func (c *cli) fmtMsgTo(buf *strings.Builder, color ansi.Code, format string, args ...any) {
+func (c *cli) fmtMsgTo(w io.Writer, color ansi.Code, msg string) {
+	if !c.shouldUseColor() {
+		fprint(w, msg)
+		return
+	}
+
+	fprint(w, color)
+	fprint(w, msg)
+	fprint(w, ansi.Reset)
+}
+
+func (c *cli) fmtfMsgTo(buf *strings.Builder, color ansi.Code, format string, args ...any) {
 	if !c.shouldUseColor() {
 		fprintf(buf, format, args...)
 		return
@@ -491,14 +502,10 @@ func (c *cli) fmtMsgTo(buf *strings.Builder, color ansi.Code, format string, arg
 }
 
 func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, txtCol, helpCol ansi.Code) string {
-	// tmplText := template.Render(tmpl.ID+".Text", tmpl.Text, tmpl.Data)
-	// tmplHint := template.Render(tmpl.ID+".Hint", tmpl.Hint, tmpl.Data)
-	// tmplHelp := template.Render(tmpl.ID+".Help", tmpl.Help, tmpl.Data)
-
 	var buf strings.Builder
 
 	if text, ok := template.Render(tmpl.ID+".Text", tmpl.Text, tmpl.Data); ok {
-		c.fmtMsgTo(
+		c.fmtfMsgTo(
 			&buf,
 			txtCol,
 			"[%s]%s %s%s",
@@ -507,13 +514,13 @@ func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, t
 	}
 
 	if snippet, ok := c.renderSnippet(tmpl.Source); ok {
-		buf.WriteString("\n")
-		buf.WriteString(snippet)
+		fprintln(&buf)
+		fprint(&buf, snippet)
 	}
 
 	if hint, ok := template.Render(tmpl.ID+".Hint", tmpl.Hint, tmpl.Data); ok {
-		buf.WriteString("\n    ")
-		c.fmtMsgTo(
+		fprint(&buf, "\n    ")
+		c.fmtfMsgTo(
 			&buf,
 			helpCol,
 			"%s hint: %s",
@@ -522,8 +529,8 @@ func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, t
 	}
 
 	if help, ok := template.Render(tmpl.ID+".Help", tmpl.Help, tmpl.Data); ok {
-		buf.WriteString("\n    ")
-		c.fmtMsgTo(
+		fprint(&buf, "\n    ")
+		c.fmtfMsgTo(
 			&buf,
 			helpCol,
 			"%s help: %s",
@@ -542,10 +549,9 @@ func (c *cli) renderSnippet(src *spec.SourceSpan) (string, bool) {
 	v := c.loadSourceLine(src)
 
 	var b strings.Builder
-	b.WriteString(c.renderSourceHeader(v))
-	b.WriteString("\n")
-	b.WriteString(c.renderSourceBody(v))
-
+	c.renderSourceHeader(&b, v)
+	fprintln(&b)
+	c.renderSourceBody(&b, v)
 	return b.String(), true
 }
 
@@ -554,48 +560,48 @@ func (c *cli) loadSourceLine(src *spec.SourceSpan) sourceLine {
 	return sourceLine{
 		filename: src.Filename,
 		line:     src.Line,
-		column:   src.Column,
+		startCol: src.StartCol,
+		endCol:   src.EndCol,
 		text:     text,
 		ok:       ok,
 	}
 }
 
-func (c *cli) renderSourceHeader(v sourceLine) string {
-	return fmt.Sprintf(
+func (c *cli) renderSourceHeader(w io.Writer, v sourceLine) {
+	fprintf(
+		w,
 		"  --> %s:%d:%d",
 		v.filename,
 		v.line,
-		v.column,
+		v.startCol,
 	)
 }
 
-func (c *cli) renderSourceBody(v sourceLine) string {
+func (c *cli) renderSourceBody(w io.Writer, v sourceLine) {
 	if !v.ok {
-		return "   | <source unavailable>"
+		fprint(w, "   | <source unavailable>")
+		return
 	}
 
 	lineNo := strconv.Itoa(v.line)
 	pad := strings.Repeat(" ", len(lineNo))
 
-	var b strings.Builder
-
 	// empty gutter line
-	fmt.Fprintf(&b, "  %s |\n", pad)
+	fprintf(w, "  %s |\n", pad)
 
 	// source line
-	fmt.Fprintf(&b, "  %s | %s\n", lineNo, v.text)
+	fprintf(w, "  %s%s%s | %s\n", ansi.BrightBlack.Reg, lineNo, ansi.Reset, v.text)
 
 	// caret line
-	if v.column > 0 {
-		fmt.Fprintf(
-			&b,
-			"  %s | %s^\n",
+	if v.startCol > 0 {
+		fprintf(
+			w,
+			"  %s | %s",
 			pad,
-			caretPadding(v.text, v.column),
+			caretPadding(v.text, v.startCol),
 		)
+		c.fmtMsgTo(w, ansi.Red.Reg, underlineRange(v.text, v.startCol, v.endCol))
 	}
-
-	return strings.TrimRightFunc(b.String(), unicode.IsSpace)
 }
 
 func caretPadding(line string, col int) string {
@@ -626,26 +632,11 @@ func caretPadding(line string, col int) string {
 	return b.String()
 }
 
-func visualColumn(line string, srcCol int) int {
-	const tabWidth = 8
-
-	col := 0
-
-	for i, r := range line {
-		if i >= srcCol {
-			break
-		}
-
-		switch r {
-		case '\t':
-			// advance to next tab stop
-			col += tabWidth - (col % tabWidth)
-		default:
-			col++
-		}
+func underlineRange(line string, start, end int) string {
+	if end <= start {
+		return "^"
 	}
-
-	return col
+	return strings.Repeat("~", end-start)
 }
 
 func (c *cli) shouldUseColor() bool {
@@ -734,4 +725,5 @@ func (r *renderer) emitEvents(events []renderEvent) {
 }
 
 func fprintln(w io.Writer, args ...any)               { _, _ = fmt.Fprintln(w, args...) }
+func fprint(w io.Writer, args ...any)                 { _, _ = fmt.Fprint(w, args...) }
 func fprintf(w io.Writer, format string, args ...any) { _, _ = fmt.Fprintf(w, format, args...) }

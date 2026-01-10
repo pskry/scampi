@@ -30,7 +30,8 @@ type (
 	SourceSpan struct {
 		Filename string
 		Line     int
-		Column   int
+		StartCol int
+		EndCol   int
 	}
 
 	Plan struct {
