@@ -15,9 +15,9 @@ type EngineDetail struct {
 }
 
 type PlanDetail struct {
-	UnitCount int
-	Duration  time.Duration
-	Problems  []PlanProblem
+	SuccessfulUnits int
+	FailedUnits     int
+	Duration        time.Duration
 }
 type PlanProblem struct {
 	Index int

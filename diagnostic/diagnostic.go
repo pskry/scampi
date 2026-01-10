@@ -88,24 +88,24 @@ func PlanStarted() event.Event {
 	}
 }
 
-func PlanFinished(unitCount int, dur time.Duration, problems []event.PlanProblem) event.Event {
+func PlanFinished(successfulUnits, failedUnits int, dur time.Duration) event.Event {
 	e := event.Event{
 		Time:  time.Now(),
 		Kind:  event.PlanFinished,
 		Scope: event.ScopePlan,
 		Detail: event.PlanDetail{
-			UnitCount: unitCount,
-			Duration:  dur,
-			Problems:  problems,
+			SuccessfulUnits: successfulUnits,
+			FailedUnits:     failedUnits,
+			Duration:        dur,
 		},
 	}
 
 	switch {
-	case len(problems) > 0:
+	case failedUnits > 0:
 		e.Severity = signal.Error
 		e.Chattiness = event.Reserved
 
-	case unitCount == 0:
+	case successfulUnits == 0:
 		e.Severity = signal.Warning
 		e.Chattiness = event.Normal
 

@@ -85,9 +85,8 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 	em.Emit(diagnostic.PlanStarted())
 
 	var (
-		plan     spec.Plan
-		problems []event.PlanProblem
-		causes   []error
+		plan   spec.Plan
+		causes []error
 	)
 
 	for i, unit := range cfg.Units {
@@ -100,12 +99,6 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 			})
 
 			causes = append(causes, err)
-			problems = append(problems, event.PlanProblem{
-				Index: i,
-				Name:  unit.Name,
-				Kind:  unit.Type.Kind(),
-				Err:   err,
-			})
 			continue
 		}
 
@@ -115,11 +108,11 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 
 	em.Emit(diagnostic.PlanFinished(
 		len(plan.Actions),
+		len(causes),
 		time.Since(start),
-		problems,
 	))
 
-	if len(problems) > 0 {
+	if len(causes) > 0 {
 		return spec.Plan{}, AbortError{
 			Causes: causes,
 		}

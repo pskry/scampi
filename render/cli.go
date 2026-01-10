@@ -222,33 +222,20 @@ func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
 
 	var events []renderEvent
 
-	for _, p := range d.Problems {
-		events = append(events, renderEvent{
-			stream: streamErr,
-			line: c.fmtMsg(
-				ansi.Red.Reg,
-				"[plan.error]%s [%d|%s] '%s': %v",
-				glyphr(symErr),
-				p.Index,
-				p.Kind,
-				p.Name,
-				p.Err,
-			),
-		})
-	}
-
-	nProblems := len(d.Problems)
-	if nProblems > 0 {
+	ttlUnits := d.SuccessfulUnits + d.FailedUnits
+	if d.FailedUnits > 0 {
 		events = append(events, renderEvent{
 			stream: streamOut,
 			line: c.fmtMsg(
 				ansi.Red.Reg,
-				"[plan]%s aborted: %d unit%s planned, %d unit%s failed (%s)",
+				"[plan]%s aborted: %d/%d unit%s planned, %d/%d unit%s failed (%s)",
 				glyphr(symFatal),
-				d.UnitCount,
-				s(d.UnitCount),
-				nProblems,
-				s(nProblems),
+				d.SuccessfulUnits,
+				ttlUnits,
+				s(d.SuccessfulUnits),
+				d.FailedUnits,
+				ttlUnits,
+				s(d.FailedUnits),
 				d.Duration,
 			),
 		})
@@ -258,8 +245,8 @@ func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
 			line: c.fmtMsg(
 				ansi.Blue.Dim,
 				"[plan] finished: %d unit%s planned (%s)",
-				d.UnitCount,
-				s(d.UnitCount),
+				d.SuccessfulUnits,
+				s(d.SuccessfulUnits),
 				d.Duration,
 			),
 		})
@@ -273,7 +260,8 @@ func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 		stream: streamOut,
 		line: c.fmtMsg(
 			ansi.BrightBlack.Dim,
-			"[plan.unit] #%d %s '%s'",
+			"[plan.unit]%s #%d %s '%s'",
+			glyphr(symOK),
 			e.Subject.Index,
 			e.Subject.Kind,
 			e.Subject.Name,
