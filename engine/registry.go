@@ -9,7 +9,7 @@ type Registry struct {
 	types map[string]spec.UnitType
 }
 
-func NewRegistry() (*Registry, error) {
+func NewRegistry() *Registry {
 	// TODO: this probably needs to be automatic at some point
 	// also: this would be where we need to put extensions
 	// for now (probably a while) this is just a manual list
@@ -23,7 +23,7 @@ func NewRegistry() (*Registry, error) {
 		r.types[spec.Kind()] = spec
 	}
 
-	return r, nil
+	return r
 }
 
 func (r *Registry) Type(kind string) (spec.UnitType, bool) {

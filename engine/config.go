@@ -66,11 +66,7 @@ func (s sourceCapturingFS) Open(name string) (fs.File, error) {
 }
 
 func loadConfig(cfgPath string, store *spec.SourceStore) (spec.Config, error) {
-	reg, err := NewRegistry()
-	if err != nil {
-		return spec.Config{}, err
-	}
-
+	reg := NewRegistry()
 	ctx := cuecontext.New()
 
 	cwd, err := os.Getwd()
