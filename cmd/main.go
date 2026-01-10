@@ -15,6 +15,7 @@ import (
 	"godoit.dev/doit/osutil"
 	"godoit.dev/doit/render"
 	"godoit.dev/doit/signal"
+	"godoit.dev/doit/spec"
 )
 
 const (
@@ -98,15 +99,19 @@ changes when the current state differs from the declared state.`,
 				Verbosity:        v,
 			}
 
-			displ := render.NewCLI(render.CLIOptions{
-				ColorMode: colorMode,
-				Verbosity: v,
-			})
+			store := spec.NewSourceStore()
+
+			displ := render.NewCLI(
+				render.CLIOptions{
+					ColorMode: colorMode,
+					Verbosity: v,
+				},
+				store)
 			defer displ.Close()
 
 			em := diagnostic.NewEmitter(pol, displ)
 
-			err = engine.Apply(ctx, em, cfg)
+			err = engine.Apply(ctx, em, cfg, store)
 			if err != nil {
 				var abort engine.AbortError
 				if errors.As(err, &abort) {

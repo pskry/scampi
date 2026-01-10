@@ -8,7 +8,8 @@ import (
 
 type (
 	Config struct {
-		Units []UnitInstance
+		Units   []UnitInstance
+		Sources SourceStore
 	}
 	UnitInstance struct {
 		Name   string

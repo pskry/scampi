@@ -1,11 +1,11 @@
 package render
 
 import (
-	"bufio"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -26,6 +26,7 @@ type (
 	cli struct {
 		opts    CLIOptions
 		render  *renderer
+		store   *spec.SourceStore
 		actions sync.Map // map[string]*actionState
 	}
 	actionState struct {
@@ -69,9 +70,10 @@ const (
 	symHelp   = '󰋖'
 )
 
-func NewCLI(opts CLIOptions) Displayer {
+func NewCLI(opts CLIOptions, store *spec.SourceStore) Displayer {
 	return &cli{
-		opts: opts,
+		opts:  opts,
+		store: store,
 		render: newRenderer(
 			os.Stdout,
 			os.Stderr,
@@ -498,62 +500,50 @@ func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, t
 		)
 	}
 
-	bb := strings.Builder{}
-	renderSnippet(&bb, tmpl.Source)
+	snippet := renderSnippet(tmpl.Source, c.store)
+	if snippet != "" {
+		snippet = "\n" + snippet
+	}
 
-	return bb.String() + text + hint + help
+	return text + snippet + hint + help
 }
 
-func loadLine(filename string, line int) (text string, ok bool) {
-	if line <= 0 {
-		return "", false
-	}
-
-	f, err := os.Open(filename)
-	if err != nil {
-		return "", false
-	}
-	defer f.Close()
-
-	sc := bufio.NewScanner(f)
-	cur := 1
-	for sc.Scan() {
-		if cur == line {
-			return sc.Text(), true
-		}
-		cur++
-	}
-
-	return "", false
-}
-
-func renderSnippet(w io.Writer, src *spec.SourceSpan) {
+func renderSnippet(src *spec.SourceSpan, store *spec.SourceStore) string {
 	if src == nil {
-		return
+		return ""
 	}
 
-	line, ok := loadLine(src.Filename, src.Line)
+	buf := strings.Builder{}
 
 	// Header
-	fmt.Fprintf(w, "  --> %s:%d:%d\n", src.Filename, src.Line, src.Column)
-	fmt.Fprintln(w, "   |")
+	fmt.Fprintf(&buf, "  --> %s:%d:%d\n", src.Filename, src.Line, src.Column)
 
-	if !ok {
-		fmt.Fprintln(w, "   | <source unavailable>")
-		return
+	if line, ok := store.Line(src.Filename, src.Line); ok {
+		indent := 2
+		indent += len(fmt.Sprintf("%d", src.Line))
+		// strIndentFmt := fmt.Sprintf("%%%ds |", indent)
+		// intIndentFmt := fmt.Sprintf("%%%dd |", indent)
+
+		// Source line
+		fmt.Fprintln(&buf, strings.Repeat(" ", indent)+" |")
+		fmt.Fprintf(&buf, "%"+strconv.Itoa(indent)+"d |", src.Line)
+		fmt.Fprintln(&buf, line+"<<LINE")
+
+		// Caret line
+		if src.Column > 0 {
+			fmt.Fprint(&buf, strings.Repeat(" ", indent)+" |")
+			fmt.Fprintf(
+				&buf,
+				"%s^\n",
+				strings.Repeat(" ", src.Column),
+			)
+		}
+	} else {
+		fmt.Fprintln(&buf, "   | <source unavailable>")
 	}
 
-	// Source line
-	fmt.Fprintf(w, "%3d | %s\n", src.Line, line)
-
-	// Caret line
-	if src.Column > 0 {
-		fmt.Fprintf(
-			w,
-			"   | %s^\n",
-			strings.Repeat(" ", src.Column-1),
-		)
-	}
+	// return strings.TrimRightFunc(buf.String(), unicode.IsSpace)
+	return buf.String()
 }
 
 func (c *cli) shouldUseColor() bool {

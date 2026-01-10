@@ -3,9 +3,11 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"reflect"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -37,7 +39,32 @@ func (o overlayFS) Open(name string) (fs.File, error) {
 	return nil, err
 }
 
-func loadConfig(cfgPath string) (spec.Config, error) {
+type sourceCapturingFS struct {
+	cwd   string
+	fs    fs.FS
+	store *spec.SourceStore
+}
+
+func (s sourceCapturingFS) Open(name string) (fs.File, error) {
+	f, err := s.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	_ = f.Close()
+
+	s.store.AddFile(name, string(data))
+
+	// Give CUE a fresh file
+	return s.fs.Open(name)
+}
+
+func loadConfig(cfgPath string, store *spec.SourceStore) (spec.Config, error) {
 	reg, err := NewRegistry()
 	if err != nil {
 		return spec.Config{}, err
@@ -50,7 +77,7 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 		return spec.Config{}, err
 	}
 
-	emb, err := fs.Sub(doit.EmbeddedSchemaModule, "cue")
+	embFS, err := fs.Sub(doit.EmbeddedSchemaModule, "cue")
 	if err != nil {
 		return spec.Config{}, err
 	}
@@ -58,8 +85,12 @@ func loadConfig(cfgPath string) (spec.Config, error) {
 	// One loader config for both schema and user config
 	loaderCfg := &load.Config{
 		FS: overlayFS{
-			Embedded: emb,
-			Host:     os.DirFS(cwd),
+			Embedded: embFS,
+			Host: sourceCapturingFS{
+				cwd:   cwd,
+				fs:    os.DirFS(cwd),
+				store: store,
+			},
 		},
 		Dir: ".",
 	}
@@ -180,8 +211,22 @@ func spanFromPos(pos token.Pos) spec.SourceSpan {
 	p := tf.Position(pos)
 
 	return spec.SourceSpan{
-		Filename: p.Filename,
+		Filename: normalizeVirtualPath(p.Filename),
 		Line:     p.Line,
 		Column:   p.Column,
 	}
+}
+
+func normalizeVirtualPath(path string) string {
+	parts := strings.Split(path, "/")
+
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p == "" || p == "@fs" {
+			continue
+		}
+		out = append(out, p)
+	}
+
+	return strings.Join(out, "/")
 }

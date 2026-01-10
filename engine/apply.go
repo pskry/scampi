@@ -35,11 +35,11 @@ type (
 	}
 )
 
-func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string) error {
+func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) error {
 	start := time.Now()
 	em.Emit(diagnostic.EngineStarted())
 
-	cfg, err := loadConfig(cfgPath)
+	cfg, err := loadConfig(cfgPath, store)
 	if err != nil {
 		errs := errors.Errors(err)
 		// FIXME: diagnostic
