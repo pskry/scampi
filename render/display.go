@@ -2,6 +2,7 @@ package render
 
 import (
 	"godoit.dev/doit/diagnostic/event"
+	"godoit.dev/doit/spec"
 )
 
 type Template struct {
@@ -11,6 +12,8 @@ type Template struct {
 	Help string
 
 	Data any
+
+	Source *spec.SourceSpan
 }
 
 type RunSummary struct {

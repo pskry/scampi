@@ -30,11 +30,12 @@ func (e InvalidOctal) Diagnostics(subject event.Subject) []event.Event {
 
 func (e InvalidOctal) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "builtin.InvalidOctal",
-		Text: "invalid octal permission '{{.Value}}'",
-		Hint: `expected {{.Regex}} (examples: {{join ", " .Examples}})`,
-		Help: "file permissions must be specified using valid octal notation",
-		Data: e,
+		ID:     "builtin.InvalidOctal",
+		Text:   "invalid octal permission '{{.Value}}'",
+		Hint:   `expected {{.Regex}} (examples: {{join ", " .Examples}})`,
+		Help:   "file permissions must be specified using valid octal notation",
+		Data:   e,
+		Source: &e.Source,
 	}
 }
 

@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bufio"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -497,7 +498,62 @@ func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, t
 		)
 	}
 
-	return text + hint + help
+	bb := strings.Builder{}
+	renderSnippet(&bb, tmpl.Source)
+
+	return bb.String() + text + hint + help
+}
+
+func loadLine(filename string, line int) (text string, ok bool) {
+	if line <= 0 {
+		return "", false
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	cur := 1
+	for sc.Scan() {
+		if cur == line {
+			return sc.Text(), true
+		}
+		cur++
+	}
+
+	return "", false
+}
+
+func renderSnippet(w io.Writer, src *spec.SourceSpan) {
+	if src == nil {
+		return
+	}
+
+	line, ok := loadLine(src.Filename, src.Line)
+
+	// Header
+	fmt.Fprintf(w, "  --> %s:%d:%d\n", src.Filename, src.Line, src.Column)
+	fmt.Fprintln(w, "   |")
+
+	if !ok {
+		fmt.Fprintln(w, "   | <source unavailable>")
+		return
+	}
+
+	// Source line
+	fmt.Fprintf(w, "%3d | %s\n", src.Line, line)
+
+	// Caret line
+	if src.Column > 0 {
+		fmt.Fprintf(
+			w,
+			"   | %s^\n",
+			strings.Repeat(" ", src.Column-1),
+		)
+	}
 }
 
 func (c *cli) shouldUseColor() bool {

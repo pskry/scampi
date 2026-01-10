@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"godoit.dev/doit/signal"
+	"godoit.dev/doit/spec"
 )
 
 // Event represents a single, immutable fact that occurred during execution.
@@ -90,4 +91,6 @@ type Template struct {
 	Hint string
 	Help string
 	Data any
+
+	Source *spec.SourceSpan
 }
