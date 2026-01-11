@@ -12,6 +12,7 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
+	cueerr "cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/cue/token"
 	"godoit.dev/doit"
@@ -98,6 +99,13 @@ func loadConfig(cfgPath string, store *spec.SourceStore) (spec.Config, error) {
 		return spec.Config{}, fmt.Errorf("no user instances loaded")
 	}
 	if err := userInstances[0].Err; err != nil {
+		var ce cueerr.Error
+		if errors.As(err, &ce) {
+			return spec.Config{}, CueDiagnostic{
+				Err:   ce,
+				Phase: "load.userInstances",
+			}
+		}
 		return spec.Config{}, err
 	}
 
@@ -141,6 +149,7 @@ func loadConfig(cfgPath string, store *spec.SourceStore) (spec.Config, error) {
 	for iter.Next() {
 		idx := iter.Selector().Index()
 		unitVal := iter.Value()
+		unitSpan, fields := extractFieldSpansFromFile(userFile, idx)
 
 		metaVal := unitVal.LookupPath(cue.ParsePath("meta"))
 		if err := metaVal.Err(); err != nil {
@@ -174,8 +183,31 @@ func loadConfig(cfgPath string, store *spec.SourceStore) (spec.Config, error) {
 			return spec.Config{}, fmt.Errorf("UnitType['%s'].NewConfig() must return a pointer. Got %T", typ.Kind(), tCfg)
 		}
 
-		if err := unitVal.Decode(tCfg); err != nil {
+		if err := unitVal.Validate(cue.Concrete(true), cue.All()); err != nil {
+			var ce cueerr.Error
+			if errors.As(err, &ce) {
+				missing := missingRequiredFieldErrors(ce, unitVal, idx, unitSpan, kind, name)
+				if len(missing) > 0 {
+					return spec.Config{}, MissingFieldsDiagnostic{
+						Missing: missing,
+					}
+				}
+				return spec.Config{}, CueDiagnostic{
+					Err:   ce,
+					Phase: "validate.unit",
+				}
+			}
 			return spec.Config{}, err
+		}
+
+		if err := unitVal.Decode(tCfg); err != nil {
+			var ce cueerr.Error
+			if errors.As(err, &ce) {
+				return spec.Config{}, CueDiagnostic{
+					Err:   ce,
+					Phase: "load.decode-config",
+				}
+			}
 		}
 
 		ui := spec.UnitInstance{
@@ -183,13 +215,50 @@ func loadConfig(cfgPath string, store *spec.SourceStore) (spec.Config, error) {
 			Type:   typ,
 			Config: tCfg,
 			Source: spanFromPos(unitVal.Pos()),
-			Fields: extractFieldSpansFromFile(userFile, idx),
+			Fields: fields,
 		}
 
 		cfg.Units = append(cfg.Units, ui)
 	}
 
 	return cfg, nil
+}
+
+func missingRequiredFieldErrors(
+	ce cueerr.Error,
+	unitVal cue.Value,
+	unitIndex int,
+	unitSource spec.SourceSpan,
+	unitKind string,
+	unitName string,
+) []CueMissingField {
+	var res []CueMissingField
+
+	for _, e := range cueerr.Errors(ce) {
+		if !strings.Contains(e.Error(), "incomplete value") {
+			continue
+		}
+
+		path := cueerr.Path(e)
+		if len(path) == 0 {
+			continue
+		}
+
+		field := path[len(path)-1]
+
+		v := unitVal.LookupPath(cue.ParsePath(field))
+		if v.Exists() && !v.IsConcrete() {
+			res = append(res, CueMissingField{
+				Field:      field,
+				UnitIndex:  unitIndex,
+				UnitKind:   unitKind,
+				UnitSource: unitSource,
+				UnitName:   unitName,
+			})
+		}
+	}
+
+	return res
 }
 
 func spanFromPos(pos token.Pos) spec.SourceSpan {
@@ -240,9 +309,10 @@ func spanFromPosRange(start, end token.Pos) spec.SourceSpan {
 	}
 }
 
-func extractFieldSpansFromFile(f *ast.File, unitIndex int) map[string]spec.FieldSpan {
-	fields := make(map[string]spec.FieldSpan)
-
+func extractFieldSpansFromFile(
+	f *ast.File,
+	unitIndex int,
+) (spec.SourceSpan, map[string]spec.FieldSpan) {
 	// 1. locate `units: [...]`
 	var units *ast.ListLit
 
@@ -257,14 +327,14 @@ func extractFieldSpansFromFile(f *ast.File, unitIndex int) map[string]spec.Field
 		}
 		list, ok := fd.Value.(*ast.ListLit)
 		if !ok {
-			return fields
+			return spec.SourceSpan{}, map[string]spec.FieldSpan{}
 		}
 		units = list
 		break
 	}
 
 	if units == nil || unitIndex >= len(units.Elts) {
-		return fields
+		return spec.SourceSpan{}, map[string]spec.FieldSpan{}
 	}
 
 	// 2. pick the unit expr
@@ -285,10 +355,11 @@ func extractFieldSpansFromFile(f *ast.File, unitIndex int) map[string]spec.Field
 	}
 
 	if st == nil {
-		return fields
+		return spec.SourceSpan{}, map[string]spec.FieldSpan{}
 	}
 
 	// 3. extract field + value spans
+	fields := make(map[string]spec.FieldSpan)
 	for _, elt := range st.Elts {
 		fd, ok := elt.(*ast.Field)
 		if !ok {
@@ -306,7 +377,8 @@ func extractFieldSpansFromFile(f *ast.File, unitIndex int) map[string]spec.Field
 		}
 	}
 
-	return fields
+	unitSpan := spanFromNode(unitExpr)
+	return unitSpan, fields
 }
 
 func normalizeVirtualPath(path string) string {

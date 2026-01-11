@@ -41,11 +41,8 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *sp
 
 	cfg, err := loadConfig(cfgPath, store)
 	if err != nil {
-		errs := errors.Errors(err)
-		// FIXME: diagnostic
-		fmt.Printf("CUE error summary:\n%v\n", err)
-		fmt.Printf("CUE error details:\n%v\n", errors.Details(err, nil))
-		fmt.Printf("CUE: %d error(s)\n", len(errs))
+		emitDiagnostics(em, err, event.Subject{})
+		// // FIXME: diagnostic - what do with stinky raw err?
 		return err
 	}
 
