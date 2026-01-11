@@ -148,7 +148,7 @@ func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) 
 	}
 
 	cfg := spec.Config{}
-	var diagResults diagnosticResults
+	var sawAbort bool
 	for iter.Next() {
 		idx := iter.Selector().Index()
 		unitVal := iter.Value()
@@ -191,14 +191,20 @@ func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) 
 			if errors.As(err, &ce) {
 				missing := missingRequiredFieldErrors(ce, unitVal, idx, unitSpan, kind, name)
 				if len(missing) > 0 {
-					dr := emitDiagnostics(
-						em,
-						event.Subject{},
-						MissingFieldsDiagnostic{
-							Missing: missing,
-						},
-					)
-					diagResults.Append(dr)
+					for _, m := range missing {
+						dr := emitDiagnostics(
+							em,
+							event.Subject{
+								Index: idx,
+								Kind:  kind,
+								Name:  name,
+							},
+							MissingFieldDiagnostic{Missing: m},
+						)
+						if dr.ShouldAbort() {
+							sawAbort = true
+						}
+					}
 					continue
 				}
 				return spec.Config{}, CueDiagnostic{
@@ -230,10 +236,8 @@ func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) 
 		cfg.Units = append(cfg.Units, ui)
 	}
 
-	if diagResults.ShouldAbort() {
-		return spec.Config{}, AbortError{
-			Causes: diagResults.Errs(),
-		}
+	if sawAbort {
+		return spec.Config{}, AbortError{}
 	}
 
 	return cfg, nil

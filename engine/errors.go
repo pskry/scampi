@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"slices"
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/diagnostic/event"
@@ -17,10 +18,8 @@ func (AbortError) Error() string {
 
 type (
 	diagnosticResult struct {
-		Errs    []error
 		Effects []diagnostic.Effect
 	}
-	diagnosticResults []diagnosticResult
 )
 
 func (r *diagnosticResult) add(effect diagnostic.Effect) {
@@ -28,33 +27,7 @@ func (r *diagnosticResult) add(effect diagnostic.Effect) {
 }
 
 func (r diagnosticResult) ShouldAbort() bool {
-	for _, e := range r.Effects {
-		if e == diagnostic.EffectAbort {
-			return true
-		}
-	}
-	return false
-}
-
-func (r *diagnosticResults) Append(dr diagnosticResult) {
-	*r = append(*r, dr)
-}
-
-func (r diagnosticResults) ShouldAbort() bool {
-	for _, dr := range r {
-		if dr.ShouldAbort() {
-			return true
-		}
-	}
-	return false
-}
-
-func (r diagnosticResults) Errs() []error {
-	var res []error
-	for _, dr := range r {
-		res = append(res, dr.Errs...)
-	}
-	return res
+	return slices.Contains(r.Effects, diagnostic.EffectAbort)
 }
 
 func emitDiagnostics(
@@ -63,7 +36,6 @@ func emitDiagnostics(
 	err error,
 ) diagnosticResult {
 	var res diagnosticResult
-	res.Errs = append(res.Errs, err)
 
 	if err == nil {
 		return res

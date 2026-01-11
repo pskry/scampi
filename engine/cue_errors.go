@@ -72,50 +72,32 @@ type CueMissingField struct {
 }
 
 type (
-	MissingFieldsDiagnostic struct {
-		Missing []CueMissingField
-	}
 	MissingFieldDiagnostic struct {
 		Missing CueMissingField
 	}
 )
 
-func (d MissingFieldsDiagnostic) Error() string {
-	return "missing required fields"
-}
-
-func (d MissingFieldsDiagnostic) Diagnostics(subject event.Subject) []event.Event {
-	var events []event.Event
-
-	for _, m := range d.Missing {
-		events = append(events,
-			diagnostic.DiagnosticRaised(
-				event.Subject{
-					Index: m.UnitIndex,
-					Kind:  m.UnitKind,
-					Name:  m.UnitName,
-				},
-				MissingFieldDiagnostic{
-					Missing: m,
-				},
-			),
-		)
-	}
-
-	return events
+func (d MissingFieldDiagnostic) Error() string {
+	return fmt.Sprintf("field %q is mandatory", d.Missing.Field)
 }
 
 func (d MissingFieldDiagnostic) EventTemplate() event.Template {
 	m := d.Missing
 	return event.Template{
 		ID:   "cue.missing-field",
-		Text: fmt.Sprintf("field %q is mandatory", m.Field),
+		Text: d.Error(),
 		Source: &spec.SourceSpan{
 			Filename: m.UnitSource.Filename,
 			Line:     m.UnitSource.Line,
 			StartCol: m.UnitSource.StartCol,
 			EndCol:   m.UnitSource.EndCol,
 		},
+	}
+}
+
+func (d MissingFieldDiagnostic) Diagnostics(subject event.Subject) []event.Event {
+	return []event.Event{
+		diagnostic.DiagnosticRaised(subject, d),
 	}
 }
 
