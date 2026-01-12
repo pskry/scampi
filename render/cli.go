@@ -408,6 +408,18 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 	sub := e.Subject
 
 	switch e.Scope {
+	case event.ScopeEngine:
+		return []renderEvent{{
+			stream: streamErr,
+			line: c.fmtTemplate(
+				d.Template,
+				"engine.error",
+				fmt.Sprintf(` in file %q`, sub.CfgPath),
+				symErr,
+				ansi.Red.Reg,
+				ansi.Cyan.Reg,
+			),
+		}}
 	case event.ScopePlan:
 		return []renderEvent{{
 			stream: streamErr,
@@ -422,17 +434,11 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 		}}
 
 	default:
-		return []renderEvent{{
-			stream: streamErr,
-			line: c.fmtTemplate(
-				d.Template,
-				fmt.Sprintf("%s.error", e.Scope),
-				fmt.Sprintf("\n    -- DEFAULT SCOPE_BRANCH PROBABLY BUG --\n%#v\n\n", e),
-				symErr,
-				ansi.Red.Reg,
-				ansi.Cyan.Reg,
-			),
-		}}
+		panic(fmt.Errorf(
+			"BUG: renderer encountered unsupported event scope %q for event %#v",
+			e.Scope,
+			e,
+		))
 	}
 }
 

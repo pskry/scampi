@@ -66,11 +66,12 @@ const (
 )
 
 type Subject struct {
-	Action string
-	Op     string
-	Index  int
-	Kind   string
-	Name   string
+	Action  string
+	Op      string
+	Index   int
+	Kind    string
+	Name    string
+	CfgPath string
 }
 
 // Chattiness describes how noisy an event is under normal operation.

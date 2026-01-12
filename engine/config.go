@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -68,18 +69,21 @@ func (s sourceCapturingFS) Open(name string) (fs.File, error) {
 	return s.fs.Open(name)
 }
 
+// loadConfig decodes and validates user configuration.
+// It returns ONLY user-facing configuration errors.
+// All other failures are engine or environment bugs and will panic.
 func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) (spec.Config, error) {
 	reg := NewRegistry()
 	ctx := cuecontext.New()
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return spec.Config{}, err
+		panic(fmt.Errorf("BUG: os.Getwd failed: %w", err))
 	}
 
 	embFS, err := fs.Sub(doit.EmbeddedSchemaModule, "cue")
 	if err != nil {
-		return spec.Config{}, err
+		panic(fmt.Errorf("BUG: embedded schema FS corrupted: %w", err))
 	}
 
 	// One loader config for both schema and user config
@@ -98,29 +102,46 @@ func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) 
 	// user config
 	userInstances := load.Instances([]string{cfgPath}, loaderCfg)
 	if len(userInstances) == 0 {
-		return spec.Config{}, fmt.Errorf("no user instances loaded")
+		panic("BUG: load.Instances returned zero instances")
 	}
 	if err := userInstances[0].Err; err != nil {
 		var ce cueerr.Error
-		if errors.As(err, &ce) {
-			return spec.Config{}, CueDiagnostic{
-				Err:   ce,
-				Phase: "load.userInstances",
-			}
+		if !errors.As(err, &ce) {
+			panic(fmt.Errorf(
+				"BUG: load.Instances returned an unexpected error for cfgPath %q: %w",
+				cfgPath,
+				err,
+			))
 		}
-		return spec.Config{}, err
+
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.userInstances",
+		}
 	}
 
 	userInst := ctx.BuildInstance(userInstances[0])
 	if err := userInst.Err(); err != nil {
-		return spec.Config{}, err
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(fmt.Errorf(
+				"BUG: load.BuildInstance returned an unexpected error for cfgPath %q: %w",
+				cfgPath,
+				err,
+			))
+		}
+
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.BuildInstance",
+		}
 	}
 
 	userFile := userInstances[0].Files[0]
 
 	coreInstances := load.Instances([]string{"godoit.dev/doit/core"}, loaderCfg)
 	if len(coreInstances) == 0 {
-		return spec.Config{}, fmt.Errorf("no core instances loaded")
+		panic("BUG: load.Instances returned zero core-instances")
 	}
 	if err := coreInstances[0].Err; err != nil {
 		return spec.Config{}, err
@@ -134,7 +155,29 @@ func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) 
 	// --- apply schema ---
 	cfgVal := coreInst.Value().Unify(userInst)
 	if err := cfgVal.Err(); err != nil {
-		return spec.Config{}, err
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			// unexpected validation failure → engine error
+			panic(fmt.Errorf(
+				"BUG: coreInst.Value().Unify(userInst) failed with an unaccounted-for error-type %T: %w",
+				err,
+				err,
+			))
+		}
+
+		if isUnitsShapeError(ce) {
+			unitsVal := cfgVal.LookupPath(cue.ParsePath("units"))
+
+			return spec.Config{}, InvalidUnitsShape{
+				Source: getUnifyErrorSpan(ce, userInst),
+				Have:   describeCueValueShape(unitsVal),
+			}
+		}
+
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.unifyCoreAndUserInst",
+		}
 	}
 
 	unitsVal := cfgVal.LookupPath(cue.ParsePath("units"))
@@ -144,7 +187,7 @@ func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) 
 
 	iter, err := unitsVal.List()
 	if err != nil {
-		return spec.Config{}, err
+		panic(fmt.Errorf("BUG: units is not a list after schema unification: %w", err))
 	}
 
 	cfg := spec.Config{}
@@ -192,7 +235,12 @@ func decodeUnit(
 	kind, name, err := resolveUnitIdentity(unitVal, unitIdx)
 	if err != nil {
 		// engine/schema error – cannot continue safely
-		return spec.UnitInstance{}, decodeResult{abort: true}
+		panic(fmt.Errorf(
+			"BUG: resolveUnitIdentity returned an unexpected error for unit %q (%s): %w",
+			name,
+			kind,
+			err,
+		))
 	}
 
 	subject := event.Subject{
@@ -238,7 +286,13 @@ func decodeUnit(
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
 			// unexpected validation failure → engine error
-			return spec.UnitInstance{}, decodeResult{abort: true}
+			panic(fmt.Errorf(
+				"BUG: unitVal.Validate failed with an unaccounted-for error-type %T for unit %q (%s): %w",
+				err,
+				name,
+				kind,
+				err,
+			))
 		}
 
 		missing := missingRequiredFieldErrors(
@@ -337,6 +391,50 @@ func resolveUnitIdentity(unitVal cue.Value, idx int) (string, string, error) {
 	}
 
 	return kind, name, nil
+}
+
+func isUnitsShapeError(ce cueerr.Error) bool {
+	for _, e := range cueerr.Errors(ce) {
+		path := cueerr.Path(e)
+		if len(path) == 1 && path[0] == "units" {
+			return true
+		}
+	}
+	return false
+}
+
+func describeCueValueShape(v cue.Value) string {
+	switch v.Kind() {
+	case cue.ListKind:
+		return "list"
+	case cue.StructKind:
+		return "struct"
+	default:
+		return v.Kind().String()
+	}
+}
+
+func getUnifyErrorSpan(err cueerr.Error, userInst cue.Value) spec.SourceSpan {
+	path := cueerr.Path(err)
+
+	// Case 1: error is inside units[<idx>]
+	if len(path) >= 2 && path[0] == "units" {
+		if idx, err := strconv.Atoi(path[1]); err == nil {
+			v := userInst.LookupPath(
+				cue.MakePath(cue.Str("units"), cue.Index(idx)),
+			)
+			return spanFromPos(v.Pos())
+		}
+	}
+
+	// Case 2: error is about top-level structure (e.g. units itself)
+	if len(path) > 0 {
+		v := userInst.LookupPath(cue.MakePath(cue.Str(path[0])))
+		return spanFromPos(v.Pos())
+	}
+
+	// Case 3: fallback → start-of-file
+	return spanFromPos(userInst.Pos())
 }
 
 func missingRequiredFieldErrors(

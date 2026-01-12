@@ -290,6 +290,8 @@ func DiagnosticRaised(subject event.Subject, d Diagnostic) event.Event {
 		scope = event.ScopeOp
 	case subject.Action != "":
 		scope = event.ScopeAction
+	case subject.CfgPath != "":
+		scope = event.ScopeEngine
 	default:
 		scope = event.ScopePlan
 	}

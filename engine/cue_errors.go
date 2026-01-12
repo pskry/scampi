@@ -14,10 +14,12 @@ import (
 type CueDiagnostic struct {
 	Err   cueerr.Error
 	Phase string // "load", "validate", "decode"
+
+	Source *spec.SourceSpan
 }
 
 func (d CueDiagnostic) Error() string {
-	return d.Err.Error()
+	return fmt.Sprintf("cue.error in phase %q: %v", d.Phase, d.Err)
 }
 
 func (d CueDiagnostic) Diagnostics(subject event.Subject) []event.Event {
@@ -38,11 +40,11 @@ func (d CueDiagnostic) Diagnostics(subject event.Subject) []event.Event {
 func (d CueDiagnostic) EventTemplate() event.Template {
 	var src *spec.SourceSpan
 
-	if sp := spanFromPos(d.Err.Position()); sp.Line != 0 {
+	if d.Source != nil {
+		src = d.Source
+	} else if sp := spanFromPos(d.Err.Position()); sp.Line != 0 {
 		src = &sp
 	}
-	// __AUTO_GENERATED_PRINT_VAR_START__
-	fmt.Println(fmt.Sprintf("EventTemplate d.Err: %v", d.Err.Position())) // __AUTO_GENERATED_PRINT_VAR_END__
 
 	msg := cueerr.Sanitize(d.Err).Error()
 
@@ -104,4 +106,42 @@ func (d MissingFieldDiagnostic) Diagnostics(subject event.Subject) []event.Event
 func (MissingFieldDiagnostic) Severity() signal.Severity { return signal.Error }
 func (MissingFieldDiagnostic) Impact() diagnostic.Impact {
 	return diagnostic.ImpactSkipUnit | diagnostic.ImpactAbort
+}
+
+type InvalidUnitsShape struct {
+	Source spec.SourceSpan
+	Have   string
+	Want   string
+}
+
+func (e InvalidUnitsShape) Error() string {
+	return fmt.Sprintf("invalid units declaration: have %q, want %q", e.Have, e.Want)
+}
+
+func (e InvalidUnitsShape) Diagnostics(subject event.Subject) []event.Event {
+	return []event.Event{
+		diagnostic.DiagnosticRaised(
+			subject,
+			e,
+		),
+	}
+}
+
+func (e InvalidUnitsShape) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "core.InvalidUnitsShape",
+		Text:   "invalid 'units' declaration",
+		Hint:   "expected a list of units, have {{.Have}}",
+		Help:   "the 'units' field must be a list, e.g. units: [ {...}, {...} ]",
+		Source: &e.Source,
+		Data:   e,
+	}
+}
+
+func (e InvalidUnitsShape) Severity() signal.Severity {
+	return signal.Error
+}
+
+func (InvalidUnitsShape) Impact() diagnostic.Impact {
+	return diagnostic.ImpactAbort
 }

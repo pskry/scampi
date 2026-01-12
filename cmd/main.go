@@ -118,12 +118,12 @@ changes when the current state differs from the declared state.`,
 			err = engine.Apply(ctx, em, cfg, store)
 			if err != nil {
 				var abort engine.AbortError
-				if errors.As(err, &abort) {
-					return cli.Exit("", exitUserError)
+				if !errors.As(err, &abort) {
+					// Engine violated its contract: unexpected error
+					panic(fmt.Errorf("BUG: engine.Apply returned unexpected error: %w", err))
 				}
 
-				// Engine violated its contract: unexpected error
-				panic(fmt.Errorf("BUG: engine.Apply returned unexpected error: %w", err))
+				return cli.Exit("", exitUserError)
 			}
 
 			return nil
@@ -137,7 +137,7 @@ func requireArgs(n int) func(context.Context, *cli.Command) (context.Context, er
 			if err := cli.ShowSubcommandHelp(cmd); err != nil {
 				return ctx, err
 			}
-			return ctx, cli.Exit("", 1)
+			return ctx, cli.Exit("", exitUserError)
 		}
 		return ctx, nil
 	}

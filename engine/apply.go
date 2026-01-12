@@ -40,7 +40,13 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *sp
 
 	cfg, err := loadConfig(em, cfgPath, store)
 	if err != nil {
-		dr := emitDiagnostics(em, event.Subject{}, err)
+		dr := emitDiagnostics(
+			em,
+			event.Subject{
+				CfgPath: cfgPath,
+			},
+			err,
+		)
 		if dr.ShouldAbort() {
 			return AbortError{Causes: []error{err}}
 		}
