@@ -3,6 +3,9 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/user"
+	"path/filepath"
 	"testing"
 
 	"godoit.dev/doit/diagnostic/event"
@@ -61,4 +64,36 @@ func (e events) String() string {
 	}
 	return "----- DIAGNOSTICS -----\n" +
 		string(j)
+}
+
+func absPath(p string) string {
+	r, err := filepath.Abs(p)
+	if err != nil {
+		panic(err)
+	}
+
+	return r
+}
+
+func currentUsr() *user.User {
+	usr, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+
+	return usr
+}
+
+func readOrDie(name string) []byte {
+	data, err := os.ReadFile(name)
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
+func writeOrDie(name string, data []byte, perm os.FileMode) {
+	if err := os.WriteFile(name, data, perm); err != nil {
+		panic(err)
+	}
 }

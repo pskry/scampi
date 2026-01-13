@@ -69,10 +69,10 @@ func (s sourceCapturingFS) Open(name string) (fs.File, error) {
 	return s.fs.Open(name)
 }
 
-// loadConfig decodes and validates user configuration.
+// LoadConfig decodes and validates user configuration.
 // It returns ONLY user-facing configuration errors.
 // All other failures are engine or environment bugs and will panic.
-func loadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) (spec.Config, error) {
+func LoadConfig(em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) (spec.Config, error) {
 	reg := NewRegistry()
 	ctx := cuecontext.New()
 

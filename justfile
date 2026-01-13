@@ -1,8 +1,10 @@
 GOLANGCI_LINT_VERSION := `go list -m -f '{{.Version}}' github.com/golangci/golangci-lint/v2`
+BENCHSTAT_VERSION := `go list -m -f '{{.Version}}' golang.org/x/perf`
 
 build_dir := "./build"
 bin_dir   := f"{{build_dir}}/bin"
 bin_path  := f"{{bin_dir}}/doit"
+bench_dir := "./benchmarks"
 
 
 [default]
@@ -12,30 +14,60 @@ bin_path  := f"{{bin_dir}}/doit"
 
 [doc("Install prerequisites")]
 install-prereqs:
+  go mod tidy
   go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{GOLANGCI_LINT_VERSION}}
+  go install golang.org/x/perf/cmd/benchstat@{{BENCHSTAT_VERSION}}
 
 [doc("Run code generation")]
-@generate:
+generate:
   go generate ./...
 
 [doc("Build the doit CLI binary")]
-@build: generate
+build:
   mkdir -p {{bin_dir}}
   go build -o {{bin_path}} ./cmd
 
 [doc("Build and run doit locally")]
-@doit *args:
+doit *args:
   go run ./cmd {{args}}
 
+# Testing
+# ##############################################################################
+
+[doc("Run tests")]
+test:
+  go test ./test
+
+[doc("Run fuzz tests")]
+fuzz time='30s':
+  go test ./test -fuzz=. -fuzztime={{time}}
+
+[doc("Run benchmarks")]
+bench save_as='' count='10':
+  {{
+    if save_as == '' {
+      f"go test ./test -bench=. -benchmem -count={{count}}"
+    } else {
+      f'''
+      mkdir -p "{{bench_dir}}"
+      echo 'Warmup run...'
+      go test ./test -bench=. -benchmem -count={{count}}
+      echo 'Recorded run...'
+      go test ./test -bench=. -benchmem -count={{count}} \
+        | tee "{{bench_dir}}/$(date '+%Y-%m-%dT%H%M')-{{save_as}}.txt"
+      '''
+    }
+  }}
+
 [doc("Format all go code")]
-@fmt:
+fmt:
   go fmt ./...
 
 [doc("Lint project")]
-@lint:
+lint:
   golangci-lint run
 
 [doc("Clean project")]
-@clean:
+clean:
   rm -rf {{build_dir}}
   go clean -testcache

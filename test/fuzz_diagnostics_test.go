@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -45,9 +44,7 @@ units: [builtin.copy & { src: "a", dest: "b" }]`,
 		tmp := t.TempDir()
 		cfgPath := filepath.Join(tmp, "config.cue")
 
-		if err := os.WriteFile(cfgPath, []byte(input), 0o644); err != nil {
-			t.Fatalf("write config: %v", err)
-		}
+		writeOrDie(cfgPath, []byte(input), 0o644)
 
 		rec := &recordingDisplayer{}
 		em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)

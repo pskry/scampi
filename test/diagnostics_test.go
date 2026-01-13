@@ -15,10 +15,7 @@ import (
 )
 
 func TestDiagnostics(t *testing.T) {
-	root, err := filepath.Abs("testdata/diagnostics")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := absPath("testdata/diagnostics")
 
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -66,11 +63,7 @@ func runDiagnosticsCase(t *testing.T, dir string) {
 func loadExpected(t *testing.T, path string) ExpectedDiagnostics {
 	t.Helper()
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	data := readOrDie(path)
 	var e ExpectedDiagnostics
 	if err := json.Unmarshal(data, &e); err != nil {
 		t.Fatal(err)

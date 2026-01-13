@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -18,11 +17,9 @@ func TestCopyEndToEnd(t *testing.T) {
 	src := filepath.Join(tmp, "src.txt")
 	dst := filepath.Join(tmp, "dst.txt")
 
-	err := os.WriteFile(src, []byte("hello"), 0o644)
-	if err != nil {
-		panic(err)
-	}
+	writeOrDie(src, []byte("hello"), 0o644)
 
+	usr := currentUsr()
 	cfg := fmt.Sprintf(`
 package test
 
@@ -34,30 +31,23 @@ units: [
 		src:   %q
 		dest:  %q
 		perm:  "0644"
-		owner: "pskry"
-		group: "staff"
+		owner: %q
+		group: %q
 	}
 ]
-`, src, dst)
+`, src, dst, usr.Uid, usr.Gid)
 
 	cfgPath := filepath.Join(tmp, "config.cue")
-	err = os.WriteFile(cfgPath, []byte(cfg), 0o644)
-	if err != nil {
-		panic(err)
-	}
+	writeOrDie(cfgPath, []byte(cfg), 0o644)
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-	err = engine.Apply(context.Background(), em, cfgPath, spec.NewSourceStore())
-	if err != nil {
+	if err := engine.Apply(context.Background(), em, cfgPath, spec.NewSourceStore()); err != nil {
 		t.Fatalf("expected successful call to engine.Apply, got err: %q\n%s", err, rec)
 	}
 
-	data, err := os.ReadFile(dst)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := readOrDie(dst)
 	if string(data) != "hello" {
 		t.Fatalf("unexpected dest contents: %q", data)
 	}

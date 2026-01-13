@@ -44,7 +44,7 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *sp
 		panic(fmt.Errorf("BUG: filepath.Abs() failed: %w", err))
 	}
 
-	cfg, err := loadConfig(em, cfgPath, store)
+	cfg, err := LoadConfig(em, cfgPath, store)
 	if err != nil {
 		dr := emitDiagnostics(
 			em,
