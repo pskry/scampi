@@ -84,6 +84,15 @@ func currentUsr() *user.User {
 	return usr
 }
 
+func readDirOrDie(name string) []os.DirEntry {
+	res, err := os.ReadDir(name)
+	if err != nil {
+		panic(err)
+	}
+
+	return res
+}
+
 func readOrDie(name string) []byte {
 	data, err := os.ReadFile(name)
 	if err != nil {

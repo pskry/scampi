@@ -59,6 +59,24 @@ bench save_as='' count='10':
     }
   }}
 
+benchcomp suffix:
+  curr=`ls {{bench_dir}}/*-{{suffix}}.txt | sort | tail -n 1`; \
+  prev=`ls {{bench_dir}}/*-{{suffix}}.txt | sort | tail -n 2 | head -n 1`; \
+  echo "Comparing:"; \
+  echo "  $prev"; \
+  echo "  $curr"; \
+  benchstat -table .config -row .fullname -col .file "$prev" "$curr"
+
+
+benchcomp2 suffix:
+  latest=`ls benchmarks/*-{{suffix}}.txt | sort | tail -n 1`; \
+  previous=$$(ls benchmarks/*-{{suffix}}.txt | sort | tail -n 2 | head -n 1); \
+  echo "Comparing:"; \
+  echo "  $$previous"; \
+  echo "  $$latest"; \
+  echo; \
+  benchstat $$previous $$latest
+
 [doc("Format all go code")]
 fmt:
   go fmt ./...

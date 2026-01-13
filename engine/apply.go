@@ -11,6 +11,7 @@ import (
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/diagnostic/event"
+	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
 	"golang.org/x/sync/errgroup"
@@ -178,7 +179,7 @@ type scheduler struct {
 	ctx     context.Context
 }
 
-func (s *scheduler) schedule(n *opNode, em diagnostic.Emitter, tgt target.Target) {
+func (s *scheduler) schedule(n *opNode, em diagnostic.Emitter, src source.Source, tgt target.Target) {
 	if n.satisfied {
 		return
 	}
@@ -190,7 +191,7 @@ func (s *scheduler) schedule(n *opNode, em diagnostic.Emitter, tgt target.Target
 
 		em.Emit(diagnostic.OpExecuteStarted(actionName, opName))
 
-		res, err := n.op.Execute(s.ctx, tgt)
+		res, err := n.op.Execute(s.ctx, src, tgt)
 
 		em.Emit(diagnostic.OpExecuted(actionName, opName, res.Changed, time.Since(start), err))
 		if err != nil {
@@ -209,7 +210,7 @@ func (s *scheduler) schedule(n *opNode, em diagnostic.Emitter, tgt target.Target
 
 				d.pending--
 				if d.pending == 0 {
-					s.schedule(d, em, tgt)
+					s.schedule(d, em, src, tgt)
 				}
 			}
 			s.mu.Unlock()
@@ -219,7 +220,7 @@ func (s *scheduler) schedule(n *opNode, em diagnostic.Emitter, tgt target.Target
 	})
 }
 
-func (s *scheduler) runChecks(nodes []*opNode, em diagnostic.Emitter, tgt target.Target) error {
+func (s *scheduler) runChecks(nodes []*opNode, em diagnostic.Emitter, src source.Source, tgt target.Target) error {
 	g, ctx := errgroup.WithContext(s.ctx)
 
 	for _, n := range nodes {
@@ -229,7 +230,7 @@ func (s *scheduler) runChecks(nodes []*opNode, em diagnostic.Emitter, tgt target
 			opName := n.op.Name()
 			em.Emit(diagnostic.OpCheckStarted(actionName, opName))
 
-			res, err := n.op.Check(ctx, tgt)
+			res, err := n.op.Check(ctx, src, tgt)
 			em.Emit(diagnostic.OpChecked(actionName, opName, res, err))
 			if err != nil {
 				return err
@@ -264,6 +265,7 @@ func (s *scheduler) initPending(nodes []*opNode) {
 func runAction(ctx context.Context, em diagnostic.Emitter, act spec.Action) (spec.Result, error) {
 	nodes, err := buildPlan(act.Ops())
 	tgt := target.LocalPosixTarget{}
+	src := source.LocalPosixSource{}
 
 	if err != nil {
 		return spec.Result{}, err
@@ -272,7 +274,7 @@ func runAction(ctx context.Context, em diagnostic.Emitter, act spec.Action) (spe
 	s := &scheduler{}
 	s.grp, s.ctx = errgroup.WithContext(ctx)
 
-	if err := s.runChecks(nodes, em, tgt); err != nil {
+	if err := s.runChecks(nodes, em, src, tgt); err != nil {
 		return spec.Result{}, err
 	}
 
@@ -280,7 +282,7 @@ func runAction(ctx context.Context, em diagnostic.Emitter, act spec.Action) (spe
 
 	for _, n := range nodes {
 		if !n.satisfied && n.pending == 0 {
-			s.schedule(n, em, tgt)
+			s.schedule(n, em, src, tgt)
 		}
 	}
 

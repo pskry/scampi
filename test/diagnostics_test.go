@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -17,10 +16,7 @@ import (
 func TestDiagnostics(t *testing.T) {
 	root := absPath("testdata/diagnostics")
 
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		t.Fatal(err)
-	}
+	entries := readDirOrDie(root)
 
 	for _, e := range entries {
 		if !e.IsDir() {

@@ -5,13 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"os"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
 )
@@ -127,9 +127,9 @@ func (op *baseOp) addDependency(dep spec.Op) { op.deps = append(op.deps, dep) }
 func (op *baseOp) setAction(action string)   { op.action = action }
 
 func (op *copyFileOp) Name() string { return "copyFileOp" }
-func (op *copyFileOp) Check(ctx context.Context, tgt target.Target) (spec.CheckResult, error) {
+func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	sleep()
-	srcData, err := os.ReadFile(op.src)
+	srcData, err := src.ReadFile(ctx, op.src)
 	if err != nil {
 		// fail if src file does not exist or is unreadable or whatever
 		// probably better using STAT in the future, but oh well
@@ -146,9 +146,9 @@ func (op *copyFileOp) Check(ctx context.Context, tgt target.Target) (spec.CheckR
 	return spec.CheckSatisfied, nil
 }
 
-func (op *copyFileOp) Execute(ctx context.Context, tgt target.Target) (spec.Result, error) {
+func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
 	sleep()
-	srcData, err := os.ReadFile(op.src)
+	srcData, err := src.ReadFile(ctx, op.src)
 	if err != nil {
 		return spec.Result{}, err
 	}
@@ -166,7 +166,7 @@ func (op *copyFileOp) Execute(ctx context.Context, tgt target.Target) (spec.Resu
 }
 
 func (op *ensureOwnerOp) Name() string { return "ensureOwnerOp" }
-func (op *ensureOwnerOp) Check(ctx context.Context, tgt target.Target) (spec.CheckResult, error) {
+func (op *ensureOwnerOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	sleep()
 	haveOwner, err := tgt.GetOwner(ctx, op.path)
 	if err != nil {
@@ -182,7 +182,7 @@ func (op *ensureOwnerOp) Check(ctx context.Context, tgt target.Target) (spec.Che
 	return spec.CheckSatisfied, nil
 }
 
-func (op *ensureOwnerOp) Execute(ctx context.Context, tgt target.Target) (spec.Result, error) {
+func (op *ensureOwnerOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
 	sleep()
 	if err := tgt.Chown(ctx, op.path, target.Owner{User: op.owner, Group: op.group}); err != nil {
 		return spec.Result{}, err
@@ -191,7 +191,7 @@ func (op *ensureOwnerOp) Execute(ctx context.Context, tgt target.Target) (spec.R
 	return spec.Result{Changed: true}, nil
 }
 func (op *ensureModeOp) Name() string { return "ensureModeOp" }
-func (op *ensureModeOp) Check(ctx context.Context, tgt target.Target) (spec.CheckResult, error) {
+func (op *ensureModeOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	sleep()
 	info, err := tgt.Stat(ctx, op.path)
 	if err != nil {
@@ -206,7 +206,7 @@ func (op *ensureModeOp) Check(ctx context.Context, tgt target.Target) (spec.Chec
 	return spec.CheckSatisfied, nil
 }
 
-func (op *ensureModeOp) Execute(ctx context.Context, tgt target.Target) (spec.Result, error) {
+func (op *ensureModeOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
 	sleep()
 	if err := tgt.Chmod(ctx, op.path, op.mode); err != nil {
 		return spec.Result{}, err
