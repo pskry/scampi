@@ -28,6 +28,7 @@ func TestImportCapabilities(t *testing.T) {
 	// ---- restricted imports (require explicit capability) ----
 	restrictedImports := []string{
 		"os",
+		"runtime",
 		"syscall",
 		"net",
 		"net/http",
@@ -40,6 +41,10 @@ func TestImportCapabilities(t *testing.T) {
 		{
 			pattern:        "cmd/main.go",
 			allowedImports: "os",
+		},
+		{
+			pattern:        "engine/errors.go",
+			allowedImports: "runtime",
 		},
 		{
 			pattern:        "render/cli.go",

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
@@ -34,16 +33,6 @@ func (e *Engine) Apply(ctx context.Context, cfgPath string, store *spec.SourceSt
 
 	cfg, err := LoadConfigWithSource(e.em, cfgPath, store, e.src)
 	if err != nil {
-		dr := emitDiagnostics(
-			e.em,
-			event.Subject{
-				CfgPath: cfgPath,
-			},
-			err,
-		)
-		if dr.ShouldAbort() {
-			return AbortError{Causes: []error{err}}
-		}
 		return err
 	}
 
@@ -52,10 +41,8 @@ func (e *Engine) Apply(ctx context.Context, cfgPath string, store *spec.SourceSt
 		return err
 	}
 
-	// em.EngineFinish(changed bool, duration time.Duration)
 	results, err := e.ExecutePlan(ctx, plan)
 	if err != nil {
-		// FIXME: diagnostic
 		return err
 	}
 

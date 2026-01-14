@@ -158,6 +158,30 @@ func LoadConfigWithSource(
 	store *spec.SourceStore,
 	src source.Source,
 ) (spec.Config, error) {
+	cfg, err := loadConfigWithSource(em, cfgPath, store, src)
+	if err != nil {
+		dr := emitDiagnostics(
+			em,
+			event.Subject{
+				CfgPath: cfgPath,
+			},
+			err,
+		)
+		if dr.ShouldAbort() {
+			return spec.Config{}, AbortError{Causes: []error{err}}
+		}
+		return spec.Config{}, panicIfNotAbortError(err)
+	}
+
+	return cfg, nil
+}
+
+func loadConfigWithSource(
+	em diagnostic.Emitter,
+	cfgPath string,
+	store *spec.SourceStore,
+	src source.Source,
+) (spec.Config, error) {
 	reg := NewRegistry()
 	ctx := cuecontext.New()
 
@@ -179,12 +203,6 @@ func LoadConfigWithSource(
 		},
 		Dir: ".",
 	}
-
-	// user config
-	// absCfgPath, err := filepath.Abs(cfgPath)
-	// if err != nil {
-	// 	panic(fmt.Errorf("BUG: failed to create absolute config-file path: %w", err))
-	// }
 
 	userInstances := load.Instances([]string{cfgPath}, loaderCfg)
 	if len(userInstances) == 0 {

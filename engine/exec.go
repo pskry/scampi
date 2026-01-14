@@ -126,6 +126,14 @@ func (s *scheduler) initPending(nodes []*opNode) {
 }
 
 func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) ([]ExecResult, error) {
+	res, err := e.executePlan(ctx, plan)
+	if err != nil {
+		return res, panicIfNotAbortError(err)
+	}
+	return res, nil
+}
+
+func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) ([]ExecResult, error) {
 	var results []ExecResult
 
 	for _, act := range plan.Actions {

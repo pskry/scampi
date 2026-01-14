@@ -2,6 +2,8 @@ package engine
 
 import (
 	"errors"
+	"fmt"
+	"runtime"
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/diagnostic/event"
@@ -41,6 +43,22 @@ func (r diagnosticResult) ShouldSkipUnit() bool {
 		}
 	}
 	return false
+}
+
+func panicIfNotAbortError(err error) error {
+	var abort AbortError
+	if errors.As(err, &abort) {
+		return abort
+	}
+	// very cold codepath
+	wrap := fmt.Errorf("BUG: Engine failed with non-signal error: %w", err)
+	if pc, file, line, ok := runtime.Caller(1); ok {
+		_ = file
+		_ = line
+		details := runtime.FuncForPC(pc)
+		wrap = fmt.Errorf("BUG: engine.%s failed with non-signal error: %w", details.Name(), err)
+	}
+	panic(wrap)
 }
 
 func emitDiagnostics(
