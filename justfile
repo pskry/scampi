@@ -59,6 +59,7 @@ bench save_as='' count='10':
     }
   }}
 
+[doc("Compare the latest 2 existing benchmarks with suffix")]
 benchcomp suffix:
   curr=`ls {{bench_dir}}/*-{{suffix}}.txt | sort | tail -n 1`; \
   prev=`ls {{bench_dir}}/*-{{suffix}}.txt | sort | tail -n 2 | head -n 1`; \
@@ -67,15 +68,13 @@ benchcomp suffix:
   echo "  $curr"; \
   benchstat -table .config -row .fullname -col .file "$prev" "$curr"
 
-
-benchcomp2 suffix:
-  latest=`ls benchmarks/*-{{suffix}}.txt | sort | tail -n 1`; \
-  previous=$$(ls benchmarks/*-{{suffix}}.txt | sort | tail -n 2 | head -n 1); \
-  echo "Comparing:"; \
-  echo "  $$previous"; \
-  echo "  $$latest"; \
-  echo; \
-  benchstat $$previous $$latest
+[doc("Plot available ns/op (geometric mean) benchmarks with suffix")]
+benchplot suffix:
+  pushd bin/benchplot/ \
+    && rm -f *.csv \
+    && rm -f *.svg \
+    && go run benchplot.go ../../{{bench_dir}}/*{{suffix}}.txt > bench.csv \
+    && gnuplot bench.gnuplot
 
 [doc("Format all go code")]
 fmt:
