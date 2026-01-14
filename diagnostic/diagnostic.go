@@ -93,7 +93,7 @@ func PlanFinished(successfulUnits, failedUnits int, dur time.Duration) event.Eve
 		Time:  time.Now(),
 		Kind:  event.PlanFinished,
 		Scope: event.ScopePlan,
-		Detail: event.PlanDetail{
+		Detail: event.PlanFinishedDetail{
 			SuccessfulUnits: successfulUnits,
 			FailedUnits:     failedUnits,
 			Duration:        dur,
@@ -133,6 +133,48 @@ func UnitPlanned(
 		},
 		Severity:   signal.Debug,
 		Chattiness: event.Chatty,
+	}
+}
+
+func PlanProduced(plan spec.Plan) event.Event {
+	var actions []event.PlannedAction
+
+	for i, act := range plan.Actions {
+		var ops []event.PlannedOp
+
+		for _, op := range act.Ops() {
+			var tmpl *spec.PlanTemplate
+
+			if d, ok := op.(spec.OpDescriber); ok {
+				if desc := d.OpDescription(); desc != nil {
+					t := desc.PlanTemplate()
+					tmpl = &t
+				}
+			}
+
+			ops = append(ops, event.PlannedOp{
+				Name:     op.Name(),
+				Template: tmpl, // nil = fallback
+			})
+		}
+
+		actions = append(actions, event.PlannedAction{
+			Index: i,
+			Name:  act.Name(),
+			Kind:  act.Kind(),
+			Ops:   ops,
+		})
+	}
+
+	return event.Event{
+		Time:  time.Now(),
+		Kind:  event.PlanProduced,
+		Scope: event.ScopePlan,
+		Detail: event.PlanDetail{
+			Actions: actions,
+		},
+		Severity:   signal.Notice,
+		Chattiness: event.Subtle,
 	}
 }
 

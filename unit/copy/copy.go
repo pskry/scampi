@@ -29,6 +29,7 @@ type (
 	copyAction struct {
 		idx   int
 		name  string
+		kind  string
 		src   string
 		dest  string
 		mode  fs.FileMode
@@ -42,7 +43,7 @@ const SleepEach = 0 * time.Millisecond
 func (Copy) Kind() string   { return "copy" }
 func (Copy) NewConfig() any { return &CopyConfig{} }
 
-func (Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
+func (c Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
 	cfg, ok := unit.Config.(*CopyConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected %T got %T", &CopyConfig{}, unit.Config)
@@ -56,6 +57,7 @@ func (Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
 	return &copyAction{
 		idx:   idx,
 		name:  cfg.Name,
+		kind:  c.Kind(),
 		src:   cfg.Src,
 		dest:  cfg.Dest,
 		mode:  mode,
@@ -64,9 +66,8 @@ func (Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
 	}, nil
 }
 
-func (c *copyAction) Name() string {
-	return c.name
-}
+func (c *copyAction) Name() string { return c.name }
+func (c *copyAction) Kind() string { return c.kind }
 
 func (c *copyAction) Ops() []spec.Op {
 	cp := &copyFileOp{
@@ -190,6 +191,7 @@ func (op *ensureOwnerOp) Execute(ctx context.Context, src source.Source, tgt tar
 
 	return spec.Result{Changed: true}, nil
 }
+
 func (op *ensureModeOp) Name() string { return "ensureModeOp" }
 func (op *ensureModeOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	sleep()

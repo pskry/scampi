@@ -14,10 +14,23 @@ type EngineDetail struct {
 	Err          error
 }
 
-type PlanDetail struct {
+type PlanFinishedDetail struct {
 	SuccessfulUnits int
 	FailedUnits     int
 	Duration        time.Duration
+}
+type PlanDetail struct {
+	Actions []PlannedAction
+}
+type PlannedAction struct {
+	Index int
+	Name  string
+	Kind  string
+	Ops   []PlannedOp
+}
+type PlannedOp struct {
+	Name     string
+	Template *spec.PlanTemplate
 }
 type PlanProblem struct {
 	Index int

@@ -31,6 +31,7 @@ func main() {
 		Usage: "Declarative task execution for local and remote systems",
 		Commands: []*cli.Command{
 			applyCmd(),
+			planCmd(),
 		},
 	}
 
@@ -87,7 +88,7 @@ the required actions to converge the system into the desired state.
 The command is idempotent: running it multiple times will only apply
 changes when the current state differs from the declared state.`,
 		Before: requireArgs(1),
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(ctx context.Context, _ *cli.Command) error {
 			colorMode, err := parseColorMode(colorFlag)
 			if err != nil {
 				return cli.Exit(err.Error(), exitUserError)
@@ -107,7 +108,8 @@ changes when the current state differs from the declared state.`,
 					ColorMode: colorMode,
 					Verbosity: v,
 				},
-				store)
+				store,
+			)
 
 			defer func() {
 				displ.Close()
@@ -116,6 +118,92 @@ changes when the current state differs from the declared state.`,
 
 			em := diagnostic.NewEmitter(pol, displ)
 			err = engine.Apply(ctx, em, cfg, store)
+			if err != nil {
+				var abort engine.AbortError
+				if !errors.As(err, &abort) {
+					// Engine violated its contract: unexpected error
+					panic(fmt.Errorf("BUG: engine.Apply returned unexpected error: %w", err))
+				}
+
+				return cli.Exit("", exitUserError)
+			}
+
+			return nil
+		},
+	}
+}
+
+func planCmd() *cli.Command {
+	var cfg string
+	var colorFlag string
+	var verbosity int
+
+	return &cli.Command{
+		Name:                   "plan",
+		Usage:                  "Show the execution plan for a configuration file",
+		UseShortOptionHandling: true,
+		Suggest:                true,
+		HideHelp:               false,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "color",
+				Value:       "auto",
+				Usage:       "colorize output: auto, always, never",
+				Destination: &colorFlag,
+			},
+			&cli.BoolFlag{
+				Name:  "v",
+				Usage: "increase verbosity (-v, -vv, -vvv, -vvvv)",
+				Config: cli.BoolConfig{
+					Count: &verbosity,
+				},
+			},
+		},
+		Arguments: []cli.Argument{
+			&cli.StringArg{
+				Name:        "config",
+				Config:      cli.StringConfig{TrimSpace: true},
+				Destination: &cfg,
+			},
+		},
+		ArgsUsage: "<config>",
+		Description: `Reads a declarative configuration file and prints the
+execution plan without applying any changes.
+
+The plan shows the actions and operations that would be executed by
+the apply command, but does not modify the system.`,
+		Before: requireArgs(1),
+		Action: func(ctx context.Context, _ *cli.Command) error {
+			colorMode, err := parseColorMode(colorFlag)
+			if err != nil {
+				return cli.Exit(err.Error(), exitUserError)
+			}
+
+			v := mapVerbosity(verbosity)
+
+			pol := diagnostic.Policy{
+				WarningsAsErrors: false,
+				Verbosity:        v,
+			}
+
+			store := spec.NewSourceStore()
+
+			displ := render.NewCLI(
+				render.CLIOptions{
+					ColorMode: colorMode,
+					Verbosity: v,
+				},
+				store,
+			)
+
+			defer func() {
+				displ.Close()
+				recoverAndReport(recover())
+			}()
+
+			em := diagnostic.NewEmitter(pol, displ)
+
+			err = engine.Plan(ctx, em, cfg, store)
 			if err != nil {
 				var abort engine.AbortError
 				if !errors.As(err, &abort) {

@@ -40,6 +40,7 @@ type (
 	}
 	Action interface {
 		Name() string
+		Kind() string
 		Ops() []Op
 	}
 	Op interface {
@@ -48,6 +49,17 @@ type (
 		Check(ctx context.Context, src source.Source, tgt target.Target) (CheckResult, error)
 		Execute(ctx context.Context, src source.Source, tgt target.Target) (Result, error)
 		DependsOn() []Op
+	}
+	OpDescriber interface {
+		OpDescription() OpDescription
+	}
+	OpDescription interface {
+		PlanTemplate() PlanTemplate
+	}
+	PlanTemplate struct {
+		ID   string
+		Text string
+		Data any
 	}
 	Result struct {
 		Changed bool

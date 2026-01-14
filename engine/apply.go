@@ -36,7 +36,7 @@ func (e *Engine) Apply(ctx context.Context, cfgPath string, store *spec.SourceSt
 		return err
 	}
 
-	plan, err := Plan(cfg, e.em)
+	plan, err := plan(cfg, e.em)
 	if err != nil {
 		return err
 	}

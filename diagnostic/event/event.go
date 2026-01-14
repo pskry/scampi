@@ -43,6 +43,7 @@ const (
 	PlanStarted
 	PlanFinished
 	UnitPlanned
+	PlanProduced
 
 	ActionStarted
 	ActionFinished

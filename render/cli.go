@@ -138,6 +138,8 @@ func (c *cli) toRenderEvents(e event.Event) []renderEvent {
 		return c.renderPlanFinished(e)
 	case event.UnitPlanned:
 		return c.renderUnitPlanned(e)
+	case event.PlanProduced:
+		return c.renderPlan(e)
 
 	// Action lifecycle
 	// ===============================================
@@ -229,7 +231,7 @@ func (c *cli) renderPlanStarted(_ event.Event) []renderEvent {
 }
 
 func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
-	d := e.Detail.(event.PlanDetail)
+	d := e.Detail.(event.PlanFinishedDetail)
 
 	var events []renderEvent
 
@@ -278,6 +280,58 @@ func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 			e.Subject.Name,
 		),
 	}}
+}
+
+func (c *cli) renderPlan(e event.Event) []renderEvent {
+	d := e.Detail.(event.PlanDetail)
+
+	var out []renderEvent
+
+	out = append(out, renderEvent{
+		stream: streamOut,
+		line:   "PLAN",
+	})
+
+	for _, a := range d.Actions {
+		out = append(out, renderEvent{
+			stream: streamOut,
+			line: c.fmtfMsg(
+				ansi.Cyan.Bold,
+				"[%d] %s (%s)",
+				a.Index,
+				a.Name,
+				a.Kind,
+			),
+		})
+
+		for _, op := range a.Ops {
+			if op.Template != nil {
+				text, ok := template.Render(
+					op.Template.ID,
+					op.Template.Text,
+					op.Template.Data,
+				)
+				if ok {
+					out = append(out, renderEvent{
+						stream: streamOut,
+						line:   "  - (tmpl) " + text,
+					})
+				} else {
+					out = append(out, renderEvent{
+						stream: streamOut,
+						line:   "  - (tmpl empty) " + op.Name,
+					})
+				}
+			} else {
+				out = append(out, renderEvent{
+					stream: streamOut,
+					line:   "  - (default) " + op.Name,
+				})
+			}
+		}
+	}
+
+	return out
 }
 
 // Action lifecycle

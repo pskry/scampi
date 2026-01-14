@@ -1,14 +1,54 @@
 package engine
 
 import (
+	"context"
+	"fmt"
+	"path/filepath"
 	"time"
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/diagnostic/event"
+	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 )
 
-func Plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
+func Plan(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) error {
+	e := New(
+		source.LocalPosixSource{},
+		nil, // Plan must NEVER touch target, not even reads
+		em,
+	)
+
+	return e.Plan(ctx, cfgPath, store)
+}
+
+func (e *Engine) Plan(ctx context.Context, cfgPath string, store *spec.SourceStore) error {
+	start := time.Now()
+	e.em.Emit(diagnostic.EngineStarted())
+
+	cfgPath, err := filepath.Abs(cfgPath)
+	if err != nil {
+		panic(fmt.Errorf("BUG: filepath.Abs() failed: %w", err))
+	}
+
+	cfg, err := LoadConfigWithSource(e.em, cfgPath, store, e.src)
+	if err != nil {
+		return err
+	}
+
+	plan, err := plan(cfg, e.em)
+	if err != nil {
+		return err
+	}
+
+	e.em.Emit(diagnostic.PlanProduced(plan))
+
+	e.em.Emit(diagnostic.EngineFinished(diagnostic.RunSummary{}, time.Since(start), err))
+
+	return err
+}
+
+func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 	start := time.Now()
 	em.Emit(diagnostic.PlanStarted())
 
