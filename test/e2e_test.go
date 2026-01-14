@@ -38,7 +38,8 @@ units: [
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-	if err := engine.ApplyWithEnv(context.Background(), em, "/config.cue", spec.NewSourceStore(), src, tgt); err != nil {
+	e := engine.New(src, tgt, em)
+	if err := e.Apply(context.Background(), "/config.cue", spec.NewSourceStore()); err != nil {
 		t.Fatalf("expected successful call to engine.Apply, got err: %q\n%s", err, rec)
 	}
 

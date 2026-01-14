@@ -44,7 +44,8 @@ func runDiagnosticsCase(t *testing.T, dir string) {
 	em := diagnostic.NewEmitter(pol, rec)
 	store := spec.NewSourceStore()
 
-	err := engine.ApplyWithEnv(context.Background(), em, cfgPath, store, source.LocalPosixSource{}, recTgt)
+	e := engine.New(source.LocalPosixSource{}, recTgt, em)
+	err := e.Apply(context.Background(), cfgPath, store)
 
 	if expect.Abort {
 		var abort engine.AbortError

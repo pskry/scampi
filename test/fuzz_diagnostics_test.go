@@ -58,7 +58,8 @@ units: [builtin.copy & { src: "a", dest: "b" }]`,
 			}
 		}()
 
-		err := engine.ApplyWithEnv(context.Background(), em, "/config.cue", store, src, tgt)
+		e := engine.New(src, tgt, em)
+		err := e.Apply(context.Background(), "/config.cue", store)
 		// ---- Error classification invariant ----
 		if err != nil {
 			var abort engine.AbortError

@@ -159,9 +159,10 @@ units: [
 			rec := &recordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 			store := spec.NewSourceStore()
+			e := engine.New(src, tgt, em)
 
 			for b.Loop() {
-				if err := engine.ApplyWithEnv(context.Background(), em, "/config.cue", store, src, tgt); err != nil {
+				if err := e.Apply(context.Background(), "/config.cue", store); err != nil {
 					b.Fatal(err)
 				}
 			}
