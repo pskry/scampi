@@ -289,8 +289,13 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 
 	out = append(out, renderEvent{
 		stream: streamOut,
-		line:   "PLAN",
+		line: c.fmtfMsg(
+			ansi.Magenta.Bold,
+			"---[ PLAN ]---",
+		),
 	})
+
+	v := c.opts.Verbosity
 
 	for _, a := range d.Actions {
 		out = append(out, renderEvent{
@@ -304,30 +309,32 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 			),
 		})
 
+		if v <= signal.Quiet {
+			continue
+		}
+
 		for _, op := range a.Ops {
-			if op.Template != nil {
-				text, ok := template.Render(
-					op.Template.ID,
-					op.Template.Text,
-					op.Template.Data,
-				)
-				if ok {
-					out = append(out, renderEvent{
-						stream: streamOut,
-						line:   "  - (tmpl) " + text,
-					})
-				} else {
-					out = append(out, renderEvent{
-						stream: streamOut,
-						line:   "  - (tmpl empty) " + op.Name,
-					})
+			line := c.fmtfMsg(
+				ansi.BrightBlack.Reg,
+				"  - %s",
+				op.Name,
+			)
+
+			if v > signal.V && op.Template != nil {
+				tmpl := op.Template
+				if text, ok := template.Render(tmpl.ID, tmpl.Text, tmpl.Data); ok {
+					line += c.fmtfMsg(
+						ansi.BrightBlack.Dim,
+						" (%s)",
+						text,
+					)
 				}
-			} else {
-				out = append(out, renderEvent{
-					stream: streamOut,
-					line:   "  - (default) " + op.Name,
-				})
 			}
+
+			out = append(out, renderEvent{
+				stream: streamOut,
+				line:   line,
+			})
 		}
 	}
 
@@ -532,6 +539,12 @@ func makeID(name string) string {
 
 // Message formatting
 // ===============================================
+
+func (c *cli) fmtMsg(color ansi.Code, msg string) string {
+	var buf strings.Builder
+	c.fmtMsgTo(&buf, color, msg)
+	return buf.String()
+}
 
 func (c *cli) fmtfMsg(color ansi.Code, format string, args ...any) string {
 	var buf strings.Builder
