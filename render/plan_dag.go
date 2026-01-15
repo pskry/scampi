@@ -14,6 +14,11 @@ type dagAction struct {
 	Layers [][]event.PlannedOp // topologically layered ops
 }
 
+type plannedNode struct {
+	Op    event.PlannedOp
+	Depth int
+}
+
 func buildPlanDAG(detail event.PlanDetail) planDAG {
 	var dag planDAG
 
@@ -79,5 +84,59 @@ func flattenLayers(layers [][]event.PlannedOp) []event.PlannedOp {
 	for _, l := range layers {
 		out = append(out, l...)
 	}
+	return out
+}
+
+func opDepth(op event.PlannedOp, index map[int]event.PlannedOp, memo map[int]int) int {
+	if d, ok := memo[op.Index]; ok {
+		return d
+	}
+	maxDepth := 0
+	for _, dep := range op.DependsOn {
+		if depOp, ok := index[dep]; ok {
+			if v := opDepth(depOp, index, memo) + 1; v > maxDepth {
+				maxDepth = v
+			}
+		}
+	}
+	memo[op.Index] = maxDepth
+	return maxDepth
+}
+
+func linearizeWithDepth(layers [][]event.PlannedOp) []plannedNode {
+	ops := flattenLayers(layers)
+
+	index := make(map[int]event.PlannedOp)
+	for _, op := range ops {
+		index[op.Index] = op
+	}
+
+	memo := make(map[int]int)
+
+	var depthOf func(op event.PlannedOp) int
+	depthOf = func(op event.PlannedOp) int {
+		if d, ok := memo[op.Index]; ok {
+			return d
+		}
+		max := 0
+		for _, dep := range op.DependsOn {
+			if depOp, ok := index[dep]; ok {
+				if v := depthOf(depOp) + 1; v > max {
+					max = v
+				}
+			}
+		}
+		memo[op.Index] = max
+		return max
+	}
+
+	var out []plannedNode
+	for _, op := range ops {
+		out = append(out, plannedNode{
+			Op:    op,
+			Depth: depthOf(op),
+		})
+	}
+
 	return out
 }

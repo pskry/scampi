@@ -6,6 +6,7 @@ require (
 	cuelang.org/go v0.15.3
 	github.com/charmbracelet/x/term v0.2.1
 	github.com/golangci/golangci-lint/v2 v2.7.2
+	github.com/mattn/go-runewidth v0.0.16
 	github.com/urfave/cli/v3 v3.6.1
 	golang.org/x/perf v0.0.0-20260112171951-5abaabe9f1bd
 	golang.org/x/sync v0.19.0
@@ -139,7 +140,6 @@ require (
 	github.com/matoous/godox v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mgechev/revive v1.13.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

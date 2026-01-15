@@ -3,6 +3,7 @@ package render
 import (
 	"regexp"
 
+	"github.com/mattn/go-runewidth"
 	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/spec"
 )
@@ -40,7 +41,7 @@ func s(n int) string {
 }
 
 func visibleLen(s string) int {
-	return len(ansiRe.ReplaceAllString(s, ""))
+	return runewidth.StringWidth(ansiRe.ReplaceAllString(s, ""))
 }
 
 func elide(s string, maxLen int) string {

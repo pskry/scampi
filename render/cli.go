@@ -335,39 +335,49 @@ func (c *cli) renderPlanNarrow(d event.PlanDetail) []renderEvent {
 	})
 
 	v := c.opts.Verbosity
+	dag := buildPlanDAG(d)
 
-	for _, a := range d.Actions {
+	for _, a := range dag.Actions {
 		out = append(out, renderEvent{
 			stream: streamOut,
 			line: c.fmtfMsg(
 				ansi.Cyan.Bold,
-				"[%d] %s (%s)",
+				"┌─ [%d] %s (%s)",
 				a.Index,
 				a.Name,
 				a.Kind,
 			),
 		})
 
-		if v <= signal.Quiet {
-			continue
-		}
+		nodes := linearizeWithDepth(a.Layers)
 
-		for _, op := range a.Ops {
-			line := c.renderNarrowOpLine(op, v)
+		for i, n := range nodes {
+			conn := "└─"
+			if i < len(nodes)-1 {
+				conn = "├─"
+			}
+
+			indent := strings.Repeat("  ", n.Depth)
+			line := c.renderNarrowOpLine("│  "+indent+conn, n.Op, v)
 
 			out = append(out, renderEvent{
 				stream: streamOut,
 				line:   c.fmtMsg(ansi.BrightBlack.Reg, line),
 			})
 		}
+
+		out = append(out, renderEvent{
+			stream: streamOut,
+			line:   c.fmtMsg(ansi.Cyan.Bold, "└─"),
+		})
 	}
 
 	return out
 }
 
-func (c *cli) renderNarrowOpLine(op event.PlannedOp, v signal.Verbosity) string {
+func (c *cli) renderNarrowOpLine(prefix string, op event.PlannedOp, v signal.Verbosity) string {
 	// Mandatory structure
-	base := "  - " + op.Name
+	base := prefix + op.Name
 	baseLen := visibleLen(base)
 
 	// If width unknown or too small → structure only
@@ -403,21 +413,10 @@ func (c *cli) renderNarrowOpLine(op event.PlannedOp, v signal.Verbosity) string 
 		return base
 	}
 
-	elided := elide(text, remaining-overhead)
-	return base + " (" + elided + ")"
+	return base + " (" + text + ")"
 }
 
 func (c *cli) renderPlanWide(d event.PlanDetail) []renderEvent {
-	depNames := func(op event.PlannedOp, index map[int]event.PlannedOp) []string {
-		var names []string
-		for _, d := range op.DependsOn {
-			names = append(names, index[d].Name)
-		}
-		return names
-	}
-
-	dag := buildPlanDAG(d)
-
 	var out []renderEvent
 	v := c.opts.Verbosity
 
@@ -426,12 +425,14 @@ func (c *cli) renderPlanWide(d event.PlanDetail) []renderEvent {
 		line:   c.fmtfMsg(ansi.Magenta.Bold, "---[ PLAN ]---"),
 	})
 
+	dag := buildPlanDAG(d)
+
 	for _, act := range dag.Actions {
 		out = append(out, renderEvent{
 			stream: streamOut,
 			line: c.fmtfMsg(
 				ansi.Cyan.Bold,
-				"[%d] %s (%s)",
+				"┌─ [%d] %s (%s)",
 				act.Index,
 				act.Name,
 				act.Kind,
@@ -439,31 +440,41 @@ func (c *cli) renderPlanWide(d event.PlanDetail) []renderEvent {
 		})
 
 		if v == signal.Quiet {
+			out = append(out, renderEvent{
+				stream: streamOut,
+				line:   c.fmtMsg(ansi.Cyan.Bold, "└─"),
+			})
 			continue
 		}
 
 		ops := flattenLayers(act.Layers)
 
-		// build op index (local, readable deps)
-		opByIndex := make(map[int]event.PlannedOp)
+		// index ops
+		index := make(map[int]event.PlannedOp)
 		for _, op := range ops {
-			opByIndex[op.Index] = op
+			index[op.Index] = op
 		}
 
+		depthMemo := make(map[int]int)
+
 		for i, op := range ops {
-			prefix := "├─"
-			if i == len(ops)-1 {
-				prefix = "└─"
+			depth := opDepth(op, index, depthMemo)
+
+			prefix := "└─"
+			if i < len(ops)-1 {
+				prefix = "├─"
 			}
+
+			indent := strings.Repeat("  ", depth)
 
 			line := c.fmtfMsg(
 				ansi.BrightBlack.Reg,
-				"    %s %s",
+				"│  %s%s %s",
+				indent,
 				prefix,
 				op.Name,
 			)
 
-			// templates at -vv
 			if v >= signal.VV && op.Template != nil {
 				if text, ok := template.Render(
 					op.Template.ID,
@@ -478,21 +489,16 @@ func (c *cli) renderPlanWide(d event.PlanDetail) []renderEvent {
 				}
 			}
 
-			// deps at -vvv
-			if v >= signal.VVV && len(op.DependsOn) > 0 {
-				names := depNames(op, opByIndex)
-				line += c.fmtfMsg(
-					ansi.BrightBlack.Dim,
-					"  ← after %s",
-					strings.Join(names, ", "),
-				)
-			}
-
 			out = append(out, renderEvent{
 				stream: streamOut,
 				line:   line,
 			})
 		}
+
+		out = append(out, renderEvent{
+			stream: streamOut,
+			line:   c.fmtMsg(ansi.Cyan.Bold, "└─"),
+		})
 	}
 
 	return out
