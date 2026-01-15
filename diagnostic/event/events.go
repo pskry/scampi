@@ -29,8 +29,10 @@ type PlannedAction struct {
 	Ops   []PlannedOp
 }
 type PlannedOp struct {
-	Name     string
-	Template *spec.PlanTemplate
+	Index     int
+	Name      string
+	DependsOn []int // DAG edges (indices of other PlannedOps)
+	Template  *spec.PlanTemplate
 }
 type PlanProblem struct {
 	Index int

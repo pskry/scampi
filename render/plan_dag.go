@@ -1,0 +1,83 @@
+package render
+
+import "godoit.dev/doit/diagnostic/event"
+
+// A DAG-ready view, renderer-only
+type planDAG struct {
+	Actions []dagAction
+}
+
+type dagAction struct {
+	Index  int
+	Name   string
+	Kind   string
+	Layers [][]event.PlannedOp // topologically layered ops
+}
+
+func buildPlanDAG(detail event.PlanDetail) planDAG {
+	var dag planDAG
+
+	for _, act := range detail.Actions {
+		layers := topoLayers(act.Ops)
+
+		dag.Actions = append(dag.Actions, dagAction{
+			Index:  act.Index,
+			Name:   act.Name,
+			Kind:   act.Kind,
+			Layers: layers,
+		})
+	}
+
+	return dag
+}
+
+func topoLayers(ops []event.PlannedOp) [][]event.PlannedOp {
+	inDegree := make(map[int]int)
+	children := make(map[int][]int)
+	index := make(map[int]event.PlannedOp)
+
+	for _, op := range ops {
+		index[op.Index] = op
+		inDegree[op.Index] = len(op.DependsOn)
+		for _, dep := range op.DependsOn {
+			children[dep] = append(children[dep], op.Index)
+		}
+	}
+
+	var layers [][]event.PlannedOp
+	var ready []int
+
+	for id, deg := range inDegree {
+		if deg == 0 {
+			ready = append(ready, id)
+		}
+	}
+
+	for len(ready) > 0 {
+		var next []int
+		var layer []event.PlannedOp
+
+		for _, id := range ready {
+			layer = append(layer, index[id])
+			for _, child := range children[id] {
+				inDegree[child]--
+				if inDegree[child] == 0 {
+					next = append(next, child)
+				}
+			}
+		}
+
+		layers = append(layers, layer)
+		ready = next
+	}
+
+	return layers
+}
+
+func flattenLayers(layers [][]event.PlannedOp) []event.PlannedOp {
+	var out []event.PlannedOp
+	for _, l := range layers {
+		out = append(out, l...)
+	}
+	return out
+}

@@ -283,52 +283,85 @@ func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 }
 
 func (c *cli) renderPlan(e event.Event) []renderEvent {
+	depNames := func(op event.PlannedOp, index map[int]event.PlannedOp) []string {
+		var names []string
+		for _, d := range op.DependsOn {
+			names = append(names, index[d].Name)
+		}
+		return names
+	}
+
 	d := e.Detail.(event.PlanDetail)
+	dag := buildPlanDAG(d)
 
 	var out []renderEvent
+	v := c.opts.Verbosity
 
 	out = append(out, renderEvent{
 		stream: streamOut,
-		line: c.fmtfMsg(
-			ansi.Magenta.Bold,
-			"---[ PLAN ]---",
-		),
+		line:   c.fmtfMsg(ansi.Magenta.Bold, "---[ PLAN ]---"),
 	})
 
-	v := c.opts.Verbosity
-
-	for _, a := range d.Actions {
+	for _, act := range dag.Actions {
 		out = append(out, renderEvent{
 			stream: streamOut,
 			line: c.fmtfMsg(
 				ansi.Cyan.Bold,
 				"[%d] %s (%s)",
-				a.Index,
-				a.Name,
-				a.Kind,
+				act.Index,
+				act.Name,
+				act.Kind,
 			),
 		})
 
-		if v <= signal.Quiet {
+		if v == signal.Quiet {
 			continue
 		}
 
-		for _, op := range a.Ops {
+		ops := flattenLayers(act.Layers)
+
+		// build op index (local, readable deps)
+		opByIndex := make(map[int]event.PlannedOp)
+		for _, op := range ops {
+			opByIndex[op.Index] = op
+		}
+
+		for i, op := range ops {
+			prefix := "├─"
+			if i == len(ops)-1 {
+				prefix = "└─"
+			}
+
 			line := c.fmtfMsg(
 				ansi.BrightBlack.Reg,
-				"  - %s",
+				"    %s %s",
+				prefix,
 				op.Name,
 			)
 
-			if v > signal.V && op.Template != nil {
-				tmpl := op.Template
-				if text, ok := template.Render(tmpl.ID, tmpl.Text, tmpl.Data); ok {
+			// templates at -vv
+			if v >= signal.VV && op.Template != nil {
+				if text, ok := template.Render(
+					op.Template.ID,
+					op.Template.Text,
+					op.Template.Data,
+				); ok {
 					line += c.fmtfMsg(
 						ansi.BrightBlack.Dim,
 						" (%s)",
 						text,
 					)
 				}
+			}
+
+			// deps at -vvv
+			if v >= signal.VVV && len(op.DependsOn) > 0 {
+				names := depNames(op, opByIndex)
+				line += c.fmtfMsg(
+					ansi.BrightBlack.Dim,
+					"  ← after %s",
+					strings.Join(names, ", "),
+				)
 			}
 
 			out = append(out, renderEvent{

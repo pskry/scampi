@@ -137,42 +137,68 @@ func UnitPlanned(
 }
 
 func PlanProduced(plan spec.Plan) event.Event {
-	var actions []event.PlannedAction
-
+	// ------------------------------------------------------------
+	// 1. Flatten all ops and assign GLOBAL indices
+	// ------------------------------------------------------------
+	var allOps []spec.Op
+	opIndex := make(map[spec.Op]int)
+	actionOpBase := make(map[int]int) // action index → first op index
 	for i, act := range plan.Actions {
-		var ops []event.PlannedOp
-
+		actionOpBase[i] = len(allOps)
 		for _, op := range act.Ops() {
-			var tmpl *spec.PlanTemplate
+			opIndex[op] = len(allOps)
+			allOps = append(allOps, op)
+		}
+	}
 
-			if d, ok := op.(spec.OpDescriber); ok {
-				if desc := d.OpDescription(); desc != nil {
-					t := desc.PlanTemplate()
-					tmpl = &t
-				}
+	// ------------------------------------------------------------
+	// 2. Build PlannedOps with dependency indices
+	// ------------------------------------------------------------
+	plannedOps := make([]event.PlannedOp, len(allOps))
+	for i, op := range allOps {
+		var tmpl *spec.PlanTemplate
+
+		if d, ok := op.(spec.OpDescriber); ok {
+			if desc := d.OpDescription(); desc != nil {
+				t := desc.PlanTemplate()
+				tmpl = &t
 			}
-
-			ops = append(ops, event.PlannedOp{
-				Name:     op.Name(),
-				Template: tmpl, // nil = fallback
-			})
 		}
 
-		actions = append(actions, event.PlannedAction{
+		var deps []int
+		for _, dep := range op.DependsOn() {
+			deps = append(deps, opIndex[dep])
+		}
+
+		plannedOps[i] = event.PlannedOp{
+			Index:     i,
+			Name:      op.Name(),
+			DependsOn: deps,
+			Template:  tmpl, // nil = fallback
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 3. Re-slice ops back into PlannedActions
+	// ------------------------------------------------------------
+	var detail event.PlanDetail
+	for i, act := range plan.Actions {
+		start := actionOpBase[i]
+		end := start + len(act.Ops())
+
+		detail.Actions = append(detail.Actions, event.PlannedAction{
 			Index: i,
 			Name:  act.Name(),
 			Kind:  act.Kind(),
-			Ops:   ops,
+			Ops:   plannedOps[start:end],
 		})
 	}
 
 	return event.Event{
-		Time:  time.Now(),
-		Kind:  event.PlanProduced,
-		Scope: event.ScopePlan,
-		Detail: event.PlanDetail{
-			Actions: actions,
-		},
+		Time:       time.Now(),
+		Kind:       event.PlanProduced,
+		Scope:      event.ScopePlan,
+		Detail:     detail,
 		Severity:   signal.Notice,
 		Chattiness: event.Subtle,
 	}
