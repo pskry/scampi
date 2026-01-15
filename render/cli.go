@@ -28,6 +28,10 @@ type (
 		render  *renderer
 		store   *spec.SourceStore
 		actions sync.Map // map[string]*actionState
+
+		// layout
+		isTTY bool
+		width int
 	}
 	actionState struct {
 		id       string
@@ -78,15 +82,35 @@ const (
 	symHelp   = '󰋖'
 )
 
+const (
+	minTemplateCols = 20  // below this, templates are useless
+	minWidePlanCols = 100 // below this, fancy, wide plan rendering adds more noise than clarity
+)
+
 func NewCLI(opts CLIOptions, store *spec.SourceStore) Displayer {
+	determineWidth := func() int {
+		if cols := os.Getenv("COLUMNS"); cols != "" {
+			if n, err := strconv.Atoi(cols); err == nil && n > 0 {
+				return n
+			}
+		}
+
+		if w, _, err := term.GetSize(os.Stdout.Fd()); err == nil && w > 0 {
+			return w
+		}
+
+		return 0
+	}
+
 	return &cli{
 		opts:  opts,
 		store: store,
 		render: newRenderer(
 			os.Stdout,
 			os.Stderr,
-			term.IsTerminal(os.Stdout.Fd()),
 		),
+		isTTY: term.IsTerminal(os.Stdout.Fd()),
+		width: determineWidth(),
 	}
 }
 
@@ -113,6 +137,13 @@ func (c *cli) Emit(e event.Event) {
 	}
 
 	events := c.toRenderEvents(e)
+	// fit lines before committing to draw loop
+	for i := range events {
+		if strings.ContainsAny(events[i].line, "\n\r") {
+			panic("BUG: renderEvent.line must neither contain '\\n' nor '\\r'")
+		}
+		events[i].line = fitLine(events[i].line, c.width)
+	}
 	c.render.emitEvents(events)
 }
 
@@ -283,6 +314,100 @@ func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 }
 
 func (c *cli) renderPlan(e event.Event) []renderEvent {
+	d := e.Detail.(event.PlanDetail)
+
+	if c.width < minWidePlanCols {
+		return c.renderPlanNarrow(d)
+	}
+	return c.renderPlanWide(d)
+}
+
+func (c *cli) renderPlanNarrow(d event.PlanDetail) []renderEvent {
+	var out []renderEvent
+
+	out = append(out, renderEvent{
+		stream: streamOut,
+		line: c.fmtfMsg(
+			ansi.Magenta.Bold,
+			"---[ PLAN NARROW | COLS: %d | isTTY: %t ]---",
+			c.width, c.isTTY,
+		),
+	})
+
+	v := c.opts.Verbosity
+
+	for _, a := range d.Actions {
+		out = append(out, renderEvent{
+			stream: streamOut,
+			line: c.fmtfMsg(
+				ansi.Cyan.Bold,
+				"[%d] %s (%s)",
+				a.Index,
+				a.Name,
+				a.Kind,
+			),
+		})
+
+		if v <= signal.Quiet {
+			continue
+		}
+
+		for _, op := range a.Ops {
+			line := c.renderNarrowOpLine(op, v)
+
+			out = append(out, renderEvent{
+				stream: streamOut,
+				line:   c.fmtMsg(ansi.BrightBlack.Reg, line),
+			})
+		}
+	}
+
+	return out
+}
+
+func (c *cli) renderNarrowOpLine(op event.PlannedOp, v signal.Verbosity) string {
+	// Mandatory structure
+	base := "  - " + op.Name
+	baseLen := visibleLen(base)
+
+	// If width unknown or too small → structure only
+	if c.width <= 0 || baseLen >= c.width {
+		return base
+	}
+
+	// Templates only at -vv
+	if v <= signal.V || op.Template == nil {
+		return base
+	}
+
+	// Remaining space on this line
+	remaining := c.width - baseLen
+
+	// Need room for " (x…)"
+	const overhead = 3 // space + parens
+	if remaining <= overhead {
+		return base
+	}
+
+	// Require a minimum usefulness threshold
+	if remaining < minTemplateCols {
+		return base
+	}
+
+	text, ok := template.Render(
+		op.Template.ID,
+		op.Template.Text,
+		op.Template.Data,
+	)
+	if !ok || text == "" {
+		return base
+	}
+
+	elided := elide(text, remaining-overhead)
+	return base + " (" + elided + ")"
+}
+
+func (c *cli) renderPlanWide(d event.PlanDetail) []renderEvent {
 	depNames := func(op event.PlannedOp, index map[int]event.PlannedOp) []string {
 		var names []string
 		for _, d := range op.DependsOn {
@@ -291,7 +416,6 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 		return names
 	}
 
-	d := e.Detail.(event.PlanDetail)
 	dag := buildPlanDAG(d)
 
 	var out []renderEvent
@@ -503,29 +627,32 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 
 	switch e.Scope {
 	case event.ScopeEngine:
-		return []renderEvent{{
-			stream: streamErr,
-			line: c.fmtTemplate(
-				d.Template,
-				"engine.error",
-				fmt.Sprintf(` in file %q`, sub.CfgPath),
-				symErr,
-				ansi.Red.Reg,
-				ansi.Cyan.Reg,
-			),
-		}}
+		var events []renderEvent
+		for _, l := range c.fmtTemplate(
+			d.Template,
+			"engine.error",
+			fmt.Sprintf(` in file %q`, sub.CfgPath),
+			symErr,
+			ansi.Red.Reg,
+			ansi.Cyan.Reg,
+		) {
+			events = append(events, renderEvent{stream: streamErr, line: l})
+		}
+		return events
+
 	case event.ScopePlan:
-		return []renderEvent{{
-			stream: streamErr,
-			line: c.fmtTemplate(
-				d.Template,
-				"plan.error",
-				fmt.Sprintf(` in unit [%d|%s] '%s'`, sub.Index, sub.Kind, sub.Name),
-				symErr,
-				ansi.Red.Reg,
-				ansi.Cyan.Reg,
-			),
-		}}
+		var events []renderEvent
+		for _, l := range c.fmtTemplate(
+			d.Template,
+			"plan.error",
+			fmt.Sprintf(` in unit [%d|%s] '%s'`, sub.Index, sub.Kind, sub.Name),
+			symErr,
+			ansi.Red.Reg,
+			ansi.Cyan.Reg,
+		) {
+			events = append(events, renderEvent{stream: streamErr, line: l})
+		}
+		return events
 
 	default:
 		panic(fmt.Errorf(
@@ -607,7 +734,7 @@ func (c *cli) fmtfMsgTo(buf *strings.Builder, color ansi.Code, format string, ar
 	buf.WriteString(string(ansi.Reset))
 }
 
-func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, txtCol, helpCol ansi.Code) string {
+func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, txtCol, helpCol ansi.Code) []string {
 	var buf strings.Builder
 
 	if text, ok := template.Render(tmpl.ID+".Text", tmpl.Text, tmpl.Data); ok {
@@ -644,7 +771,7 @@ func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, t
 		)
 	}
 
-	return buf.String()
+	return strings.Split(buf.String(), "\n")
 }
 
 func (c *cli) renderSnippet(src *spec.SourceSpan) (string, bool) {
@@ -756,7 +883,7 @@ func (c *cli) shouldUseColor() bool {
 	case signal.ColorNever:
 		return false
 	case signal.ColorAuto:
-		return c.render.isTTY
+		return c.isTTY
 	default:
 		return false
 	}
@@ -786,22 +913,20 @@ type (
 		stream stream
 	}
 	renderer struct {
-		out   io.Writer
-		err   io.Writer
-		isTTY bool
+		out io.Writer
+		err io.Writer
 
 		ch   chan renderEvent
 		done chan struct{}
 	}
 )
 
-func newRenderer(out, err io.Writer, isTTY bool) *renderer {
+func newRenderer(out, err io.Writer) *renderer {
 	r := &renderer{
-		out:   out,
-		err:   err,
-		isTTY: isTTY,
-		ch:    make(chan renderEvent, 256),
-		done:  make(chan struct{}),
+		out:  out,
+		err:  err,
+		ch:   make(chan renderEvent, 256),
+		done: make(chan struct{}),
 	}
 
 	// render loop
