@@ -14,9 +14,11 @@ type dagAction struct {
 	Layers [][]event.PlannedOp // topologically layered ops
 }
 
-type plannedNode struct {
-	Op    event.PlannedOp
-	Depth int
+type renderNode struct {
+	Op      event.PlannedOp
+	Depth   int
+	IsLast  bool   // last sibling at this depth
+	Parents []bool // per depth: should a vertical bar continue?
 }
 
 func buildPlanDAG(detail event.PlanDetail) planDAG {
@@ -103,16 +105,47 @@ func opDepth(op event.PlannedOp, index map[int]event.PlannedOp, memo map[int]int
 	return maxDepth
 }
 
-func linearizeWithDepth(layers [][]event.PlannedOp) []plannedNode {
+func buildDepTree(ops []event.PlannedOp) map[int][]event.PlannedOp {
+	children := make(map[int][]event.PlannedOp)
+
+	for _, op := range ops {
+		for _, dep := range op.DependsOn {
+			children[dep] = append(children[dep], op)
+		}
+	}
+
+	return children
+}
+
+func findRoots(ops []event.PlannedOp) []event.PlannedOp {
+	hasParent := make(map[int]bool)
+	for _, op := range ops {
+		for _, dep := range op.DependsOn {
+			hasParent[op.Index] = true
+			_ = dep
+		}
+	}
+
+	var roots []event.PlannedOp
+	for _, op := range ops {
+		if !hasParent[op.Index] {
+			roots = append(roots, op)
+		}
+	}
+	return roots
+}
+
+func linearizeWithGutters(layers [][]event.PlannedOp) []renderNode {
 	ops := flattenLayers(layers)
 
+	// Index ops by ID
 	index := make(map[int]event.PlannedOp)
 	for _, op := range ops {
 		index[op.Index] = op
 	}
 
+	// Compute dependency depth (unchanged logic)
 	memo := make(map[int]int)
-
 	var depthOf func(op event.PlannedOp) int
 	depthOf = func(op event.PlannedOp) int {
 		if d, ok := memo[op.Index]; ok {
@@ -130,12 +163,39 @@ func linearizeWithDepth(layers [][]event.PlannedOp) []plannedNode {
 		return max
 	}
 
-	var out []plannedNode
+	// Count remaining nodes per depth
+	remaining := make(map[int]int)
 	for _, op := range ops {
-		out = append(out, plannedNode{
-			Op:    op,
-			Depth: depthOf(op),
-		})
+		d := depthOf(op)
+		remaining[d]++
+	}
+
+	var (
+		out     []renderNode
+		parents []bool // active vertical bars per depth
+	)
+
+	for _, op := range ops {
+		d := depthOf(op)
+
+		// Ensure parents slice is deep enough
+		for len(parents) <= d {
+			parents = append(parents, false)
+		}
+
+		remaining[d]--
+		isLast := remaining[d] == 0
+
+		node := renderNode{
+			Op:      op,
+			Depth:   d,
+			IsLast:  isLast,
+			Parents: append([]bool{}, parents[:d]...),
+		}
+		out = append(out, node)
+
+		// Update continuation for this depth
+		parents[d] = !isLast
 	}
 
 	return out

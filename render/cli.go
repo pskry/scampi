@@ -334,8 +334,8 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 	out = append(out, renderEvent{
 		stream: streamOut,
 		line: c.fmtMsg(
-			ansi.Magenta.Bold,
-			"---[ PLAN ]---",
+			ansi.Magenta.Reg,
+			"PLAN",
 		),
 	})
 
@@ -346,11 +346,52 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 		if act.Kind != "" {
 			kind = fmt.Sprintf(" %s ›", act.Kind)
 		}
-		gutter := " •"
-		// gutter := " ▸"
-		if v > signal.Quiet {
-			gutter = "┌─"
+
+		if v == signal.Quiet {
+
+			nOps := 0
+			for _, l := range act.Layers {
+				nOps += len(l)
+			}
+
+			line := c.fmtfMsg(
+				ansi.Cyan.Bold,
+				" • [%d]%s %s",
+				act.Index,
+				kind,
+				act.Name,
+			)
+
+			var opLine string
+			switch nOps {
+			case 0:
+				// this would be very odd tbh, but ¯\_(ツ)_/¯
+				opLine = " (noop)"
+			case 1:
+				opLine = " (1 op)"
+			default:
+				opLine = fmt.Sprintf(" (%d ops)", nOps)
+			}
+
+			line += c.fmtMsg(
+				ansi.BrightBlack.Dim,
+				opLine,
+			)
+
+			out = append(out, renderEvent{
+				stream: streamOut,
+				line:   line,
+			})
+			continue
 		}
+
+		gutter := "┏━"
+		if len(act.Layers) > 0 {
+			gutter += "┯"
+		} else {
+			gutter += "━"
+		}
+
 		out = append(out, renderEvent{
 			stream: streamOut,
 			line: c.fmtfMsg(
@@ -363,70 +404,98 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 			),
 		})
 
-		if v == signal.Quiet {
-			continue
-		}
-
 		ops := flattenLayers(act.Layers)
 
-		// index ops
-		index := make(map[int]event.PlannedOp)
-		for _, op := range ops {
-			index[op.Index] = op
-		}
+		children := buildDepTree(ops)
+		roots := findRoots(ops)
 
-		depthMemo := make(map[int]int)
-
-		for i, op := range ops {
-			depth := opDepth(op, index, depthMemo)
-
-			prefix := "└─"
-			if i < len(ops)-1 {
-				prefix = "├─"
-			}
-
-			indent := strings.Repeat("  ", depth)
-
-			line := c.fmtMsg(
-				ansi.Cyan.Bold,
-				"│",
+		for i, root := range roots {
+			c.renderOpTree(
+				&out,
+				root,
+				children,
+				[]bool{true},
+				i == len(roots)-1,
+				v,
 			)
-			line += "  "
-			line += c.fmtfMsg(
-				ansi.BrightBlack.Bold,
-				"%s%s %s",
-				indent,
-				prefix,
-				op.Name,
-			)
-
-			if v >= signal.VV && op.Template != nil {
-				if text, ok := template.Render(
-					op.Template.ID,
-					op.Template.Text,
-					op.Template.Data,
-				); ok {
-					line += c.fmtfMsg(
-						ansi.BrightBlack.Dim,
-						" (%s)",
-						text,
-					)
-				}
-			}
-
-			out = append(out, renderEvent{
-				stream: streamOut,
-				line:   line,
-			})
 		}
 
 		out = append(out, renderEvent{
 			stream: streamOut,
-			line:   c.fmtMsg(ansi.Cyan.Bold, "└─>"),
+			line:   c.fmtMsg(ansi.Cyan.Bold, "■"),
 		})
 	}
 
 	return out
+}
+
+func (c *cli) renderOpTree(
+	out *[]renderEvent,
+	op event.PlannedOp,
+	children map[int][]event.PlannedOp,
+	prefix []bool,
+	isLast bool,
+	v signal.Verbosity,
+) {
+	// Build gutter
+	var b strings.Builder
+
+	for i, cont := range prefix {
+		var seg string
+		if cont {
+			seg = "│ "
+			seg = "┇ "
+		} else {
+			seg = "   "
+		}
+
+		if i == 0 {
+			// Action-level gutter
+			b.WriteString(c.fmtMsg(ansi.Cyan.Bold, seg))
+		} else {
+			// Op-level gutter
+			b.WriteString(c.fmtMsg(ansi.BrightBlack.Reg, seg))
+		}
+	}
+
+	// Connector for this node
+	conn := "├─ "
+	if isLast {
+		conn = "└─ "
+	}
+	b.WriteString(c.fmtMsg(ansi.BrightBlack.Reg, conn))
+
+	line := b.String()
+	line += c.fmtMsg(ansi.BrightBlack.Reg, op.Name)
+
+	if v >= signal.VV && op.Template != nil {
+		if text, ok := template.Render(
+			op.Template.ID,
+			op.Template.Text,
+			op.Template.Data,
+		); ok {
+			line += c.fmtfMsg(ansi.BrightBlack.Dim, " (%s)", text)
+		}
+	}
+
+	*out = append(*out, renderEvent{
+		stream: streamOut,
+		line:   line,
+	})
+
+	// Recurse into children
+	kids := children[op.Index]
+	for i, child := range kids {
+		last := i == len(kids)-1
+		c.renderOpTree(
+			out,
+			child,
+			children,
+			append(prefix, !isLast),
+			last,
+			v,
+		)
+	}
 }
 
 // Action lifecycle
