@@ -86,6 +86,22 @@ const (
 	minWidePlanCols = 70 // below this, fancy, wide plan rendering adds more noise than clarity
 )
 
+var (
+	colPlan       = ansi.Magenta
+	colPlanHeader = colPlan.Bold
+	colPlanRail   = colPlan.Dim
+
+	colAction       = ansi.Cyan
+	colActionHeader = colAction.Bold
+	colActionRail   = colAction.Reg
+	colActionOps    = colAction.Dim
+
+	colOp       = ansi.BrightBlack
+	colOpHeader = colOp.Reg
+	colOpRail   = colOp.Dim
+	colOpDesc   = colOp.Dim
+)
+
 func NewCLI(opts CLIOptions, store *spec.SourceStore) Displayer {
 	determineWidth := func() int {
 		if cols := os.Getenv("COLUMNS"); cols != "" {
@@ -315,6 +331,10 @@ func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 	}}
 }
 
+// renderPlan invariant:
+// The plan is represented as a single continuous vertical rail.
+// Action rails are nested inside the plan rail.
+// Ops never touch the plan rail directly.
 func (c *cli) renderPlan(e event.Event) []renderEvent {
 	d := e.Detail.(event.PlanDetail)
 
@@ -333,13 +353,38 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 
 	out = append(out, renderEvent{
 		stream: streamOut,
-		line: c.fmtMsg(
-			ansi.Magenta.Reg,
-			"PLAN",
-		),
+		line:   "",
+	})
+
+	hdr := c.fmtMsg(colPlanRail, "┌─┬ ") +
+		c.fmtMsg(colPlanHeader, "execution plan")
+	out = append(out, renderEvent{
+		stream: streamOut,
+		line:   hdr,
 	})
 
 	dag := buildPlanDAG(d)
+
+	digits10 := func(i int) int {
+		if i == 0 {
+			return 1
+		}
+		n := 0
+		for i > 0 {
+			i /= 10
+			n++
+		}
+		return n
+	}
+
+	maxIndex := 0
+	for _, act := range dag.Actions {
+		if act.Index > maxIndex {
+			maxIndex = act.Index
+		}
+	}
+
+	indexWidth := digits10(maxIndex)
 
 	for _, act := range dag.Actions {
 		kind := ""
@@ -348,19 +393,20 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 		}
 
 		if v == signal.Quiet {
-
 			nOps := 0
 			for _, l := range act.Layers {
 				nOps += len(l)
 			}
 
-			line := c.fmtfMsg(
-				ansi.Cyan.Bold,
-				" • [%d]%s %s",
-				act.Index,
-				kind,
-				act.Name,
-			)
+			line := c.fmtMsg(colActionRail, " •") +
+				c.fmtfMsg(
+					colActionHeader,
+					" [%*d]%s %s",
+					indexWidth,
+					act.Index,
+					kind,
+					act.Name,
+				)
 
 			var opLine string
 			switch nOps {
@@ -374,9 +420,11 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 			}
 
 			line += c.fmtMsg(
-				ansi.BrightBlack.Dim,
+				colActionOps,
 				opLine,
 			)
+
+			line = c.fmtMsg(colPlanRail, "│") + line
 
 			out = append(out, renderEvent{
 				stream: streamOut,
@@ -392,17 +440,22 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 			gutter += "━"
 		}
 
-		out = append(out, renderEvent{
-			stream: streamOut,
-			line: c.fmtfMsg(
-				ansi.Cyan.Bold,
-				"%s [%d]%s %s",
-				gutter,
-				act.Index,
-				kind,
-				act.Name,
-			),
-		})
+		{
+			line := c.fmtMsg(colPlanRail, "│ ") +
+				c.fmtMsg(colActionRail, gutter) +
+				c.fmtfMsg(
+					colActionHeader,
+					" [%*d]%s %s",
+					indexWidth,
+					act.Index,
+					kind,
+					act.Name,
+				)
+			out = append(out, renderEvent{
+				stream: streamOut,
+				line:   line,
+			})
+		}
 
 		ops := flattenLayers(act.Layers)
 
@@ -420,11 +473,24 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 			)
 		}
 
+		line := c.fmtMsg(colPlanRail, "│ ") +
+			c.fmtMsg(colActionRail, "■")
+
 		out = append(out, renderEvent{
 			stream: streamOut,
-			line:   c.fmtMsg(ansi.Cyan.Bold, "■"),
+			line:   line,
 		})
 	}
+
+	out = append(out, renderEvent{
+		stream: streamOut,
+		line:   c.fmtMsg(colPlanRail, "└─■"),
+	})
+
+	out = append(out, renderEvent{
+		stream: streamOut,
+		line:   "",
+	})
 
 	return out
 }
@@ -451,10 +517,10 @@ func (c *cli) renderOpTree(
 
 		if i == 0 {
 			// Action-level gutter
-			b.WriteString(c.fmtMsg(ansi.Cyan.Bold, seg))
+			b.WriteString(c.fmtMsg(colActionRail, seg))
 		} else {
 			// Op-level gutter
-			b.WriteString(c.fmtMsg(ansi.BrightBlack.Reg, seg))
+			b.WriteString(c.fmtMsg(colOpRail, seg))
 		}
 	}
 
@@ -463,10 +529,10 @@ func (c *cli) renderOpTree(
 	if isLast {
 		conn = "└─ "
 	}
-	b.WriteString(c.fmtMsg(ansi.BrightBlack.Reg, conn))
+	b.WriteString(c.fmtMsg(colOpRail, conn))
 
 	line := b.String()
-	line += c.fmtMsg(ansi.BrightBlack.Reg, op.Name)
+	line += c.fmtMsg(colOpHeader, op.Name)
 
 	if v >= signal.VV && op.Template != nil {
 		if text, ok := template.Render(
@@ -474,10 +540,11 @@ func (c *cli) renderOpTree(
 			op.Template.Text,
 			op.Template.Data,
 		); ok {
-			line += c.fmtfMsg(ansi.BrightBlack.Dim, " (%s)", text)
+			line += c.fmtfMsg(colOpDesc, " (%s)", text)
 		}
 	}
 
+	line = c.fmtMsg(colPlanRail, "│ ") + line
 	*out = append(*out, renderEvent{
 		stream: streamOut,
 		line:   line,
