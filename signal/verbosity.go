@@ -1,3 +1,4 @@
+//go:generate stringer -type=Verbosity
 package signal
 
 type Verbosity uint8

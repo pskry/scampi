@@ -373,6 +373,6 @@ func DiagnosticRaised(subject event.Subject, d Diagnostic) event.Event {
 			Template: d.EventTemplate(),
 		},
 		Severity:   d.Severity(),
-		Chattiness: event.Normal,
+		Chattiness: event.Subtle,
 	}
 }
