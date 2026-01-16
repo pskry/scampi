@@ -19,13 +19,15 @@ import (
 
 type (
 	CLIOptions struct {
-		ColorMode signal.ColorMode
-		Verbosity signal.Verbosity
+		ColorMode  signal.ColorMode
+		Verbosity  signal.Verbosity
+		ForceASCII bool
 	}
 
 	cli struct {
 		opts    CLIOptions
 		render  *renderer
+		glyphs  glyphSet
 		store   *spec.SourceStore
 		actions sync.Map // map[string]*actionState
 
@@ -45,41 +47,30 @@ type (
 		text     string
 		ok       bool
 	}
-)
+	glyphSet struct {
+		change string
+		ok     string
+		exec   string
+		warn   string
+		error  string
+		fatal  string
+		hint   string
+		help   string
 
-// Nerdfont state glyphs
-// ===============================================
-
-const (
-	// '󰏫' nf-md-pencil
-	// '󰄬' nf-md-check
-	// '󰄭' nf-md-check_all
-	// '󰗠' nf-md-check_circle
-	// '󰒓' nf-md-cog
-	// '󰼛' nf-md-play_outline
-	// '󰐊' nf-md-play
-	// '󰀦' nf-md-alert
-	// '󰀪' nf-md-alert_outline
-	// '󰈅' nf-md-exclamation
-	// '󰚌' nf-md-skull
-	// '󰯈' nf-md-skull_outline
-	// '󰅖' nf-md-close
-	// '󰌵' nf-md-lightbulb
-	// '󰌶' nf-md-lightbulb_outline
-	// '󰋖' nf-md-help
-	// '󰋗' nf-md-help_circle
-	// '󰘥' nf-md-help_circle_outline
-	// '󰡾' nf-md-lifebuoy
-	// '󰂭' nf-md-block_helper
-
-	symChange = '󰏫'
-	symOK     = '󰄬'
-	symExec   = '󰐊'
-	symWarn   = '󰀦'
-	symErr    = '󰅖'
-	symFatal  = '󰚌'
-	symHint   = '󰌵'
-	symHelp   = '󰋖'
+		// plan rails
+		planStart            string
+		planRail             string
+		planEnd              string
+		actionStart          string
+		actionStartNoOp      string
+		actionStartCollapsed string
+		actionRail           string
+		actionIndent         string
+		actionKindSep        string
+		actionEnd            string
+		opBranch             string
+		opLast               string
+	}
 )
 
 const (
@@ -102,8 +93,88 @@ var (
 	colOpDesc   = colOp.Dim
 )
 
+var (
+	fancyGlyphs = glyphSet{
+		// Nerdfont state glyphs
+		// ===============================================
+		// '󰏫' nf-md-pencil
+		// '󰄬' nf-md-check
+		// '󰄭' nf-md-check_all
+		// '󰗠' nf-md-check_circle
+		// '󰒓' nf-md-cog
+		// '󰼛' nf-md-play_outline
+		// '󰐊' nf-md-play
+		// '󰀦' nf-md-alert
+		// '󰀪' nf-md-alert_outline
+		// '󰈅' nf-md-exclamation
+		// '󰚌' nf-md-skull
+		// '󰯈' nf-md-skull_outline
+		// '󰅖' nf-md-close
+		// '󰌵' nf-md-lightbulb
+		// '󰌶' nf-md-lightbulb_outline
+		// '󰋖' nf-md-help
+		// '󰋗' nf-md-help_circle
+		// '󰘥' nf-md-help_circle_outline
+		// '󰡾' nf-md-lifebuoy
+		// '󰂭' nf-md-block_helper
+		change: "󰏫",
+		ok:     "󰄬",
+		exec:   "󰐊",
+		warn:   "󰀦",
+		error:  "󰅖",
+		fatal:  "󰚌",
+		hint:   "󰌵",
+		help:   "󰋖",
+
+		// plan rails
+		planStart:            "┌─┬",
+		planRail:             "│",
+		planEnd:              "└─■",
+		actionStart:          "┏━┯",
+		actionStartNoOp:      "┏━━",
+		actionStartCollapsed: "•",
+		actionRail:           "┇",
+		actionIndent:         "  ",
+		actionKindSep:        "›",
+		actionEnd:            "■",
+		opBranch:             "├─",
+		opLast:               "└─",
+	}
+
+	asciiGlyphs = glyphSet{
+		// State glyphs (ASCII-safe, semantic)
+		change: "~",
+		ok:     "+",
+		exec:   ">",
+		warn:   "!",
+		error:  "x",
+		fatal:  "X",
+		hint:   "?",
+		help:   "i",
+
+		// Plan rails
+		planStart:            "+--",
+		planRail:             "|",
+		planEnd:              "+-#",
+		actionStart:          "+--",
+		actionStartNoOp:      "+--",
+		actionStartCollapsed: "*",
+		actionRail:           "|",
+		actionIndent:         "  ",
+		actionKindSep:        ">",
+		actionEnd:            "#",
+		opBranch:             "|-",
+		opLast:               "`-",
+	}
+)
+
 func NewCLI(opts CLIOptions, store *spec.SourceStore) Displayer {
-	determineWidth := func() int {
+	glyphs := fancyGlyphs
+	if opts.ForceASCII {
+		glyphs = asciiGlyphs
+	}
+
+	width := func() int {
 		if cols := os.Getenv("COLUMNS"); cols != "" {
 			if n, err := strconv.Atoi(cols); err == nil && n > 0 {
 				return n
@@ -115,7 +186,7 @@ func NewCLI(opts CLIOptions, store *spec.SourceStore) Displayer {
 		}
 
 		return 0
-	}
+	}()
 
 	return &cli{
 		opts:  opts,
@@ -124,8 +195,9 @@ func NewCLI(opts CLIOptions, store *spec.SourceStore) Displayer {
 			os.Stdout,
 			os.Stderr,
 		),
-		isTTY: term.IsTerminal(os.Stdout.Fd()),
-		width: determineWidth(),
+		glyphs: glyphs,
+		isTTY:  term.IsTerminal(os.Stdout.Fd()),
+		width:  width,
 	}
 }
 
@@ -240,7 +312,7 @@ func (c *cli) renderEngineFinished(e event.Event) []renderEvent {
 			line: c.fmtfMsg(
 				ansi.BrightRed.Bold,
 				"[engine]%s failed: %v",
-				glyphr(symFatal),
+				glyphr(c.glyphs.fatal),
 				d.Err,
 			),
 		}}
@@ -291,7 +363,7 @@ func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
 			line: c.fmtfMsg(
 				ansi.Red.Reg,
 				"[plan]%s aborted: %d/%d unit%s planned, %d/%d unit%s failed (%s)",
-				glyphr(symFatal),
+				glyphr(c.glyphs.fatal),
 				d.SuccessfulUnits,
 				ttlUnits,
 				s(d.SuccessfulUnits),
@@ -323,7 +395,7 @@ func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 		line: c.fmtfMsg(
 			ansi.BrightBlack.Dim,
 			"[plan.unit]%s #%d %s '%s'",
-			glyphr(symOK),
+			glyphr(c.glyphs.ok),
 			e.Subject.Index,
 			e.Subject.Kind,
 			e.Subject.Name,
@@ -356,7 +428,7 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 		line:   "",
 	})
 
-	hdr := c.fmtMsg(colPlanRail, "┌─┬ ") +
+	hdr := c.fmtMsg(colPlanRail, c.glyphs.planStart+" ") +
 		c.fmtMsg(colPlanHeader, "execution plan")
 	out = append(out, renderEvent{
 		stream: streamOut,
@@ -389,7 +461,7 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 	for _, act := range dag.Actions {
 		kind := ""
 		if act.Kind != "" {
-			kind = fmt.Sprintf(" %s ›", act.Kind)
+			kind = fmt.Sprintf(" %s %s", act.Kind, c.glyphs.actionKindSep)
 		}
 
 		if v == signal.Quiet {
@@ -398,7 +470,7 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 				nOps += len(l)
 			}
 
-			line := c.fmtMsg(colActionRail, " •") +
+			line := c.fmtMsg(colActionRail, " "+c.glyphs.actionStartCollapsed) +
 				c.fmtfMsg(
 					colActionHeader,
 					" [%*d]%s %s",
@@ -424,7 +496,7 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 				opLine,
 			)
 
-			line = c.fmtMsg(colPlanRail, "│") + line
+			line = c.fmtMsg(colPlanRail, c.glyphs.planRail) + line
 
 			out = append(out, renderEvent{
 				stream: streamOut,
@@ -433,15 +505,13 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 			continue
 		}
 
-		gutter := "┏━"
-		if len(act.Layers) > 0 {
-			gutter += "┯"
-		} else {
-			gutter += "━"
+		gutter := c.glyphs.actionStart
+		if len(act.Layers) == 0 {
+			gutter = c.glyphs.actionStartNoOp
 		}
 
 		{
-			line := c.fmtMsg(colPlanRail, "│ ") +
+			line := c.fmtMsg(colPlanRail, c.glyphs.planRail+" ") +
 				c.fmtMsg(colActionRail, gutter) +
 				c.fmtfMsg(
 					colActionHeader,
@@ -473,8 +543,8 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 			)
 		}
 
-		line := c.fmtMsg(colPlanRail, "│ ") +
-			c.fmtMsg(colActionRail, "■")
+		line := c.fmtMsg(colPlanRail, c.glyphs.planRail+" ") +
+			c.fmtMsg(colActionRail, c.glyphs.actionEnd)
 
 		out = append(out, renderEvent{
 			stream: streamOut,
@@ -484,7 +554,7 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 
 	out = append(out, renderEvent{
 		stream: streamOut,
-		line:   c.fmtMsg(colPlanRail, "└─■"),
+		line:   c.fmtMsg(colPlanRail, c.glyphs.planEnd),
 	})
 
 	out = append(out, renderEvent{
@@ -509,10 +579,9 @@ func (c *cli) renderOpTree(
 	for i, cont := range prefix {
 		var seg string
 		if cont {
-			seg = "│ "
-			seg = "┇ "
+			seg = c.glyphs.actionRail + " "
 		} else {
-			seg = "   "
+			seg = c.glyphs.actionIndent
 		}
 
 		if i == 0 {
@@ -525,9 +594,9 @@ func (c *cli) renderOpTree(
 	}
 
 	// Connector for this node
-	conn := "├─ "
+	conn := c.glyphs.opBranch
 	if isLast {
-		conn = "└─ "
+		conn = c.glyphs.opLast
 	}
 	b.WriteString(c.fmtMsg(colOpRail, conn))
 
@@ -544,7 +613,7 @@ func (c *cli) renderOpTree(
 		}
 	}
 
-	line = c.fmtMsg(colPlanRail, "│ ") + line
+	line = c.fmtMsg(colPlanRail, c.glyphs.planRail+" ") + line
 	*out = append(*out, renderEvent{
 		stream: streamOut,
 		line:   line,
@@ -580,7 +649,7 @@ func (c *cli) renderActionFinished(e event.Event) []renderEvent {
 				ansi.Red.Reg,
 				"[%s]%s '%s' failed: %v",
 				st.id,
-				glyphr(symFatal),
+				glyphr(c.glyphs.fatal),
 				e.Subject.Action,
 				d.Err,
 			),
@@ -593,7 +662,7 @@ func (c *cli) renderActionFinished(e event.Event) []renderEvent {
 				ansi.Yellow.Reg,
 				"[%s]%s '%s' changed (%s)",
 				st.id,
-				glyphr(symChange),
+				glyphr(c.glyphs.change),
 				e.Subject.Action,
 				d.Duration,
 			),
@@ -606,7 +675,7 @@ func (c *cli) renderActionFinished(e event.Event) []renderEvent {
 				ansi.Green.Dim,
 				"[%s]%s '%s' up-to-date",
 				st.id,
-				glyphr(symOK),
+				glyphr(c.glyphs.ok),
 				e.Subject.Action,
 			),
 		}}
@@ -627,7 +696,7 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 			line: c.fmtfMsg(
 				ansi.BrightBlack.Dim,
 				"[%s]%s '%s' up-to-date",
-				st.id, glyphr(symOK), e.Subject.Op,
+				st.id, glyphr(c.glyphs.ok), e.Subject.Op,
 			),
 		}}
 
@@ -637,7 +706,7 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 			line: c.fmtfMsg(
 				ansi.BrightBlack.Dim,
 				"[%s]%s '%s' needs change",
-				st.id, glyphr(symChange), e.Subject.Op,
+				st.id, glyphr(c.glyphs.change), e.Subject.Op,
 			),
 		}}
 
@@ -647,7 +716,7 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 			line: c.fmtfMsg(
 				ansi.Yellow.Reg,
 				"[%s]%s check %s unknown: %v",
-				st.id, glyphr(symWarn), e.Subject.Op, d.Err,
+				st.id, glyphr(c.glyphs.warn), e.Subject.Op, d.Err,
 			),
 		}}
 	}
@@ -666,7 +735,7 @@ func (c *cli) renderOpExecuted(e event.Event) []renderEvent {
 			line: c.fmtfMsg(
 				ansi.Red.Reg,
 				"[%s]%s '%s' failed: %v",
-				st.id, glyphr(symFatal), e.Subject.Op, d.Err,
+				st.id, glyphr(c.glyphs.fatal), e.Subject.Op, d.Err,
 			),
 		}}
 
@@ -676,7 +745,7 @@ func (c *cli) renderOpExecuted(e event.Event) []renderEvent {
 			line: c.fmtfMsg(
 				ansi.BrightBlack.Reg,
 				"[%s]%s '%s' changed (%s)",
-				st.id, glyphr(symExec), e.Subject.Op, d.Duration,
+				st.id, glyphr(c.glyphs.exec), e.Subject.Op, d.Duration,
 			),
 		}}
 
@@ -699,7 +768,7 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 			d.Template,
 			"engine.error",
 			fmt.Sprintf(` in file %q`, sub.CfgPath),
-			symErr,
+			c.glyphs.error,
 			ansi.Red.Reg,
 			ansi.Cyan.Reg,
 		) {
@@ -713,7 +782,7 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 			d.Template,
 			"plan.error",
 			fmt.Sprintf(` in unit [%d|%s] '%s'`, sub.Index, sub.Kind, sub.Name),
-			symErr,
+			c.glyphs.error,
 			ansi.Red.Reg,
 			ansi.Cyan.Reg,
 		) {
@@ -736,7 +805,7 @@ func (c *cli) renderUnknownEvent(e event.Event) []renderEvent {
 		line: c.fmtfMsg(
 			ansi.Red.Reg,
 			"[unknown]%s unknown event kind '%s': %+v",
-			glyphr(symWarn), e.Kind, e,
+			glyphr(c.glyphs.warn), e.Kind, e,
 		),
 	}}
 }
@@ -801,7 +870,7 @@ func (c *cli) fmtfMsgTo(buf *strings.Builder, color ansi.Code, format string, ar
 	buf.WriteString(string(ansi.Reset))
 }
 
-func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, txtCol, helpCol ansi.Code) []string {
+func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph string, txtCol, helpCol ansi.Code) []string {
 	var buf strings.Builder
 
 	if text, ok := template.Render(tmpl.ID+".Text", tmpl.Text, tmpl.Data); ok {
@@ -824,7 +893,7 @@ func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, t
 			&buf,
 			helpCol,
 			"%s hint: %s",
-			glyphl(symHint), hint,
+			glyphl(c.glyphs.hint), hint,
 		)
 	}
 
@@ -834,7 +903,7 @@ func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph rune, t
 			&buf,
 			helpCol,
 			"%s help: %s",
-			glyphl(symHelp), help,
+			glyphl(c.glyphs.help), help,
 		)
 	}
 
@@ -904,7 +973,7 @@ func (c *cli) renderSourceBody(w io.Writer, v sourceLine) {
 			gutter,
 			caretPadding(v.text, v.startCol),
 		)
-		c.fmtMsgTo(w, ansi.Red.Reg, underlineRange(v.text, v.startCol, v.endCol))
+		c.fmtMsgTo(w, ansi.Red.Reg, underlineRange(v.startCol, v.endCol))
 	}
 }
 
@@ -936,7 +1005,7 @@ func caretPadding(line string, col int) string {
 	return b.String()
 }
 
-func underlineRange(line string, start, end int) string {
+func underlineRange(start, end int) string {
 	if end <= start {
 		return "^"
 	}
@@ -956,12 +1025,12 @@ func (c *cli) shouldUseColor() bool {
 	}
 }
 
-func glyphr(g rune) string {
-	return " " + string(g)
+func glyphr(g string) string {
+	return " " + g
 }
 
-func glyphl(g rune) string {
-	return string(g) + " "
+func glyphl(g string) string {
+	return g + " "
 }
 
 // Renderer
