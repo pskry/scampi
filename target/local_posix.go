@@ -21,7 +21,16 @@ func (LocalPosixTarget) WriteFile(_ context.Context, path string, data []byte, m
 }
 
 func (LocalPosixTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
-	return os.Stat(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("%w: %q", ErrNotExist, path)
+		}
+
+		return nil, err
+	}
+
+	return info, nil
 }
 
 func (LocalPosixTarget) Chown(_ context.Context, path string, owner Owner) error {
@@ -52,9 +61,11 @@ func (LocalPosixTarget) Chmod(_ context.Context, path string, mode fs.FileMode) 
 func (LocalPosixTarget) GetOwner(_ context.Context, path string) (Owner, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		// file might not exist yet or whatever
-		// don't fail, just signal that we need to run
-		return Owner{}, nil
+		if os.IsNotExist(err) {
+			return Owner{}, fmt.Errorf("%w: %q", ErrNotExist, path)
+		}
+
+		return Owner{}, err
 	}
 
 	stat, ok := info.Sys().(*syscall.Stat_t)

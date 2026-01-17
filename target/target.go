@@ -2,8 +2,11 @@ package target
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 )
+
+var ErrNotExist = errors.New("path does not exist")
 
 type (
 	// Target represents an execution environment.
@@ -29,3 +32,7 @@ type (
 		GetOwner(ctx context.Context, path string) (Owner, error)
 	}
 )
+
+func IsNotExist(err error) bool {
+	return errors.Is(err, ErrNotExist)
+}

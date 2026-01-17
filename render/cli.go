@@ -790,6 +790,20 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 		}
 		return events
 
+	case event.ScopeOp:
+		var events []renderEvent
+		for _, l := range c.fmtTemplate(
+			d.Template,
+			"plan.error",
+			fmt.Sprintf(` in unit [%d|%s] '%s'`, sub.Index, sub.Kind, sub.Name),
+			c.glyphs.error,
+			ansi.Red.Reg,
+			ansi.Cyan.Reg,
+		) {
+			events = append(events, renderEvent{stream: streamErr, line: l})
+		}
+		return events
+
 	default:
 		panic(fmt.Errorf(
 			"BUG: renderer encountered unsupported event scope %q for event %#v",

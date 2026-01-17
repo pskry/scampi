@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"reflect"
 
 	"godoit.dev/doit/source"
@@ -31,6 +32,7 @@ type (
 		mode  fs.FileMode
 		owner string
 		group string
+		unit  spec.UnitInstance
 	}
 )
 
@@ -57,6 +59,8 @@ func (c Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
 		mode:  mode,
 		owner: cfg.Owner,
 		group: cfg.Group,
+
+		unit: unit,
 	}, nil
 }
 
@@ -65,6 +69,10 @@ func (c *copyAction) Kind() string { return c.kind }
 
 func (c *copyAction) Ops() []spec.Op {
 	cp := &copyFileOp{
+		baseOp: baseOp{
+			srcSpan:  c.unit.Fields["src"].Value,
+			destSpan: c.unit.Fields["dest"].Value,
+		},
 		src:  c.src,
 		dest: c.dest,
 	}
@@ -94,8 +102,10 @@ func (c *copyAction) Ops() []spec.Op {
 
 type (
 	baseOp struct {
-		action spec.Action
-		deps   []spec.Op
+		action   spec.Action
+		deps     []spec.Op
+		srcSpan  spec.SourceSpan
+		destSpan spec.SourceSpan
 	}
 	copyFileOp struct {
 		baseOp
@@ -122,17 +132,32 @@ func (op *baseOp) setAction(action spec.Action) { op.action = action }
 
 func (op *copyFileOp) Name() string { return "copyFileOp" }
 func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
+	// source must exist
 	srcData, err := src.ReadFile(ctx, op.src)
 	if err != nil {
-		// fail if src file does not exist or is unreadable or whatever
-		// probably better using STAT in the future, but oh well
-		return spec.CheckUnsatisfied, err
+		return spec.CheckUnsatisfied, CopySourceMissing{
+			Path:   op.src,
+			Err:    err,
+			Source: op.srcSpan,
+		}
 	}
 
+	// destination parent must exist
+	if _, err := tgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
+		return spec.CheckUnsatisfied, CopyDestDirMissing{
+			Path:   filepath.Dir(op.dest),
+			Err:    err,
+			Source: op.destSpan,
+		}
+	}
+
+	// dest file comparison (expected drift)
 	destData, err := tgt.ReadFile(ctx, op.dest)
-	if err != nil || !bytes.Equal(srcData, destData) {
-		// we do not fail the playbook if dest doesn't exist, is unreadable, etc.
-		// we're just indicating that copyFileOp needs to run
+	if err != nil {
+		return spec.CheckUnsatisfied, nil
+	}
+
+	if !bytes.Equal(srcData, destData) {
 		return spec.CheckUnsatisfied, nil
 	}
 
@@ -159,14 +184,20 @@ func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target
 
 func (op *ensureOwnerOp) Name() string { return "ensureOwnerOp" }
 func (op *ensureOwnerOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
-	haveOwner, err := tgt.GetOwner(ctx, op.path)
+	have, err := tgt.GetOwner(ctx, op.path)
 	if err != nil {
+		// file missing -> expected drift
+		if target.IsNotExist(err) {
+			return spec.CheckUnsatisfied, nil
+		}
+
+		// FIXME: runtime error (perm, IO, etc.), what do we do here?
 		return spec.CheckUnknown, err
 	}
 
-	wantOwner := target.Owner{User: op.owner, Group: op.group}
+	want := target.Owner{User: op.owner, Group: op.group}
 	// TODO: this is probably a target concern
-	if !reflect.DeepEqual(haveOwner, wantOwner) {
+	if !reflect.DeepEqual(have, want) {
 		return spec.CheckUnsatisfied, nil
 	}
 
@@ -185,7 +216,13 @@ func (op *ensureModeOp) Name() string { return "ensureModeOp" }
 func (op *ensureModeOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	info, err := tgt.Stat(ctx, op.path)
 	if err != nil {
-		return spec.CheckUnsatisfied, nil
+		// file missing -> expected drift
+		if target.IsNotExist(err) {
+			return spec.CheckUnsatisfied, nil
+		}
+
+		// FIXME: runtime error (perm, IO, etc.), what do we do here?
+		return spec.CheckUnknown, nil
 	}
 
 	want := info.Mode()

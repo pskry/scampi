@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"godoit.dev/doit/diagnostic"
+	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
@@ -94,11 +95,27 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 			s.em.Emit(diagnostic.OpCheckStarted(actionName, opName))
 
 			res, err := n.op.Check(ctx, s.src, s.tgt)
-			s.em.Emit(diagnostic.OpChecked(actionName, opName, res, err))
 			if err != nil {
+				dr := emitDiagnostics(
+					s.em,
+					event.Subject{
+						Action: actionName,
+						Op:     opName,
+						Kind:   n.op.Action().Kind(),
+						Name:   n.op.Action().Name(),
+					},
+					err,
+				)
+
+				s.em.Emit(diagnostic.OpChecked(actionName, opName, res, err))
+				if dr.ShouldAbort() {
+					return AbortError{Causes: []error{err}}
+				}
+
 				return err
 			}
 
+			s.em.Emit(diagnostic.OpChecked(actionName, opName, res, nil))
 			n.satisfied = (res == spec.CheckSatisfied)
 			return nil
 		})
