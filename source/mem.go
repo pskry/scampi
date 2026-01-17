@@ -3,10 +3,13 @@ package source
 import (
 	"context"
 	"io/fs"
+	"sync"
 	"time"
 )
 
 type MemSource struct {
+	mu sync.RWMutex
+
 	Files    map[string][]byte
 	ModTimes map[string]time.Time
 }
@@ -19,6 +22,9 @@ func NewMemSource() *MemSource {
 }
 
 func (m *MemSource) ReadFile(_ context.Context, path string) ([]byte, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	data, ok := m.Files[path]
 	if !ok {
 		return nil, fs.ErrNotExist
@@ -30,6 +36,9 @@ func (m *MemSource) ReadFile(_ context.Context, path string) ([]byte, error) {
 }
 
 func (m *MemSource) WriteFile(_ context.Context, path string, data []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	cp := make([]byte, len(data))
 	copy(cp, data)
 	m.Files[path] = cp
@@ -42,6 +51,9 @@ func (m *MemSource) EnsureDir(_ context.Context, _ string) error {
 }
 
 func (m *MemSource) Stat(_ context.Context, path string) (FileMeta, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	data, ok := m.Files[path]
 	if !ok {
 		return FileMeta{Exists: false}, nil

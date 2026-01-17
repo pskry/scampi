@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sync"
 
 	"godoit.dev/doit/diagnostic/event"
 )
@@ -38,11 +39,14 @@ type ExpectedUnit struct {
 type (
 	events             []event.Event
 	recordingDisplayer struct {
+		mu     sync.Mutex
 		events events
 	}
 )
 
 func (r *recordingDisplayer) Emit(e event.Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.events = append(r.events, e)
 }
 
