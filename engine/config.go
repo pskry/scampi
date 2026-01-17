@@ -36,14 +36,8 @@ func (o overlayFS) Open(name string) (fs.File, error) {
 		return f, nil
 	}
 	if errors.Is(err, fs.ErrNotExist) {
-		s, err := o.Host.Open(name)
-		if err == nil {
-			return s, err
-		}
-
-		return s, err
+		return o.Host.Open(name)
 	}
-
 	return nil, err
 }
 

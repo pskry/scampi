@@ -2,6 +2,7 @@ package target
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"sync"
 	"time"
@@ -53,6 +54,15 @@ func (m *MemTarget) WriteFile(_ context.Context, path string, data []byte, perm 
 }
 
 func (m *MemTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
+	// Root directory always exists
+	if path == "/" {
+		return memFileInfo{
+			name:  "/",
+			mode:  fs.ModeDir | 0o755,
+			isDir: true,
+		}, nil
+	}
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -101,12 +111,11 @@ func (m *MemTarget) GetOwner(_ context.Context, path string) (Owner, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	owner, ok := m.Owners[path]
-	if !ok {
-		// mirror LocalPosixTarget behavior
-		return Owner{}, nil
+	if _, ok := m.Files[path]; !ok {
+		return Owner{}, fmt.Errorf("%w: %q", ErrNotExist, path)
 	}
-	return owner, nil
+
+	return m.Owners[path], nil
 }
 
 type memFileInfo struct {
@@ -114,11 +123,12 @@ type memFileInfo struct {
 	size    int64
 	mode    fs.FileMode
 	modTime time.Time
+	isDir   bool
 }
 
 func (i memFileInfo) Name() string       { return i.name }
 func (i memFileInfo) Size() int64        { return i.size }
 func (i memFileInfo) Mode() fs.FileMode  { return i.mode }
 func (i memFileInfo) ModTime() time.Time { return i.modTime }
-func (i memFileInfo) IsDir() bool        { return false }
+func (i memFileInfo) IsDir() bool        { return i.isDir }
 func (i memFileInfo) Sys() any           { return nil }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"reflect"
 
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
@@ -195,9 +194,7 @@ func (op *ensureOwnerOp) Check(ctx context.Context, src source.Source, tgt targe
 		return spec.CheckUnknown, err
 	}
 
-	want := target.Owner{User: op.owner, Group: op.group}
-	// TODO: this is probably a target concern
-	if !reflect.DeepEqual(have, want) {
+	if have.User != op.owner || have.Group != op.group {
 		return spec.CheckUnsatisfied, nil
 	}
 
@@ -225,8 +222,8 @@ func (op *ensureModeOp) Check(ctx context.Context, src source.Source, tgt target
 		return spec.CheckUnknown, nil
 	}
 
-	want := info.Mode()
-	if want != op.mode {
+	have := info.Mode()
+	if have != op.mode {
 		return spec.CheckUnsatisfied, nil
 	}
 

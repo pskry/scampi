@@ -89,22 +89,6 @@ func flattenLayers(layers [][]event.PlannedOp) []event.PlannedOp {
 	return out
 }
 
-func opDepth(op event.PlannedOp, index map[int]event.PlannedOp, memo map[int]int) int {
-	if d, ok := memo[op.Index]; ok {
-		return d
-	}
-	maxDepth := 0
-	for _, dep := range op.DependsOn {
-		if depOp, ok := index[dep]; ok {
-			if v := opDepth(depOp, index, memo) + 1; v > maxDepth {
-				maxDepth = v
-			}
-		}
-	}
-	memo[op.Index] = maxDepth
-	return maxDepth
-}
-
 func buildDepTree(ops []event.PlannedOp) map[int][]event.PlannedOp {
 	children := make(map[int][]event.PlannedOp)
 
