@@ -41,7 +41,7 @@ func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
 	}
 
 	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, noopEmitter{})
-	res, err := e.ExecutePlan(context.Background(), plan)
+	rep, err := e.ExecutePlan(context.Background(), plan)
 	if err != nil {
 		t.Fatalf("non-aborting diagnostics must not return error, got %v", err)
 	}
@@ -50,8 +50,24 @@ func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
 		t.Fatalf("op with warning diagnostics must be treated as needing execution")
 	}
 
-	if !res[0].Res.Changed {
-		t.Fatalf("op with warning diagnostics must execute")
+	if len(rep.Actions) != 1 {
+		t.Fatalf("expected exactly one action report")
+	}
+
+	ar := rep.Actions[0]
+
+	if len(ar.Ops) != 1 {
+		t.Fatalf("expected exactly one op report")
+	}
+
+	opRep := ar.Ops[0]
+
+	if opRep.Outcome != engine.OpSucceeded {
+		t.Fatalf("expected op to succeed, got outcome %v", opRep.Outcome)
+	}
+
+	if opRep.Result == nil || !opRep.Result.Changed {
+		t.Fatalf("op with warning diagnostics must execute and report Changed")
 	}
 }
 

@@ -41,26 +41,22 @@ func (e *Engine) Apply(ctx context.Context, cfgPath string, store *spec.SourceSt
 		return err
 	}
 
-	results, err := e.ExecutePlan(ctx, plan)
+	rep, err := e.ExecutePlan(ctx, plan)
 	if err != nil {
+		// fail-fast preserved
 		return err
 	}
 
-	rs := diagnostic.RunSummary{
-		ChangedCount: 0,
-		FailedCount:  0,
-		TotalCount:   len(results),
-	}
-	for _, res := range results {
-		if res.Res.Changed {
-			rs.ChangedCount++
-		}
-		if res.Err != nil {
-			rs.FailedCount++
-		}
+	// Derive RunSummary truthfully from execution report
+	var rs diagnostic.RunSummary
+
+	for _, ar := range rep.Actions {
+		rs.TotalCount += ar.Summary.Total
+		rs.ChangedCount += ar.Summary.Changed
+		rs.FailedCount += ar.Summary.Failed
 	}
 
 	e.em.Emit(diagnostic.EngineFinished(rs, time.Since(start), err))
 
-	return err
+	return nil
 }

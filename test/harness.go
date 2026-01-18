@@ -88,8 +88,53 @@ type (
 
 		checkFn checkFn
 		execFn  execFn
+
+		checkCalls int
+		execCalls  int
 	}
 )
+
+func okCheckFn(res spec.CheckResult) checkFn {
+	return func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+		return res, nil
+	}
+}
+
+func okExecFn(changed bool) execFn {
+	return func(context.Context, source.Source, target.Target) (spec.Result, error) {
+		return spec.Result{Changed: changed}, nil
+	}
+}
+
+func diagCheckFn(severity signal.Severity, impact diagnostic.Impact) checkFn {
+	return func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+		return spec.CheckUnknown, &fakeDiagnostic{
+			severity: severity,
+			impact:   impact,
+		}
+	}
+}
+
+func diagExecFn(severity signal.Severity, impact diagnostic.Impact) execFn {
+	return func(context.Context, source.Source, target.Target) (spec.Result, error) {
+		return spec.Result{}, &fakeDiagnostic{
+			severity: severity,
+			impact:   impact,
+		}
+	}
+}
+
+func errCheckFn(err error) checkFn {
+	return func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+		return spec.CheckUnknown, err
+	}
+}
+
+func errExecFn(err error) execFn {
+	return func(context.Context, source.Source, target.Target) (spec.Result, error) {
+		return spec.Result{}, err
+	}
+}
 
 func panicCheckFn(msg string) checkFn {
 	return func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
@@ -106,11 +151,13 @@ func panicExecFn(msg string) execFn {
 func (o fakeOp) Name() string         { return o.name }
 func (o fakeOp) Action() spec.Action  { return o.action }
 func (o fakeOp) DependsOn() []spec.Op { return o.deps }
-func (o fakeOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
+func (o *fakeOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
+	o.checkCalls++
 	return o.checkFn(ctx, src, tgt)
 }
 
-func (o fakeOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
+func (o *fakeOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
+	o.execCalls++
 	return o.execFn(ctx, src, tgt)
 }
 

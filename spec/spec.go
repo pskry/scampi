@@ -56,6 +56,7 @@ type (
 	OpDescription interface {
 		PlanTemplate() PlanTemplate
 	}
+
 	PlanTemplate struct {
 		ID   string
 		Text string
@@ -64,8 +65,9 @@ type (
 	Result struct {
 		Changed bool
 	}
-	CheckResult uint8
 )
+
+type CheckResult uint8
 
 const (
 	CheckUnknown CheckResult = iota
