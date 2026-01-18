@@ -45,7 +45,7 @@ func panicIfNotAbortError(err error) error {
 		_ = file
 		_ = line
 		details := runtime.FuncForPC(pc)
-		wrap = fmt.Errorf("BUG: engine.%s failed with non-signal error: %w", details.Name(), err)
+		wrap = fmt.Errorf("BUG: %s failed with non-signal error: %w", details.Name(), err)
 	}
 	panic(wrap)
 }

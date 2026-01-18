@@ -102,7 +102,6 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 						Action: actionName,
 						Op:     opName,
 						Kind:   n.op.Action().Kind(),
-						Name:   n.op.Action().Name(),
 					},
 					err,
 				)
@@ -157,8 +156,8 @@ func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) ([]ExecResult,
 func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) ([]ExecResult, error) {
 	var results []ExecResult
 
-	for _, act := range plan.Actions {
-		res, err := e.executeAction(ctx, act)
+	for i, act := range plan.Actions {
+		res, err := e.executeAction(ctx, i, act)
 		if err != nil {
 			return []ExecResult{}, err
 		}
@@ -169,7 +168,7 @@ func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) ([]ExecResult,
 	return results, nil
 }
 
-func (e *Engine) executeAction(ctx context.Context, act spec.Action) (spec.Result, error) {
+func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (spec.Result, error) {
 	start := time.Now()
 	name := act.Name()
 	e.em.Emit(diagnostic.ActionStarted(name))
@@ -177,16 +176,16 @@ func (e *Engine) executeAction(ctx context.Context, act spec.Action) (spec.Resul
 	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
-	res, err := e.runAction(actCtx, act)
+	res, err := e.runAction(actCtx, idx, act)
 	e.em.Emit(diagnostic.ActionFinished(name, res.Changed, time.Since(start), err))
 	if err != nil {
-		return spec.Result{}, fmt.Errorf("action %s failed: %w", name, err)
+		return spec.Result{}, err
 	}
 
 	return res, nil
 }
 
-func (e *Engine) runAction(ctx context.Context, act spec.Action) (spec.Result, error) {
+func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (spec.Result, error) {
 	nodes, err := buildPlan(act.Ops())
 	if err != nil {
 		return spec.Result{}, err
@@ -212,6 +211,23 @@ func (e *Engine) runAction(ctx context.Context, act spec.Action) (spec.Result, e
 	}
 
 	if err := s.grp.Wait(); err != nil {
+		dr, consumed := emitDiagnostics(
+			e.em,
+			event.Subject{
+				Index:  idx,
+				Action: act.Name(),
+				Kind:   act.Kind(),
+			},
+			err,
+		)
+		if dr.ShouldAbort() {
+			return spec.Result{}, AbortError{Causes: []error{err}}
+		}
+
+		if consumed {
+			return spec.Result{}, nil
+		}
+
 		return spec.Result{}, err
 	}
 

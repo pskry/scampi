@@ -48,6 +48,7 @@ type (
 		mu     sync.Mutex
 		events events
 	}
+	noopEmitter struct{}
 )
 
 func (r *recordingDisplayer) Emit(e event.Event) {
@@ -74,6 +75,8 @@ func (e events) String() string {
 	return "----- DIAGNOSTICS -----\n" +
 		string(j)
 }
+
+func (noopEmitter) Emit(event.Event) {}
 
 type (
 	checkFn func(context.Context, source.Source, target.Target) (spec.CheckResult, error)
@@ -118,6 +121,17 @@ type fakeAction struct {
 func (fakeAction) Kind() string     { return "fakeActionKind" }
 func (fakeAction) Name() string     { return "fakeAction" }
 func (a fakeAction) Ops() []spec.Op { return a.ops }
+
+func mkAction(ops ...*fakeOp) *fakeAction {
+	act := &fakeAction{}
+
+	for _, op := range ops {
+		act.ops = append(act.ops, op)
+		op.action = act
+	}
+
+	return act
+}
 
 type fakeDiagnostic struct {
 	severity signal.Severity

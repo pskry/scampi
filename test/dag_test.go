@@ -22,17 +22,6 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 		}
 	}
 
-	mkAction := func(ops ...*fakeOp) spec.Action {
-		act := &fakeAction{}
-
-		for _, op := range ops {
-			act.ops = append(act.ops, op)
-			op.action = act
-		}
-
-		return act
-	}
-
 	tests := []struct {
 		name      string
 		build     func() spec.Plan

@@ -18,12 +18,6 @@ import (
 // - diagnostics policy allows non-aborting diagnostics
 // - execution must continue pessimistically
 func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
-	ctx := context.Background()
-
-	recTgt := &target.Recorder{Inner: target.LocalPosixTarget{}}
-	rec := &recordingDisplayer{}
-	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
-
 	var execRan atomic.Bool
 
 	op := &fakeOp{
@@ -40,17 +34,14 @@ func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
 		},
 	}
 
-	act := &fakeAction{
-		ops: []spec.Op{op},
-	}
-	op.action = act
-
 	plan := spec.Plan{
-		Actions: []spec.Action{act},
+		Actions: []spec.Action{
+			mkAction(op),
+		},
 	}
 
-	e := engine.New(source.LocalPosixSource{}, recTgt, em)
-	res, err := e.ExecutePlan(ctx, plan)
+	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, noopEmitter{})
+	res, err := e.ExecutePlan(context.Background(), plan)
 	if err != nil {
 		t.Fatalf("non-aborting diagnostics must not return error, got %v", err)
 	}
@@ -65,11 +56,6 @@ func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
 }
 
 func TestCheck_NonAbortDiagnostic_AllowsSiblingOps(t *testing.T) {
-	ctx := context.Background()
-
-	rec := &recordingDisplayer{}
-	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
-
 	var ranA, ranB atomic.Bool
 
 	opA := &fakeOp{
@@ -97,18 +83,14 @@ func TestCheck_NonAbortDiagnostic_AllowsSiblingOps(t *testing.T) {
 		},
 	}
 
-	act := &fakeAction{
-		ops: []spec.Op{opA, opB},
-	}
-	opA.action = act
-	opB.action = act
-
 	plan := spec.Plan{
-		Actions: []spec.Action{act},
+		Actions: []spec.Action{
+			mkAction(opA, opB),
+		},
 	}
 
-	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, em)
-	_, err := e.ExecutePlan(ctx, plan)
+	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, noopEmitter{})
+	_, err := e.ExecutePlan(context.Background(), plan)
 	if err != nil {
 		t.Fatalf("non-abort diagnostics must not fail execution: %v", err)
 	}
@@ -119,11 +101,6 @@ func TestCheck_NonAbortDiagnostic_AllowsSiblingOps(t *testing.T) {
 }
 
 func TestCheck_AbortDiagnostic_StopsSiblingOps(t *testing.T) {
-	ctx := context.Background()
-
-	rec := &recordingDisplayer{}
-	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
-
 	opA := &fakeOp{
 		name: "A",
 		checkFn: func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
@@ -143,20 +120,136 @@ func TestCheck_AbortDiagnostic_StopsSiblingOps(t *testing.T) {
 		execFn: panicExecFn("execFn of B must not be called after aborting check"),
 	}
 
-	act := &fakeAction{
-		ops: []spec.Op{opA, opB},
-	}
-	opA.action = act
-	opB.action = act
-
 	plan := spec.Plan{
-		Actions: []spec.Action{act},
+		Actions: []spec.Action{
+			mkAction(opA, opB),
+		},
 	}
 
-	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, em)
-	_, err := e.ExecutePlan(ctx, plan)
+	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, noopEmitter{})
+	_, err := e.ExecutePlan(context.Background(), plan)
 
 	if err == nil {
 		t.Fatalf("abort diagnostic must abort execution")
+	}
+}
+
+func TestCheck_AbortDiagnostic_StopsActionExecution(t *testing.T) {
+	op := &fakeOp{
+		name: "abort-op",
+		checkFn: func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+			return spec.CheckUnsatisfied, fakeDiagnostic{
+				severity: signal.Error,
+				impact:   diagnostic.ImpactAbort,
+			}
+		},
+		execFn: panicExecFn("exec must not run after aborting check"),
+	}
+	noExecOp := &fakeOp{
+		name:    "no-exec-op",
+		checkFn: panicCheckFn("check must not run after abort"),
+		execFn:  panicExecFn("exec must not run after aborting check"),
+	}
+
+	plan := spec.Plan{
+		Actions: []spec.Action{
+			mkAction(op),
+			mkAction(noExecOp),
+		},
+	}
+
+	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, noopEmitter{})
+	_, err := e.ExecutePlan(context.Background(), plan)
+
+	if err == nil {
+		t.Fatalf("abort diagnostic must abort execution")
+	}
+}
+
+func TestCheck_NonAbortDiagnostic_AllowsSiblingExecution(t *testing.T) {
+	var ranA, ranB bool
+
+	opA := &fakeOp{
+		name: "A",
+		checkFn: func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+			return spec.CheckUnsatisfied, fakeDiagnostic{
+				severity: signal.Warning,
+				impact:   diagnostic.ImpactNone,
+			}
+		},
+		execFn: func(context.Context, source.Source, target.Target) (spec.Result, error) {
+			ranA = true
+			return spec.Result{Changed: true}, nil
+		},
+	}
+
+	opB := &fakeOp{
+		name: "B",
+		checkFn: func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+			return spec.CheckUnsatisfied, nil
+		},
+		execFn: func(context.Context, source.Source, target.Target) (spec.Result, error) {
+			ranB = true
+			return spec.Result{Changed: true}, nil
+		},
+	}
+
+	plan := spec.Plan{
+		Actions: []spec.Action{
+			mkAction(opA, opB),
+		},
+	}
+
+	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, noopEmitter{})
+	_, err := e.ExecutePlan(context.Background(), plan)
+	if err != nil {
+		t.Fatalf("non-abort diagnostics must not fail execution: %v", err)
+	}
+
+	if !ranA || !ranB {
+		t.Fatalf("all sibling ops must execute")
+	}
+}
+
+func TestExecute_FailedOp_BlocksDependentOps(t *testing.T) {
+	ctx := context.Background()
+
+	// parent op: executes and fails
+	parent := &fakeOp{
+		name: "parent",
+		checkFn: func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+			return spec.CheckUnsatisfied, nil
+		},
+		execFn: func(context.Context, source.Source, target.Target) (spec.Result, error) {
+			return spec.Result{}, fakeDiagnostic{
+				severity: signal.Error,
+				impact:   diagnostic.ImpactAbort,
+			}
+		},
+	}
+
+	// child op: must never execute
+	child := &fakeOp{
+		name: "child",
+		checkFn: func(context.Context, source.Source, target.Target) (spec.CheckResult, error) {
+			return spec.CheckUnsatisfied, nil
+		},
+		execFn: panicExecFn("exec must not run after parent failure"),
+	}
+
+	// dependency: child depends on parent
+	child.deps = append(child.deps, parent)
+
+	plan := spec.Plan{
+		Actions: []spec.Action{
+			mkAction(parent, child),
+		},
+	}
+
+	e := engine.New(source.LocalPosixSource{}, target.LocalPosixTarget{}, noopEmitter{})
+	_, err := e.ExecutePlan(ctx, plan)
+
+	if err == nil {
+		t.Fatalf("execution error must propagate")
 	}
 }
