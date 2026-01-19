@@ -9,6 +9,13 @@ import (
 	"godoit.dev/doit/spec"
 )
 
+type Impact uint8
+
+const (
+	ImpactAbort Impact = 1 << iota
+	ImpactNone  Impact = 0
+)
+
 type (
 	Emitter interface {
 		Emit(e event.Event)
@@ -16,6 +23,7 @@ type (
 	Diagnostic interface {
 		EventTemplate() event.Template
 		Severity() signal.Severity
+		Impact() Impact
 	}
 	DiagnosticProvider interface {
 		Diagnostics(subject event.Subject) []event.Event

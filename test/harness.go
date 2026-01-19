@@ -201,13 +201,8 @@ func (fakeDiagnostic) EventTemplate() event.Template {
 	}
 }
 
-func (d fakeDiagnostic) Severity() signal.Severity {
-	return d.severity
-}
-
-func (d fakeDiagnostic) Impact() diagnostic.Impact {
-	return d.impact
-}
+func (d fakeDiagnostic) Severity() signal.Severity { return d.severity }
+func (d fakeDiagnostic) Impact() diagnostic.Impact { return d.impact }
 
 func absPath(p string) string {
 	r, err := filepath.Abs(p)

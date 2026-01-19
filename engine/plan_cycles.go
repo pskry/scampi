@@ -41,9 +41,8 @@ func (e CyclicDependency) EventTemplate() event.Template {
 	}
 }
 
-func (e CyclicDependency) Severity() signal.Severity {
-	return signal.Error
-}
+func (e CyclicDependency) Severity() signal.Severity { return signal.Error }
+func (CyclicDependency) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
 func DetectPlanCycles(em diagnostic.Emitter, plan spec.Plan) error {
 	cycles := detectPlanCycles(plan)

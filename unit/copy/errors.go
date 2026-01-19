@@ -36,9 +36,8 @@ func (e CopySourceMissing) EventTemplate() event.Template {
 	}
 }
 
-func (CopySourceMissing) Severity() signal.Severity {
-	return signal.Error
-}
+func (CopySourceMissing) Severity() signal.Severity { return signal.Error }
+func (CopySourceMissing) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type CopyDestDirMissing struct {
 	Path   string
@@ -67,9 +66,8 @@ func (e CopyDestDirMissing) EventTemplate() event.Template {
 	}
 }
 
-func (CopyDestDirMissing) Severity() signal.Severity {
-	return signal.Error
-}
+func (CopyDestDirMissing) Severity() signal.Severity { return signal.Error }
+func (CopyDestDirMissing) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type UserNotFound struct {
 	User   string
@@ -97,9 +95,8 @@ func (e UserNotFound) EventTemplate() event.Template {
 	}
 }
 
-func (UserNotFound) Severity() signal.Severity {
-	return signal.Error
-}
+func (UserNotFound) Severity() signal.Severity { return signal.Error }
+func (UserNotFound) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type GroupNotFound struct {
 	Group  string
@@ -127,9 +124,8 @@ func (e GroupNotFound) EventTemplate() event.Template {
 	}
 }
 
-func (GroupNotFound) Severity() signal.Severity {
-	return signal.Error
-}
+func (GroupNotFound) Severity() signal.Severity { return signal.Error }
+func (GroupNotFound) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type OwnerReadError struct {
 	Path   string
@@ -161,9 +157,8 @@ func (e OwnerReadError) EventTemplate() event.Template {
 	}
 }
 
-func (OwnerReadError) Severity() signal.Severity {
-	return signal.Error
-}
+func (OwnerReadError) Severity() signal.Severity { return signal.Error }
+func (OwnerReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type ModeReadError struct {
 	Path   string
@@ -195,6 +190,5 @@ func (e ModeReadError) EventTemplate() event.Template {
 	}
 }
 
-func (ModeReadError) Severity() signal.Severity {
-	return signal.Error
-}
+func (ModeReadError) Severity() signal.Severity { return signal.Error }
+func (ModeReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

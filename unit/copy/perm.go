@@ -43,9 +43,8 @@ func (e InvalidPermission) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidPermission) Severity() signal.Severity {
-	return signal.Error
-}
+func (InvalidPermission) Severity() signal.Severity { return signal.Error }
+func (InvalidPermission) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 var (
 	octalRe = regexp.MustCompile(`^0[0-7]{3}$`)

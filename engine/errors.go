@@ -69,12 +69,9 @@ func emitDiagnostics(
 	for _, ev := range dp.Diagnostics(subject) {
 		em.Emit(ev)
 
-		// determine impact
-		impact := diagnostic.ImpactAbort // safe default
-		if ip, ok := err.(diagnostic.ImpactProvider); ok {
-			impact = ip.Impact()
+		if d, ok := err.(diagnostic.Diagnostic); ok {
+			res.add(d.Impact())
 		}
-		res.add(impact)
 	}
 
 	return res, true

@@ -61,9 +61,8 @@ func (d CueDiagnostic) EventTemplate() event.Template {
 	}
 }
 
-func (d CueDiagnostic) Severity() signal.Severity {
-	return signal.Error
-}
+func (CueDiagnostic) Severity() signal.Severity { return signal.Error }
+func (CueDiagnostic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type CueMissingField struct {
 	Field      string
@@ -104,9 +103,7 @@ func (d MissingFieldDiagnostic) Diagnostics(subject event.Subject) []event.Event
 }
 
 func (MissingFieldDiagnostic) Severity() signal.Severity { return signal.Error }
-func (MissingFieldDiagnostic) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
+func (MissingFieldDiagnostic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type InvalidUnitsShape struct {
 	Source spec.SourceSpan
@@ -138,13 +135,8 @@ func (e InvalidUnitsShape) EventTemplate() event.Template {
 	}
 }
 
-func (e InvalidUnitsShape) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (InvalidUnitsShape) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
+func (e InvalidUnitsShape) Severity() signal.Severity { return signal.Error }
+func (InvalidUnitsShape) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
 type UnknownUnitKind struct {
 	Kind   string
@@ -172,6 +164,5 @@ func (e UnknownUnitKind) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownUnitKind) Severity() signal.Severity {
-	return signal.Error
-}
+func (UnknownUnitKind) Severity() signal.Severity { return signal.Error }
+func (UnknownUnitKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
