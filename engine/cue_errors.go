@@ -145,3 +145,33 @@ func (e InvalidUnitsShape) Severity() signal.Severity {
 func (InvalidUnitsShape) Impact() diagnostic.Impact {
 	return diagnostic.ImpactAbort
 }
+
+type UnknownUnitKind struct {
+	Kind   string
+	Source spec.SourceSpan
+}
+
+func (e UnknownUnitKind) Error() string {
+	return fmt.Sprintf("unknown unit kind %q", e.Kind)
+}
+
+func (e UnknownUnitKind) Diagnostics(subject event.Subject) []event.Event {
+	return []event.Event{
+		diagnostic.DiagnosticRaised(subject, e),
+	}
+}
+
+func (e UnknownUnitKind) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "config.UnknownUnitKind",
+		Text:   `unknown unit kind "{{.Kind}}"`,
+		Hint:   "check that the unit kind is spelled correctly",
+		Help:   "available kinds are registered in the engine; see documentation for supported unit types",
+		Source: &e.Source,
+		Data:   e,
+	}
+}
+
+func (UnknownUnitKind) Severity() signal.Severity {
+	return signal.Error
+}

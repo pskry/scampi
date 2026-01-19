@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"slices"
 	"sync"
@@ -354,11 +353,10 @@ func buildPlan(ops []spec.Op) ([]*opNode, error) {
 		for _, dep := range n.op.DependsOn() {
 			dn, ok := nodes[dep]
 			if !ok {
-				// FIXME: error
-				return nil, fmt.Errorf(
-					"op %q depends on unknown op %q",
+				panic(util.BUG(
+					"op %q depends on unknown op %q (UnitType implementation error)",
 					n.op.Name(), dep.Name(),
-				)
+				))
 			}
 
 			n.deps = append(n.deps, dn)
@@ -394,8 +392,7 @@ func buildPlan(ops []spec.Op) ([]*opNode, error) {
 	}
 
 	if visited != len(nodes) {
-		// FIXME: error
-		return nil, fmt.Errorf("cycle detected in op graph")
+		panic(util.BUG("cycle detected in op graph (UnitType implementation error)"))
 	}
 
 	for _, n := range nodes {

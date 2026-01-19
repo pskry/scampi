@@ -354,8 +354,10 @@ func decodeUnit(
 		dr, _ := emitDiagnostics(
 			em,
 			subject,
-			// FIXME: error
-			fmt.Errorf("unknown unit kind %q", kind),
+			UnknownUnitKind{
+				Kind:   kind,
+				Source: unitSpan,
+			},
 		)
 		return spec.UnitInstance{}, decodeResult{
 			abort: dr.ShouldAbort(),
