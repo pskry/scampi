@@ -7,6 +7,7 @@ import (
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/engine"
+	"godoit.dev/doit/model"
 	"godoit.dev/doit/signal"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
@@ -62,7 +63,7 @@ func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
 
 	opRep := ar.Ops[0]
 
-	if opRep.Outcome != engine.OpSucceeded {
+	if opRep.Outcome != model.OpSucceeded {
 		t.Fatalf("expected op to succeed, got outcome %v", opRep.Outcome)
 	}
 

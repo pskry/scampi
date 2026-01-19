@@ -6,6 +6,7 @@ import (
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/engine"
+	"godoit.dev/doit/model"
 	"godoit.dev/doit/signal"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
@@ -56,9 +57,9 @@ func TestExecuteAction_AllOpsSkipped(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpSkipped)
-	mustOpOutcome(t, ar, "B", engine.OpSkipped)
-	mustOpOutcome(t, ar, "C", engine.OpSkipped)
+	mustOpOutcome(t, ar, "A", model.OpSkipped)
+	mustOpOutcome(t, ar, "B", model.OpSkipped)
+	mustOpOutcome(t, ar, "C", model.OpSkipped)
 }
 
 // Dependency graph:
@@ -106,9 +107,9 @@ func TestExecuteAction_LinearSuccess(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpSucceeded)
-	mustOpOutcome(t, ar, "B", engine.OpSucceeded)
-	mustOpOutcome(t, ar, "C", engine.OpSucceeded)
+	mustOpOutcome(t, ar, "A", model.OpSucceeded)
+	mustOpOutcome(t, ar, "B", model.OpSucceeded)
+	mustOpOutcome(t, ar, "C", model.OpSucceeded)
 }
 
 // Dependency graph:
@@ -174,9 +175,9 @@ func TestExecuteAction_FailFast_MiddleOfChain(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpSucceeded)
-	mustOpOutcome(t, ar, "B", engine.OpFailed)
-	mustOpOutcome(t, ar, "C", engine.OpAborted)
+	mustOpOutcome(t, ar, "A", model.OpSucceeded)
+	mustOpOutcome(t, ar, "B", model.OpFailed)
+	mustOpOutcome(t, ar, "C", model.OpAborted)
 }
 
 // Dependency graph:
@@ -239,10 +240,10 @@ func TestExecuteAction_BranchFailure(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpSucceeded)
-	mustOpOutcome(t, ar, "B", engine.OpSucceeded)
-	mustOpOutcome(t, ar, "C", engine.OpFailed)
-	mustOpOutcome(t, ar, "D", engine.OpAborted)
+	mustOpOutcome(t, ar, "A", model.OpSucceeded)
+	mustOpOutcome(t, ar, "B", model.OpSucceeded)
+	mustOpOutcome(t, ar, "C", model.OpFailed)
+	mustOpOutcome(t, ar, "D", model.OpAborted)
 }
 
 // Dependency graph:
@@ -277,7 +278,7 @@ func TestExecuteAction_CheckDiagnostic_Continues(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpSucceeded)
+	mustOpOutcome(t, ar, "A", model.OpSucceeded)
 }
 
 // Dependency graph:
@@ -316,8 +317,8 @@ func TestExecuteAction_AbortDuringCheck(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpAborted)
-	mustOpOutcome(t, ar, "B", engine.OpAborted)
+	mustOpOutcome(t, ar, "A", model.OpAborted)
+	mustOpOutcome(t, ar, "B", model.OpAborted)
 }
 
 // Dependency graph:
@@ -362,9 +363,9 @@ func TestExecuteAction_AbortDuringExecution(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpSucceeded)
-	mustOpOutcome(t, ar, "B", engine.OpFailed)
-	mustOpOutcome(t, ar, "C", engine.OpAborted)
+	mustOpOutcome(t, ar, "A", model.OpSucceeded)
+	mustOpOutcome(t, ar, "B", model.OpFailed)
+	mustOpOutcome(t, ar, "C", model.OpAborted)
 }
 
 // Dependency graph:
@@ -421,11 +422,11 @@ func TestExecuteAction_SkippedUpstream_ExecutesDownstream(t *testing.T) {
 	}
 
 	ar := mustSingleAction(t, rep)
-	mustOpOutcome(t, ar, "A", engine.OpSkipped)
-	mustOpOutcome(t, ar, "B", engine.OpSucceeded)
+	mustOpOutcome(t, ar, "A", model.OpSkipped)
+	mustOpOutcome(t, ar, "B", model.OpSucceeded)
 }
 
-func mustSingleAction(t *testing.T, rep engine.ExecutionReport) engine.ActionReport {
+func mustSingleAction(t *testing.T, rep model.ExecutionReport) model.ActionReport {
 	t.Helper()
 
 	if len(rep.Actions) != 1 {
@@ -436,10 +437,10 @@ func mustSingleAction(t *testing.T, rep engine.ExecutionReport) engine.ActionRep
 
 func mustOpOutcome(
 	t *testing.T,
-	ar engine.ActionReport,
+	ar model.ActionReport,
 	opName string,
-	want engine.OpOutcome,
-) engine.OpReport {
+	want model.OpOutcome,
+) model.OpReport {
 	t.Helper()
 
 	for _, op := range ar.Ops {
@@ -457,5 +458,5 @@ func mustOpOutcome(
 	}
 
 	t.Fatalf("op %q not found in action report", opName)
-	return engine.OpReport{}
+	return model.OpReport{}
 }

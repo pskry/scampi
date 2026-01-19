@@ -10,6 +10,7 @@ import (
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/diagnostic/event"
+	"godoit.dev/doit/model"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
@@ -19,54 +20,19 @@ import (
 
 const actionTimeout = 5 * time.Second
 
-type OpOutcome uint8
+const opOutcomeUnknown = model.OpOutcome(0xff)
 
-const (
-	OpOutcomeUnknown OpOutcome = iota // internal only
-	OpSucceeded
-	OpFailed
-	OpAborted
-	OpSkipped
-)
-
-type ExecutionReport struct {
-	Actions []ActionReport
-	Err     error // terminal error for the run (abort / failure), if any
-}
-type ActionReport struct {
-	Action spec.Action
-
-	Ops []OpReport
-
-	Summary ActionSummary
-}
-type OpReport struct {
-	Op      spec.Op
-	Outcome OpOutcome
-
-	Result *spec.Result
-	Err    error
-}
-type ActionSummary struct {
-	Total     int
-	Succeeded int
-	Failed    int
-	Aborted   int
-	Skipped   int
-	Changed   int
-}
-
-func (r OpReport) validate() {
+func validateOpReport(r model.OpReport) {
 	switch r.Outcome {
-	case OpSucceeded:
+	case model.OpSucceeded:
 		if r.Result == nil || r.Err != nil {
 			panic("BUG: succeeded op must have result only")
 		}
-	case OpFailed, OpAborted:
+	case model.OpFailed, model.OpAborted:
 		if r.Err == nil || r.Result != nil {
 			panic("BUG: failed/aborted op must have err only")
 		}
-	case OpSkipped:
+	case model.OpSkipped:
 		if r.Result != nil || r.Err != nil {
 			panic("BUG: skipped op must have no result or err")
 		}
@@ -85,7 +51,7 @@ type opNode struct {
 
 	satisfied bool
 
-	outcome OpOutcome
+	outcome model.OpOutcome
 	result  *spec.Result
 	err     error
 }
@@ -117,11 +83,11 @@ func (s *scheduler) schedule(n *opNode) {
 
 		s.em.Emit(diagnostic.OpExecuted(actionName, opName, res.Changed, time.Since(start), err))
 		if err == nil {
-			n.outcome = OpSucceeded
+			n.outcome = model.OpSucceeded
 			n.err = nil
 			n.result = &res
 		} else {
-			n.outcome = OpFailed
+			n.outcome = model.OpFailed
 			n.err = err
 			n.result = nil
 			return err
@@ -173,7 +139,7 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 
 				s.em.Emit(diagnostic.OpChecked(actionName, opName, res, err))
 				if dr.ShouldAbort() {
-					n.outcome = OpAborted
+					n.outcome = model.OpAborted
 					n.err = err
 					return AbortError{Causes: []error{err}}
 				}
@@ -188,7 +154,7 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 			s.em.Emit(diagnostic.OpChecked(actionName, opName, res, nil))
 			if res == spec.CheckSatisfied {
 				n.satisfied = true
-				n.outcome = OpSkipped
+				n.outcome = model.OpSkipped
 				return nil
 			}
 
@@ -218,7 +184,7 @@ func (s *scheduler) initPending(nodes []*opNode) {
 	}
 }
 
-func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) (ExecutionReport, error) {
+func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, error) {
 	res, err := e.executePlan(ctx, plan)
 	if err != nil {
 		return res, panicIfNotAbortError(err)
@@ -226,8 +192,8 @@ func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) (ExecutionRepo
 	return res, nil
 }
 
-func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (ExecutionReport, error) {
-	var rep ExecutionReport
+func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, error) {
+	var rep model.ExecutionReport
 
 	for i, act := range plan.Actions {
 		res, err := e.executeAction(ctx, i, act)
@@ -242,7 +208,7 @@ func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (ExecutionRepo
 	return rep, nil
 }
 
-func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (ActionReport, error) {
+func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (model.ActionReport, error) {
 	start := time.Now()
 	name := act.Name()
 	e.em.Emit(diagnostic.ActionStarted(name))
@@ -268,10 +234,10 @@ func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (A
 	return res, nil
 }
 
-func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (ActionReport, error) {
+func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model.ActionReport, error) {
 	nodes, err := buildPlan(act.Ops())
 	if err != nil {
-		return ActionReport{}, err
+		return model.ActionReport{}, err
 	}
 
 	s := &scheduler{
@@ -285,8 +251,8 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (Actio
 	if err != nil {
 		// mark remaining ops as aborted
 		for _, n := range nodes {
-			if n.outcome == OpOutcomeUnknown {
-				n.outcome = OpAborted
+			if n.outcome == opOutcomeUnknown {
+				n.outcome = model.OpAborted
 				n.err = err
 			}
 		}
@@ -305,8 +271,8 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (Actio
 	err = s.grp.Wait()
 	if err != nil {
 		for _, n := range nodes {
-			if n.outcome == OpOutcomeUnknown {
-				n.outcome = OpAborted
+			if n.outcome == opOutcomeUnknown {
+				n.outcome = model.OpAborted
 				n.err = err
 			}
 		}
@@ -315,7 +281,7 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (Actio
 buildReport:
 	// Enforce invariant: every op MUST have an outcome
 	for _, n := range nodes {
-		if n.outcome == OpOutcomeUnknown {
+		if n.outcome == opOutcomeUnknown {
 			panic(util.BUG("op left without outcome"))
 		}
 	}
@@ -338,32 +304,32 @@ buildReport:
 	}
 
 	// Build ActionReport
-	var rep ActionReport
+	var rep model.ActionReport
 	rep.Action = act
 
 	for _, n := range nodes {
-		or := OpReport{
+		or := model.OpReport{
 			Op:      n.op,
 			Outcome: n.outcome,
 			Result:  n.result,
 			Err:     n.err,
 		}
-		or.validate()
+		validateOpReport(or)
 		rep.Ops = append(rep.Ops, or)
 
 		rep.Summary.Total++
 
 		switch n.outcome {
-		case OpSucceeded:
+		case model.OpSucceeded:
 			rep.Summary.Succeeded++
 			if n.result != nil && n.result.Changed {
 				rep.Summary.Changed++
 			}
-		case OpFailed:
+		case model.OpFailed:
 			rep.Summary.Failed++
-		case OpAborted:
+		case model.OpAborted:
 			rep.Summary.Aborted++
-		case OpSkipped:
+		case model.OpSkipped:
 			rep.Summary.Skipped++
 		}
 	}
@@ -378,7 +344,7 @@ func buildPlan(ops []spec.Op) ([]*opNode, error) {
 		nodes[op] = &opNode{
 			op: op,
 			// explicit invariants
-			outcome: OpOutcomeUnknown,
+			outcome: opOutcomeUnknown,
 			result:  nil,
 			err:     nil,
 		}
