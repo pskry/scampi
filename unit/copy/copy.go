@@ -3,13 +3,13 @@ package copy
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/fs"
 	"path/filepath"
 
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
+	"godoit.dev/doit/util"
 )
 
 type (
@@ -41,7 +41,7 @@ func (Copy) NewConfig() any { return &CopyConfig{} }
 func (c Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
 	cfg, ok := unit.Config.(*CopyConfig)
 	if !ok {
-		return nil, fmt.Errorf("expected %T got %T", &CopyConfig{}, unit.Config)
+		return nil, util.BUG("expected %T got %T", &CopyConfig{}, unit.Config)
 	}
 
 	mode, err := parsePerm(cfg.Perm, unit.Fields["perm"].Value)

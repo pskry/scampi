@@ -26,18 +26,18 @@ func validateOpReport(r model.OpReport) {
 	switch r.Outcome {
 	case model.OpSucceeded:
 		if r.Result == nil || r.Err != nil {
-			panic("BUG: succeeded op must have result only")
+			panic(util.BUG("succeeded op must have result only, had error: %w", r.Err))
 		}
 	case model.OpFailed, model.OpAborted:
 		if r.Err == nil || r.Result != nil {
-			panic("BUG: failed/aborted op must have err only")
+			panic(util.BUG("failed/aborted op must have err only, had result: %+v", r.Result))
 		}
 	case model.OpSkipped:
 		if r.Result != nil || r.Err != nil {
-			panic("BUG: skipped op must have no result or err")
+			panic(util.BUG("skipped op must have no result or err"))
 		}
 	default:
-		panic("BUG: unknown op outcome")
+		panic(util.BUG("unknown op outcome"))
 	}
 }
 

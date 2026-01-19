@@ -238,7 +238,7 @@ func parseColorMode(cmd *cli.Command) (signal.ColorMode, error) {
 	case "never":
 		return signal.ColorNever, nil
 	default:
-		return 0, fmt.Errorf("invalid --color value %q (expected auto, always, or never)", s)
+		return 0, util.Errorf("invalid --color value %q (expected auto, always, or never)", s)
 	}
 }
 

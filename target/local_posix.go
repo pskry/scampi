@@ -2,7 +2,6 @@ package target
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"os"
 	"os/user"
@@ -26,7 +25,7 @@ func (LocalPosixTarget) Stat(_ context.Context, path string) (fs.FileInfo, error
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %q", ErrNotExist, path)
+			return nil, util.WrapErrf(ErrNotExist, "%q", path)
 		}
 
 		return nil, err
@@ -64,7 +63,7 @@ func (LocalPosixTarget) GetOwner(_ context.Context, path string) (Owner, error) 
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Owner{}, fmt.Errorf("%w: %q", ErrNotExist, path)
+			return Owner{}, util.WrapErrf(ErrNotExist, "%q", path)
 		}
 
 		return Owner{}, err

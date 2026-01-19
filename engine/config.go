@@ -200,7 +200,7 @@ func loadConfigWithSource(
 
 	userInstances := load.Instances([]string{cfgPath}, loaderCfg)
 	if len(userInstances) == 0 {
-		panic("util.BUG: load.Instances returned zero instances")
+		panic(util.BUG("load.Instances returned zero instances for '%s'", cfgPath))
 	}
 	if err := userInstances[0].Err; err != nil {
 		var ce cueerr.Error
@@ -239,7 +239,7 @@ func loadConfigWithSource(
 
 	coreInstances := load.Instances([]string{"godoit.dev/doit/core"}, loaderCfg)
 	if len(coreInstances) == 0 {
-		panic("util.BUG: load.Instances returned zero core-instances")
+		panic(util.BUG("load.Instances returned zero core-instances"))
 	}
 	if err := coreInstances[0].Err; err != nil {
 		return spec.Config{}, err

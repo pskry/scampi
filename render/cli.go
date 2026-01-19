@@ -228,7 +228,7 @@ func (c *cli) Emit(e event.Event) {
 	// fit lines before committing to draw loop
 	for i := range events {
 		if strings.ContainsAny(events[i].line, "\n\r") {
-			panic("util.BUG: renderEvent.line must neither contain '\\n' nor '\\r'")
+			panic(util.BUG("renderEvent.line must neither contain '\\n' nor '\\r'"))
 		}
 		events[i].line = fitLine(events[i].line, c.width)
 		if c.shouldUseColor() {

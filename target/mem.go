@@ -2,10 +2,11 @@ package target
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"sync"
 	"time"
+
+	"godoit.dev/doit/util"
 )
 
 type MemTarget struct {
@@ -112,7 +113,7 @@ func (m *MemTarget) GetOwner(_ context.Context, path string) (Owner, error) {
 	defer m.mu.RUnlock()
 
 	if _, ok := m.Files[path]; !ok {
-		return Owner{}, fmt.Errorf("%w: %q", ErrNotExist, path)
+		return Owner{}, util.WrapErrf(ErrNotExist, "%q", path)
 	}
 
 	return m.Owners[path], nil
