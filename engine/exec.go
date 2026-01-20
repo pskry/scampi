@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"slices"
@@ -234,9 +235,9 @@ func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (m
 }
 
 func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model.ActionReport, error) {
-	nodes, err := buildPlan(act.Ops())
-	if err != nil {
-		return model.ActionReport{}, err
+	nodes, planErr := buildPlan(act.Ops())
+	if planErr != nil {
+		return model.ActionReport{}, planErr
 	}
 
 	s := &scheduler{
@@ -246,28 +247,25 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 	}
 	s.grp, s.ctx = errgroup.WithContext(ctx)
 
-	err = s.runChecks(nodes)
-	if err != nil {
-		// mark remaining ops as aborted
+	checkErr := s.runChecks(nodes)
+
+	var execErr error
+	if checkErr == nil {
+		s.initPending(nodes)
+
 		for _, n := range nodes {
-			if n.outcome == opOutcomeUnknown {
-				n.outcome = model.OpAborted
-				n.err = err
+			if !n.satisfied && n.pending == 0 {
+				s.schedule(n)
 			}
 		}
-		// SKIP scheduling entirely
-		goto buildReport
+
+		execErr = s.grp.Wait()
 	}
 
-	s.initPending(nodes)
+	// First error wins
+	err := cmp.Or(checkErr, execErr)
 
-	for _, n := range nodes {
-		if !n.satisfied && n.pending == 0 {
-			s.schedule(n)
-		}
-	}
-
-	err = s.grp.Wait()
+	// Mark any ops without outcome as aborted
 	if err != nil {
 		for _, n := range nodes {
 			if n.outcome == opOutcomeUnknown {
@@ -276,8 +274,6 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 			}
 		}
 	}
-
-buildReport:
 	// Enforce invariant: every op MUST have an outcome
 	for _, n := range nodes {
 		if n.outcome == opOutcomeUnknown {

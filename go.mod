@@ -10,6 +10,7 @@ require (
 	github.com/urfave/cli/v3 v3.6.1
 	golang.org/x/perf v0.0.0-20260112171951-5abaabe9f1bd
 	golang.org/x/sync v0.19.0
+	golang.org/x/tools v0.40.0
 )
 
 replace cuelang.org/go => github.com/pskry/cue v0.0.0-20260103154650-0a3f5647eaf1
@@ -221,7 +222,6 @@ require (
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	golang.org/x/tools v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
