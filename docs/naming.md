@@ -197,9 +197,33 @@ type Plan struct {
 
 ---
 
-## 5. Target
+## 5. Source and Target
 
-A **Target** represents the execution environment.
+**Source** and **Target** are the two execution environment abstractions.
+
+### Source
+
+A **Source** is where configuration data originates.
+
+```go
+type Source interface {
+    ReadFile(ctx, path) ([]byte, error)
+    WriteFile(ctx, path, data) error   // for caching
+    EnsureDir(ctx, path) error         // for caching
+    Stat(ctx, path) (FileMeta, error)
+}
+```
+
+* Supports both read and write (write is for caching, not mutation)
+* Examples: local filesystem, git repository, S3 bucket, remote storage
+* Used to fetch files that will be distributed to targets
+
+The write operations exist for caching scenarios: downloading an ISO once
+and caching it locally before distributing to many targets.
+
+### Target
+
+A **Target** is where changes are applied.
 
 ```go
 type Target interface {
@@ -208,17 +232,26 @@ type Target interface {
 }
 ```
 
-Examples:
-
-* `LocalPosixTarget`
-* (future) `SshPosixTarget`
-* (future) `WindowsTarget`
+* The managed system(s)
+* Examples: local filesystem, SSH remote, container, cloud instance
 
 Key rule:
 
 > Ops must treat the target as the **authority for system behavior**.
 
 Platform-specific logic belongs in targets, not ops.
+
+### Source vs Target
+
+| Aspect       | Source           | Target             |
+| ------------ | ---------------- | ------------------ |
+| Role         | Data origin      | Change destination |
+| Read         | Yes              | Yes                |
+| Write        | For caching only | For mutations      |
+| Multiplicity | Typically one    | Often many         |
+
+Both are abstract interfaces. The local POSIX implementations are development
+defaults, not the only options. Users will configure these in the future.
 
 ---
 
@@ -266,13 +299,14 @@ Extensibility is achieved by **clear boundaries**, not abstractions.
 
 ## 8. Summary table
 
-| Concept           | CUE  | Go           |
-| ----------------- | ---- | ------------ |
-| Declarative work  | unit | UnitInstance |
-| Semantic category | kind | UnitType     |
-| Planned execution | —    | Action       |
-| Executable step   | —    | Op           |
-| Execution env     | —    | Target       |
+| Concept            | CUE  | Go           |
+| ------------------ | ---- | ------------ |
+| Declarative work   | unit | UnitInstance |
+| Semantic category  | kind | UnitType     |
+| Planned execution  | —    | Action       |
+| Executable step    | —    | Op           |
+| Data origin        | —    | Source       |
+| Change destination | —    | Target       |
 
 ---
 
