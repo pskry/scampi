@@ -82,34 +82,33 @@ func (s *scheduler) schedule(n *opNode) {
 		res, err := n.op.Execute(s.ctx, s.src, s.tgt)
 
 		s.em.Emit(diagnostic.OpExecuted(actionName, opName, res.Changed, time.Since(start), err))
-		if err == nil {
-			n.outcome = model.OpSucceeded
-			n.err = nil
-			n.result = &res
-		} else {
+
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		if err != nil {
 			n.outcome = model.OpFailed
 			n.err = err
 			n.result = nil
 			return err
 		}
 
-		{ // critical section start
-			s.mu.Lock()
-			s.results = append(s.results, res)
+		n.outcome = model.OpSucceeded
+		n.err = nil
+		n.result = &res
+		s.results = append(s.results, res)
 
-			// unblock unsatisfied dependents
-			for _, d := range n.dependents {
-				if d.satisfied {
-					continue
-				}
-
-				d.pending--
-				if d.pending == 0 {
-					s.schedule(d)
-				}
+		// unblock unsatisfied dependents
+		for _, d := range n.dependents {
+			if d.satisfied {
+				continue
 			}
-			s.mu.Unlock()
-		} // critical section end
+
+			d.pending--
+			if d.pending == 0 {
+				s.schedule(d)
+			}
+		}
 
 		return nil
 	})
@@ -139,8 +138,10 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 
 				s.em.Emit(diagnostic.OpChecked(actionName, opName, res, err))
 				if dr.ShouldAbort() {
+					s.mu.Lock()
 					n.outcome = model.OpAborted
 					n.err = err
+					s.mu.Unlock()
 					return AbortError{Causes: []error{err}}
 				}
 
@@ -152,13 +153,15 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 			}
 
 			s.em.Emit(diagnostic.OpChecked(actionName, opName, res, nil))
+
+			s.mu.Lock()
 			if res == spec.CheckSatisfied {
 				n.satisfied = true
 				n.outcome = model.OpSkipped
-				return nil
+			} else {
+				n.satisfied = false
 			}
-
-			n.satisfied = false
+			s.mu.Unlock()
 			return nil
 		})
 	}
@@ -253,11 +256,15 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 	if checkErr == nil {
 		s.initPending(nodes)
 
+		// Hold lock while reading node state to avoid race with goroutines
+		// decrementing pending counts
+		s.mu.Lock()
 		for _, n := range nodes {
 			if !n.satisfied && n.pending == 0 {
 				s.schedule(n)
 			}
 		}
+		s.mu.Unlock()
 
 		execErr = s.grp.Wait()
 	}
