@@ -41,8 +41,12 @@ func TestExecuteAction_AllOpsSkipped(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB, opC),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB, opC),
+			},
 		},
 	}
 
@@ -91,8 +95,12 @@ func TestExecuteAction_LinearSuccess(t *testing.T) {
 	opC.deps = []spec.Op{opB}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB, opC),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB, opC),
+			},
 		},
 	}
 
@@ -148,8 +156,12 @@ func TestExecuteAction_FailFast_MiddleOfChain(t *testing.T) {
 	act = mkAction(opA, opB, opC)
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			act,
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				act,
+			},
 		},
 	}
 
@@ -221,8 +233,12 @@ func TestExecuteAction_BranchFailure(t *testing.T) {
 	opD.deps = []spec.Op{opC}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB, opC, opD),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB, opC, opD),
+			},
 		},
 	}
 
@@ -262,8 +278,12 @@ func TestExecuteAction_CheckDiagnostic_Continues(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA),
+			},
 		},
 	}
 
@@ -305,8 +325,12 @@ func TestExecuteAction_AbortDuringCheck(t *testing.T) {
 	opB.deps = []spec.Op{opA}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB),
+			},
 		},
 	}
 
@@ -351,8 +375,12 @@ func TestExecuteAction_AbortDuringExecution(t *testing.T) {
 	opC.deps = []spec.Op{opB}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB, opC),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB, opC),
+			},
 		},
 	}
 
@@ -394,8 +422,12 @@ func TestExecuteAction_SkippedUpstream_ExecutesDownstream(t *testing.T) {
 	opB.deps = []spec.Op{opA}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB),
+			},
 		},
 	}
 
@@ -444,7 +476,8 @@ func mustOpOutcome(
 	t.Helper()
 
 	for _, op := range ar.Ops {
-		if op.Op.Name() == opName {
+		fo, ok := op.Op.(*fakeOp)
+		if ok && fo.name == opName {
 			if op.Outcome != want {
 				t.Fatalf(
 					"op %q: expected outcome %v, got %v",

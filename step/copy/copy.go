@@ -15,7 +15,7 @@ import (
 type (
 	Copy       struct{}
 	CopyConfig struct {
-		Name  string
+		Desc  string
 		Src   string
 		Dest  string
 		Perm  string
@@ -24,34 +24,34 @@ type (
 	}
 	copyAction struct {
 		idx   int
-		name  string
+		desc  string
 		kind  string
 		src   string
 		dest  string
 		mode  fs.FileMode
 		owner string
 		group string
-		unit  spec.UnitInstance
+		step  spec.StepInstance
 	}
 )
 
 func (Copy) Kind() string   { return "copy" }
 func (Copy) NewConfig() any { return &CopyConfig{} }
 
-func (c Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
-	cfg, ok := unit.Config.(*CopyConfig)
+func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+	cfg, ok := step.Config.(*CopyConfig)
 	if !ok {
-		return nil, util.BUG("expected %T got %T", &CopyConfig{}, unit.Config)
+		return nil, util.BUG("expected %T got %T", &CopyConfig{}, step.Config)
 	}
 
-	mode, err := parsePerm(cfg.Perm, unit.Fields["perm"].Value)
+	mode, err := parsePerm(cfg.Perm, step.Fields["perm"].Value)
 	if err != nil {
 		return nil, err
 	}
 
 	return &copyAction{
 		idx:   idx,
-		name:  cfg.Name,
+		desc:  cfg.Desc,
 		kind:  c.Kind(),
 		src:   cfg.Src,
 		dest:  cfg.Dest,
@@ -59,25 +59,25 @@ func (c Copy) Plan(idx int, unit spec.UnitInstance) (spec.Action, error) {
 		owner: cfg.Owner,
 		group: cfg.Group,
 
-		unit: unit,
+		step: step,
 	}, nil
 }
 
-func (c *copyAction) Name() string { return c.name }
+func (c *copyAction) Desc() string { return c.desc }
 func (c *copyAction) Kind() string { return c.kind }
 
 func (c *copyAction) Ops() []spec.Op {
 	cp := &copyFileOp{
 		baseOp: baseOp{
-			srcSpan:  c.unit.Fields["src"].Value,
-			destSpan: c.unit.Fields["dest"].Value,
+			srcSpan:  c.step.Fields["src"].Value,
+			destSpan: c.step.Fields["dest"].Value,
 		},
 		src:  c.src,
 		dest: c.dest,
 	}
 	chown := &ensureOwnerOp{
 		baseOp: baseOp{
-			destSpan: c.unit.Fields["dest"].Value,
+			destSpan: c.step.Fields["dest"].Value,
 		},
 		path:  c.dest,
 		owner: c.owner,
@@ -85,7 +85,7 @@ func (c *copyAction) Ops() []spec.Op {
 	}
 	chmod := &ensureModeOp{
 		baseOp: baseOp{
-			destSpan: c.unit.Fields["dest"].Value,
+			destSpan: c.step.Fields["dest"].Value,
 		},
 		path: c.dest,
 		mode: c.mode,
@@ -135,7 +135,6 @@ func (op *baseOp) DependsOn() []spec.Op         { return op.deps }
 func (op *baseOp) addDependency(dep spec.Op)    { op.deps = append(op.deps, dep) }
 func (op *baseOp) setAction(action spec.Action) { op.action = action }
 
-func (op *copyFileOp) Name() string { return "copyFileOp" }
 func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	// source must exist
 	srcData, err := src.ReadFile(ctx, op.src)
@@ -187,7 +186,6 @@ func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target
 	return spec.Result{Changed: true}, nil
 }
 
-func (op *ensureOwnerOp) Name() string { return "ensureOwnerOp" }
 func (op *ensureOwnerOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
 	have, err := tgt.GetOwner(ctx, op.path)
 	if err != nil {
@@ -235,7 +233,6 @@ func (op *ensureOwnerOp) Execute(ctx context.Context, _ source.Source, tgt targe
 	return spec.Result{Changed: changed}, nil
 }
 
-func (op *ensureModeOp) Name() string { return "ensureModeOp" }
 func (op *ensureModeOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
 	info, err := tgt.Stat(ctx, op.path)
 	if err != nil {

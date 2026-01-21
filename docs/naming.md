@@ -23,9 +23,9 @@ The engine translates this into *how to make it so* in **Go**.
 The core flow is:
 
 ```
-CUE unit (kind + fields)
+CUE step (kind + fields)
         ↓
-Go UnitType
+Go StepType
         ↓
 Action (planned execution)
         ↓
@@ -43,14 +43,14 @@ Every name in the codebase exists to make this flow obvious.
 CUE is the **user-facing, declarative language**.
 Go adapts to CUE concepts — not the other way around.
 
-### Unit
+### Step
 
-A **unit** is a *single declarative unit of work* defined by the user.
+A **step** is a *single declarative step of work* defined by the user.
 
 Example:
 
 ```cue
-units: [
+steps: [
     builtin.copy & {
         name:  "copy config"
         src:   "./src.yml"
@@ -64,7 +64,7 @@ units: [
 
 ### Kind
 
-A **kind** identifies *what type of unit this is*.
+A **kind** identifies *what type of step this is*.
 
 * Stored as `meta.kind`
 * Examples: `"copy"`, `"service"`, `"package"`
@@ -77,9 +77,9 @@ Kinds are semantic categories, not implementations.
 
 Go code mirrors the CUE model, but separates **definition**, **instance**, and **execution**.
 
-### UnitType
+### StepType
 
-A **UnitType** represents a CUE *kind* in Go.
+A **StepType** represents a CUE *kind* in Go.
 
 It defines:
 
@@ -87,7 +87,7 @@ It defines:
 * how to plan execution
 
 ```go
-type UnitType interface {
+type StepType interface {
     Kind() string
     NewConfig() any
     Plan(idx int, cfg any) (Action, error)
@@ -96,39 +96,39 @@ type UnitType interface {
 
 Key points:
 
-* There is exactly one `UnitType` per CUE kind
-* `UnitType` is *not* an implementation detail
+* There is exactly one `StepType` per CUE kind
+* `StepType` is *not* an implementation detail
 * Avoid `Impl`, `Handler`, or `Spec` suffixes
 
-> A unit has a **type**, not an "implementation".
+> A step has a **type**, not an "implementation".
 
 ---
 
-### UnitInstance
+### StepInstance
 
-A **UnitInstance** represents one concrete unit declared by the user.
+A **StepInstance** represents one concrete step declared by the user.
 
 ```go
-type UnitInstance struct {
+type StepInstance struct {
     Name   string
-    Type   UnitType
+    Type   StepType
     Config any
 }
 ```
 
 * Created by decoding user CUE
-* Couples user data with its `UnitType`
+* Couples user data with its `StepType`
 * Exists only during planning
 
 ---
 
 ### Registry
 
-The **Registry** maps CUE kinds to Go `UnitType`s.
+The **Registry** maps CUE kinds to Go `StepType`s.
 
 ```go
 type Registry struct {
-    types map[string]spec.UnitType
+    types map[string]spec.StepType
 }
 ```
 
@@ -145,7 +145,7 @@ The registry is intentionally explicit and centralized.
 
 ### Action
 
-An **Action** is the planned execution of one unit instance.
+An **Action** is the planned execution of one step instance.
 
 ```go
 type Action interface {
@@ -154,7 +154,7 @@ type Action interface {
 }
 ```
 
-* Produced by `UnitType.Plan`
+* Produced by `StepType.Plan`
 * Still declarative
 * Not yet tied to a target
 
@@ -266,7 +266,7 @@ defaults, not the only options. Users will configure these in the future.
 ### Canonical directories
 
 ```
-unit/          # UnitType implementations (one per kind)
+step/          # StepType implementations (one per kind)
 engine/        # Planning and execution engine
 spec/          # Core domain interfaces and types
 target/        # Execution environments
@@ -276,9 +276,9 @@ cue/           # Embedded CUE schema
 Example:
 
 ```
-unit/
+step/
   copy/
-    copy.go   # type Copy implements UnitType
+    copy.go   # type Copy implements StepType
 ```
 
 ---
@@ -301,8 +301,8 @@ Extensibility is achieved by **clear boundaries**, not abstractions.
 
 | Concept            | CUE  | Go           |
 | ------------------ | ---- | ------------ |
-| Declarative work   | unit | UnitInstance |
-| Semantic category  | kind | UnitType     |
+| Declarative work   | step | StepInstance |
+| Semantic category  | kind | StepType     |
 | Planned execution  | —    | Action       |
 | Executable step    | —    | Op           |
 | Data origin        | —    | Source       |
@@ -315,6 +315,6 @@ Extensibility is achieved by **clear boundaries**, not abstractions.
 If you are unsure how to name something, ask:
 
 > "Where does this live in the
-> **unit → type → action → op → target** flow?"
+> **step → type → action → op → target** flow?"
 
 If the name doesn't answer that clearly, it's wrong.

@@ -123,12 +123,16 @@ func assertDiagnostics(
 			}
 		}
 
-		if exp.Unit != nil {
-			if ev.Subject.Index != exp.Unit.Index {
-				t.Fatalf("[%d] expected unit index %d, got %d", i, exp.Unit.Index, ev.Subject.Index)
+		if exp.Step != nil {
+			sub, ok := ev.Subject.(event.PlanSubject)
+			if !ok {
+				t.Fatalf("[%d] expected PlanSubject, got %T", i, ev.Subject)
 			}
-			if ev.Subject.Kind != exp.Unit.Kind {
-				t.Fatalf("[%d] expected unit kind %q, got %q", i, exp.Unit.Kind, ev.Subject.Kind)
+			if sub.StepIndex != exp.Step.Index {
+				t.Fatalf("[%d] expected step index %d, got %d", i, exp.Step.Index, sub.StepIndex)
+			}
+			if sub.StepKind != exp.Step.Kind {
+				t.Fatalf("[%d] expected step kind %q, got %q", i, exp.Step.Kind, sub.StepKind)
 			}
 		}
 	}

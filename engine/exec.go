@@ -61,10 +61,24 @@ type scheduler struct {
 	tgt target.Target
 	em  diagnostic.Emitter
 
+	// action context for building event.Subject
+	actIdx  int
+	actKind string
+	actDesc string
+
 	mu      sync.Mutex
 	results []spec.Result
 	grp     *errgroup.Group
 	ctx     context.Context
+}
+
+func (s *scheduler) opSubject(op spec.Op) event.OpSubject {
+	return event.OpSubject{
+		StepIndex: s.actIdx,
+		StepKind:  s.actKind,
+		StepDesc:  s.actDesc,
+		DisplayID: diagnostic.OpDisplayID(op),
+	}
 }
 
 func (s *scheduler) schedule(n *opNode) {
@@ -74,14 +88,13 @@ func (s *scheduler) schedule(n *opNode) {
 
 	s.grp.Go(func() error {
 		start := time.Now()
-		actionName := n.op.Action().Name()
-		opName := n.op.Name()
+		subj := s.opSubject(n.op)
 
-		s.em.Emit(diagnostic.OpExecuteStarted(actionName, opName))
+		s.em.EmitOpLifecycle(diagnostic.OpExecuteStarted(subj))
 
 		res, err := n.op.Execute(s.ctx, s.src, s.tgt)
 
-		s.em.Emit(diagnostic.OpExecuted(actionName, opName, res.Changed, time.Since(start), err))
+		s.em.EmitOpLifecycle(diagnostic.OpExecuted(subj, res.Changed, time.Since(start), err))
 
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -120,23 +133,14 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 	for _, n := range nodes {
 		n := n
 		g.Go(func() error {
-			actionName := n.op.Action().Name()
-			opName := n.op.Name()
-			s.em.Emit(diagnostic.OpCheckStarted(actionName, opName))
+			subj := s.opSubject(n.op)
+			s.em.EmitOpLifecycle(diagnostic.OpCheckStarted(subj))
 
 			res, err := n.op.Check(ctx, s.src, s.tgt)
 			if err != nil {
-				dr, consumed := emitDiagnostics(
-					s.em,
-					event.Subject{
-						Action: actionName,
-						Op:     opName,
-						Kind:   n.op.Action().Kind(),
-					},
-					err,
-				)
+				dr, consumed := emitDiagnostics(s.em, subj, err)
 
-				s.em.Emit(diagnostic.OpChecked(actionName, opName, res, err))
+				s.em.EmitOpLifecycle(diagnostic.OpChecked(subj, res, err))
 				if dr.ShouldAbort() {
 					s.mu.Lock()
 					n.outcome = model.OpAborted
@@ -152,7 +156,7 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 				return err
 			}
 
-			s.em.Emit(diagnostic.OpChecked(actionName, opName, res, nil))
+			s.em.EmitOpLifecycle(diagnostic.OpChecked(subj, res, nil))
 
 			s.mu.Lock()
 			if res == spec.CheckSatisfied {
@@ -198,7 +202,7 @@ func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) (model.Executi
 func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, error) {
 	var rep model.ExecutionReport
 
-	for i, act := range plan.Actions {
+	for i, act := range plan.Unit.Actions {
 		res, err := e.executeAction(ctx, i, act)
 		rep.Actions = append(rep.Actions, res)
 		if err != nil {
@@ -213,17 +217,20 @@ func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (model.Executi
 
 func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (model.ActionReport, error) {
 	start := time.Now()
-	name := act.Name()
-	e.em.Emit(diagnostic.ActionStarted(name))
+	kind := act.Kind()
+	desc := act.Desc()
+	e.em.EmitActionLifecycle(diagnostic.ActionStarted(idx, kind, desc))
 
 	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
 	res, err := e.runAction(actCtx, idx, act)
 
-	e.em.Emit(
+	e.em.EmitActionLifecycle(
 		diagnostic.ActionFinished(
-			name,
+			idx,
+			kind,
+			desc,
 			res.Summary,
 			time.Since(start),
 			err,
@@ -244,9 +251,12 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 	}
 
 	s := &scheduler{
-		src: e.src,
-		tgt: e.tgt,
-		em:  e.em,
+		src:     e.src,
+		tgt:     e.tgt,
+		em:      e.em,
+		actIdx:  idx,
+		actKind: act.Kind(),
+		actDesc: act.Desc(),
 	}
 	s.grp, s.ctx = errgroup.WithContext(ctx)
 
@@ -271,7 +281,6 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 
 	// First error wins
 	err := cmp.Or(checkErr, execErr)
-
 	// Mark any ops without outcome as aborted
 	if err != nil {
 		for _, n := range nodes {
@@ -291,10 +300,10 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 	if err != nil {
 		dr, consumed := emitDiagnostics(
 			e.em,
-			event.Subject{
-				Index:  idx,
-				Action: act.Name(),
-				Kind:   act.Kind(),
+			event.ActionSubject{
+				StepIndex: idx,
+				StepKind:  act.Kind(),
+				StepDesc:  act.Desc(),
 			},
 			err,
 		)
@@ -357,8 +366,8 @@ func buildPlan(ops []spec.Op) ([]*opNode, error) {
 			dn, ok := nodes[dep]
 			if !ok {
 				panic(util.BUG(
-					"op %q depends on unknown op %q (UnitType implementation error)",
-					n.op.Name(), dep.Name(),
+					"op %p depends on unknown op %p (StepType implementation error)",
+					n.op, dep,
 				))
 			}
 
@@ -395,7 +404,7 @@ func buildPlan(ops []spec.Op) ([]*opNode, error) {
 	}
 
 	if visited != len(nodes) {
-		panic(util.BUG("cycle detected in op graph (UnitType implementation error)"))
+		panic(util.BUG("cycle detected in op graph (StepType implementation error)"))
 	}
 
 	for _, n := range nodes {

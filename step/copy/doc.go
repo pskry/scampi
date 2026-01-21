@@ -1,4 +1,4 @@
-// Package copy implements the builtin copy unit.
+// Package copy implements the builtin copy step.
 //
 // It defines copy-related actions and operations, including checks and execution
 // behavior specific to filesystem copying.

@@ -6,7 +6,7 @@
       "scope": "ScopePlan",
       "severity": "Error",
       "kind": "DiagnosticRaised",
-      "unit": {
+      "step": {
         "index": 0,
         "kind": "copy"
       }

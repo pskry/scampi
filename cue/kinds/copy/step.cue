@@ -1,11 +1,8 @@
 package copy
 
-#Unit: close({
-	meta: {
-		kind: "copy"
-	}
-
-	name:  string
+#Step: close({
+	_kind: "copy"
+	desc?: string
 	src:   string
 	dest:  string
 	perm:  string

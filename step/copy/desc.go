@@ -1,6 +1,8 @@
 package copy
 
-import "godoit.dev/doit/spec"
+import (
+	"godoit.dev/doit/spec"
+)
 
 type copyFileDesc struct {
 	Src  string

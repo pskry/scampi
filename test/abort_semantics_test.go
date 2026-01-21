@@ -36,8 +36,12 @@ func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(op),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(op),
+			},
 		},
 	}
 
@@ -101,8 +105,11 @@ func TestCheck_NonAbortDiagnostic_AllowsSiblingOps(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB),
+		Unit: spec.Unit{
+			ID: "fakeUnit",
+			Actions: []spec.Action{
+				mkAction(opA, opB),
+			},
 		},
 	}
 
@@ -138,8 +145,12 @@ func TestCheck_AbortDiagnostic_StopsSiblingOps(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB),
+			},
 		},
 	}
 
@@ -169,9 +180,13 @@ func TestCheck_AbortDiagnostic_StopsActionExecution(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(op),
-			mkAction(noExecOp),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(op),
+				mkAction(noExecOp),
+			},
 		},
 	}
 
@@ -212,8 +227,12 @@ func TestCheck_NonAbortDiagnostic_AllowsSiblingExecution(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(opA, opB),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(opA, opB),
+			},
 		},
 	}
 
@@ -258,8 +277,12 @@ func TestExecute_FailedOp_BlocksDependentOps(t *testing.T) {
 	child.deps = append(child.deps, parent)
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(parent, child),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(parent, child),
+			},
 		},
 	}
 

@@ -1,3 +1,4 @@
+//go:generate stringer -type=CheckResult
 package spec
 
 import (
@@ -9,22 +10,27 @@ import (
 
 type (
 	Config struct {
-		Units   []UnitInstance
+		Unit    UnitInstance
+		Steps   []StepInstance
 		Sources SourceStore
 	}
 	UnitInstance struct {
-		Name   string
-		Type   UnitType
+		ID   UnitID
+		Desc string
+	}
+	StepInstance struct {
+		Desc   string // optional human description
+		Type   StepType
 		Config any
 		Source SourceSpan
 		Fields map[string]FieldSpan
 	}
-	UnitType interface {
+	StepType interface {
 		Kind() string
 		// NewConfig MUST return a pointer to a freshly allocated config struct.
 		// Returning a value will cause undefined behavior.
 		NewConfig() any
-		Plan(idx int, unit UnitInstance) (Action, error)
+		Plan(idx int, step StepInstance) (Action, error)
 	}
 	FieldSpan struct {
 		Field SourceSpan
@@ -38,15 +44,20 @@ type (
 	}
 
 	Plan struct {
+		Unit Unit
+	}
+	UnitID string
+	Unit   struct {
+		ID      UnitID
+		Desc    string
 		Actions []Action
 	}
 	Action interface {
-		Name() string
+		Desc() string // optional human description
 		Kind() string
 		Ops() []Op
 	}
 	Op interface {
-		Name() string
 		Action() Action
 		Check(ctx context.Context, src source.Source, tgt target.Target) (CheckResult, error)
 		Execute(ctx context.Context, src source.Source, tgt target.Target) (Result, error)

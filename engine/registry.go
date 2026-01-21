@@ -2,23 +2,23 @@ package engine
 
 import (
 	"godoit.dev/doit/spec"
-	"godoit.dev/doit/unit/copy"
+	"godoit.dev/doit/step/copy"
 )
 
 type Registry struct {
-	types map[string]spec.UnitType
+	types map[string]spec.StepType
 }
 
 func NewRegistry() *Registry {
 	// TODO: this probably needs to be automatic at some point
 	// also: this would be where we need to put extensions
 	// for now (probably a while) this is just a manual list
-	types := []spec.UnitType{
+	types := []spec.StepType{
 		copy.Copy{},
 	}
 
 	r := &Registry{}
-	r.types = make(map[string]spec.UnitType)
+	r.types = make(map[string]spec.StepType)
 	for _, spec := range types {
 		r.types[spec.Kind()] = spec
 	}
@@ -26,7 +26,7 @@ func NewRegistry() *Registry {
 	return r
 }
 
-func (r *Registry) Type(kind string) (spec.UnitType, bool) {
-	spec, ok := r.types[kind]
-	return spec, ok
+func (r *Registry) StepType(kind string) (spec.StepType, bool) {
+	step, ok := r.types[kind]
+	return step, ok
 }

@@ -153,6 +153,12 @@ func (s sourceFS) Open(name string) (fs.File, error) {
 	return newMemFile(name, data), nil
 }
 
+const (
+	cueUnit   = "unit"
+	cueUnitID = "id"
+	cueSteps  = "steps"
+)
+
 // LoadConfig decodes and validates user configuration.
 // It returns ONLY user-facing configuration errors.
 // All other failures are engine or environment bugs and will panic.
@@ -178,27 +184,11 @@ func LoadConfigWithSource(
 	store *spec.SourceStore,
 	src source.Source,
 ) (cfg spec.Config, err error) {
-	// Guard against panics in the CUE library (known upstream bugs).
-	// Convert to a user-facing diagnostic rather than crashing.
-	defer func() {
-		if r := recover(); r != nil {
-			panicErr := CuePanic{Recovered: r}
-			_, _ = emitDiagnostics(
-				em,
-				event.Subject{
-					CfgPath: cfgPath,
-				},
-				panicErr,
-			)
-			err = AbortError{Causes: []error{panicErr}}
-		}
-	}()
-
 	cfg, err = loadConfigWithSource(ctx, em, cfgPath, store, src)
 	if err != nil {
 		dr, _ := emitDiagnostics(
 			em,
-			event.Subject{
+			event.EngineSubject{
 				CfgPath: cfgPath,
 			},
 			err,
@@ -213,6 +203,33 @@ func LoadConfigWithSource(
 }
 
 func loadConfigWithSource(
+	ctx context.Context,
+	em diagnostic.Emitter,
+	cfgPath string,
+	store *spec.SourceStore,
+	src source.Source,
+) (cfg spec.Config, err error) {
+	// Guard against panics in the CUE library (known upstream bugs).
+	// Convert to a user-facing diagnostic rather than crashing.
+	defer func() {
+		if r := recover(); r != nil {
+			panicErr := CuePanic{Recovered: r}
+			_, _ = emitDiagnostics(
+				em,
+				event.EngineSubject{
+					CfgPath: cfgPath,
+				},
+				panicErr,
+			)
+			err = AbortError{Causes: []error{panicErr}}
+		}
+	}()
+
+	cfg, err = loadConfigWithSourceUnsafe(ctx, em, cfgPath, store, src)
+	return
+}
+
+func loadConfigWithSourceUnsafe(
 	ctx context.Context,
 	em diagnostic.Emitter,
 	cfgPath string,
@@ -268,7 +285,7 @@ func loadConfigWithSource(
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
 			panic(util.BUG(
-				"load.BuildInstance returned an unexpected error for cfgPath %q: %w",
+				"load.BuildUserInstance returned an unexpected error for cfgPath %q: %w",
 				cfgPath,
 				err,
 			))
@@ -276,7 +293,7 @@ func loadConfigWithSource(
 
 		return spec.Config{}, CueDiagnostic{
 			Err:   ce,
-			Phase: "load.BuildInstance",
+			Phase: "load.BuildUserInstance",
 		}
 	}
 
@@ -285,12 +302,36 @@ func loadConfigWithSource(
 		panic(util.BUG("load.Instances returned zero core-instances"))
 	}
 	if err := coreInstances[0].Err; err != nil {
-		return spec.Config{}, err
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(util.BUG(
+				"load.CoreInstances returned an unexpected error for cfgPath %q: %w",
+				cfgPath,
+				err,
+			))
+		}
+
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.CoreInstances",
+		}
 	}
 
 	coreInst := cueCtx.BuildInstance(coreInstances[0])
 	if err := coreInst.Err(); err != nil {
-		return spec.Config{}, err
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(util.BUG(
+				"load.BuildCoreInstance returned an unexpected error for cfgPath %q: %w",
+				cfgPath,
+				err,
+			))
+		}
+
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.BuildCoreInstance",
+		}
 	}
 
 	// --- apply schema ---
@@ -300,45 +341,79 @@ func loadConfigWithSource(
 		if !errors.As(err, &ce) {
 			// unexpected validation failure → engine error
 			panic(util.BUG(
-				"coreInst.Value().Unify(userInst) failed with an unaccounted-for error-type %T: %w",
+				"load.Unify failed with an unaccounted-for error-type %T: %w",
 				err,
 				err,
 			))
 		}
 
-		if isUnitsShapeError(ce) {
-			return spec.Config{}, InvalidUnitsShape{
-				Source: getUnifyErrorSpan(ce, userInst),
-				Have:   describeCueValueShape(userInst, "units"),
-				Want:   describeCueValueShape(coreInst, "units"),
+		if isErrorWithPath(ce, cueSteps) {
+			return spec.Config{}, InvalidStepsShape{
+				Source: getStepsUnifyErrorSpan(ce, userInst),
+				Have:   describeCueValueShape(userInst, cueSteps),
+				Want:   describeCueSchemaShape(coreInst, cueSteps),
+			}
+		}
+		if isErrorWithPath(ce, cueUnit) {
+			return spec.Config{}, InvalidUnitShape{
+				Source: getStepsUnifyErrorSpan(ce, userInst),
+				Have:   describeCueValueShape(userInst, cueUnit),
+				Want:   describeCueSchemaShape(coreInst, cueUnit),
+			}
+		}
+		if path, ok := isTypeMismatchError(ce); ok {
+			return spec.Config{}, TypeMismatch{
+				Source: getErrorPathSpan(ce, userInst),
+				Path:   path,
+				Have:   describeCueValueShape(userInst, path),
+				Want:   describeCueSchemaShape(coreInst, path),
 			}
 		}
 
 		return spec.Config{}, CueDiagnostic{
 			Err:   ce,
-			Phase: "load.unifyCoreAndUserInst",
+			Phase: "load.Unify",
 		}
 	}
 
-	unitsVal := cfgVal.LookupPath(cue.ParsePath("units"))
-	if err := unitsVal.Err(); err != nil {
+	userFile := userInstance.Files[0]
+	unitInst, err := decodeUnit(cfgVal, cfgPath, userFile, em)
+	if err != nil {
 		return spec.Config{}, err
 	}
 
-	iter, err := unitsVal.List()
-	if err != nil {
-		panic(util.BUG("units is not a list after schema unification: %w", err))
+	stepsVal := cfgVal.LookupPath(cue.ParsePath(cueSteps))
+	if err := stepsVal.Err(); err != nil {
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(util.BUG(
+				"load.LookupStepsPath failed with an unaccounted-for error-type %T: %w",
+				err,
+				err,
+			))
+		}
+
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.LookupStepsPath",
+		}
 	}
 
-	cfg := spec.Config{}
+	iter, err := stepsVal.List()
+	if err != nil {
+		panic(util.BUG("steps is not a list after schema unification: %w", err))
+	}
+
+	cfg := spec.Config{
+		Unit: unitInst,
+	}
 	var sawAbort bool
 	for iter.Next() {
-		userFile := userInstance.Files[0]
 		idx := iter.Selector().Index()
-		unitVal := iter.Value()
-		unitSpan, fields := extractFieldSpansFromFile(userFile, idx)
+		stepVal := iter.Value()
+		stepSpan, fields := extractFieldSpansFromFile(userFile, idx)
 
-		ui, decRes := decodeUnit(unitVal, idx, reg, em, unitSpan, fields)
+		si, decRes := decodeStep(stepVal, idx, reg, em, stepSpan, fields)
 		if decRes.abort {
 			sawAbort = true
 		}
@@ -347,7 +422,7 @@ func loadConfigWithSource(
 			continue
 		}
 
-		cfg.Units = append(cfg.Units, ui)
+		cfg.Steps = append(cfg.Steps, si)
 	}
 
 	if sawAbort {
@@ -357,94 +432,193 @@ func loadConfigWithSource(
 	return cfg, nil
 }
 
+func decodeUnit(
+	cfgVal cue.Value,
+	cfgPath string,
+	userFile *ast.File,
+	em diagnostic.Emitter,
+) (spec.UnitInstance, error) {
+	unitVal := cfgVal.LookupPath(cue.ParsePath(cueUnit))
+	if err := unitVal.Err(); err != nil {
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			// unexpected validation failure → engine error
+			panic(util.BUG(
+				"load.LookupUnitPath failed with an unaccounted-for error-type %T: %w",
+				err,
+				err,
+			))
+		}
+
+		// if no unit is defined, we just default to "anonymous unit"
+		if strings.Contains(ce.Error(), "field not found") {
+			// return spec.UnitInstance{
+			// 	ID:   "anonymous",
+			// 	Desc: "automatically generated anonymous unit",
+			// }, nil
+			return spec.UnitInstance{}, nil
+		}
+
+		return spec.UnitInstance{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.LookupUnitPath",
+		}
+	}
+
+	// Validate
+	// ------------------------------------------------------------
+	if err := unitVal.Validate(cue.Concrete(true), cue.All()); err != nil {
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(util.BUG(
+				"load.ValidateUnit failed with an unaccounted-for error-type %T: %w",
+				err,
+				err,
+			))
+		}
+
+		if isUnitRequiredFieldError(ce) {
+			span := extractSpanFromFile(userFile, cueUnit)
+
+			subject := event.EngineSubject{
+				CfgPath: cfgPath,
+			}
+
+			missing := findMissingRequiredFields(ce, unitVal, span)
+			if len(missing) > 0 {
+				var abort bool
+				for _, m := range missing {
+					dr, _ := emitDiagnostics(
+						em,
+						subject,
+						MissingFieldDiagnostic{Missing: m},
+					)
+
+					if dr.ShouldAbort() {
+						abort = true
+					}
+				}
+				if abort {
+					return spec.UnitInstance{}, AbortError{Causes: []error{err}}
+				}
+			}
+
+			dr, _ := emitDiagnostics(
+				em,
+				subject,
+				CueDiagnostic{
+					Err:   ce,
+					Phase: "decode",
+				},
+			)
+
+			if dr.ShouldAbort() {
+				return spec.UnitInstance{}, AbortError{Causes: []error{err}}
+			}
+			return spec.UnitInstance{}, nil
+		}
+
+		return spec.UnitInstance{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.ValidateUnit",
+		}
+
+	}
+
+	// Decode
+	// ------------------------------------------------------------
+	var unitInst spec.UnitInstance
+	if err := unitVal.Decode(&unitInst); err != nil {
+		// If Validate passed, Decode MUST NOT fail.
+		// This is a hard invariant violation.
+		panic(util.BUG(
+			"unitVal.Decode failed after successful validation: %w",
+			err,
+		))
+	}
+
+	return unitInst, nil
+}
+
 type decodeResult struct {
 	abort bool
 	ok    bool
 }
 
-func decodeUnit(
-	unitVal cue.Value,
-	unitIdx int,
+func decodeStep(
+	stepVal cue.Value,
+	stepIdx int,
 	reg *Registry,
 	em diagnostic.Emitter,
-	unitSpan spec.SourceSpan,
+	stepSpan spec.SourceSpan,
 	fields map[string]spec.FieldSpan,
-) (spec.UnitInstance, decodeResult) {
-	// ------------------------------------------------------------
-	// Resolve identity (non-diagnostic for now)
-	// ------------------------------------------------------------
-	kind, name, err := resolveUnitIdentity(unitVal, unitIdx)
+) (spec.StepInstance, decodeResult) {
+	kind, desc, err := resolveStepKind(stepVal, stepIdx)
 	if err != nil {
 		// engine/schema error – cannot continue safely
 		panic(util.BUG(
-			"resolveUnitIdentity returned an unexpected error for unit %q (%s): %w",
-			name,
+			"resolveStepIdentity returned an unexpected error for step %q (%s): %w",
+			desc,
 			kind,
 			err,
 		))
 	}
 
-	subject := event.Subject{
-		Index: unitIdx,
-		Kind:  kind,
-		Name:  name,
+	subject := event.PlanSubject{
+		StepIndex: stepIdx,
+		StepKind:  kind,
+		StepDesc:  desc,
 	}
 
+	// Resolve step type
 	// ------------------------------------------------------------
-	// Resolve unit type
-	// ------------------------------------------------------------
-	ut, ok := reg.Type(kind)
+	st, ok := reg.StepType(kind)
 	if !ok {
 		dr, _ := emitDiagnostics(
 			em,
 			subject,
-			UnknownUnitKind{
+			UnknownStepKind{
 				Kind:   kind,
-				Source: unitSpan,
+				Source: stepSpan,
 			},
 		)
-		return spec.UnitInstance{}, decodeResult{
+		return spec.StepInstance{}, decodeResult{
 			abort: dr.ShouldAbort(),
 			ok:    false,
 		}
 	}
 
-	// ------------------------------------------------------------
 	// Instantiate config
 	// ------------------------------------------------------------
-	tCfg := ut.NewConfig()
+	tCfg := st.NewConfig()
 	rv := reflect.ValueOf(tCfg)
 	if rv.Kind() != reflect.Pointer {
 		panic(util.BUG(
-			"UnitType['%s'].NewConfig() must return a pointer (got %T)",
-			ut.Kind(),
+			"StepType['%s'].NewConfig() must return a pointer (got %T)",
+			st.Kind(),
 			tCfg,
 		))
 	}
 
+	// Validation
 	// ------------------------------------------------------------
-	// VALIDATION PHASE (user fault, rich diagnostics)
-	// ------------------------------------------------------------
-	if err := unitVal.Validate(cue.Concrete(true), cue.All()); err != nil {
+	if err := stepVal.Validate(cue.Concrete(true), cue.All()); err != nil {
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
 			// unexpected validation failure → engine error
 			panic(util.BUG(
-				"unitVal.Validate failed with an unaccounted-for error-type %T for unit %q (%s): %w",
+				"stepVal.Validate failed with an unaccounted-for error-type %T for step %q (%s): %w",
 				err,
-				name,
+				desc,
 				kind,
 				err,
 			))
 		}
 
-		missing := missingRequiredFieldErrors(
+		missing := findIncompleteFields(
 			ce,
-			unitVal,
-			unitIdx,
-			unitSpan,
-			kind,
-			name,
+			stepVal,
+			stepSpan,
 		)
 
 		if len(missing) > 0 {
@@ -459,7 +633,7 @@ func decodeUnit(
 					abort = true
 				}
 			}
-			return spec.UnitInstance{}, decodeResult{
+			return spec.StepInstance{}, decodeResult{
 				abort: abort,
 				ok:    false,
 			}
@@ -475,103 +649,132 @@ func decodeUnit(
 			},
 		)
 
-		return spec.UnitInstance{}, decodeResult{
+		return spec.StepInstance{}, decodeResult{
 			abort: dr.ShouldAbort(),
 			ok:    false,
 		}
 	}
 
+	// Decode
 	// ------------------------------------------------------------
-	// DECODE PHASE (engine/schema invariant)
-	// ------------------------------------------------------------
-	if err := unitVal.Decode(tCfg); err != nil {
+	if err := stepVal.Decode(tCfg); err != nil {
 		// If Validate passed, Decode MUST NOT fail.
 		// This is a hard invariant violation.
 		panic(util.BUG(
-			"unitVal.Decode failed after successful validation for unit %q (%s): %w",
-			name,
+			"stepVal.Decode failed after successful validation for step %q (%s): %w",
+			desc,
 			kind,
 			err,
 		))
 	}
 
-	// ------------------------------------------------------------
 	// Success
 	// ------------------------------------------------------------
-	ui := spec.UnitInstance{
-		Name:   name,
-		Type:   ut,
+	si := spec.StepInstance{
+		Desc:   desc,
+		Type:   st,
 		Config: tCfg,
-		Source: spanFromPos(unitVal.Pos()),
+		Source: spanFromPos(stepVal.Pos()),
 		Fields: fields,
 	}
 
-	return ui, decodeResult{
+	return si, decodeResult{
 		abort: false,
 		ok:    true,
 	}
 }
 
-func resolveUnitIdentity(unitVal cue.Value, idx int) (string, string, error) {
-	metaVal := unitVal.LookupPath(cue.ParsePath("meta"))
-	if err := metaVal.Err(); err != nil {
-		return "", "", err
-	}
-
-	kindVal := metaVal.LookupPath(cue.ParsePath("kind"))
-	if err := kindVal.Err(); err != nil {
-		return "", "", err
-	}
-
-	kind, err := kindVal.String()
+func resolveStepKind(stepVal cue.Value, idx int) (string, string, error) {
+	// Hidden fields require iteration with cue.Hidden(true)
+	iter, err := stepVal.Fields(cue.Hidden(true))
 	if err != nil {
 		return "", "", err
 	}
 
-	name, err := unitVal.LookupPath(cue.ParsePath("name")).String()
-	if err != nil {
-		name = fmt.Sprintf("%s[%d]", kind, idx)
+	var kind string
+	for iter.Next() {
+		if iter.Selector().String() == "_kind" {
+			kind, err = iter.Value().String()
+			if err != nil {
+				return "", "", err
+			}
+			break
+		}
 	}
 
-	return kind, name, nil
+	if kind == "" {
+		return "", "", fmt.Errorf("step at index %d has no _kind field", idx)
+	}
+
+	// desc is optional - fall back to kind[idx] if not set
+	desc, err := stepVal.LookupPath(cue.ParsePath("desc")).String()
+	if err != nil {
+		desc = fmt.Sprintf("%s[%d]", kind, idx)
+	}
+
+	return kind, desc, nil
 }
 
-func isUnitsShapeError(ce cueerr.Error) bool {
+func isErrorWithPath(ce cueerr.Error, searchPath string) bool {
 	for _, e := range cueerr.Errors(ce) {
 		path := cueerr.Path(e)
-		if len(path) == 1 && path[0] == "units" {
+		if len(path) == 1 && path[0] == searchPath {
 			return true
 		}
 	}
 	return false
 }
 
-func describeCueValueShape(base cue.Value, path string) string {
-	v := base.LookupPath(cue.ParsePath(path))
-	switch v.Kind() {
-	case cue.ListKind:
-		return "list"
-	case cue.StructKind:
-		return "struct"
-	default:
-		return v.Kind().String()
+func isUnitRequiredFieldError(ce cueerr.Error) bool {
+	for _, e := range cueerr.Errors(ce) {
+		path := cueerr.Path(e)
+		if len(path) == 2 && path[0] == cueUnit && path[1] == cueUnitID {
+			return true
+		}
 	}
+	return false
 }
 
-func getUnifyErrorSpan(err cueerr.Error, userInst cue.Value) spec.SourceSpan {
+func isTypeMismatchError(ce cueerr.Error) (string, bool) {
+	for _, e := range cueerr.Errors(ce) {
+		if strings.Contains(e.Error(), "mismatched types") {
+			return strings.Join(cueerr.Path(e), "."), true
+		}
+	}
+	return "", false
+}
+
+func describeCueSchemaShape(base cue.Value, path string) string {
+	unified := base.FillPath(cue.ParsePath(path), "_")
+	v := unified.LookupPath(cue.ParsePath(path))
+	return v.Kind().String()
+}
+
+func describeCueValueShape(base cue.Value, path string) string {
+	v := base.LookupPath(cue.ParsePath(path))
+	return v.Kind().String()
+}
+
+func getErrorPathSpan(err cueerr.Error, userInst cue.Value) spec.SourceSpan {
+	path := cue.ParsePath(strings.Join(cueerr.Path(err), "."))
+	v := userInst.LookupPath(path)
+	return spanFromPos(v.Pos())
+}
+
+func getStepsUnifyErrorSpan(err cueerr.Error, userInst cue.Value) spec.SourceSpan {
 	path := cueerr.Path(err)
 
-	// Case 1: error is inside units[<idx>]
-	if len(path) >= 2 && path[0] == "units" {
+	// Case 1: error is inside steps[<idx>]
+	if len(path) >= 2 && path[0] == cueSteps {
 		if idx, err := strconv.Atoi(path[1]); err == nil {
 			v := userInst.LookupPath(
-				cue.MakePath(cue.Str("units"), cue.Index(idx)),
+				cue.MakePath(cue.Str(cueSteps), cue.Index(idx)),
 			)
 			return spanFromPos(v.Pos())
 		}
 	}
 
-	// Case 2: error is about top-level structure (e.g. units itself)
+	// Case 2: error is about top-level structure (e.g. steps itself)
 	if len(path) > 0 {
 		v := userInst.LookupPath(cue.MakePath(cue.Str(path[0])))
 		return spanFromPos(v.Pos())
@@ -581,13 +784,41 @@ func getUnifyErrorSpan(err cueerr.Error, userInst cue.Value) spec.SourceSpan {
 	return spanFromPos(userInst.Pos())
 }
 
-func missingRequiredFieldErrors(
+func findMissingRequiredFields(
 	ce cueerr.Error,
-	unitVal cue.Value,
-	unitIndex int,
-	unitSource spec.SourceSpan,
-	unitKind string,
-	unitName string,
+	stepVal cue.Value,
+	stepSource spec.SourceSpan,
+) []CueMissingField {
+	var res []CueMissingField
+
+	for _, e := range cueerr.Errors(ce) {
+		if !strings.Contains(e.Error(), "required but not present") {
+			continue
+		}
+
+		path := cueerr.Path(e)
+		if len(path) == 0 {
+			continue
+		}
+
+		field := path[len(path)-1]
+
+		v := stepVal.LookupPath(cue.ParsePath(field))
+		if !v.Exists() && !v.IsConcrete() {
+			res = append(res, CueMissingField{
+				Field:  field,
+				Source: stepSource,
+			})
+		}
+	}
+
+	return res
+}
+
+func findIncompleteFields(
+	ce cueerr.Error,
+	stepVal cue.Value,
+	source spec.SourceSpan,
 ) []CueMissingField {
 	var res []CueMissingField
 
@@ -603,14 +834,11 @@ func missingRequiredFieldErrors(
 
 		field := path[len(path)-1]
 
-		v := unitVal.LookupPath(cue.ParsePath(field))
+		v := stepVal.LookupPath(cue.ParsePath(field))
 		if v.Exists() && !v.IsConcrete() {
 			res = append(res, CueMissingField{
-				Field:      field,
-				UnitIndex:  unitIndex,
-				UnitKind:   unitKind,
-				UnitSource: unitSource,
-				UnitName:   unitName,
+				Field:  field,
+				Source: source,
 			})
 		}
 	}
@@ -666,12 +894,29 @@ func spanFromPosRange(start, end token.Pos) spec.SourceSpan {
 	}
 }
 
+func extractSpanFromFile(f *ast.File, declName string) spec.SourceSpan {
+	for _, d := range f.Decls {
+		fd, ok := d.(*ast.Field)
+		if !ok {
+			continue
+		}
+		id, ok := fd.Label.(*ast.Ident)
+		if !ok || id.Name != declName {
+			continue
+		}
+
+		return spanFromNode(fd)
+	}
+
+	return spec.SourceSpan{}
+}
+
 func extractFieldSpansFromFile(
 	f *ast.File,
-	unitIndex int,
+	stepIndex int,
 ) (spec.SourceSpan, map[string]spec.FieldSpan) {
-	// 1. locate `units: [...]`
-	var units *ast.ListLit
+	// 1. locate `steps: [...]`
+	var steps *ast.ListLit
 
 	for _, d := range f.Decls {
 		fd, ok := d.(*ast.Field)
@@ -679,30 +924,30 @@ func extractFieldSpansFromFile(
 			continue
 		}
 		id, ok := fd.Label.(*ast.Ident)
-		if !ok || id.Name != "units" {
+		if !ok || id.Name != cueSteps {
 			continue
 		}
 		list, ok := fd.Value.(*ast.ListLit)
 		if !ok {
 			return spec.SourceSpan{}, map[string]spec.FieldSpan{}
 		}
-		units = list
+		steps = list
 		break
 	}
 
-	if units == nil || unitIndex >= len(units.Elts) {
+	if steps == nil || stepIndex >= len(steps.Elts) {
 		return spec.SourceSpan{}, map[string]spec.FieldSpan{}
 	}
 
-	// 2. pick the unit expr
-	unitExpr := units.Elts[unitIndex]
+	// 2. pick the steps expr
+	stepExpr := steps.Elts[stepIndex]
 
-	// units may be:
+	// step may be:
 	//   { ... }
 	//   builtin.copy & { ... }
 	var st *ast.StructLit
 
-	switch e := unitExpr.(type) {
+	switch e := stepExpr.(type) {
 	case *ast.StructLit:
 		st = e
 	case *ast.BinaryExpr:
@@ -734,8 +979,8 @@ func extractFieldSpansFromFile(
 		}
 	}
 
-	unitSpan := spanFromNode(unitExpr)
-	return unitSpan, fields
+	stepSpan := spanFromNode(stepExpr)
+	return stepSpan, fields
 }
 
 func normalizeVirtualPath(path string) string {

@@ -30,23 +30,31 @@ type ExpectedDiagnostic struct {
 	Severity string `json:"severity"`
 
 	Source *ExpectedSource `json:"source,omitempty"`
-	Unit   *ExpectedUnit   `json:"unit,omitempty"`
+	Step   *ExpectedStep   `json:"step,omitempty"`
 }
 
 type ExpectedSource struct {
 	Line int `json:"line"`
 }
 
-type ExpectedUnit struct {
+type ExpectedStep struct {
 	Index int    `json:"index"`
 	Kind  string `json:"kind"`
 }
 
 type (
 	events             []event.Event
+	engineEvents       []event.EngineEvent
+	planEvents         []event.PlanEvent
+	actionEvents       []event.ActionEvent
+	opEvents           []event.OpEvent
 	recordingDisplayer struct {
-		mu     sync.Mutex
-		events events
+		mu           sync.Mutex
+		engineEvents engineEvents
+		planEvents   planEvents
+		actionEvents actionEvents
+		opEvents     opEvents
+		events       events
 	}
 	noopEmitter struct{}
 )
@@ -57,14 +65,78 @@ func (r *recordingDisplayer) Emit(e event.Event) {
 	r.events = append(r.events, e)
 }
 
+func (r *recordingDisplayer) EmitEngineLifecycle(e event.EngineEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.engineEvents = append(r.engineEvents, e)
+}
+
+func (r *recordingDisplayer) EmitPlanLifecycle(e event.PlanEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.planEvents = append(r.planEvents, e)
+}
+
+func (r *recordingDisplayer) EmitActionLifecycle(e event.ActionEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.actionEvents = append(r.actionEvents, e)
+}
+
+func (r *recordingDisplayer) EmitOpLifecycle(e event.OpEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.opEvents = append(r.opEvents, e)
+}
+func (r *recordingDisplayer) EmitDiagnostic(e event.Event) { r.Emit(e) }
+
 func (r *recordingDisplayer) Close() {}
 
 func (r *recordingDisplayer) String() string {
-	return r.events.String()
+	return r.engineEvents.String() + "\n" +
+		r.planEvents.String() + "\n" +
+		r.actionEvents.String() + "\n" +
+		r.events.String()
 }
 
 func (r *recordingDisplayer) dump(w io.Writer) {
 	_, _ = fmt.Fprintln(w, r)
+}
+
+func (e engineEvents) String() string {
+	j, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return "----- ENGINE DIAGNOSTICS -----\n" +
+		string(j)
+}
+
+func (e planEvents) String() string {
+	j, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return "----- PLAN DIAGNOSTICS -----\n" +
+		string(j)
+}
+
+func (e actionEvents) String() string {
+	j, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return "----- ACTION DIAGNOSTICS -----\n" +
+		string(j)
+}
+
+func (e opEvents) String() string {
+	j, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return "----- OP DIAGNOSTICS -----\n" +
+		string(j)
 }
 
 func (e events) String() string {
@@ -72,11 +144,16 @@ func (e events) String() string {
 	if err != nil {
 		panic(err)
 	}
-	return "----- DIAGNOSTICS -----\n" +
+	return "----- OTHER DIAGNOSTICS -----\n" +
 		string(j)
 }
 
-func (noopEmitter) Emit(event.Event) {}
+func (noopEmitter) Emit(event.Event)                      {}
+func (noopEmitter) EmitEngineLifecycle(event.EngineEvent) {}
+func (noopEmitter) EmitPlanLifecycle(event.PlanEvent)     {}
+func (noopEmitter) EmitActionLifecycle(event.ActionEvent) {}
+func (noopEmitter) EmitOpLifecycle(event.OpEvent)         {}
+func (noopEmitter) EmitDiagnostic(event.Event)            {}
 
 type (
 	checkFn func(context.Context, source.Source, target.Target) (spec.CheckResult, error)
@@ -150,9 +227,22 @@ func panicExecFn(msg string) execFn {
 	}
 }
 
-func (o fakeOp) Name() string         { return o.name }
 func (o fakeOp) Action() spec.Action  { return o.action }
 func (o fakeOp) DependsOn() []spec.Op { return o.deps }
+
+// OpDescriber implementation for cycle detection tests
+type fakeOpDescription struct {
+	name string
+}
+
+func (d fakeOpDescription) PlanTemplate() spec.PlanTemplate {
+	return spec.PlanTemplate{ID: d.name}
+}
+
+func (o fakeOp) OpDescription() spec.OpDescription {
+	return fakeOpDescription{name: o.name}
+}
+
 func (o *fakeOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	o.checkCalls++
 	return o.checkFn(ctx, src, tgt)
@@ -168,7 +258,7 @@ type fakeAction struct {
 }
 
 func (fakeAction) Kind() string     { return "fakeActionKind" }
-func (fakeAction) Name() string     { return "fakeAction" }
+func (fakeAction) Desc() string     { return "fakeAction" }
 func (a fakeAction) Ops() []spec.Op { return a.ops }
 
 func mkAction(ops ...*fakeOp) *fakeAction {

@@ -14,12 +14,22 @@ type CyclicDependency struct {
 	Cycle []spec.Op
 }
 
-func (e CyclicDependency) Error() string {
-	names := make([]string, 0, len(e.Cycle))
-	for _, op := range e.Cycle {
-		names = append(names, op.Name())
+// opID returns an identifier for an op (template ID if available, otherwise pointer)
+func opID(op spec.Op) string {
+	if d, ok := op.(spec.OpDescriber); ok {
+		if desc := d.OpDescription(); desc != nil {
+			return desc.PlanTemplate().ID
+		}
 	}
-	return "cyclic dependency: " + strings.Join(names, " -> ")
+	return fmt.Sprintf("%p", op)
+}
+
+func (e CyclicDependency) Error() string {
+	ids := make([]string, 0, len(e.Cycle))
+	for _, op := range e.Cycle {
+		ids = append(ids, opID(op))
+	}
+	return "cyclic dependency: " + strings.Join(ids, " -> ")
 }
 
 func (e CyclicDependency) Diagnostics(subject event.Subject) []event.Event {
@@ -29,15 +39,15 @@ func (e CyclicDependency) Diagnostics(subject event.Subject) []event.Event {
 }
 
 func (e CyclicDependency) EventTemplate() event.Template {
-	ops := make([]string, 0, len(e.Cycle))
+	ids := make([]string, 0, len(e.Cycle))
 	for _, op := range e.Cycle {
-		ops = append(ops, op.Name())
+		ids = append(ids, opID(op))
 	}
 
 	return event.Template{
 		ID:   "engine.CyclicDependency",
 		Text: "cyclic dependency detected",
-		Hint: strings.Join(ops, " -> "),
+		Hint: strings.Join(ids, " -> "),
 	}
 }
 
@@ -52,10 +62,10 @@ func DetectPlanCycles(em diagnostic.Emitter, plan spec.Plan) error {
 			cd := CyclicDependency{Cycle: cycle}
 			err.Causes = append(err.Causes, cd)
 
-			em.Emit(diagnostic.DiagnosticRaised(
-				event.Subject{
-					Kind: cycle[0].Action().Kind(),
-					Name: cycle[0].Action().Name(),
+			em.EmitDiagnostic(diagnostic.DiagnosticRaised(
+				event.PlanSubject{
+					StepKind: cycle[0].Action().Kind(),
+					StepDesc: cycle[0].Action().Desc(),
 				},
 				cd,
 			))
@@ -98,7 +108,7 @@ func detectPlanCycles(plan spec.Plan) [][]spec.Op {
 		onStack[op] = false
 	}
 
-	for _, a := range plan.Actions {
+	for _, a := range plan.Unit.Actions {
 		for _, op := range a.Ops() {
 			if !visited[op] {
 				dfs(op)

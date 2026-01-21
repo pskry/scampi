@@ -24,7 +24,7 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *sp
 
 func (e *Engine) Apply(ctx context.Context, cfgPath string, store *spec.SourceStore) error {
 	start := time.Now()
-	e.em.Emit(diagnostic.EngineStarted())
+	e.em.EmitEngineLifecycle(diagnostic.EngineStarted())
 
 	cfgPath, err := filepath.Abs(cfgPath)
 	if err != nil {
@@ -47,7 +47,7 @@ func (e *Engine) Apply(ctx context.Context, cfgPath string, store *spec.SourceSt
 		return err
 	}
 
-	e.em.Emit(diagnostic.EngineFinished(rep, time.Since(start), err))
+	e.em.EmitEngineLifecycle(diagnostic.EngineFinished(rep, time.Since(start), err))
 
 	return nil
 }

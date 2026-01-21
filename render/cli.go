@@ -1,8 +1,8 @@
+//go:generate stringer -type=stream
 package render
 
 import (
 	"fmt"
-	"hash/fnv"
 	"io"
 	"os"
 	"strconv"
@@ -79,19 +79,42 @@ const (
 )
 
 var (
-	colPlan       = ansi.Magenta
-	colPlanHeader = colPlan.Bold
-	colPlanRail   = colPlan.Dim
+	colEngineStarted           = ansi.Green().Dim()
+	colEngineFinishedUnchanged = ansi.Green()
+	colEngineFinishedChanged   = ansi.Yellow()
+	colEngineFinishedFailed    = ansi.Red()
+	colEngineFinishedFatal     = ansi.BrightRed().Bold()
 
-	colAction       = ansi.Cyan
-	colActionHeader = colAction.Bold
-	colActionRail   = colAction.Reg
-	colActionOps    = colAction.Dim
+	colPlanHeader             = ansi.Magenta().Bold()
+	colPlanRail               = ansi.Magenta().Dim()
+	colPlanStarted            = ansi.Blue()
+	colPlanStartedUnit        = ansi.Blue().Bold()
+	colPlanFinishedOK         = ansi.Blue().Dim()
+	colPlanFinishedOKUnit     = ansi.Blue().Dim().Bold()
+	colPlanFinishedFailed     = ansi.Red()
+	colPlanFinishedFailedUnit = ansi.Red().Bold()
+	colPlanStepPlanned        = ansi.BrightBlack().Dim()
 
-	colOp       = ansi.BrightBlack
-	colOpHeader = colOp.Reg
-	colOpRail   = colOp.Dim
-	colOpDesc   = colOp.Dim
+	colActionHeader            = ansi.Cyan().Bold()
+	colActionRail              = ansi.Cyan()
+	colActionOps               = ansi.Cyan().Dim()
+	colActionFinishedUnchanged = ansi.Green().Dim()
+	colActionFinishedChanged   = ansi.Yellow()
+	colActionFinishedFailed    = ansi.Red()
+
+	colOpHeader           = ansi.BrightBlack()
+	colOpRail             = ansi.BrightBlack().Dim()
+	colOpDesc             = ansi.BrightBlack().Dim()
+	colOpCheckSatisfied   = ansi.BrightBlack().Dim()
+	colOpCheckUnsatisfied = ansi.BrightBlack().Dim()
+	colOpCheckUnknown     = ansi.Yellow()
+	colOpExecChanged      = ansi.BrightBlack()
+	colOpExecFailed       = ansi.Red()
+
+	colDiagMsg      = ansi.Red()
+	colDiagHelp     = ansi.Cyan()
+	colSourceGutter = ansi.BrightBlack()
+	colSourceCaret  = ansi.Red()
 )
 
 var (
@@ -202,29 +225,24 @@ func NewCLI(opts CLIOptions, store *spec.SourceStore) Displayer {
 	}
 }
 
-func (c *cli) Emit(e event.Event) {
-	shouldRender := func() bool {
-		v := c.opts.Verbosity
+func (c *cli) shouldRender(chatty event.Chattiness) bool {
+	v := c.opts.Verbosity
 
-		switch e.Chattiness {
-		case event.Yappy:
-			return v >= signal.VVV
-		case event.Chatty:
-			return v >= signal.VV
-		case event.Normal:
-			return v >= signal.V
-		case event.Reserved, event.Subtle:
-			return true
-		default:
-			return true
-		}
+	switch chatty {
+	case event.Yappy:
+		return v >= signal.VVV
+	case event.Chatty:
+		return v >= signal.VV
+	case event.Normal:
+		return v >= signal.V
+	case event.Reserved, event.Subtle:
+		return true
+	default:
+		return true
 	}
+}
 
-	if !shouldRender() {
-		return
-	}
-
-	events := c.toRenderEvents(e)
+func (c *cli) commitRenderEvents(events []renderEvent) {
 	// fit lines before committing to draw loop
 	for i := range events {
 		if strings.ContainsAny(events[i].line, "\n\r") {
@@ -238,80 +256,112 @@ func (c *cli) Emit(e event.Event) {
 	c.render.emitEvents(events)
 }
 
-func (c *cli) Close() {
-	c.render.close()
+func (c *cli) EmitEngineLifecycle(e event.EngineEvent) {
+	if !c.shouldRender(e.Chattiness) {
+		return
+	}
+
+	switch e.Kind {
+	case event.EngineStarted:
+		c.commitRenderEvents(c.renderEngineStarted(e))
+	case event.EngineFinished:
+		c.commitRenderEvents(c.renderEngineFinished(e))
+	default:
+		panic(util.BUG("unknown engine event kind %q (0x%02x)", e.Kind, uint8(e.Kind)))
+	}
 }
 
-func (c *cli) toRenderEvents(e event.Event) []renderEvent {
-	switch e.Kind {
-
-	// Engine lifecycle
-	// ===============================================
-	case event.EngineStarted:
-		return c.renderEngineStarted(e)
-	case event.EngineFinished:
-		return c.renderEngineFinished(e)
-
-	// Plan lifecycle
-	// ===============================================
-	case event.PlanStarted:
-		return c.renderPlanStarted(e)
-	case event.PlanFinished:
-		return c.renderPlanFinished(e)
-	case event.UnitPlanned:
-		return c.renderUnitPlanned(e)
-	case event.PlanProduced:
-		return c.renderPlan(e)
-
-	// Action lifecycle
-	// ===============================================
-	case event.ActionStarted:
-		return nil // intentionally ignored
-	case event.ActionFinished:
-		return c.renderActionFinished(e)
-
-	// Op lifecycle
-	// ===============================================
-	case event.OpCheckStarted:
-		return nil // intentionally ignored
-	case event.OpChecked:
-		return c.renderOpChecked(e)
-	case event.OpExecuteStarted:
-		return nil // intentionally ignored
-	case event.OpExecuted:
-		return c.renderOpExecuted(e)
-
-	// Diagnostics
-	// ===============================================
-	case event.DiagnosticRaised:
-		return c.renderDiagnosticRaised(e)
-
-	default:
-		return c.renderUnknownEvent(e)
+func (c *cli) EmitPlanLifecycle(e event.PlanEvent) {
+	if !c.shouldRender(e.Chattiness) {
+		return
 	}
+
+	switch e.Kind {
+	case event.PlanStarted:
+		c.commitRenderEvents(c.renderPlanStarted(e))
+	case event.PlanFinished:
+		c.commitRenderEvents(c.renderPlanFinished(e))
+	case event.StepPlanned:
+		c.commitRenderEvents(c.renderStepPlanned(e))
+	case event.PlanProduced:
+		c.commitRenderEvents(c.renderPlan(e))
+	default:
+		panic(util.BUG("unknown plan event kind %q (0x%02x)", e.Kind, uint8(e.Kind)))
+	}
+}
+
+func (c *cli) EmitActionLifecycle(e event.ActionEvent) {
+	if !c.shouldRender(e.Chattiness) {
+		return
+	}
+
+	switch e.Kind {
+	case event.ActionStarted:
+		// intentionally ignored
+	case event.ActionFinished:
+		c.commitRenderEvents(c.renderActionFinished(e))
+	default:
+		panic(util.BUG("unknown action event kind %q (0x%02x)", e.Kind, uint8(e.Kind)))
+	}
+}
+
+func (c *cli) EmitOpLifecycle(e event.OpEvent) {
+	if !c.shouldRender(e.Chattiness) {
+		return
+	}
+
+	switch e.Kind {
+	case event.OpCheckStarted:
+		// intentionally ignored
+	case event.OpChecked:
+		c.commitRenderEvents(c.renderOpChecked(e))
+	case event.OpExecuteStarted:
+		// intentionally ignored
+	case event.OpExecuted:
+		c.commitRenderEvents(c.renderOpExecuted(e))
+	default:
+		panic(util.BUG("OP LC %q", e.Kind))
+
+	}
+}
+
+func (c *cli) EmitDiagnostic(e event.Event) {
+	if !c.shouldRender(e.Chattiness) {
+		return
+	}
+
+	switch e.Kind {
+	case event.DiagnosticRaised:
+		c.commitRenderEvents(c.renderDiagnosticRaised(e))
+	default:
+		panic(util.BUG("ENGINE DIAG %q", e.Kind))
+	}
+}
+
+func (c *cli) Close() {
+	c.render.close()
 }
 
 // Engine lifecycle
 // ===============================================
 
-func (c *cli) renderEngineStarted(_ event.Event) []renderEvent {
+func (c *cli) renderEngineStarted(_ event.EngineEvent) []renderEvent {
 	return []renderEvent{{
 		stream: streamOut,
 		line: c.fmtfMsg(
-			ansi.Green.Dim,
+			colEngineStarted,
 			"[engine] started",
 		),
 	}}
 }
 
-func (c *cli) renderEngineFinished(e event.Event) []renderEvent {
-	d := e.Detail.(event.EngineDetail)
-
+func (c *cli) renderEngineFinished(e event.EngineEvent) []renderEvent {
+	d := *e.Detail
 	if d.Err != nil {
 		return []renderEvent{{
 			stream: streamErr,
 			line: c.fmtfMsg(
-				ansi.BrightRed.Bold,
+				colEngineFinishedFatal,
 				"[engine]%s failed: %v",
 				glyphr(c.glyphs.fatal),
 				d.Err,
@@ -319,18 +369,18 @@ func (c *cli) renderEngineFinished(e event.Event) []renderEvent {
 		}}
 	}
 
-	color := ansi.Green.Reg
+	color := colEngineFinishedUnchanged
 	if d.FailedCount > 0 {
-		color = ansi.Red.Reg
+		color = colEngineFinishedFailed
 	} else if d.ChangedCount > 0 {
-		color = ansi.Yellow.Reg
+		color = colEngineFinishedChanged
 	}
 
 	return []renderEvent{{
 		stream: streamOut,
 		line: c.fmtfMsg(
 			color,
-			"[engine] finished (%d change%s, %d failure%s, %d unit%s, %s)",
+			"[engine] finished (%d change%s, %d failure%s, %d step%s, %s)",
 			d.ChangedCount, s(d.ChangedCount),
 			d.FailedCount, s(d.FailedCount),
 			d.TotalCount, s(d.TotalCount),
@@ -342,64 +392,106 @@ func (c *cli) renderEngineFinished(e event.Event) []renderEvent {
 // Plan lifecycle
 // ===============================================
 
-func (c *cli) renderPlanStarted(_ event.Event) []renderEvent {
+func (c *cli) renderPlanStarted(e event.PlanEvent) []renderEvent {
+	d := *e.StartedDetail
+	line := c.fmtfMsg(
+		colPlanStarted,
+		"[plan] planning",
+	)
+	if d.UnitID != "" {
+		line += c.fmtfMsg(
+			colPlanStartedUnit,
+			" %s",
+			d.UnitID,
+		)
+	}
+	line += c.fmtMsg(
+		colPlanStarted,
+		" started",
+	)
+
 	return []renderEvent{{
 		stream: streamOut,
-		line: c.fmtfMsg(
-			ansi.Blue.Reg,
-			"[plan] started",
-		),
+		line:   line,
 	}}
 }
 
-func (c *cli) renderPlanFinished(e event.Event) []renderEvent {
-	d := e.Detail.(event.PlanFinishedDetail)
+func (c *cli) renderPlanFinished(e event.PlanEvent) []renderEvent {
+	d := *e.FinishedDetail
 
 	var events []renderEvent
 
-	ttlUnits := d.SuccessfulUnits + d.FailedUnits
-	if d.FailedUnits > 0 {
+	ttlSteps := d.SuccessfulSteps + d.FailedSteps
+	if d.FailedSteps > 0 {
+		line := c.fmtfMsg(
+			colPlanFinishedFailed,
+			"[plan]%s planning",
+			glyphr(c.glyphs.fatal),
+		)
+		if d.UnitID != "" {
+			line += c.fmtfMsg(
+				colPlanFinishedFailedUnit,
+				" %s",
+				d.UnitID,
+			)
+		}
+		line += c.fmtfMsg(
+			colPlanFinishedFailed,
+			" aborted: %d/%d step%s planned, %d/%d step%s failed (%s)",
+			d.SuccessfulSteps,
+			ttlSteps,
+			s(d.SuccessfulSteps),
+			d.FailedSteps,
+			ttlSteps,
+			s(d.FailedSteps),
+			d.Duration,
+		)
+
 		events = append(events, renderEvent{
 			stream: streamOut,
-			line: c.fmtfMsg(
-				ansi.Red.Reg,
-				"[plan]%s aborted: %d/%d unit%s planned, %d/%d unit%s failed (%s)",
-				glyphr(c.glyphs.fatal),
-				d.SuccessfulUnits,
-				ttlUnits,
-				s(d.SuccessfulUnits),
-				d.FailedUnits,
-				ttlUnits,
-				s(d.FailedUnits),
-				d.Duration,
-			),
+			line:   line,
 		})
 	} else {
+		line := c.fmtMsg(
+			colPlanFinishedOK,
+			"[plan] planning",
+		)
+
+		if d.UnitID != "" {
+			line += c.fmtfMsg(
+				colPlanFinishedOKUnit,
+				" %s",
+				d.UnitID,
+			)
+		}
+		line += c.fmtfMsg(
+			colPlanFinishedOK,
+			" finished: %d step%s planned (%s)",
+			d.SuccessfulSteps,
+			s(d.SuccessfulSteps),
+			d.Duration,
+		)
+
 		events = append(events, renderEvent{
 			stream: streamOut,
-			line: c.fmtfMsg(
-				ansi.Blue.Dim,
-				"[plan] finished: %d unit%s planned (%s)",
-				d.SuccessfulUnits,
-				s(d.SuccessfulUnits),
-				d.Duration,
-			),
+			line:   line,
 		})
 	}
 
 	return events
 }
 
-func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
+func (c *cli) renderStepPlanned(e event.PlanEvent) []renderEvent {
+	sub := e.Subject.(event.PlanSubject)
 	return []renderEvent{{
 		stream: streamOut,
 		line: c.fmtfMsg(
-			ansi.BrightBlack.Dim,
-			"[plan.unit]%s #%d %s '%s'",
+			colPlanStepPlanned,
+			"[plan.step]%s #%d %s '%s'",
 			glyphr(c.glyphs.ok),
-			e.Subject.Index,
-			e.Subject.Kind,
-			e.Subject.Name,
+			sub.StepIndex,
+			sub.StepKind,
+			sub.StepDesc,
 		),
 	}}
 }
@@ -408,8 +500,8 @@ func (c *cli) renderUnitPlanned(e event.Event) []renderEvent {
 // The plan is represented as a single continuous vertical rail.
 // Action rails are nested inside the plan rail.
 // Ops never touch the plan rail directly.
-func (c *cli) renderPlan(e event.Event) []renderEvent {
-	d := e.Detail.(event.PlanDetail)
+func (c *cli) renderPlan(e event.PlanEvent) []renderEvent {
+	d := *e.Detail
 
 	if c.width < minWidePlanCols {
 		for i := range d.Actions {
@@ -429,8 +521,27 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 		line:   "",
 	})
 
-	hdr := c.fmtMsg(colPlanRail, c.glyphs.planStart+" ") +
-		c.fmtMsg(colPlanHeader, "execution plan")
+	hdr := c.fmtMsg(colPlanRail, c.glyphs.planStart)
+	hdr += c.fmtMsg(
+		colPlanHeader,
+		" execution plan",
+	)
+
+	if d.UnitID != "" {
+		hdr += c.fmtfMsg(
+			colPlanHeader,
+			": %s",
+			d.UnitID,
+		)
+		if d.UnitDesc != "" {
+			hdr += c.fmtfMsg(
+				colPlanHeader,
+				" %s %s",
+				c.glyphs.actionKindSep, d.UnitDesc,
+			)
+		}
+	}
+
 	out = append(out, renderEvent{
 		stream: streamOut,
 		line:   hdr,
@@ -478,7 +589,7 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 					indexWidth,
 					act.Index,
 					kind,
-					act.Name,
+					act.Desc,
 				)
 
 			var opLine string
@@ -520,7 +631,7 @@ func (c *cli) renderPlan(e event.Event) []renderEvent {
 					indexWidth,
 					act.Index,
 					kind,
-					act.Name,
+					act.Desc,
 				)
 			out = append(out, renderEvent{
 				stream: streamOut,
@@ -602,7 +713,7 @@ func (c *cli) renderOpTree(
 	b.WriteString(c.fmtMsg(colOpRail, conn))
 
 	line := b.String()
-	line += c.fmtMsg(colOpHeader, op.Name)
+	line += c.fmtMsg(colOpHeader, op.DisplayID)
 
 	if v >= signal.VV && op.Template != nil {
 		if text, ok := template.Render(
@@ -638,7 +749,8 @@ func (c *cli) renderOpTree(
 // Action lifecycle
 // ===============================================
 
-func (c *cli) renderActionFinished(e event.Event) []renderEvent {
+func (c *cli) renderActionFinished(e event.ActionEvent) []renderEvent {
+	// TODO: make this less convoluted...
 	fmtActionSummary := func(s model.ActionSummary) string {
 		switch {
 		case s.Failed > 0 || s.Aborted > 0:
@@ -662,58 +774,72 @@ func (c *cli) renderActionFinished(e event.Event) []renderEvent {
 		}
 	}
 
-	d := e.Detail.(event.ActionDetail)
+	d := *e.Detail
 	s := d.Summary
-	st := c.ensureAction(e.Subject.Action)
+	sub := e.Subject.(event.ActionSubject)
+	st := c.ensureActionFromSubject(sub)
 
 	var (
-		color ansi.Code
+		color ansi.ANSI
 		glyph string
 	)
 
 	switch {
 	case s.Failed > 0 || s.Aborted > 0:
-		color = ansi.Red.Reg
+		color = colActionFinishedFailed
 		glyph = c.glyphs.fatal
 
 	case s.Changed > 0:
-		color = ansi.Yellow.Reg
+		color = colActionFinishedChanged
 		glyph = c.glyphs.change
 
 	default:
-		color = ansi.Green.Dim
+		color = colActionFinishedUnchanged
 		glyph = c.glyphs.ok
 	}
 
+	line := c.fmtfMsg(
+		color,
+		"[%s]%s",
+		st.id,
+		glyphr(glyph),
+	)
+	if sub.StepDesc != "" {
+		line += c.fmtfMsg(
+			color,
+			" %s —",
+			sub.StepDesc,
+		)
+	}
+	line += c.fmtfMsg(
+		color,
+		" %s (%s)",
+		fmtActionSummary(s),
+		d.Duration,
+	)
+
 	return []renderEvent{{
 		stream: streamOut,
-		line: c.fmtfMsg(
-			color,
-			"[%s]%s %s — %s (%s)",
-			st.id,
-			glyphr(glyph),
-			e.Subject.Action,
-			fmtActionSummary(s),
-			d.Duration,
-		),
+		line:   line,
 	}}
 }
 
 // Op lifecycle
 // ===============================================
 
-func (c *cli) renderOpChecked(e event.Event) []renderEvent {
-	d := e.Detail.(event.OpCheckDetail)
-	st := c.ensureAction(e.Subject.Action)
+func (c *cli) renderOpChecked(e event.OpEvent) []renderEvent {
+	d := *e.CheckDetail
+	sub := e.Subject.(event.OpSubject)
+	st := c.ensureActionFromOp(sub)
 
 	switch d.Result {
 	case spec.CheckSatisfied:
 		return []renderEvent{{
 			stream: streamOut,
 			line: c.fmtfMsg(
-				ansi.BrightBlack.Dim,
-				"[%s]%s '%s' up-to-date",
-				st.id, glyphr(c.glyphs.ok), e.Subject.Op,
+				colOpCheckSatisfied,
+				"[%s]%s %s - up-to-date",
+				st.id, glyphr(c.glyphs.ok), sub.DisplayID,
 			),
 		}}
 
@@ -721,9 +847,9 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 		return []renderEvent{{
 			stream: streamOut,
 			line: c.fmtfMsg(
-				ansi.BrightBlack.Dim,
-				"[%s]%s '%s' needs change",
-				st.id, glyphr(c.glyphs.change), e.Subject.Op,
+				colOpCheckUnsatisfied,
+				"[%s]%s %s - needs change",
+				st.id, glyphr(c.glyphs.change), sub.DisplayID,
 			),
 		}}
 
@@ -731,9 +857,9 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 		return []renderEvent{{
 			stream: streamErr,
 			line: c.fmtfMsg(
-				ansi.Yellow.Reg,
-				"[%s]%s check %s unknown: %v",
-				st.id, glyphr(c.glyphs.warn), e.Subject.Op, d.Err,
+				colOpCheckUnknown,
+				"[%s]%s %s - unknown: %v",
+				st.id, glyphr(c.glyphs.warn), sub.DisplayID, d.Err,
 			),
 		}}
 	}
@@ -741,18 +867,19 @@ func (c *cli) renderOpChecked(e event.Event) []renderEvent {
 	return nil
 }
 
-func (c *cli) renderOpExecuted(e event.Event) []renderEvent {
-	d := e.Detail.(event.OpExecuteDetail)
-	st := c.ensureAction(e.Subject.Action)
+func (c *cli) renderOpExecuted(e event.OpEvent) []renderEvent {
+	d := *e.ExecuteDetail
+	sub := e.Subject.(event.OpSubject)
+	st := c.ensureActionFromOp(sub)
 
 	switch {
 	case d.Err != nil:
 		return []renderEvent{{
 			stream: streamErr,
 			line: c.fmtfMsg(
-				ansi.Red.Reg,
+				colOpExecFailed,
 				"[%s]%s '%s' failed: %v",
-				st.id, glyphr(c.glyphs.fatal), e.Subject.Op, d.Err,
+				st.id, glyphr(c.glyphs.fatal), sub.DisplayID, d.Err,
 			),
 		}}
 
@@ -760,9 +887,9 @@ func (c *cli) renderOpExecuted(e event.Event) []renderEvent {
 		return []renderEvent{{
 			stream: streamOut,
 			line: c.fmtfMsg(
-				ansi.BrightBlack.Reg,
+				colOpExecChanged,
 				"[%s]%s '%s' changed (%s)",
-				st.id, glyphr(c.glyphs.exec), e.Subject.Op, d.Duration,
+				st.id, glyphr(c.glyphs.exec), sub.DisplayID, d.Duration,
 			),
 		}}
 
@@ -776,110 +903,84 @@ func (c *cli) renderOpExecuted(e event.Event) []renderEvent {
 
 func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 	d := e.Detail.(event.DiagnosticDetail)
-	sub := e.Subject
 
-	switch e.Scope {
-	case event.ScopeEngine:
-		var events []renderEvent
-		for _, l := range c.fmtTemplate(
-			d.Template,
-			"engine.error",
-			fmt.Sprintf(` in file %q`, sub.CfgPath),
-			c.glyphs.error,
-			ansi.Red.Reg,
-			ansi.Cyan.Reg,
-		) {
-			events = append(events, renderEvent{stream: streamErr, line: l})
-		}
-		return events
+	var msg string
+	var prefix string
 
-	case event.ScopePlan:
-		var events []renderEvent
-		for _, l := range c.fmtTemplate(
-			d.Template,
-			"plan.error",
-			fmt.Sprintf(` in unit [%d|%s] '%s'`, sub.Index, sub.Kind, sub.Name),
-			c.glyphs.error,
-			ansi.Red.Reg,
-			ansi.Cyan.Reg,
-		) {
-			events = append(events, renderEvent{stream: streamErr, line: l})
-		}
-		return events
+	switch sub := e.Subject.(type) {
+	case event.EngineSubject:
+		prefix = "engine.error"
+		msg = fmt.Sprintf(` in file %q`, sub.CfgPath)
 
-	case event.ScopeOp:
-		var events []renderEvent
-		for _, l := range c.fmtTemplate(
-			d.Template,
-			"plan.error",
-			fmt.Sprintf(` in unit [%d|%s] '%s'`, sub.Index, sub.Kind, sub.Name),
-			c.glyphs.error,
-			ansi.Red.Reg,
-			ansi.Cyan.Reg,
-		) {
-			events = append(events, renderEvent{stream: streamErr, line: l})
-		}
-		return events
+	case event.PlanSubject:
+		prefix = "plan.error"
+		msg = fmt.Sprintf(` in step [%d|%s] '%s'`, sub.StepIndex, sub.StepKind, sub.StepDesc)
+
+	case event.ActionSubject:
+		prefix = "action.error"
+		msg = fmt.Sprintf(` in step [%d|%s] '%s'`, sub.StepIndex, sub.StepKind, sub.StepDesc)
+
+	case event.OpSubject:
+		prefix = "op.error"
+		msg = fmt.Sprintf(` in op '%s' of step [%d|%s] '%s'`, sub.DisplayID, sub.StepIndex, sub.StepKind, sub.StepDesc)
 
 	default:
 		panic(util.BUG(
-			"renderer encountered unsupported event scope %q for event %#v",
-			e.Scope,
+			"renderer encountered unsupported Subject type %T for event %#v",
+			e.Subject,
 			e,
 		))
 	}
-}
 
-func (c *cli) renderUnknownEvent(e event.Event) []renderEvent {
-	return []renderEvent{{
-		stream: streamErr,
-		line: c.fmtfMsg(
-			ansi.Red.Reg,
-			"[unknown]%s unknown event kind '%s': %+v",
-			glyphr(c.glyphs.warn), e.Kind, e,
-		),
-	}}
+	var events []renderEvent
+	for _, l := range c.fmtTemplate(
+		d.Template,
+		prefix,
+		msg,
+		c.glyphs.error,
+		colDiagMsg,
+		colDiagHelp,
+	) {
+		events = append(events, renderEvent{stream: streamErr, line: l})
+	}
+	return events
 }
 
 // Helpers
 // ===============================================
 
-func (c *cli) ensureAction(name string) *actionState {
-	st, _ := c.actions.LoadOrStore(name, &actionState{
-		id: makeID(name),
+func (c *cli) ensureActionFromSubject(sub event.ActionSubject) *actionState {
+	key := fmt.Sprintf("%s:%d", sub.StepKind, sub.StepIndex)
+	st, _ := c.actions.LoadOrStore(key, &actionState{
+		id: key,
 	})
 	return st.(*actionState)
 }
 
-// makeID produces a short, stable, human-friendly identifier
-func makeID(name string) string {
-	base := strings.ToLower(name)
-	base = strings.ReplaceAll(base, `"`, "")
-	base = strings.Fields(base)[0]
-
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(name))
-	suffix := h.Sum32() & 0xff
-
-	return fmt.Sprintf("%s:%02x", base, suffix)
+func (c *cli) ensureActionFromOp(sub event.OpSubject) *actionState {
+	key := fmt.Sprintf("%s:%d", sub.StepKind, sub.StepIndex)
+	st, _ := c.actions.LoadOrStore(key, &actionState{
+		id: key,
+	})
+	return st.(*actionState)
 }
 
 // Message formatting
 // ===============================================
 
-func (c *cli) fmtMsg(color ansi.Code, msg string) string {
+func (c *cli) fmtMsg(color ansi.ANSI, msg string) string {
 	var buf strings.Builder
 	c.fmtMsgTo(&buf, color, msg)
 	return buf.String()
 }
 
-func (c *cli) fmtfMsg(color ansi.Code, format string, args ...any) string {
+func (c *cli) fmtfMsg(color ansi.ANSI, format string, args ...any) string {
 	var buf strings.Builder
 	c.fmtfMsgTo(&buf, color, format, args...)
 	return buf.String()
 }
 
-func (c *cli) fmtMsgTo(w io.Writer, color ansi.Code, msg string) {
+func (c *cli) fmtMsgTo(w io.Writer, color ansi.ANSI, msg string) {
 	if !c.shouldUseColor() {
 		fprint(w, msg)
 		return
@@ -890,18 +991,18 @@ func (c *cli) fmtMsgTo(w io.Writer, color ansi.Code, msg string) {
 	fprint(w, ansi.Reset)
 }
 
-func (c *cli) fmtfMsgTo(buf *strings.Builder, color ansi.Code, format string, args ...any) {
+func (c *cli) fmtfMsgTo(buf *strings.Builder, color ansi.ANSI, format string, args ...any) {
 	if !c.shouldUseColor() {
 		fprintf(buf, format, args...)
 		return
 	}
 
-	buf.WriteString(string(color))
+	buf.WriteString(color.String())
 	fprintf(buf, format, args...)
-	buf.WriteString(string(ansi.Reset))
+	buf.WriteString(ansi.Reset)
 }
 
-func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph string, txtCol, helpCol ansi.Code) []string {
+func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph string, txtCol, helpCol ansi.ANSI) []string {
 	var buf strings.Builder
 
 	if text, ok := template.Render(tmpl.ID+".Text", tmpl.Text, tmpl.Data); ok {
@@ -1006,8 +1107,7 @@ func (c *cli) renderSourceHeader(w io.Writer, v sourceLine) {
 }
 
 func (c *cli) renderSourceBody(w io.Writer, v sourceLine) {
-	gutterCol := ansi.BrightBlack.Reg
-	gutter := c.fmtfMsg(gutterCol, "|")
+	gutter := c.fmtfMsg(colSourceGutter, "|")
 
 	if !v.ok {
 		fprintf(w, "   %s <source unavailable>", gutter)
@@ -1021,7 +1121,7 @@ func (c *cli) renderSourceBody(w io.Writer, v sourceLine) {
 	fprintf(w, "  %s %s\n", pad, gutter)
 
 	// source line
-	fprintf(w, "  %s%s%s %s %s\n", gutterCol, lineNo, ansi.Reset, gutter, v.text)
+	fprintf(w, "  %s%s%s %s %s\n", colSourceGutter, lineNo, ansi.Reset, gutter, v.text)
 
 	// caret line
 	if v.startCol > 0 {
@@ -1032,7 +1132,7 @@ func (c *cli) renderSourceBody(w io.Writer, v sourceLine) {
 			gutter,
 			caretPadding(v.text, v.startCol),
 		)
-		c.fmtMsgTo(w, ansi.Red.Reg, underlineRange(v.startCol, v.endCol))
+		c.fmtMsgTo(w, colSourceCaret, underlineRange(v.startCol, v.endCol))
 	}
 }
 

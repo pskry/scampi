@@ -22,9 +22,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "copy-test"
+		desc:  "copy-test"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"
@@ -62,8 +62,8 @@ units: [
 	if !ok {
 		t.Fatal("mode not set")
 	}
-	if mode != fs.FileMode(0644) {
-		t.Errorf("unexpected mode: got %o, want %o", mode, 0644)
+	if mode != fs.FileMode(0o644) {
+		t.Errorf("unexpected mode: got %o, want %o", mode, 0o644)
 	}
 
 	// Verify ownership was set
@@ -83,9 +83,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "idempotent-copy"
+		desc:  "idempotent-copy"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"
@@ -102,7 +102,7 @@ units: [
 
 	// Pre-populate target with matching state
 	tgt.Files["/dest.txt"] = []byte("content")
-	tgt.Modes["/dest.txt"] = fs.FileMode(0644)
+	tgt.Modes["/dest.txt"] = fs.FileMode(0o644)
 	tgt.Owners["/dest.txt"] = target.Owner{User: "owner", Group: "group"}
 
 	rec := &recordingDisplayer{}
@@ -116,12 +116,10 @@ units: [
 
 	// Check that ActionFinished has all ops skipped (no changes, no failures)
 	var actionFinished *event.ActionDetail
-	for _, ev := range rec.events {
+	for _, ev := range rec.actionEvents {
 		if ev.Kind == event.ActionFinished {
-			if detail, ok := ev.Detail.(event.ActionDetail); ok {
-				actionFinished = &detail
-				break
-			}
+			actionFinished = ev.Detail
+			break
 		}
 	}
 
@@ -139,23 +137,23 @@ units: [
 	}
 
 	// Verify no OpExecuted events (skipped ops don't execute)
-	for _, ev := range rec.events {
+	for _, ev := range rec.opEvents {
 		if ev.Kind == event.OpExecuted {
 			t.Error("unexpected OpExecuted event - skipped ops should not execute")
 		}
 	}
 }
 
-// TestIntegration_MultipleUnits verifies sequential execution of multiple units.
-func TestIntegration_MultipleUnits(t *testing.T) {
+// TestIntegration_MultipleSteps verifies sequential execution of multiple steps.
+func TestIntegration_MultipleSteps(t *testing.T) {
 	cfg := `
 package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "copy-1"
+		desc:  "copy-1"
 		src:   "/src-a.txt"
 		dest:  "/dest-a.txt"
 		perm:  "0644"
@@ -163,7 +161,7 @@ units: [
 		group: "group"
 	},
 	builtin.copy & {
-		name:  "copy-2"
+		desc:  "copy-2"
 		src:   "/src-b.txt"
 		dest:  "/dest-b.txt"
 		perm:  "0600"
@@ -197,16 +195,16 @@ units: [
 	}
 
 	// Verify different permissions
-	if tgt.Modes["/dest-a.txt"] != fs.FileMode(0644) {
-		t.Errorf("file A mode: got %o, want %o", tgt.Modes["/dest-a.txt"], 0644)
+	if tgt.Modes["/dest-a.txt"] != fs.FileMode(0o644) {
+		t.Errorf("file A mode: got %o, want %o", tgt.Modes["/dest-a.txt"], 0o644)
 	}
-	if tgt.Modes["/dest-b.txt"] != fs.FileMode(0600) {
-		t.Errorf("file B mode: got %o, want %o", tgt.Modes["/dest-b.txt"], 0600)
+	if tgt.Modes["/dest-b.txt"] != fs.FileMode(0o600) {
+		t.Errorf("file B mode: got %o, want %o", tgt.Modes["/dest-b.txt"], 0o600)
 	}
 
 	// Verify two ActionFinished events
 	actionCount := 0
-	for _, ev := range rec.events {
+	for _, ev := range rec.actionEvents {
 		if ev.Kind == event.ActionFinished {
 			actionCount++
 		}
@@ -224,9 +222,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "will-fail"
+		desc:  "will-fail"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"
@@ -271,9 +269,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "source-fail"
+		desc:  "source-fail"
 		src:   "/missing.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"
@@ -312,9 +310,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "first-fails"
+		desc:  "first-fails"
 		src:   "/src-a.txt"
 		dest:  "/dest-a.txt"
 		perm:  "0644"
@@ -322,7 +320,7 @@ units: [
 		group: "group"
 	},
 	builtin.copy & {
-		name:  "never-runs"
+		desc:  "never-runs"
 		src:   "/src-b.txt"
 		dest:  "/dest-b.txt"
 		perm:  "0644"
@@ -359,7 +357,7 @@ units: [
 
 	// Should only have one ActionStarted event (second action never started)
 	actionStartCount := 0
-	for _, ev := range rec.events {
+	for _, ev := range rec.actionEvents {
 		if ev.Kind == event.ActionStarted {
 			actionStartCount++
 		}
@@ -377,9 +375,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "update-content"
+		desc:  "update-content"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"
@@ -396,7 +394,7 @@ units: [
 
 	// Pre-populate target with OLD content
 	tgt.Files["/dest.txt"] = []byte("old content")
-	tgt.Modes["/dest.txt"] = fs.FileMode(0644)
+	tgt.Modes["/dest.txt"] = fs.FileMode(0o644)
 	tgt.Owners["/dest.txt"] = target.Owner{User: "user", Group: "group"}
 
 	rec := &recordingDisplayer{}
@@ -416,12 +414,10 @@ units: [
 
 	// Check ActionFinished for changes
 	var actionFinished *event.ActionDetail
-	for _, ev := range rec.events {
+	for _, ev := range rec.actionEvents {
 		if ev.Kind == event.ActionFinished {
-			if detail, ok := ev.Detail.(event.ActionDetail); ok {
-				actionFinished = &detail
-				break
-			}
+			actionFinished = ev.Detail
+			break
 		}
 	}
 
@@ -443,9 +439,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "update-mode"
+		desc:  "update-mode"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0755"
@@ -462,7 +458,7 @@ units: [
 
 	// Pre-populate target with correct content but WRONG mode
 	tgt.Files["/dest.txt"] = []byte("content")
-	tgt.Modes["/dest.txt"] = fs.FileMode(0644) // Different from 0755
+	tgt.Modes["/dest.txt"] = fs.FileMode(0o644) // Different from 0755
 	tgt.Owners["/dest.txt"] = target.Owner{User: "user", Group: "group"}
 
 	rec := &recordingDisplayer{}
@@ -475,9 +471,9 @@ units: [
 	}
 
 	// Mode should be updated
-	if tgt.Modes["/dest.txt"] != fs.FileMode(0755) {
+	if tgt.Modes["/dest.txt"] != fs.FileMode(0o755) {
 		t.Errorf("mode not updated: got %o, want %o",
-			tgt.Modes["/dest.txt"], 0755)
+			tgt.Modes["/dest.txt"], 0o755)
 	}
 }
 
@@ -489,9 +485,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "update-owner"
+		desc:  "update-owner"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"
@@ -508,7 +504,7 @@ units: [
 
 	// Pre-populate target with correct content and mode but WRONG owner
 	tgt.Files["/dest.txt"] = []byte("content")
-	tgt.Modes["/dest.txt"] = fs.FileMode(0644)
+	tgt.Modes["/dest.txt"] = fs.FileMode(0o644)
 	tgt.Owners["/dest.txt"] = target.Owner{User: "olduser", Group: "oldgroup"}
 
 	rec := &recordingDisplayer{}
@@ -534,9 +530,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "retry-test"
+		desc:  "retry-test"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"

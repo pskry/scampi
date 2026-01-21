@@ -202,18 +202,13 @@ func (CueDiagnostic) Severity() signal.Severity { return signal.Error }
 func (CueDiagnostic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type CueMissingField struct {
-	Field      string
-	UnitIndex  int
-	UnitKind   string
-	UnitName   string
-	UnitSource spec.SourceSpan
+	Field  string
+	Source spec.SourceSpan
 }
 
-type (
-	MissingFieldDiagnostic struct {
-		Missing CueMissingField
-	}
-)
+type MissingFieldDiagnostic struct {
+	Missing CueMissingField
+}
 
 func (d MissingFieldDiagnostic) Error() string {
 	return fmt.Sprintf("field %q is mandatory", d.Missing.Field)
@@ -225,10 +220,10 @@ func (d MissingFieldDiagnostic) EventTemplate() event.Template {
 		ID:   "config.MissingField",
 		Text: d.Error(),
 		Source: &spec.SourceSpan{
-			Filename: m.UnitSource.Filename,
-			Line:     m.UnitSource.Line,
-			StartCol: m.UnitSource.StartCol,
-			EndCol:   m.UnitSource.EndCol,
+			Filename: m.Source.Filename,
+			Line:     m.Source.Line,
+			StartCol: m.Source.StartCol,
+			EndCol:   m.Source.EndCol,
 		},
 	}
 }
@@ -242,17 +237,18 @@ func (d MissingFieldDiagnostic) Diagnostics(subject event.Subject) []event.Event
 func (MissingFieldDiagnostic) Severity() signal.Severity { return signal.Error }
 func (MissingFieldDiagnostic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type InvalidUnitsShape struct {
+type TypeMismatch struct {
 	Source spec.SourceSpan
+	Path   string
 	Have   string
 	Want   string
 }
 
-func (e InvalidUnitsShape) Error() string {
-	return fmt.Sprintf("invalid units declaration: have %q, want %q", e.Have, e.Want)
+func (e TypeMismatch) Error() string {
+	return fmt.Sprintf("type mismatch in %q: have %q, want %q", e.Path, e.Have, e.Want)
 }
 
-func (e InvalidUnitsShape) Diagnostics(subject event.Subject) []event.Event {
+func (e TypeMismatch) Diagnostics(subject event.Subject) []event.Event {
 	return []event.Event{
 		diagnostic.DiagnosticRaised(
 			subject,
@@ -261,48 +257,113 @@ func (e InvalidUnitsShape) Diagnostics(subject event.Subject) []event.Event {
 	}
 }
 
-func (e InvalidUnitsShape) EventTemplate() event.Template {
+func (e TypeMismatch) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "core.InvalidUnitsShape",
-		Text:   "invalid 'units' declaration, expected {{.Want}}",
+		ID:     "core.TypeMismatch",
+		Text:   "type mismatch in '{{.Path}}', expected {{.Want}}",
 		Hint:   "expected {{.Want}}, have {{.Have}}",
-		Help:   "the 'units' field must be a list, e.g. units: [ {...}, {...} ]",
 		Source: &e.Source,
 		Data:   e,
 	}
 }
 
-func (e InvalidUnitsShape) Severity() signal.Severity { return signal.Error }
-func (InvalidUnitsShape) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+func (e TypeMismatch) Severity() signal.Severity { return signal.Error }
+func (TypeMismatch) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
-type UnknownUnitKind struct {
+type InvalidUnitShape struct {
+	Source spec.SourceSpan
+	Have   string
+	Want   string
+}
+
+func (e InvalidUnitShape) Error() string {
+	return fmt.Sprintf("invalid unit declaration: have %q, want %q", e.Have, e.Want)
+}
+
+func (e InvalidUnitShape) Diagnostics(subject event.Subject) []event.Event {
+	return []event.Event{
+		diagnostic.DiagnosticRaised(
+			subject,
+			e,
+		),
+	}
+}
+
+func (e InvalidUnitShape) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "core.InvalidUnitShape",
+		Text:   "invalid 'unit' declaration, expected {{.Want}}",
+		Hint:   "expected {{.Want}}, have {{.Have}}",
+		Help:   `the 'unit' field must be a {{.Want}}, e.g. unit: {id: "...", desc: "..." }`,
+		Source: &e.Source,
+		Data:   e,
+	}
+}
+
+func (e InvalidUnitShape) Severity() signal.Severity { return signal.Error }
+func (InvalidUnitShape) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+
+type InvalidStepsShape struct {
+	Source spec.SourceSpan
+	Have   string
+	Want   string
+}
+
+func (e InvalidStepsShape) Error() string {
+	return fmt.Sprintf("invalid steps declaration: have %q, want %q", e.Have, e.Want)
+}
+
+func (e InvalidStepsShape) Diagnostics(subject event.Subject) []event.Event {
+	return []event.Event{
+		diagnostic.DiagnosticRaised(
+			subject,
+			e,
+		),
+	}
+}
+
+func (e InvalidStepsShape) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "core.InvalidStepsShape",
+		Text:   "invalid 'steps' declaration, expected {{.Want}}",
+		Hint:   "expected {{.Want}}, have {{.Have}}",
+		Help:   "the 'steps' field must be a {{.Want}}, e.g. steps: [ {...}, {...} ]",
+		Source: &e.Source,
+		Data:   e,
+	}
+}
+
+func (e InvalidStepsShape) Severity() signal.Severity { return signal.Error }
+func (InvalidStepsShape) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+
+type UnknownStepKind struct {
 	Kind   string
 	Source spec.SourceSpan
 }
 
-func (e UnknownUnitKind) Error() string {
-	return fmt.Sprintf("unknown unit kind %q", e.Kind)
+func (e UnknownStepKind) Error() string {
+	return fmt.Sprintf("unknown step kind %q", e.Kind)
 }
 
-func (e UnknownUnitKind) Diagnostics(subject event.Subject) []event.Event {
+func (e UnknownStepKind) Diagnostics(subject event.Subject) []event.Event {
 	return []event.Event{
 		diagnostic.DiagnosticRaised(subject, e),
 	}
 }
 
-func (e UnknownUnitKind) EventTemplate() event.Template {
+func (e UnknownStepKind) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "config.UnknownUnitKind",
-		Text:   `unknown unit kind "{{.Kind}}"`,
-		Hint:   "check that the unit kind is spelled correctly",
-		Help:   "available kinds are registered in the engine; see documentation for supported unit types",
+		ID:     "config.UnknownStepKind",
+		Text:   `unknown step kind "{{.Kind}}"`,
+		Hint:   "check that the step kind is spelled correctly",
+		Help:   "available kinds are registered in the engine; see documentation for supported step types",
 		Source: &e.Source,
 		Data:   e,
 	}
 }
 
-func (UnknownUnitKind) Severity() signal.Severity { return signal.Error }
-func (UnknownUnitKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (UnknownStepKind) Severity() signal.Severity { return signal.Error }
+func (UnknownStepKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 // CuePanic wraps a panic recovered from the CUE library.
 // This handles (un-)known upstream bugs where CUE panics on malformed input.
@@ -325,6 +386,7 @@ func (e CuePanic) EventTemplate() event.Template {
 		ID:   "cue.InternalError",
 		Text: "CUE encountered an internal error while parsing configuration",
 		Hint: "this is likely a CUE bug triggered by malformed input",
+		Help: "recovered panic: {{.Recovered}}",
 		Data: e,
 	}
 }

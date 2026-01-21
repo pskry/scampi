@@ -17,9 +17,9 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-units: [
+steps: [
 	builtin.copy & {
-		name:  "builtin.copy action"
+		desc:  "builtin.copy action"
 		src:   "/src.txt"
 		dest:  "/dest.txt"
 		perm:  "0644"

@@ -50,7 +50,7 @@ func TestParsePerm_InvalidPermissions(t *testing.T) {
 				t.Fatalf("error does not expose diagnostics: %T", err)
 			}
 
-			evs := dp.Diagnostics(event.Subject{})
+			evs := dp.Diagnostics(event.PlanSubject{})
 			if len(evs) != 1 {
 				t.Fatalf("expected 1 diagnostic, got %d", len(evs))
 			}

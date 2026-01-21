@@ -2,7 +2,7 @@
   "abort": true,
   "diagnostics": [
     {
-      "id": "core.InvalidUnitsShape",
+      "id": "core.InvalidStepsShape",
       "scope": "ScopeEngine",
       "severity": "Error",
       "kind": "DiagnosticRaised",

@@ -7,7 +7,7 @@ import (
 	"godoit.dev/doit/spec"
 )
 
-type EngineDetail struct {
+type EngineFinishedDetail struct {
 	ChangedCount int
 	FailedCount  int
 	TotalCount   int
@@ -15,29 +15,35 @@ type EngineDetail struct {
 	Err          error
 }
 
+type PlanStartedDetail struct {
+	UnitID string
+}
 type PlanFinishedDetail struct {
-	SuccessfulUnits int
-	FailedUnits     int
+	UnitID          string
+	SuccessfulSteps int
+	FailedSteps     int
 	Duration        time.Duration
 }
 type PlanDetail struct {
-	Actions []PlannedAction
+	UnitID   string
+	UnitDesc string
+	Actions  []PlannedAction
 }
 type PlannedAction struct {
 	Index int
-	Name  string
+	Desc  string
 	Kind  string
 	Ops   []PlannedOp
 }
 type PlannedOp struct {
 	Index     int
-	Name      string
-	DependsOn []int // DAG edges (indices of other PlannedOps)
+	DisplayID string // derived from OpDescriber or fallback
+	DependsOn []int  // DAG edges (indices of other PlannedOps)
 	Template  *spec.PlanTemplate
 }
 type PlanProblem struct {
 	Index int
-	Name  string
+	Desc  string
 	Kind  string
 	Err   error
 }

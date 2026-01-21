@@ -29,8 +29,12 @@ func TestCheck_RawErrorInOpCheck_PropagatesAndPanics(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(op),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(op),
+			},
 		},
 	}
 
@@ -60,8 +64,12 @@ func TestCheck_RawErrorInOpExec_PropagatesAndPanics(t *testing.T) {
 	}
 
 	plan := spec.Plan{
-		Actions: []spec.Action{
-			mkAction(op),
+		Unit: spec.Unit{
+			ID:   "fakeUnit",
+			Desc: "fakeUnit description",
+			Actions: []spec.Action{
+				mkAction(op),
+			},
 		},
 	}
 

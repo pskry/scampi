@@ -48,10 +48,10 @@ import (
 	"godoit.dev/doit/builtin"
 )
 
-units: [
+steps: [
   for i in list.Range(0, %d, 1) {
     builtin.copy & {
-      name:  "unit-\(i)"
+      desc:  "step-\(i)"
       src:   "/tmp/src-\(i)"
       dest:  "/tmp/dest-\(i)"
       perm:  "0644"
@@ -86,10 +86,10 @@ func BenchmarkDiagnosticEmission(b *testing.B) {
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-	sub := event.Subject{
-		Index: 0,
-		Kind:  "copy",
-		Name:  "bench",
+	sub := event.PlanSubject{
+		StepIndex: 0,
+		StepKind:  "copy",
+		StepDesc:  "bench",
 	}
 
 	diag := fakeDiagnostic{
@@ -98,7 +98,7 @@ func BenchmarkDiagnosticEmission(b *testing.B) {
 	}
 
 	for b.Loop() {
-		em.Emit(diagnostic.DiagnosticRaised(sub, diag))
+		em.EmitDiagnostic(diagnostic.DiagnosticRaised(sub, diag))
 	}
 }
 
@@ -118,10 +118,10 @@ import (
 	"godoit.dev/doit/builtin"
 )
 
-units: [
+steps: [
 	for i in list.Range(0, %d, 1) {
 		builtin.copy & {
-			name:  "unit-\(i)"
+			desc:  "step-\(i)"
 			src:   "/src.txt"
 			dest:  "/dest.txt"
 			perm:  "0644"
@@ -157,11 +157,11 @@ func BenchmarkValidateCueInput(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			units := make([]string, 0)
+			steps := make([]string, 0)
 			for i := range size {
-				unit := fmt.Sprintf(`
+				step := fmt.Sprintf(`
 builtin.copy & {
-  name:  "unit-%d"
+  desc:  "step-%d"
 	src:   "/src.txt"
 	dest:  "/dest.txt"
 	perm:  "0644"
@@ -169,7 +169,7 @@ builtin.copy & {
 	group: "perf-group"
 }
 `, i)
-				units = append(units, unit)
+				steps = append(steps, step)
 			}
 
 			cfg := fmt.Sprintf(`
@@ -180,10 +180,10 @@ import (
 	"godoit.dev/doit/builtin"
 )
 
-units: [
+steps: [
 %s
 ]
-`, strings.Join(units, "\n\n"))
+`, strings.Join(steps, "\n\n"))
 
 			data := []byte(cfg)
 			for i := 0; i < b.N; i++ {

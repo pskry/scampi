@@ -67,7 +67,7 @@ func emitDiagnostics(
 	}
 
 	for _, ev := range dp.Diagnostics(subject) {
-		em.Emit(ev)
+		em.EmitDiagnostic(ev)
 
 		if d, ok := err.(diagnostic.Diagnostic); ok {
 			res.add(d.Impact())

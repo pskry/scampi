@@ -1,3 +1,4 @@
+//go:generate stringer -type=ColorMode
 package signal
 
 type ColorMode uint8

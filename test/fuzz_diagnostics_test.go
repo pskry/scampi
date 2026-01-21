@@ -19,16 +19,16 @@ func FuzzDiagnostics(f *testing.F) {
 	seeds := []string{
 		// minimal valid-ish
 		`package fuzz
-units: []`,
+steps: []`,
 
-		// invalid units shape
+		// invalid steps shape
 		`package fuzz
-units: {}`,
+steps: {}`,
 
 		// missing fields
 		`package fuzz
 import "godoit.dev/doit/builtin"
-units: [builtin.copy & { src: "a", dest: "b" }]`,
+steps: [builtin.copy & { src: "a", dest: "b" }]`,
 
 		// garbage
 		`this is not cue`,

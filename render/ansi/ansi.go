@@ -1,130 +1,103 @@
 package ansi
 
-type (
-	Code string
-	ANSI struct {
-		Reg  Code
-		Bold Code
-		Dim  Code
-		Ul   Code
-	}
+import (
+	"slices"
+	"strconv"
+	"strings"
 )
+
+// ANSI represents a condensed SGR sequence builder
+type ANSI struct {
+	params []int
+}
 
 const (
 	Reset = "\x1b[0m"
-
-	// black
-	blackReg  = "\x1b[0;30m"
-	blackBold = "\x1b[1;30m"
-	blackDim  = "\x1b[2;30m"
-	blackUl   = "\x1b[4;30m"
-
-	// red
-	redReg  = "\x1b[0;31m"
-	redBold = "\x1b[1;31m"
-	redDim  = "\x1b[2;31m"
-	redUl   = "\x1b[4;31m"
-
-	// green
-	greenReg  = "\x1b[0;32m"
-	greenBold = "\x1b[1;32m"
-	greenDim  = "\x1b[2;32m"
-	greenUl   = "\x1b[4;32m"
-
-	// yellow
-	yellowReg  = "\x1b[0;33m"
-	yellowBold = "\x1b[1;33m"
-	yellowDim  = "\x1b[2;33m"
-	yellowUl   = "\x1b[4;33m"
-
-	// blue
-	blueReg  = "\x1b[0;34m"
-	blueBold = "\x1b[1;34m"
-	blueDim  = "\x1b[2;34m"
-	blueUl   = "\x1b[4;34m"
-
-	// magenta
-	magentaReg  = "\x1b[0;35m"
-	magentaBold = "\x1b[1;35m"
-	magentaDim  = "\x1b[2;35m"
-	magentaUl   = "\x1b[4;35m"
-
-	// cyan
-	cyanReg  = "\x1b[0;36m"
-	cyanBold = "\x1b[1;36m"
-	cyanDim  = "\x1b[2;36m"
-	cyanUl   = "\x1b[4;36m"
-
-	// white
-	whiteReg  = "\x1b[0;37m"
-	whiteBold = "\x1b[1;37m"
-	whiteDim  = "\x1b[2;37m"
-	whiteUl   = "\x1b[4;37m"
-
-	// bright black
-	brightBlackReg  = "\x1b[0;90m"
-	brightBlackBold = "\x1b[1;90m"
-	brightBlackDim  = "\x1b[2;90m"
-	brightBlackUl   = "\x1b[4;90m"
-
-	// bright red
-	brightRedReg  = "\x1b[0;91m"
-	brightRedBold = "\x1b[1;91m"
-	brightRedDim  = "\x1b[2;91m"
-	brightRedUl   = "\x1b[4;91m"
-
-	// bright green
-	brightGreenReg  = "\x1b[0;92m"
-	brightGreenBold = "\x1b[1;92m"
-	brightGreenDim  = "\x1b[2;92m"
-	brightGreenUl   = "\x1b[4;92m"
-
-	// bright yellow
-	brightYellowReg  = "\x1b[0;93m"
-	brightYellowBold = "\x1b[1;93m"
-	brightYellowDim  = "\x1b[2;93m"
-	brightYellowUl   = "\x1b[4;93m"
-
-	// bright blue
-	brightBlueReg  = "\x1b[0;94m"
-	brightBlueBold = "\x1b[1;94m"
-	brightBlueDim  = "\x1b[2;94m"
-	brightBlueUl   = "\x1b[4;94m"
-
-	// bright magenta
-	brightMagentaReg  = "\x1b[0;95m"
-	brightMagentaBold = "\x1b[1;95m"
-	brightMagentaDim  = "\x1b[2;95m"
-	brightMagentaUl   = "\x1b[4;95m"
-
-	// bright cyan
-	brightCyanReg  = "\x1b[0;96m"
-	brightCyanBold = "\x1b[1;96m"
-	brightCyanDim  = "\x1b[2;96m"
-	brightCyanUl   = "\x1b[4;96m"
-
-	// bright white
-	brightWhiteReg  = "\x1b[0;97m"
-	brightWhiteBold = "\x1b[1;97m"
-	brightWhiteDim  = "\x1b[2;97m"
-	brightWhiteUl   = "\x1b[4;97m"
 )
 
-var (
-	Black         = ANSI{Reg: blackReg, Bold: blackBold, Dim: blackDim, Ul: blackUl}
-	Red           = ANSI{Reg: redReg, Bold: redBold, Dim: redDim, Ul: redUl}
-	Green         = ANSI{Reg: greenReg, Bold: greenBold, Dim: greenDim, Ul: greenUl}
-	Yellow        = ANSI{Reg: yellowReg, Bold: yellowBold, Dim: yellowDim, Ul: yellowUl}
-	Blue          = ANSI{Reg: blueReg, Bold: blueBold, Dim: blueDim, Ul: blueUl}
-	Magenta       = ANSI{Reg: magentaReg, Bold: magentaBold, Dim: magentaDim, Ul: magentaUl}
-	Cyan          = ANSI{Reg: cyanReg, Bold: cyanBold, Dim: cyanDim, Ul: cyanUl}
-	White         = ANSI{Reg: whiteReg, Bold: whiteBold, Dim: whiteDim, Ul: whiteUl}
-	BrightBlack   = ANSI{Reg: brightBlackReg, Bold: brightBlackBold, Dim: brightBlackDim, Ul: brightBlackUl}
-	BrightRed     = ANSI{Reg: brightRedReg, Bold: brightRedBold, Dim: brightRedDim, Ul: brightRedUl}
-	BrightGreen   = ANSI{Reg: brightGreenReg, Bold: brightGreenBold, Dim: brightGreenDim, Ul: brightGreenUl}
-	BrightYellow  = ANSI{Reg: brightYellowReg, Bold: brightYellowBold, Dim: brightYellowDim, Ul: brightYellowUl}
-	BrightBlue    = ANSI{Reg: brightBlueReg, Bold: brightBlueBold, Dim: brightBlueDim, Ul: brightBlueUl}
-	BrightMagenta = ANSI{Reg: brightMagentaReg, Bold: brightMagentaBold, Dim: brightMagentaDim, Ul: brightMagentaUl}
-	BrightCyan    = ANSI{Reg: brightCyanReg, Bold: brightCyanBold, Dim: brightCyanDim, Ul: brightCyanUl}
-	BrightWhite   = ANSI{Reg: brightWhiteReg, Bold: brightWhiteBold, Dim: brightWhiteDim, Ul: brightWhiteUl}
-)
+// ---- internals ----
+
+func (a ANSI) add(p int) ANSI {
+	if slices.Contains(a.params, p) {
+		return a
+	}
+	c := make([]int, len(a.params)+1)
+	copy(c, a.params)
+	c[len(a.params)] = p
+	return ANSI{params: c}
+}
+
+func (a ANSI) String() string {
+	if len(a.params) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\x1b[")
+
+	for i, p := range a.params {
+		if i > 0 {
+			b.WriteByte(';')
+		}
+		b.WriteString(strconv.Itoa(p))
+	}
+
+	b.WriteByte('m')
+	return b.String()
+}
+
+// Wrap applies the style and resets after
+func (a ANSI) Wrap(s string) string {
+	return a.String() + s + Reset
+}
+
+// ---- styles (universally supported) ----
+
+func (a ANSI) Bold() ANSI      { return a.add(1) }
+func (a ANSI) Dim() ANSI       { return a.add(2) }
+func (a ANSI) Underline() ANSI { return a.add(4) }
+func (a ANSI) Reverse() ANSI   { return a.add(7) }
+
+// ---- foreground colors ----
+
+func Black() ANSI   { return ANSI{}.add(30) }
+func Red() ANSI     { return ANSI{}.add(31) }
+func Green() ANSI   { return ANSI{}.add(32) }
+func Yellow() ANSI  { return ANSI{}.add(33) }
+func Blue() ANSI    { return ANSI{}.add(34) }
+func Magenta() ANSI { return ANSI{}.add(35) }
+func Cyan() ANSI    { return ANSI{}.add(36) }
+func White() ANSI   { return ANSI{}.add(37) }
+
+// ---- bright foreground colors ----
+
+func BrightBlack() ANSI   { return ANSI{}.add(90) }
+func BrightRed() ANSI     { return ANSI{}.add(91) }
+func BrightGreen() ANSI   { return ANSI{}.add(92) }
+func BrightYellow() ANSI  { return ANSI{}.add(93) }
+func BrightBlue() ANSI    { return ANSI{}.add(94) }
+func BrightMagenta() ANSI { return ANSI{}.add(95) }
+func BrightCyan() ANSI    { return ANSI{}.add(96) }
+func BrightWhite() ANSI   { return ANSI{}.add(97) }
+
+// ---- background colors ----
+
+func (a ANSI) BgBlack() ANSI   { return a.add(40) }
+func (a ANSI) BgRed() ANSI     { return a.add(41) }
+func (a ANSI) BgGreen() ANSI   { return a.add(42) }
+func (a ANSI) BgYellow() ANSI  { return a.add(43) }
+func (a ANSI) BgBlue() ANSI    { return a.add(44) }
+func (a ANSI) BgMagenta() ANSI { return a.add(45) }
+func (a ANSI) BgCyan() ANSI    { return a.add(46) }
+func (a ANSI) BgWhite() ANSI   { return a.add(47) }
+
+// ---- bright background colors ----
+
+func (a ANSI) BgBrightBlack() ANSI   { return a.add(100) }
+func (a ANSI) BgBrightRed() ANSI     { return a.add(101) }
+func (a ANSI) BgBrightGreen() ANSI   { return a.add(102) }
+func (a ANSI) BgBrightYellow() ANSI  { return a.add(103) }
+func (a ANSI) BgBrightBlue() ANSI    { return a.add(104) }
+func (a ANSI) BgBrightMagenta() ANSI { return a.add(105) }
+func (a ANSI) BgBrightCyan() ANSI    { return a.add(106) }
+func (a ANSI) BgBrightWhite() ANSI   { return a.add(107) }

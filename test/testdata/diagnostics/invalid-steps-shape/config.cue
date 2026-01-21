@@ -1,3 +1,3 @@
 package diagnostics_test
 
-units: {}
+steps: {}

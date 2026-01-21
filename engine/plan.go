@@ -25,7 +25,7 @@ func Plan(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *spe
 
 func (e *Engine) Plan(ctx context.Context, cfgPath string, store *spec.SourceStore) error {
 	start := time.Now()
-	e.em.Emit(diagnostic.EngineStarted())
+	e.em.EmitEngineLifecycle(diagnostic.EngineStarted())
 
 	cfgPath, err := filepath.Abs(cfgPath)
 	if err != nil {
@@ -42,32 +42,38 @@ func (e *Engine) Plan(ctx context.Context, cfgPath string, store *spec.SourceSto
 		return err
 	}
 
-	e.em.Emit(diagnostic.PlanProduced(plan))
+	e.em.EmitPlanLifecycle(diagnostic.PlanProduced(plan))
 
-	e.em.Emit(diagnostic.EngineFinished(model.ExecutionReport{}, time.Since(start), err))
+	e.em.EmitEngineLifecycle(diagnostic.EngineFinished(model.ExecutionReport{}, time.Since(start), err))
 
 	return err
 }
 
 func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 	start := time.Now()
-	em.Emit(diagnostic.PlanStarted())
+	em.EmitPlanLifecycle(diagnostic.PlanStarted(cfg.Unit.ID))
 
 	var (
-		plan        spec.Plan
 		causes      []error
 		diagResults []diagnosticResult
 	)
 
-	for i, unit := range cfg.Units {
-		act, err := unit.Type.Plan(i, unit)
+	plan := spec.Plan{
+		Unit: spec.Unit{
+			ID:   cfg.Unit.ID,
+			Desc: cfg.Unit.Desc,
+		},
+	}
+
+	for i, step := range cfg.Steps {
+		act, err := step.Type.Plan(i, step)
 		if err != nil {
 			dr, _ := emitDiagnostics(
 				em,
-				event.Subject{
-					Index: i,
-					Name:  unit.Name,
-					Kind:  unit.Type.Kind(),
+				event.PlanSubject{
+					StepIndex: i,
+					StepDesc:  step.Desc,
+					StepKind:  step.Type.Kind(),
 				},
 				err,
 			)
@@ -77,12 +83,13 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 			continue
 		}
 
-		plan.Actions = append(plan.Actions, act)
-		em.Emit(diagnostic.UnitPlanned(i, act.Name(), unit.Type.Kind()))
+		plan.Unit.Actions = append(plan.Unit.Actions, act)
+		em.EmitPlanLifecycle(diagnostic.StepPlanned(i, act.Desc(), step.Type.Kind()))
 	}
 
-	em.Emit(diagnostic.PlanFinished(
-		len(plan.Actions),
+	em.EmitPlanLifecycle(diagnostic.PlanFinished(
+		plan.Unit.ID,
+		len(plan.Unit.Actions),
 		len(causes),
 		time.Since(start),
 	))

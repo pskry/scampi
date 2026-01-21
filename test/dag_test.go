@@ -37,8 +37,12 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				b.deps = []spec.Op{a}
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a, b),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a, b),
+						},
 					},
 				}
 			},
@@ -58,8 +62,12 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				c.deps = []spec.Op{a}
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a, b, c),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a, b, c),
+						},
 					},
 				}
 			},
@@ -82,8 +90,12 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				d.deps = []spec.Op{c}
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a, b, c, d),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a, b, c, d),
+						},
 					},
 				}
 			},
@@ -99,8 +111,12 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				a.deps = []spec.Op{a}
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a),
+						},
 					},
 				}
 			},
@@ -122,8 +138,12 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				d.deps = []spec.Op{c}
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a, b, c, d),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a, b, c, d),
+						},
 					},
 				}
 			},
@@ -149,8 +169,12 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				f.deps = nil
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a, b, c, e, f),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a, b, c, e, f),
+						},
 					},
 				}
 			},
@@ -172,8 +196,12 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				d.deps = []spec.Op{a}
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a, b, c, d),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a, b, c, d),
+						},
 					},
 				}
 			},
@@ -193,10 +221,14 @@ func TestPlan_CyclicDependencies(t *testing.T) {
 				c.deps = []spec.Op{a}
 
 				return spec.Plan{
-					Actions: []spec.Action{
-						mkAction(a),
-						mkAction(b),
-						mkAction(c),
+					Unit: spec.Unit{
+						ID:   "fakeUnit",
+						Desc: "fakeUnit description",
+						Actions: []spec.Action{
+							mkAction(a),
+							mkAction(b),
+							mkAction(c),
+						},
 					},
 				}
 			},

@@ -8,10 +8,10 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-func Test_UnitType_NewConfig_ReturnsPointer(t *testing.T) {
-	findUnitType := func(pkgs []*packages.Package) *types.Interface {
+func Test_StepType_NewConfig_ReturnsPointer(t *testing.T) {
+	findStepType := func(pkgs []*packages.Package) *types.Interface {
 		for _, pkg := range pkgs {
-			if obj := pkg.Types.Scope().Lookup("UnitType"); obj != nil {
+			if obj := pkg.Types.Scope().Lookup("StepType"); obj != nil {
 				if tn, ok := obj.(*types.TypeName); ok {
 					if iface, ok := tn.Type().Underlying().(*types.Interface); ok {
 						return iface
@@ -22,8 +22,8 @@ func Test_UnitType_NewConfig_ReturnsPointer(t *testing.T) {
 		return nil
 	}
 
-	hasNewConfigMethod := func(unitType *types.Interface) bool {
-		for method := range unitType.Methods() {
+	hasNewConfigMethod := func(stepType *types.Interface) bool {
+		for method := range stepType.Methods() {
 			if method.Name() == "NewConfig" {
 				return true
 			}
@@ -43,13 +43,13 @@ func Test_UnitType_NewConfig_ReturnsPointer(t *testing.T) {
 		t.Fatalf("failed to load packages: %v", err)
 	}
 
-	unitType := findUnitType(pkgs)
-	if unitType == nil {
-		t.Fatal("UnitType interface not found — invariant test is meaningless")
+	stepType := findStepType(pkgs)
+	if stepType == nil {
+		t.Fatal("StepType interface not found — invariant test is meaningless")
 	}
 
-	if !hasNewConfigMethod(unitType) {
-		t.Fatal("UnitType no longer defines NewConfig — update invariant test")
+	if !hasNewConfigMethod(stepType) {
+		t.Fatal("StepType no longer defines NewConfig — update invariant test")
 	}
 
 	checked := 0
@@ -66,13 +66,13 @@ func Test_UnitType_NewConfig_ReturnsPointer(t *testing.T) {
 				continue
 			}
 
-			// Skip interfaces (including UnitType itself)
+			// Skip interfaces (including StepType itself)
 			if _, ok := named.Underlying().(*types.Interface); ok {
 				continue
 			}
 
-			implements := types.Implements(named, unitType) ||
-				types.Implements(types.NewPointer(named), unitType)
+			implements := types.Implements(named, stepType) ||
+				types.Implements(types.NewPointer(named), stepType)
 
 			if !implements {
 				continue
@@ -82,7 +82,7 @@ func Test_UnitType_NewConfig_ReturnsPointer(t *testing.T) {
 			ms := types.NewMethodSet(types.NewPointer(named))
 			sel := ms.Lookup(pkg.Types, "NewConfig")
 			if sel == nil {
-				t.Fatalf("%s implements UnitType but has no NewConfig method", named)
+				t.Fatalf("%s implements StepType but has no NewConfig method", named)
 			}
 
 			fnObj := sel.Obj().(*types.Func)
@@ -138,6 +138,6 @@ func Test_UnitType_NewConfig_ReturnsPointer(t *testing.T) {
 	}
 
 	if checked == 0 {
-		t.Fatal("no UnitType implementations found — invariant test not exercised")
+		t.Fatal("no StepType implementations found — invariant test not exercised")
 	}
 }

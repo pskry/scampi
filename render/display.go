@@ -30,7 +30,11 @@ type RunSummary struct {
 }
 
 type Displayer interface {
-	Emit(e event.Event)
+	EmitEngineLifecycle(e event.EngineEvent)
+	EmitPlanLifecycle(e event.PlanEvent)
+	EmitActionLifecycle(e event.ActionEvent)
+	EmitOpLifecycle(e event.OpEvent)
+	EmitDiagnostic(e event.Event)
 	Close()
 }
 

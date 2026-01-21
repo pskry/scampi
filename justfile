@@ -36,6 +36,10 @@ doit *args:
 
 [doc("Run tests")]
 test:
+  go test ./...
+
+[doc("Run tests with race-detector")]
+race:
   go test -race ./...
 
 [doc("Run fuzz tests")]

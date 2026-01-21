@@ -58,7 +58,7 @@ Verbosity controls **how much explanation** you receive — never *what happened
 
 * **`-vvv`**
   Full operational detail.
-  Satisfied checks, full plan units, all ops visibility.
+  Satisfied checks, full plan steps, all ops visibility.
 
 Increasing verbosity **never removes information** — it only adds context.
 

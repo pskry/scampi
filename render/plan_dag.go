@@ -9,7 +9,7 @@ type planDAG struct {
 
 type dagAction struct {
 	Index  int
-	Name   string
+	Desc   string
 	Kind   string
 	Layers [][]event.PlannedOp // topologically layered ops
 }
@@ -22,7 +22,7 @@ func buildPlanDAG(detail event.PlanDetail) planDAG {
 
 		dag.Actions = append(dag.Actions, dagAction{
 			Index:  act.Index,
-			Name:   act.Name,
+			Desc:   act.Desc,
 			Kind:   act.Kind,
 			Layers: layers,
 		})
