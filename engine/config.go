@@ -22,7 +22,6 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"godoit.dev/doit"
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/util"
@@ -186,14 +185,8 @@ func LoadConfigWithSource(
 ) (cfg spec.Config, err error) {
 	cfg, err = loadConfigWithSource(ctx, em, cfgPath, store, src)
 	if err != nil {
-		dr, _ := emitDiagnostics(
-			em,
-			event.EngineSubject{
-				CfgPath: cfgPath,
-			},
-			err,
-		)
-		if dr.ShouldAbort() {
+		impact, _ := emitEngineDiagnostic(em, cfgPath, err)
+		if impact.Is(diagnostic.ImpactAbort) {
 			return spec.Config{}, AbortError{Causes: []error{err}}
 		}
 		return spec.Config{}, panicIfNotAbortError(err)
@@ -214,13 +207,7 @@ func loadConfigWithSource(
 	defer func() {
 		if r := recover(); r != nil {
 			panicErr := CuePanic{Recovered: r}
-			_, _ = emitDiagnostics(
-				em,
-				event.EngineSubject{
-					CfgPath: cfgPath,
-				},
-				panicErr,
-			)
+			_, _ = emitEngineDiagnostic(em, cfgPath, panicErr)
 			err = AbortError{Causes: []error{panicErr}}
 		}
 	}()
@@ -480,21 +467,12 @@ func decodeUnit(
 		if isUnitRequiredFieldError(ce) {
 			span := extractSpanFromFile(userFile, cueUnit)
 
-			subject := event.EngineSubject{
-				CfgPath: cfgPath,
-			}
-
 			missing := findMissingRequiredFields(ce, unitVal, span)
 			if len(missing) > 0 {
 				var abort bool
 				for _, m := range missing {
-					dr, _ := emitDiagnostics(
-						em,
-						subject,
-						MissingFieldDiagnostic{Missing: m},
-					)
-
-					if dr.ShouldAbort() {
+					impact, _ := emitEngineDiagnostic(em, cfgPath, MissingFieldDiagnostic{Missing: m})
+					if impact.Is(diagnostic.ImpactAbort) {
 						abort = true
 					}
 				}
@@ -503,16 +481,12 @@ func decodeUnit(
 				}
 			}
 
-			dr, _ := emitDiagnostics(
-				em,
-				subject,
-				CueDiagnostic{
-					Err:   ce,
-					Phase: "decode",
-				},
-			)
+			impact, _ := emitEngineDiagnostic(em, cfgPath, CueDiagnostic{
+				Err:   ce,
+				Phase: "decode",
+			})
 
-			if dr.ShouldAbort() {
+			if impact.Is(diagnostic.ImpactAbort) {
 				return spec.UnitInstance{}, AbortError{Causes: []error{err}}
 			}
 			return spec.UnitInstance{}, nil
@@ -564,26 +538,16 @@ func decodeStep(
 		))
 	}
 
-	subject := event.PlanSubject{
-		StepIndex: stepIdx,
-		StepKind:  kind,
-		StepDesc:  desc,
-	}
-
 	// Resolve step type
 	// ------------------------------------------------------------
 	st, ok := reg.StepType(kind)
 	if !ok {
-		dr, _ := emitDiagnostics(
-			em,
-			subject,
-			UnknownStepKind{
-				Kind:   kind,
-				Source: stepSpan,
-			},
-		)
+		impact, _ := emitPlanDiagnostic(em, stepIdx, kind, desc, UnknownStepKind{
+			Kind:   kind,
+			Source: stepSpan,
+		})
 		return spec.StepInstance{}, decodeResult{
-			abort: dr.ShouldAbort(),
+			abort: impact.Is(diagnostic.ImpactAbort),
 			ok:    false,
 		}
 	}
@@ -624,12 +588,8 @@ func decodeStep(
 		if len(missing) > 0 {
 			var abort bool
 			for _, m := range missing {
-				dr, _ := emitDiagnostics(
-					em,
-					subject,
-					MissingFieldDiagnostic{Missing: m},
-				)
-				if dr.ShouldAbort() {
+				impact, _ := emitPlanDiagnostic(em, stepIdx, kind, desc, MissingFieldDiagnostic{Missing: m})
+				if impact.Is(diagnostic.ImpactAbort) {
 					abort = true
 				}
 			}
@@ -640,17 +600,13 @@ func decodeStep(
 		}
 
 		// generic cue validation error, still user-facing
-		dr, _ := emitDiagnostics(
-			em,
-			subject,
-			CueDiagnostic{
-				Err:   ce,
-				Phase: "decode",
-			},
-		)
+		impact, _ := emitPlanDiagnostic(em, stepIdx, kind, desc, CueDiagnostic{
+			Err:   ce,
+			Phase: "decode",
+		})
 
 		return spec.StepInstance{}, decodeResult{
-			abort: dr.ShouldAbort(),
+			abort: impact.Is(diagnostic.ImpactAbort),
 			ok:    false,
 		}
 	}

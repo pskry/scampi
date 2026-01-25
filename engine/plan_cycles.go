@@ -32,12 +32,6 @@ func (e CyclicDependency) Error() string {
 	return "cyclic dependency: " + strings.Join(ids, " -> ")
 }
 
-func (e CyclicDependency) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
-}
-
 func (e CyclicDependency) EventTemplate() event.Template {
 	ids := make([]string, 0, len(e.Cycle))
 	for _, op := range e.Cycle {
@@ -62,11 +56,10 @@ func DetectPlanCycles(em diagnostic.Emitter, plan spec.Plan) error {
 			cd := CyclicDependency{Cycle: cycle}
 			err.Causes = append(err.Causes, cd)
 
-			em.EmitDiagnostic(diagnostic.DiagnosticRaised(
-				event.PlanSubject{
-					StepKind: cycle[0].Action().Kind(),
-					StepDesc: cycle[0].Action().Desc(),
-				},
+			em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(
+				0, // step index not applicable for cycle detection
+				cycle[0].Action().Kind(),
+				cycle[0].Action().Desc(),
 				cd,
 			))
 		}

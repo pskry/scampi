@@ -56,7 +56,7 @@ func runDiagnosticsCase(t *testing.T, dir string) {
 	}
 
 	defer rec.dump(t.Output())
-	assertDiagnostics(t, rec.events, expect.Diagnostics, cfgPath)
+	assertDiagnostics(t, rec, expect.Diagnostics, cfgPath)
 
 	AssertTargetUntouched(t, recTgt)
 }
@@ -72,40 +72,92 @@ func loadExpected(t *testing.T, path string) ExpectedDiagnostics {
 	return e
 }
 
+// collectedDiagnostic is a normalized representation of any diagnostic type
+// for easier comparison with expected diagnostics.
+type collectedDiagnostic struct {
+	scope    string
+	severity string
+	template event.Template
+	step     *event.StepDetail
+}
+
+func collectDiagnostics(rec *recordingDisplayer) []collectedDiagnostic {
+	var collected []collectedDiagnostic
+
+	for _, d := range rec.engineDiagnostics {
+		collected = append(collected, collectedDiagnostic{
+			scope:    "ScopeEngine",
+			severity: d.Severity.String(),
+			template: d.Detail.Template,
+			step:     nil,
+		})
+	}
+
+	for _, d := range rec.planDiagnostics {
+		step := d.Step
+		collected = append(collected, collectedDiagnostic{
+			scope:    "ScopePlan",
+			severity: d.Severity.String(),
+			template: d.Detail.Template,
+			step:     &step,
+		})
+	}
+
+	for _, d := range rec.actionDiagnostics {
+		step := d.Step
+		collected = append(collected, collectedDiagnostic{
+			scope:    "ScopeAction",
+			severity: d.Severity.String(),
+			template: d.Detail.Template,
+			step:     &step,
+		})
+	}
+
+	for _, d := range rec.opDiagnostics {
+		step := d.Step
+		collected = append(collected, collectedDiagnostic{
+			scope:    "ScopeOp",
+			severity: d.Severity.String(),
+			template: d.Detail.Template,
+			step:     &step,
+		})
+	}
+
+	return collected
+}
+
 func assertDiagnostics(
 	t *testing.T,
-	have []event.Event,
+	rec *recordingDisplayer,
 	expect []ExpectedDiagnostic,
 	cfgPath string,
 ) {
-	var actual []event.Event
-	for _, ev := range have {
-		if ev.Kind == event.DiagnosticRaised {
-			actual = append(actual, ev)
-		}
-	}
+	t.Helper()
+
+	actual := collectDiagnostics(rec)
 
 	if len(actual) != len(expect) {
-		t.Fatalf("expected %d events, got %d", len(expect), len(actual))
+		t.Fatalf("expected %d diagnostics, got %d", len(expect), len(actual))
 	}
 
 	for i, exp := range expect {
 		// NOTE: diagnostics are expected to be emitted in deterministic order
-		ev := actual[i]
+		got := actual[i]
 
-		if ev.Severity.String() != exp.Severity {
-			t.Fatalf("[%d] expected severity %q, got %q", i, exp.Severity, ev.Severity)
-		}
-		if ev.Kind.String() != exp.Kind {
-			t.Fatalf("[%d] expected kind %q, got %q", i, exp.Kind, ev.Kind)
-		}
-		if ev.Scope.String() != exp.Scope {
-			t.Fatalf("[%d] expected scope %q, got %q", i, exp.Scope, ev.Scope)
+		if got.severity != exp.Severity {
+			t.Fatalf("[%d] expected severity %q, got %q", i, exp.Severity, got.severity)
 		}
 
-		d := diagnosticDetail(t, ev)
+		// Kind is always "DiagnosticRaised" for diagnostics - implicit in the new model
+		if exp.Kind != "DiagnosticRaised" {
+			t.Fatalf("[%d] unexpected kind in test data: %q (should always be DiagnosticRaised)", i, exp.Kind)
+		}
 
-		tmpl := d.Template
+		if got.scope != exp.Scope {
+			t.Fatalf("[%d] expected scope %q, got %q", i, exp.Scope, got.scope)
+		}
+
+		tmpl := got.template
 
 		if tmpl.ID != exp.ID {
 			t.Fatalf("[%d] expected id %q, got %q", i, exp.ID, tmpl.ID)
@@ -124,30 +176,15 @@ func assertDiagnostics(
 		}
 
 		if exp.Step != nil {
-			sub, ok := ev.Subject.(event.PlanSubject)
-			if !ok {
-				t.Fatalf("[%d] expected PlanSubject, got %T", i, ev.Subject)
+			if got.step == nil {
+				t.Fatalf("[%d] expected step info, got nil", i)
 			}
-			if sub.StepIndex != exp.Step.Index {
-				t.Fatalf("[%d] expected step index %d, got %d", i, exp.Step.Index, sub.StepIndex)
+			if got.step.StepIndex != exp.Step.Index {
+				t.Fatalf("[%d] expected step index %d, got %d", i, exp.Step.Index, got.step.StepIndex)
 			}
-			if sub.StepKind != exp.Step.Kind {
-				t.Fatalf("[%d] expected step kind %q, got %q", i, exp.Step.Kind, sub.StepKind)
+			if got.step.StepKind != exp.Step.Kind {
+				t.Fatalf("[%d] expected step kind %q, got %q", i, exp.Step.Kind, got.step.StepKind)
 			}
 		}
 	}
-}
-
-func diagnosticDetail(t *testing.T, ev event.Event) event.DiagnosticDetail {
-	t.Helper()
-
-	if ev.Kind != event.DiagnosticRaised {
-		t.Fatalf("expected DiagnosticRaised, got %v", ev.Kind)
-	}
-
-	d, ok := ev.Detail.(event.DiagnosticDetail)
-	if !ok {
-		t.Fatalf("unexpected Detail type %T", ev.Detail)
-	}
-	return d
 }

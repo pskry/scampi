@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/spec"
 )
 
@@ -45,27 +44,19 @@ func TestParsePerm_InvalidPermissions(t *testing.T) {
 				t.Fatalf("expected error for input %q", tc.input)
 			}
 
-			dp, ok := err.(diagnostic.DiagnosticProvider)
+			d, ok := err.(diagnostic.Diagnostic)
 			if !ok {
-				t.Fatalf("error does not expose diagnostics: %T", err)
+				t.Fatalf("error does not implement diagnostic.Diagnostic: %T", err)
 			}
 
-			evs := dp.Diagnostics(event.PlanSubject{})
-			if len(evs) != 1 {
-				t.Fatalf("expected 1 diagnostic, got %d", len(evs))
-			}
+			tmpl := d.EventTemplate()
 
-			detail, ok := evs[0].Detail.(event.DiagnosticDetail)
-			if !ok {
-				t.Fatalf("expected DiagnosticDetail, got %T", evs[0].Detail)
-			}
-
-			text := strings.ToLower(detail.Template.Text)
+			text := strings.ToLower(tmpl.Text)
 			if !strings.Contains(text, "permission") {
 				t.Fatalf("expected diagnostic text to mention permission, got %q", text)
 			}
 
-			help := strings.ToLower(detail.Template.Help)
+			help := strings.ToLower(tmpl.Help)
 			for _, sub := range wantHelpSub {
 				if !strings.Contains(help, sub) {
 					t.Fatalf("expected help to mention %q, got %q", sub, help)

@@ -71,39 +71,58 @@ steps: [builtin.copy & { src: "a", dest: "b" }]`,
 			}
 		}
 
-		// ---- Event invariants ----
-		for _, ev := range rec.events {
-			assertEventWellFormed(t, ev)
-		}
+		// ---- Diagnostic invariants ----
+		assertEngineDiagnosticsWellFormed(t, rec.engineDiagnostics)
+		assertPlanDiagnosticsWellFormed(t, rec.planDiagnostics)
+		assertActionDiagnosticsWellFormed(t, rec.actionDiagnostics)
+		assertOpDiagnosticsWellFormed(t, rec.opDiagnostics)
 	})
 }
 
-func assertEventWellFormed(t *testing.T, ev event.Event) {
+func assertEngineDiagnosticsWellFormed(t *testing.T, diags []event.EngineDiagnostic) {
 	t.Helper()
-
-	// Kind must be known
-	if ev.Kind.String() == "" {
-		t.Fatalf("event has empty Kind: %#v", ev)
-	}
-
-	// Scope must be known
-	if ev.Scope.String() == "" {
-		t.Fatalf("event has empty Scope: %#v", ev)
-	}
-
-	// Severity must be known
-	if ev.Severity.String() == "" {
-		t.Fatalf("event has empty Severity: %#v", ev)
-	}
-
-	// DiagnosticRaised must carry a template
-	if ev.Kind == event.DiagnosticRaised {
-		d, ok := ev.Detail.(event.DiagnosticDetail)
-		if !ok {
-			t.Fatalf("DiagnosticRaised without DiagnosticDetail: %#v", ev)
+	for i, d := range diags {
+		if d.Severity.String() == "" {
+			t.Fatalf("engine diagnostic [%d] has empty Severity", i)
 		}
-		if d.Template.ID == "" {
-			t.Fatalf("DiagnosticRaised with empty Template.ID: %#v", ev)
+		if d.Detail.Template.ID == "" {
+			t.Fatalf("engine diagnostic [%d] has empty Template.ID", i)
+		}
+	}
+}
+
+func assertPlanDiagnosticsWellFormed(t *testing.T, diags []event.PlanDiagnostic) {
+	t.Helper()
+	for i, d := range diags {
+		if d.Severity.String() == "" {
+			t.Fatalf("plan diagnostic [%d] has empty Severity", i)
+		}
+		if d.Detail.Template.ID == "" {
+			t.Fatalf("plan diagnostic [%d] has empty Template.ID", i)
+		}
+	}
+}
+
+func assertActionDiagnosticsWellFormed(t *testing.T, diags []event.ActionDiagnostic) {
+	t.Helper()
+	for i, d := range diags {
+		if d.Severity.String() == "" {
+			t.Fatalf("action diagnostic [%d] has empty Severity", i)
+		}
+		if d.Detail.Template.ID == "" {
+			t.Fatalf("action diagnostic [%d] has empty Template.ID", i)
+		}
+	}
+}
+
+func assertOpDiagnosticsWellFormed(t *testing.T, diags []event.OpDiagnostic) {
+	t.Helper()
+	for i, d := range diags {
+		if d.Severity.String() == "" {
+			t.Fatalf("op diagnostic [%d] has empty Severity", i)
+		}
+		if d.Detail.Template.ID == "" {
+			t.Fatalf("op diagnostic [%d] has empty Template.ID", i)
 		}
 	}
 }

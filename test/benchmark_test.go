@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/engine"
 	"godoit.dev/doit/signal"
 	"godoit.dev/doit/source"
@@ -86,19 +85,13 @@ func BenchmarkDiagnosticEmission(b *testing.B) {
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-	sub := event.PlanSubject{
-		StepIndex: 0,
-		StepKind:  "copy",
-		StepDesc:  "bench",
-	}
-
 	diag := fakeDiagnostic{
 		severity: signal.Error,
 		impact:   diagnostic.ImpactAbort,
 	}
 
 	for b.Loop() {
-		em.EmitDiagnostic(diagnostic.DiagnosticRaised(sub, diag))
+		em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(0, "copy", "bench", diag))
 	}
 }
 

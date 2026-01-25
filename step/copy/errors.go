@@ -19,12 +19,6 @@ func (e CopySourceMissing) Error() string {
 	return fmt.Sprintf("source file %q does not exist", e.Path)
 }
 
-func (e CopySourceMissing) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
-}
-
 func (e CopySourceMissing) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.copy.SourceMissing",
@@ -47,12 +41,6 @@ type CopyDestDirMissing struct {
 
 func (e CopyDestDirMissing) Error() string {
 	return fmt.Sprintf("destination directory %q does not exist", e.Path)
-}
-
-func (e CopyDestDirMissing) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
 }
 
 func (e CopyDestDirMissing) EventTemplate() event.Template {
@@ -78,12 +66,6 @@ func (e UserNotFound) Error() string {
 	return fmt.Sprintf("user %q does not exist on target", e.User)
 }
 
-func (e UserNotFound) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
-}
-
 func (e UserNotFound) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.copy.UserNotFound",
@@ -105,12 +87,6 @@ type GroupNotFound struct {
 
 func (e GroupNotFound) Error() string {
 	return fmt.Sprintf("group %q does not exist on target", e.Group)
-}
-
-func (e GroupNotFound) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
 }
 
 func (e GroupNotFound) EventTemplate() event.Template {
@@ -141,12 +117,6 @@ func (e OwnerReadError) Unwrap() error {
 	return e.Err
 }
 
-func (e OwnerReadError) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
-}
-
 func (e OwnerReadError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.copy.OwnerReadError",
@@ -172,12 +142,6 @@ func (e ModeReadError) Error() string {
 
 func (e ModeReadError) Unwrap() error {
 	return e.Err
-}
-
-func (e ModeReadError) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
 }
 
 func (e ModeReadError) EventTemplate() event.Template {

@@ -5,7 +5,6 @@ import (
 	"runtime"
 
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/util"
 )
 
@@ -15,23 +14,6 @@ type AbortError struct {
 
 func (AbortError) Error() string {
 	return "execution aborted"
-}
-
-type diagnosticResult struct {
-	Impacts []diagnostic.Impact
-}
-
-func (r *diagnosticResult) add(impact diagnostic.Impact) {
-	r.Impacts = append(r.Impacts, impact)
-}
-
-func (r diagnosticResult) ShouldAbort() bool {
-	for _, i := range r.Impacts {
-		if i&diagnostic.ImpactAbort != 0 {
-			return true
-		}
-	}
-	return false
 }
 
 func panicIfNotAbortError(err error) error {
@@ -50,29 +32,95 @@ func panicIfNotAbortError(err error) error {
 	panic(wrap)
 }
 
-func emitDiagnostics(
+// emitEngineDiagnostic emits a diagnostic for engine-level errors.
+// Returns the impact and whether a diagnostic was emitted.
+func emitEngineDiagnostic(
 	em diagnostic.Emitter,
-	subject event.Subject,
+	cfgPath string,
 	err error,
-) (diagnosticResult, bool) {
-	var res diagnosticResult
-
+) (diagnostic.Impact, bool) {
 	if err == nil {
-		return res, false
+		return 0, false
 	}
 
-	var dp diagnostic.DiagnosticProvider
-	if !errors.As(err, &dp) {
-		return res, false
+	var d diagnostic.Diagnostic
+	if !errors.As(err, &d) {
+		return 0, false
 	}
 
-	for _, ev := range dp.Diagnostics(subject) {
-		em.EmitDiagnostic(ev)
+	em.EmitEngineDiagnostic(diagnostic.RaiseEngineDiagnostic(cfgPath, d))
+	return d.Impact(), true
+}
 
-		if d, ok := err.(diagnostic.Diagnostic); ok {
-			res.add(d.Impact())
-		}
+// emitPlanDiagnostic emits a diagnostic for plan-level errors.
+// Returns the impact and whether a diagnostic was emitted.
+func emitPlanDiagnostic(
+	em diagnostic.Emitter,
+	stepIndex int,
+	stepKind string,
+	stepDesc string,
+	err error,
+) (diagnostic.Impact, bool) {
+	if err == nil {
+		return 0, false
 	}
 
-	return res, true
+	var d diagnostic.Diagnostic
+	if !errors.As(err, &d) {
+		return 0, false
+	}
+
+	em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(
+		stepIndex, stepKind, stepDesc, d,
+	))
+	return d.Impact(), true
+}
+
+// emitActionDiagnostic emits a diagnostic for action-level errors.
+// Returns the impact and whether a diagnostic was emitted.
+func emitActionDiagnostic(
+	em diagnostic.Emitter,
+	stepIndex int,
+	stepKind string,
+	stepDesc string,
+	err error,
+) (diagnostic.Impact, bool) {
+	if err == nil {
+		return 0, false
+	}
+
+	var d diagnostic.Diagnostic
+	if !errors.As(err, &d) {
+		return 0, false
+	}
+
+	em.EmitActionDiagnostic(diagnostic.RaiseActionDiagnostic(
+		stepIndex, stepKind, stepDesc, d,
+	))
+	return d.Impact(), true
+}
+
+// emitOpDiagnostic emits a diagnostic for op-level errors.
+// Returns the impact and whether a diagnostic was emitted.
+func emitOpDiagnostic(
+	em diagnostic.Emitter,
+	stepIndex int,
+	stepKind string,
+	stepDesc string,
+	displayID string,
+	err error,
+) (diagnostic.Impact, bool) {
+	if err == nil {
+		return 0, false
+	}
+
+	var d diagnostic.Diagnostic
+	if !errors.As(err, &d) {
+		return 0, false
+	}
+
+	em.EmitOpDiagnostic(diagnostic.RaiseOpDiagnostic(
+		stepIndex, stepKind, stepDesc, displayID, d,
+	))
+	return d.Impact(), true
 }

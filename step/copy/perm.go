@@ -23,12 +23,6 @@ func (e InvalidPermission) Error() string {
 	return fmt.Sprintf("invalid permission %q", e.Value)
 }
 
-func (e InvalidPermission) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
-}
-
 func (e InvalidPermission) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "builtin.copy.InvalidPermission",

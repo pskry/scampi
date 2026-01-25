@@ -52,7 +52,22 @@ func (p *policyEmitter) EmitOpLifecycle(ev event.OpEvent) {
 	p.out.EmitOpLifecycle(ev)
 }
 
-func (p *policyEmitter) EmitDiagnostic(ev event.Event) {
+func (p *policyEmitter) EmitEngineDiagnostic(ev event.EngineDiagnostic) {
 	ev.Severity = p.pol.apply(ev.Severity)
-	p.out.EmitDiagnostic(ev)
+	p.out.EmitEngineDiagnostic(ev)
+}
+
+func (p *policyEmitter) EmitPlanDiagnostic(ev event.PlanDiagnostic) {
+	ev.Severity = p.pol.apply(ev.Severity)
+	p.out.EmitPlanDiagnostic(ev)
+}
+
+func (p *policyEmitter) EmitActionDiagnostic(ev event.ActionDiagnostic) {
+	ev.Severity = p.pol.apply(ev.Severity)
+	p.out.EmitActionDiagnostic(ev)
+}
+
+func (p *policyEmitter) EmitOpDiagnostic(ev event.OpDiagnostic) {
+	ev.Severity = p.pol.apply(ev.Severity)
+	p.out.EmitOpDiagnostic(ev)
 }

@@ -131,12 +131,6 @@ func (e MalformedInput) Error() string {
 	return fmt.Sprintf("malformed input: %s", e.Reason)
 }
 
-func (e MalformedInput) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
-}
-
 func (e MalformedInput) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.MalformedInput",
@@ -157,21 +151,6 @@ type CueDiagnostic struct {
 
 func (d CueDiagnostic) Error() string {
 	return fmt.Sprintf("cue.error in phase %q: %v", d.Phase, d.Err)
-}
-
-func (d CueDiagnostic) Diagnostics(subject event.Subject) []event.Event {
-	var events []event.Event
-
-	for _, e := range cueerr.Errors(d.Err) {
-		events = append(events,
-			diagnostic.DiagnosticRaised(subject, CueDiagnostic{
-				Err:   e,
-				Phase: d.Phase,
-			}),
-		)
-	}
-
-	return events
 }
 
 func (d CueDiagnostic) EventTemplate() event.Template {
@@ -228,12 +207,6 @@ func (d MissingFieldDiagnostic) EventTemplate() event.Template {
 	}
 }
 
-func (d MissingFieldDiagnostic) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, d),
-	}
-}
-
 func (MissingFieldDiagnostic) Severity() signal.Severity { return signal.Error }
 func (MissingFieldDiagnostic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
@@ -246,15 +219,6 @@ type TypeMismatch struct {
 
 func (e TypeMismatch) Error() string {
 	return fmt.Sprintf("type mismatch in %q: have %q, want %q", e.Path, e.Have, e.Want)
-}
-
-func (e TypeMismatch) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(
-			subject,
-			e,
-		),
-	}
 }
 
 func (e TypeMismatch) EventTemplate() event.Template {
@@ -278,15 +242,6 @@ type InvalidUnitShape struct {
 
 func (e InvalidUnitShape) Error() string {
 	return fmt.Sprintf("invalid unit declaration: have %q, want %q", e.Have, e.Want)
-}
-
-func (e InvalidUnitShape) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(
-			subject,
-			e,
-		),
-	}
 }
 
 func (e InvalidUnitShape) EventTemplate() event.Template {
@@ -313,15 +268,6 @@ func (e InvalidStepsShape) Error() string {
 	return fmt.Sprintf("invalid steps declaration: have %q, want %q", e.Have, e.Want)
 }
 
-func (e InvalidStepsShape) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(
-			subject,
-			e,
-		),
-	}
-}
-
 func (e InvalidStepsShape) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "core.InvalidStepsShape",
@@ -343,12 +289,6 @@ type UnknownStepKind struct {
 
 func (e UnknownStepKind) Error() string {
 	return fmt.Sprintf("unknown step kind %q", e.Kind)
-}
-
-func (e UnknownStepKind) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
 }
 
 func (e UnknownStepKind) EventTemplate() event.Template {
@@ -373,12 +313,6 @@ type CuePanic struct {
 
 func (e CuePanic) Error() string {
 	return fmt.Sprintf("cue panic: %v", e.Recovered)
-}
-
-func (e CuePanic) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, e),
-	}
 }
 
 func (e CuePanic) EventTemplate() event.Template {

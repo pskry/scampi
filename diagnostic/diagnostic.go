@@ -36,6 +36,10 @@ const (
 	ImpactNone  Impact = 0
 )
 
+func (i Impact) Is(other Impact) bool {
+	return i&other != 0
+}
+
 type (
 	Emitter interface {
 		EmitEngineLifecycle(e event.EngineEvent)
@@ -43,15 +47,15 @@ type (
 		EmitActionLifecycle(e event.ActionEvent)
 		EmitOpLifecycle(e event.OpEvent)
 
-		EmitDiagnostic(e event.Event)
+		EmitEngineDiagnostic(e event.EngineDiagnostic)
+		EmitPlanDiagnostic(e event.PlanDiagnostic)
+		EmitActionDiagnostic(e event.ActionDiagnostic)
+		EmitOpDiagnostic(e event.OpDiagnostic)
 	}
 	Diagnostic interface {
 		EventTemplate() event.Template
 		Severity() signal.Severity
 		Impact() Impact
-	}
-	DiagnosticProvider interface {
-		Diagnostics(subject event.Subject) []event.Event
 	}
 )
 
@@ -92,7 +96,7 @@ func EngineFinished(rep model.ExecutionReport, dur time.Duration, err error) eve
 		e.Severity = signal.Error
 		e.Chattiness = event.Normal
 
-	case e.Detail.FailedCount > 0:
+	case e.Detail.ChangedCount > 0:
 		e.Severity = signal.Notice
 		e.Chattiness = event.Subtle
 
@@ -148,15 +152,11 @@ func PlanFinished(unitID spec.UnitID, successfulSteps, failedSteps int, dur time
 	return e
 }
 
-func StepPlanned(
-	index int,
-	desc string,
-	kind string,
-) event.PlanEvent {
+func StepPlanned(index int, desc string, kind string) event.PlanEvent {
 	return event.PlanEvent{
 		Time: time.Now(),
 		Kind: event.StepPlanned,
-		Subject: event.PlanSubject{
+		Step: event.StepDetail{
 			StepIndex: index,
 			StepDesc:  desc,
 			StepKind:  kind,
@@ -211,10 +211,7 @@ func PlanProduced(plan spec.Plan) event.PlanEvent {
 	// ------------------------------------------------------------
 	// 3. Re-slice ops back into PlannedActions
 	// ------------------------------------------------------------
-	detail := event.PlanDetail{
-		UnitID:   string(plan.Unit.ID),
-		UnitDesc: plan.Unit.Desc,
-	}
+	var detail event.PlanDetail
 	for i, act := range plan.Unit.Actions {
 		start := actionOpBase[i]
 		end := start + len(act.Ops())
@@ -243,7 +240,7 @@ func ActionStarted(idx int, kind, desc string) event.ActionEvent {
 	return event.ActionEvent{
 		Time: time.Now(),
 		Kind: event.ActionStarted,
-		Subject: event.ActionSubject{
+		Step: event.StepDetail{
 			StepIndex: idx,
 			StepKind:  kind,
 			StepDesc:  desc,
@@ -264,7 +261,7 @@ func ActionFinished(
 	e := event.ActionEvent{
 		Time: time.Now(),
 		Kind: event.ActionFinished,
-		Subject: event.ActionSubject{
+		Step: event.StepDetail{
 			StepIndex: idx,
 			StepKind:  kind,
 			StepDesc:  desc,
@@ -298,21 +295,31 @@ func ActionFinished(
 // Op lifecycle
 // ===============================================
 
-func OpCheckStarted(subject event.Subject) event.OpEvent {
+func OpCheckStarted(stepIdx int, stepKind, stepDesc, displayID string) event.OpEvent {
 	return event.OpEvent{
-		Time:       time.Now(),
-		Kind:       event.OpCheckStarted,
-		Subject:    subject,
+		Time: time.Now(),
+		Kind: event.OpCheckStarted,
+		Step: event.StepDetail{
+			StepIndex: stepIdx,
+			StepKind:  stepKind,
+			StepDesc:  stepDesc,
+		},
+		DisplayID:  displayID,
 		Severity:   signal.Debug,
 		Chattiness: event.Chatty,
 	}
 }
 
-func OpChecked(subject event.Subject, res spec.CheckResult, err error) event.OpEvent {
+func OpChecked(stepIdx int, stepKind, stepDesc, displayID string, res spec.CheckResult, err error) event.OpEvent {
 	e := event.OpEvent{
-		Time:    time.Now(),
-		Kind:    event.OpChecked,
-		Subject: subject,
+		Time: time.Now(),
+		Kind: event.OpChecked,
+		Step: event.StepDetail{
+			StepIndex: stepIdx,
+			StepKind:  stepKind,
+			StepDesc:  stepDesc,
+		},
+		DisplayID: displayID,
 		CheckDetail: &event.OpCheckDetail{
 			Result: res,
 			Err:    err,
@@ -336,21 +343,39 @@ func OpChecked(subject event.Subject, res spec.CheckResult, err error) event.OpE
 	return e
 }
 
-func OpExecuteStarted(subject event.Subject) event.OpEvent {
+func OpExecuteStarted(stepIdx int, stepKind, stepDesc, displayID string) event.OpEvent {
 	return event.OpEvent{
-		Time:       time.Now(),
-		Kind:       event.OpExecuteStarted,
-		Subject:    subject,
+		Time: time.Now(),
+		Kind: event.OpExecuteStarted,
+		Step: event.StepDetail{
+			StepIndex: stepIdx,
+			StepKind:  stepKind,
+			StepDesc:  stepDesc,
+		},
+		DisplayID:  displayID,
 		Severity:   signal.Info,
 		Chattiness: event.Chatty,
 	}
 }
 
-func OpExecuted(subject event.Subject, changed bool, dur time.Duration, err error) event.OpEvent {
+func OpExecuted(
+	stepIdx int,
+	stepKind string,
+	stepDesc string,
+	displayID string,
+	changed bool,
+	dur time.Duration,
+	err error,
+) event.OpEvent {
 	e := event.OpEvent{
-		Time:    time.Now(),
-		Kind:    event.OpExecuted,
-		Subject: subject,
+		Time: time.Now(),
+		Kind: event.OpExecuted,
+		Step: event.StepDetail{
+			StepIndex: stepIdx,
+			StepKind:  stepKind,
+			StepDesc:  stepDesc,
+		},
+		DisplayID: displayID,
 		ExecuteDetail: &event.OpExecuteDetail{
 			Changed:  changed,
 			Duration: dur,
@@ -378,12 +403,59 @@ func OpExecuted(subject event.Subject, changed bool, dur time.Duration, err erro
 // Diagnostics
 // ===============================================
 
-func DiagnosticRaised(subject event.Subject, d Diagnostic) event.Event {
-	return event.Event{
+func RaiseEngineDiagnostic(cfgPath string, d Diagnostic) event.EngineDiagnostic {
+	return event.EngineDiagnostic{
 		Time:    time.Now(),
-		Kind:    event.DiagnosticRaised,
-		Scope:   subject.Scope(),
-		Subject: subject,
+		CfgPath: cfgPath,
+		Detail: event.DiagnosticDetail{
+			Template: d.EventTemplate(),
+		},
+		Severity:   d.Severity(),
+		Chattiness: event.Subtle,
+	}
+}
+
+func RaisePlanDiagnostic(stepIdx int, stepKind, stepDesc string, d Diagnostic) event.PlanDiagnostic {
+	return event.PlanDiagnostic{
+		Time: time.Now(),
+		Step: event.StepDetail{
+			StepIndex: stepIdx,
+			StepKind:  stepKind,
+			StepDesc:  stepDesc,
+		},
+		Detail: event.DiagnosticDetail{
+			Template: d.EventTemplate(),
+		},
+		Severity:   d.Severity(),
+		Chattiness: event.Subtle,
+	}
+}
+
+func RaiseActionDiagnostic(stepIdx int, stepKind, stepDesc string, d Diagnostic) event.ActionDiagnostic {
+	return event.ActionDiagnostic{
+		Time: time.Now(),
+		Step: event.StepDetail{
+			StepIndex: stepIdx,
+			StepKind:  stepKind,
+			StepDesc:  stepDesc,
+		},
+		Detail: event.DiagnosticDetail{
+			Template: d.EventTemplate(),
+		},
+		Severity:   d.Severity(),
+		Chattiness: event.Subtle,
+	}
+}
+
+func RaiseOpDiagnostic(stepIdx int, stepKind, stepDesc, displayID string, d Diagnostic) event.OpDiagnostic {
+	return event.OpDiagnostic{
+		Time: time.Now(),
+		Step: event.StepDetail{
+			StepIndex: stepIdx,
+			StepKind:  stepKind,
+			StepDesc:  stepDesc,
+		},
+		DisplayID: displayID,
 		Detail: event.DiagnosticDetail{
 			Template: d.EventTemplate(),
 		},

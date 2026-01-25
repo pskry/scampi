@@ -43,27 +43,27 @@ type ExpectedStep struct {
 }
 
 type (
-	events             []event.Event
 	engineEvents       []event.EngineEvent
 	planEvents         []event.PlanEvent
 	actionEvents       []event.ActionEvent
 	opEvents           []event.OpEvent
+	engineDiagnostics  []event.EngineDiagnostic
+	planDiagnostics    []event.PlanDiagnostic
+	actionDiagnostics  []event.ActionDiagnostic
+	opDiagnostics      []event.OpDiagnostic
 	recordingDisplayer struct {
-		mu           sync.Mutex
-		engineEvents engineEvents
-		planEvents   planEvents
-		actionEvents actionEvents
-		opEvents     opEvents
-		events       events
+		mu                sync.Mutex
+		engineEvents      engineEvents
+		planEvents        planEvents
+		actionEvents      actionEvents
+		opEvents          opEvents
+		engineDiagnostics engineDiagnostics
+		planDiagnostics   planDiagnostics
+		actionDiagnostics actionDiagnostics
+		opDiagnostics     opDiagnostics
 	}
 	noopEmitter struct{}
 )
-
-func (r *recordingDisplayer) Emit(e event.Event) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.events = append(r.events, e)
-}
 
 func (r *recordingDisplayer) EmitEngineLifecycle(e event.EngineEvent) {
 	r.mu.Lock()
@@ -88,7 +88,30 @@ func (r *recordingDisplayer) EmitOpLifecycle(e event.OpEvent) {
 	defer r.mu.Unlock()
 	r.opEvents = append(r.opEvents, e)
 }
-func (r *recordingDisplayer) EmitDiagnostic(e event.Event) { r.Emit(e) }
+
+func (r *recordingDisplayer) EmitEngineDiagnostic(e event.EngineDiagnostic) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.engineDiagnostics = append(r.engineDiagnostics, e)
+}
+
+func (r *recordingDisplayer) EmitPlanDiagnostic(e event.PlanDiagnostic) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.planDiagnostics = append(r.planDiagnostics, e)
+}
+
+func (r *recordingDisplayer) EmitActionDiagnostic(e event.ActionDiagnostic) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.actionDiagnostics = append(r.actionDiagnostics, e)
+}
+
+func (r *recordingDisplayer) EmitOpDiagnostic(e event.OpDiagnostic) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.opDiagnostics = append(r.opDiagnostics, e)
+}
 
 func (r *recordingDisplayer) Close() {}
 
@@ -96,7 +119,11 @@ func (r *recordingDisplayer) String() string {
 	return r.engineEvents.String() + "\n" +
 		r.planEvents.String() + "\n" +
 		r.actionEvents.String() + "\n" +
-		r.events.String()
+		r.opEvents.String() + "\n" +
+		r.engineDiagnostics.String() + "\n" +
+		r.planDiagnostics.String() + "\n" +
+		r.actionDiagnostics.String() + "\n" +
+		r.opDiagnostics.String()
 }
 
 func (r *recordingDisplayer) dump(w io.Writer) {
@@ -135,25 +162,54 @@ func (e opEvents) String() string {
 	if err != nil {
 		panic(err)
 	}
-	return "----- OP DIAGNOSTICS -----\n" +
+	return "----- OP EVENTS -----\n" +
 		string(j)
 }
 
-func (e events) String() string {
+func (e engineDiagnostics) String() string {
 	j, err := json.MarshalIndent(e, "", "  ")
 	if err != nil {
 		panic(err)
 	}
-	return "----- OTHER DIAGNOSTICS -----\n" +
+	return "----- ENGINE DIAGNOSTICS -----\n" +
 		string(j)
 }
 
-func (noopEmitter) Emit(event.Event)                      {}
-func (noopEmitter) EmitEngineLifecycle(event.EngineEvent) {}
-func (noopEmitter) EmitPlanLifecycle(event.PlanEvent)     {}
-func (noopEmitter) EmitActionLifecycle(event.ActionEvent) {}
-func (noopEmitter) EmitOpLifecycle(event.OpEvent)         {}
-func (noopEmitter) EmitDiagnostic(event.Event)            {}
+func (e planDiagnostics) String() string {
+	j, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return "----- PLAN DIAGNOSTICS (DIAGS) -----\n" +
+		string(j)
+}
+
+func (e actionDiagnostics) String() string {
+	j, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return "----- ACTION DIAGNOSTICS (DIAGS) -----\n" +
+		string(j)
+}
+
+func (e opDiagnostics) String() string {
+	j, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return "----- OP DIAGNOSTICS (DIAGS) -----\n" +
+		string(j)
+}
+
+func (noopEmitter) EmitEngineLifecycle(event.EngineEvent)       {}
+func (noopEmitter) EmitPlanLifecycle(event.PlanEvent)           {}
+func (noopEmitter) EmitActionLifecycle(event.ActionEvent)       {}
+func (noopEmitter) EmitOpLifecycle(event.OpEvent)               {}
+func (noopEmitter) EmitEngineDiagnostic(event.EngineDiagnostic) {}
+func (noopEmitter) EmitPlanDiagnostic(event.PlanDiagnostic)     {}
+func (noopEmitter) EmitActionDiagnostic(event.ActionDiagnostic) {}
+func (noopEmitter) EmitOpDiagnostic(event.OpDiagnostic)         {}
 
 type (
 	checkFn func(context.Context, source.Source, target.Target) (spec.CheckResult, error)
@@ -286,12 +342,6 @@ func (d fakeDiagnostic) Error() string {
 }
 
 func (d fakeDiagnostic) Unwrap() error { return d.cause }
-
-func (d fakeDiagnostic) Diagnostics(subject event.Subject) []event.Event {
-	return []event.Event{
-		diagnostic.DiagnosticRaised(subject, d),
-	}
-}
 
 func (d fakeDiagnostic) EventTemplate() event.Template {
 	text := "test diagnostic"

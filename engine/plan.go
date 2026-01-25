@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/model"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
@@ -54,8 +53,8 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 	em.EmitPlanLifecycle(diagnostic.PlanStarted(cfg.Unit.ID))
 
 	var (
-		causes      []error
-		diagResults []diagnosticResult
+		causes  []error
+		impacts []diagnostic.Impact
 	)
 
 	plan := spec.Plan{
@@ -68,17 +67,8 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 	for i, step := range cfg.Steps {
 		act, err := step.Type.Plan(i, step)
 		if err != nil {
-			dr, _ := emitDiagnostics(
-				em,
-				event.PlanSubject{
-					StepIndex: i,
-					StepDesc:  step.Desc,
-					StepKind:  step.Type.Kind(),
-				},
-				err,
-			)
-
-			diagResults = append(diagResults, dr)
+			impact, _ := emitPlanDiagnostic(em, i, step.Type.Kind(), step.Desc, err)
+			impacts = append(impacts, impact)
 			causes = append(causes, err)
 			continue
 		}
@@ -94,8 +84,8 @@ func plan(cfg spec.Config, em diagnostic.Emitter) (spec.Plan, error) {
 		time.Since(start),
 	))
 
-	for _, dr := range diagResults {
-		if dr.ShouldAbort() {
+	for _, impact := range impacts {
+		if impact.Is(diagnostic.ImpactAbort) {
 			return spec.Plan{}, AbortError{
 				Causes: causes,
 			}

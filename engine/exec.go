@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/model"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
@@ -61,7 +60,7 @@ type scheduler struct {
 	tgt target.Target
 	em  diagnostic.Emitter
 
-	// action context for building event.Subject
+	// action context
 	actIdx  int
 	actKind string
 	actDesc string
@@ -72,15 +71,6 @@ type scheduler struct {
 	ctx     context.Context
 }
 
-func (s *scheduler) opSubject(op spec.Op) event.OpSubject {
-	return event.OpSubject{
-		StepIndex: s.actIdx,
-		StepKind:  s.actKind,
-		StepDesc:  s.actDesc,
-		DisplayID: diagnostic.OpDisplayID(op),
-	}
-}
-
 func (s *scheduler) schedule(n *opNode) {
 	if n.satisfied {
 		return
@@ -88,13 +78,18 @@ func (s *scheduler) schedule(n *opNode) {
 
 	s.grp.Go(func() error {
 		start := time.Now()
-		subj := s.opSubject(n.op)
+		displayID := diagnostic.OpDisplayID(n.op)
 
-		s.em.EmitOpLifecycle(diagnostic.OpExecuteStarted(subj))
+		s.em.EmitOpLifecycle(diagnostic.OpExecuteStarted(
+			s.actIdx, s.actKind, s.actDesc, displayID,
+		))
 
 		res, err := n.op.Execute(s.ctx, s.src, s.tgt)
 
-		s.em.EmitOpLifecycle(diagnostic.OpExecuted(subj, res.Changed, time.Since(start), err))
+		s.em.EmitOpLifecycle(diagnostic.OpExecuted(
+			s.actIdx, s.actKind, s.actDesc, displayID,
+			res.Changed, time.Since(start), err,
+		))
 
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -133,15 +128,20 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 	for _, n := range nodes {
 		n := n
 		g.Go(func() error {
-			subj := s.opSubject(n.op)
-			s.em.EmitOpLifecycle(diagnostic.OpCheckStarted(subj))
+			displayID := diagnostic.OpDisplayID(n.op)
+			s.em.EmitOpLifecycle(diagnostic.OpCheckStarted(
+				s.actIdx, s.actKind, s.actDesc, displayID,
+			))
 
 			res, err := n.op.Check(ctx, s.src, s.tgt)
 			if err != nil {
-				dr, consumed := emitDiagnostics(s.em, subj, err)
+				impact, consumed := emitOpDiagnostic(s.em, s.actIdx, s.actKind, s.actDesc, displayID, err)
 
-				s.em.EmitOpLifecycle(diagnostic.OpChecked(subj, res, err))
-				if dr.ShouldAbort() {
+				s.em.EmitOpLifecycle(diagnostic.OpChecked(
+					s.actIdx, s.actKind, s.actDesc, displayID,
+					res, err,
+				))
+				if impact.Is(diagnostic.ImpactAbort) {
 					s.mu.Lock()
 					n.outcome = model.OpAborted
 					n.err = err
@@ -156,7 +156,10 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 				return err
 			}
 
-			s.em.EmitOpLifecycle(diagnostic.OpChecked(subj, res, nil))
+			s.em.EmitOpLifecycle(diagnostic.OpChecked(
+				s.actIdx, s.actKind, s.actDesc, displayID,
+				res, nil,
+			))
 
 			s.mu.Lock()
 			if res == spec.CheckSatisfied {
@@ -298,16 +301,8 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 	}
 
 	if err != nil {
-		dr, consumed := emitDiagnostics(
-			e.em,
-			event.ActionSubject{
-				StepIndex: idx,
-				StepKind:  act.Kind(),
-				StepDesc:  act.Desc(),
-			},
-			err,
-		)
-		if dr.ShouldAbort() {
+		impact, consumed := emitActionDiagnostic(e.em, idx, act.Kind(), act.Desc(), err)
+		if impact.Is(diagnostic.ImpactAbort) {
 			err = AbortError{Causes: []error{err}}
 		} else if consumed {
 			err = nil

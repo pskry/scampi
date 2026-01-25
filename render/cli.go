@@ -325,19 +325,6 @@ func (c *cli) EmitOpLifecycle(e event.OpEvent) {
 	}
 }
 
-func (c *cli) EmitDiagnostic(e event.Event) {
-	if !c.shouldRender(e.Chattiness) {
-		return
-	}
-
-	switch e.Kind {
-	case event.DiagnosticRaised:
-		c.commitRenderEvents(c.renderDiagnosticRaised(e))
-	default:
-		panic(util.BUG("ENGINE DIAG %q", e.Kind))
-	}
-}
-
 func (c *cli) Close() {
 	c.render.close()
 }
@@ -482,16 +469,15 @@ func (c *cli) renderPlanFinished(e event.PlanEvent) []renderEvent {
 }
 
 func (c *cli) renderStepPlanned(e event.PlanEvent) []renderEvent {
-	sub := e.Subject.(event.PlanSubject)
 	return []renderEvent{{
 		stream: streamOut,
 		line: c.fmtfMsg(
 			colPlanStepPlanned,
 			"[plan.step]%s #%d %s '%s'",
 			glyphr(c.glyphs.ok),
-			sub.StepIndex,
-			sub.StepKind,
-			sub.StepDesc,
+			e.Step.StepIndex,
+			e.Step.StepKind,
+			e.Step.StepDesc,
 		),
 	}}
 }
@@ -776,8 +762,7 @@ func (c *cli) renderActionFinished(e event.ActionEvent) []renderEvent {
 
 	d := *e.Detail
 	s := d.Summary
-	sub := e.Subject.(event.ActionSubject)
-	st := c.ensureActionFromSubject(sub)
+	st := c.ensureActionFromStep(e.Step)
 
 	var (
 		color ansi.ANSI
@@ -804,11 +789,11 @@ func (c *cli) renderActionFinished(e event.ActionEvent) []renderEvent {
 		st.id,
 		glyphr(glyph),
 	)
-	if sub.StepDesc != "" {
+	if e.Step.StepDesc != "" {
 		line += c.fmtfMsg(
 			color,
 			" %s —",
-			sub.StepDesc,
+			e.Step.StepDesc,
 		)
 	}
 	line += c.fmtfMsg(
@@ -829,8 +814,7 @@ func (c *cli) renderActionFinished(e event.ActionEvent) []renderEvent {
 
 func (c *cli) renderOpChecked(e event.OpEvent) []renderEvent {
 	d := *e.CheckDetail
-	sub := e.Subject.(event.OpSubject)
-	st := c.ensureActionFromOp(sub)
+	st := c.ensureActionFromStep(e.Step)
 
 	switch d.Result {
 	case spec.CheckSatisfied:
@@ -839,7 +823,7 @@ func (c *cli) renderOpChecked(e event.OpEvent) []renderEvent {
 			line: c.fmtfMsg(
 				colOpCheckSatisfied,
 				"[%s]%s %s - up-to-date",
-				st.id, glyphr(c.glyphs.ok), sub.DisplayID,
+				st.id, glyphr(c.glyphs.ok), e.DisplayID,
 			),
 		}}
 
@@ -849,7 +833,7 @@ func (c *cli) renderOpChecked(e event.OpEvent) []renderEvent {
 			line: c.fmtfMsg(
 				colOpCheckUnsatisfied,
 				"[%s]%s %s - needs change",
-				st.id, glyphr(c.glyphs.change), sub.DisplayID,
+				st.id, glyphr(c.glyphs.change), e.DisplayID,
 			),
 		}}
 
@@ -859,7 +843,7 @@ func (c *cli) renderOpChecked(e event.OpEvent) []renderEvent {
 			line: c.fmtfMsg(
 				colOpCheckUnknown,
 				"[%s]%s %s - unknown: %v",
-				st.id, glyphr(c.glyphs.warn), sub.DisplayID, d.Err,
+				st.id, glyphr(c.glyphs.warn), e.DisplayID, d.Err,
 			),
 		}}
 	}
@@ -869,8 +853,7 @@ func (c *cli) renderOpChecked(e event.OpEvent) []renderEvent {
 
 func (c *cli) renderOpExecuted(e event.OpEvent) []renderEvent {
 	d := *e.ExecuteDetail
-	sub := e.Subject.(event.OpSubject)
-	st := c.ensureActionFromOp(sub)
+	st := c.ensureActionFromStep(e.Step)
 
 	switch {
 	case d.Err != nil:
@@ -879,7 +862,7 @@ func (c *cli) renderOpExecuted(e event.OpEvent) []renderEvent {
 			line: c.fmtfMsg(
 				colOpExecFailed,
 				"[%s]%s '%s' failed: %v",
-				st.id, glyphr(c.glyphs.fatal), sub.DisplayID, d.Err,
+				st.id, glyphr(c.glyphs.fatal), e.DisplayID, d.Err,
 			),
 		}}
 
@@ -889,7 +872,7 @@ func (c *cli) renderOpExecuted(e event.OpEvent) []renderEvent {
 			line: c.fmtfMsg(
 				colOpExecChanged,
 				"[%s]%s '%s' changed (%s)",
-				st.id, glyphr(c.glyphs.exec), sub.DisplayID, d.Duration,
+				st.id, glyphr(c.glyphs.exec), e.DisplayID, d.Duration,
 			),
 		}}
 
@@ -901,40 +884,67 @@ func (c *cli) renderOpExecuted(e event.OpEvent) []renderEvent {
 // Diagnostics
 // ===============================================
 
-func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
-	d := e.Detail.(event.DiagnosticDetail)
-
-	var msg string
-	var prefix string
-
-	switch sub := e.Subject.(type) {
-	case event.EngineSubject:
-		prefix = "engine.error"
-		msg = fmt.Sprintf(` in file %q`, sub.CfgPath)
-
-	case event.PlanSubject:
-		prefix = "plan.error"
-		msg = fmt.Sprintf(` in step [%d|%s] '%s'`, sub.StepIndex, sub.StepKind, sub.StepDesc)
-
-	case event.ActionSubject:
-		prefix = "action.error"
-		msg = fmt.Sprintf(` in step [%d|%s] '%s'`, sub.StepIndex, sub.StepKind, sub.StepDesc)
-
-	case event.OpSubject:
-		prefix = "op.error"
-		msg = fmt.Sprintf(` in op '%s' of step [%d|%s] '%s'`, sub.DisplayID, sub.StepIndex, sub.StepKind, sub.StepDesc)
-
-	default:
-		panic(util.BUG(
-			"renderer encountered unsupported Subject type %T for event %#v",
-			e.Subject,
-			e,
-		))
+func (c *cli) EmitEngineDiagnostic(e event.EngineDiagnostic) {
+	if !c.shouldRender(e.Chattiness) {
+		return
 	}
 
+	c.renderDiagnostic(
+		"engine.error",
+		fmt.Sprintf(` in file %q`, e.CfgPath),
+		e.Detail.Template,
+	)
+}
+
+func (c *cli) EmitPlanDiagnostic(e event.PlanDiagnostic) {
+	if !c.shouldRender(e.Chattiness) {
+		return
+	}
+
+	c.renderDiagnostic(
+		"plan.error",
+		fmt.Sprintf(
+			` in step [%d|%s] '%s'`,
+			e.Step.StepIndex, e.Step.StepKind, e.Step.StepDesc,
+		),
+		e.Detail.Template,
+	)
+}
+
+func (c *cli) EmitActionDiagnostic(e event.ActionDiagnostic) {
+	if !c.shouldRender(e.Chattiness) {
+		return
+	}
+
+	c.renderDiagnostic(
+		"action.error",
+		fmt.Sprintf(
+			` in step [%d|%s] '%s'`,
+			e.Step.StepIndex, e.Step.StepKind, e.Step.StepDesc,
+		),
+		e.Detail.Template,
+	)
+}
+
+func (c *cli) EmitOpDiagnostic(e event.OpDiagnostic) {
+	if !c.shouldRender(e.Chattiness) {
+		return
+	}
+
+	c.renderDiagnostic(
+		"op.error",
+		fmt.Sprintf(
+			` in op '%s' of step [%d|%s] '%s'`,
+			e.DisplayID, e.Step.StepIndex, e.Step.StepKind, e.Step.StepDesc,
+		),
+		e.Detail.Template,
+	)
+}
+
+func (c *cli) renderDiagnostic(prefix, msg string, tmpl event.Template) {
 	var events []renderEvent
 	for _, l := range c.fmtTemplate(
-		d.Template,
+		tmpl,
 		prefix,
 		msg,
 		c.glyphs.error,
@@ -943,22 +953,15 @@ func (c *cli) renderDiagnosticRaised(e event.Event) []renderEvent {
 	) {
 		events = append(events, renderEvent{stream: streamErr, line: l})
 	}
-	return events
+
+	c.commitRenderEvents(events)
 }
 
 // Helpers
 // ===============================================
 
-func (c *cli) ensureActionFromSubject(sub event.ActionSubject) *actionState {
-	key := fmt.Sprintf("%s:%d", sub.StepKind, sub.StepIndex)
-	st, _ := c.actions.LoadOrStore(key, &actionState{
-		id: key,
-	})
-	return st.(*actionState)
-}
-
-func (c *cli) ensureActionFromOp(sub event.OpSubject) *actionState {
-	key := fmt.Sprintf("%s:%d", sub.StepKind, sub.StepIndex)
+func (c *cli) ensureActionFromStep(step event.StepDetail) *actionState {
+	key := fmt.Sprintf("%s:%d", step.StepKind, step.StepIndex)
 	st, _ := c.actions.LoadOrStore(key, &actionState{
 		id: key,
 	})
