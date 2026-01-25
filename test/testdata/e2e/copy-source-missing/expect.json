@@ -1,0 +1,10 @@
+{
+  "target": {
+    "files": {}
+  },
+  "changed": 0,
+  "error": true,
+  "diagnostics": [
+    "builtin.copy.SourceMissing"
+  ]
+}

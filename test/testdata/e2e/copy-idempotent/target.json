@@ -1,0 +1,14 @@
+{
+  "files": {
+    "/dest.txt": "same content"
+  },
+  "perms": {
+    "/dest.txt": "0644"
+  },
+  "owners": {
+    "/dest.txt": {
+      "user": "testuser",
+      "group": "testgroup"
+    }
+  }
+}

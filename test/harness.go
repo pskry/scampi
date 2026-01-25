@@ -375,6 +375,14 @@ func readDirOrDie(name string) []os.DirEntry {
 	return res
 }
 
+func readDirSafe(name string) ([]os.DirEntry, error) {
+	return os.ReadDir(name)
+}
+
+func readFileSafe(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
+
 func readOrDie(name string) []byte {
 	data, err := os.ReadFile(name)
 	if err != nil {

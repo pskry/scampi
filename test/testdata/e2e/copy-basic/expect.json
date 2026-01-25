@@ -1,0 +1,11 @@
+{
+  "target": {
+    "files": {
+      "/dest.txt": "Hello, World!"
+    },
+    "perms": {
+      "/dest.txt": "0644"
+    }
+  },
+  "changed": 2
+}
