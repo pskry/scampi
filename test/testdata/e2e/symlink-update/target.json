@@ -1,0 +1,5 @@
+{
+  "symlinks": {
+    "/link.txt": "/old-target.txt"
+  }
+}

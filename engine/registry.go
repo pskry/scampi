@@ -3,6 +3,7 @@ package engine
 import (
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/step/copy"
+	"godoit.dev/doit/step/symlink"
 )
 
 type Registry struct {
@@ -15,6 +16,7 @@ func NewRegistry() *Registry {
 	// for now (probably a while) this is just a manual list
 	types := []spec.StepType{
 		copy.Copy{},
+		symlink.Symlink{},
 	}
 
 	r := &Registry{}

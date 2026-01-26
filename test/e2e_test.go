@@ -28,9 +28,10 @@ type E2EScenario struct {
 
 // E2EFiles represents a virtual filesystem as a map of path -> content.
 type E2EFiles struct {
-	Files  map[string]string   `json:"files"`
-	Perms  map[string]string   `json:"perms,omitempty"`  // path -> "0644"
-	Owners map[string]E2EOwner `json:"owners,omitempty"` // path -> owner info
+	Files    map[string]string   `json:"files"`
+	Perms    map[string]string   `json:"perms,omitempty"`    // path -> "0644"
+	Owners   map[string]E2EOwner `json:"owners,omitempty"`   // path -> owner info
+	Symlinks map[string]string   `json:"symlinks,omitempty"` // link -> target
 }
 
 // E2EOwner represents file ownership.
@@ -117,6 +118,9 @@ func runE2EScenario(t *testing.T, dir string) {
 	for path, owner := range tgtFiles.Owners {
 		tgt.Owners[path] = target.Owner{User: owner.User, Group: owner.Group}
 	}
+	for link, linkTarget := range tgtFiles.Symlinks {
+		tgt.Symlinks[link] = linkTarget
+	}
 
 	// Run engine
 	rec := &recordingDisplayer{}
@@ -159,6 +163,18 @@ func runE2EScenario(t *testing.T, dir string) {
 		}
 		if gotPerm != wantPerm {
 			t.Errorf("target file %q perms: got %o, want %o", path, gotPerm, wantPerm)
+		}
+	}
+
+	// Assert target symlinks (if specified)
+	for link, wantTarget := range expect.Target.Symlinks {
+		gotTarget, ok := tgt.Symlinks[link]
+		if !ok {
+			t.Errorf("expected symlink %q to exist", link)
+			continue
+		}
+		if gotTarget != wantTarget {
+			t.Errorf("symlink %q: got target %q, want %q", link, gotTarget, wantTarget)
 		}
 	}
 

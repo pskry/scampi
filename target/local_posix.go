@@ -34,6 +34,31 @@ func (LocalPosixTarget) Stat(_ context.Context, path string) (fs.FileInfo, error
 	return info, nil
 }
 
+func (LocalPosixTarget) Lstat(_ context.Context, path string) (fs.FileInfo, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, util.WrapErrf(ErrNotExist, "%q", path)
+		}
+
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func (LocalPosixTarget) Readlink(_ context.Context, path string) (string, error) {
+	return os.Readlink(path)
+}
+
+func (LocalPosixTarget) Symlink(_ context.Context, target, link string) error {
+	return os.Symlink(target, link)
+}
+
+func (LocalPosixTarget) Remove(_ context.Context, path string) error {
+	return os.Remove(path)
+}
+
 func (LocalPosixTarget) Chown(_ context.Context, path string, owner Owner) error {
 	usr, err := lookupUser(owner.User)
 	if err != nil {

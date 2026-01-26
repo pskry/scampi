@@ -24,6 +24,10 @@ type (
 		ReadFile(ctx context.Context, path string) ([]byte, error)
 		WriteFile(ctx context.Context, path string, data []byte, perm fs.FileMode) error
 		Stat(ctx context.Context, path string) (fs.FileInfo, error)
+		Lstat(ctx context.Context, path string) (fs.FileInfo, error)
+		Readlink(ctx context.Context, path string) (string, error)
+		Symlink(ctx context.Context, target, link string) error
+		Remove(ctx context.Context, path string) error
 
 		Chown(ctx context.Context, path string, owner Owner) error
 		Chmod(ctx context.Context, path string, mode fs.FileMode) error

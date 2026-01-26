@@ -1,0 +1,10 @@
+{
+  "target": {
+    "files": {
+      "/link.txt": "I am a regular file, not a symlink"
+    }
+  },
+  "changed": 0,
+  "error": true,
+  "diagnostics": ["builtin.symlink.NotASymlink"]
+}

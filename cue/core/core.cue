@@ -7,4 +7,4 @@ unit?: close({
 	desc?: string
 })
 
-steps: [...close(builtin.#BuiltinStep)]
+steps: [...builtin.#BuiltinStep]

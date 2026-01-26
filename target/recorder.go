@@ -43,3 +43,19 @@ func (r *Recorder) Chown(ctx context.Context, path string, owner Owner) error {
 func (r *Recorder) GetOwner(ctx context.Context, path string) (Owner, error) {
 	return r.Inner.GetOwner(ctx, path)
 }
+
+func (r *Recorder) Lstat(ctx context.Context, path string) (fs.FileInfo, error) {
+	return r.Inner.Lstat(ctx, path)
+}
+
+func (r *Recorder) Readlink(ctx context.Context, path string) (string, error) {
+	return r.Inner.Readlink(ctx, path)
+}
+
+func (r *Recorder) Symlink(ctx context.Context, target, link string) error {
+	return r.Inner.Symlink(ctx, target, link)
+}
+
+func (r *Recorder) Remove(ctx context.Context, path string) error {
+	return r.Inner.Remove(ctx, path)
+}

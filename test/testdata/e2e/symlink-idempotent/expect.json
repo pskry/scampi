@@ -1,0 +1,8 @@
+{
+  "target": {
+    "symlinks": {
+      "/link.txt": "/target.txt"
+    }
+  },
+  "changed": 0
+}

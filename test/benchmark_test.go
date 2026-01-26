@@ -146,6 +146,113 @@ steps: [
 	}
 }
 
+// -----------------------------------------------------------------------------
+// Benchmark: Apply() no-op run for symlink (idempotent path)
+// -----------------------------------------------------------------------------
+
+func BenchmarkApplyNoOp_Symlink(b *testing.B) {
+	sizes := []int{1, 10, 100, 1000, 10000}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
+			cfg := fmt.Sprintf(`
+package bench
+
+import (
+	"list"
+	"godoit.dev/doit/builtin"
+)
+
+steps: [
+	for i in list.Range(0, %d, 1) {
+		builtin.symlink & {
+			desc:   "symlink-\(i)"
+			target: "/target.txt"
+			link:   "/link.txt"
+		}
+	}
+]
+`, size)
+
+			src := source.NewMemSource()
+			tgt := target.NewMemTarget()
+
+			src.Files["/config.cue"] = []byte(cfg)
+			tgt.Symlinks["/link.txt"] = "/target.txt"
+
+			rec := &recordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+			store := spec.NewSourceStore()
+			e := engine.New(src, tgt, em)
+
+			for b.Loop() {
+				if err := e.Apply(context.Background(), "/config.cue", store); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Benchmark: Apply() no-op run with mixed step types
+// -----------------------------------------------------------------------------
+
+func BenchmarkApplyNoOp_Mixed(b *testing.B) {
+	sizes := []int{1, 10, 100, 1000, 10000}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
+			// Half copy, half symlink
+			cfg := fmt.Sprintf(`
+package bench
+
+import (
+	"list"
+	"godoit.dev/doit/builtin"
+)
+
+steps: [
+	for i in list.Range(0, %d, 1) {
+		builtin.copy & {
+			desc:  "copy-\(i)"
+			src:   "/src.txt"
+			dest:  "/dest.txt"
+			perm:  "0644"
+			owner: "perf-owner"
+			group: "perf-group"
+		}
+	},
+	for i in list.Range(0, %d, 1) {
+		builtin.symlink & {
+			desc:   "symlink-\(i)"
+			target: "/target.txt"
+			link:   "/link.txt"
+		}
+	}
+]
+`, size, size)
+
+			src := source.NewMemSource()
+			tgt := target.NewMemTarget()
+
+			src.Files["/src.txt"] = []byte("hello")
+			src.Files["/config.cue"] = []byte(cfg)
+			tgt.Files["/dest.txt"] = []byte("hello")
+			tgt.Symlinks["/link.txt"] = "/target.txt"
+
+			rec := &recordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+			store := spec.NewSourceStore()
+			e := engine.New(src, tgt, em)
+
+			for b.Loop() {
+				if err := e.Apply(context.Background(), "/config.cue", store); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkValidateCueInput(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
