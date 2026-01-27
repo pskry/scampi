@@ -108,7 +108,7 @@ func applyCmd() *cli.Command {
 
 	return &cli.Command{
 		Name:                   "apply",
-		Usage:                  "Apply the desired state defined in a configuration file",
+		Usage:                  "Apply the desired state from a configuration file",
 		UseShortOptionHandling: true,
 		Suggest:                true,
 		HideHelp:               false,
@@ -120,10 +120,10 @@ func applyCmd() *cli.Command {
 			},
 		},
 		ArgsUsage: "<config>",
-		Description: `Reads a declarative configuration file and executes
-the required actions to converge the system into the desired state.
+		Description: `Reads a declarative configuration file and executes the
+required operations to converge the system to the desired state.
 
-The command is idempotent: running it multiple times will only apply
+The command is idempotent: running it multiple times only applies
 changes when the current state differs from the declared state.`,
 		Before: requireArgs(1),
 		Action: func(ctx context.Context, _ *cli.Command) error {
@@ -164,7 +164,7 @@ func checkCmd() *cli.Command {
 
 	return &cli.Command{
 		Name:                   "check",
-		Usage:                  "Check what would change without applying",
+		Usage:                  "Check the current system state against a configuration file",
 		UseShortOptionHandling: true,
 		Suggest:                true,
 		HideHelp:               false,
@@ -176,12 +176,12 @@ func checkCmd() *cli.Command {
 			},
 		},
 		ArgsUsage: "<config>",
-		Description: `Reads a declarative configuration file and checks what
-would need to change to converge the system into the desired state.
+		Description: `Reads a declarative configuration file and inspects the
+target system to determine which operations are already satisfied and
+which would need to execute.
 
-Unlike 'plan', this command inspects the target system to determine
-which operations are already satisfied and which would need to execute.
-No changes are made to the system.`,
+No changes are made to the system. Unlike 'plan', this command evaluates
+the actual system state.`,
 		Before: requireArgs(1),
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
@@ -236,8 +236,8 @@ func planCmd() *cli.Command {
 		Description: `Reads a declarative configuration file and prints the
 execution plan without applying any changes.
 
-The plan shows the actions and operations that would be executed by
-the apply command, but does not modify the system.`,
+The plan shows the operations that would be executed by 'apply', but
+does not inspect or modify the target system.`,
 		Before: requireArgs(1),
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
@@ -276,10 +276,7 @@ the apply command, but does not modify the system.`,
 func requireArgs(n int) func(context.Context, *cli.Command) (context.Context, error) {
 	return func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 		if cmd.Args().Len() != n {
-			if err := cli.ShowSubcommandHelp(cmd); err != nil {
-				return ctx, err
-			}
-			return ctx, cli.Exit("", exitUserError)
+			cli.ShowSubcommandHelpAndExit(cmd, exitUserError)
 		}
 		return ctx, nil
 	}
