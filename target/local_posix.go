@@ -2,6 +2,7 @@ package target
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"os/user"
@@ -84,6 +85,16 @@ func (LocalPosixTarget) Chmod(_ context.Context, path string, mode fs.FileMode) 
 	return os.Chmod(path, mode)
 }
 
+func (LocalPosixTarget) HasUser(_ context.Context, user string) bool {
+	_, err := lookupUser(user)
+	return err == nil
+}
+
+func (LocalPosixTarget) HasGroup(_ context.Context, group string) bool {
+	_, err := lookupGroup(group)
+	return err == nil
+}
+
 func (LocalPosixTarget) GetOwner(_ context.Context, path string) (Owner, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -112,20 +123,37 @@ func (LocalPosixTarget) GetOwner(_ context.Context, path string) (Owner, error) 
 }
 
 func lookupUser(u string) (*user.User, error) {
-	if isLikelyID(u) {
-		return user.LookupId(u)
+	if id, ok := isLikelyID(u); ok {
+		usr, err := user.LookupId(u)
+		if errors.Is(err, user.UnknownUserIdError(id)) {
+			return nil, util.WrapErrf(ErrUnknownUser, "%q", u)
+		}
+		return usr, err
 	}
-	return user.Lookup(u)
+	usr, err := user.Lookup(u)
+
+	if errors.Is(err, user.UnknownUserError(u)) {
+		return nil, util.WrapErrf(ErrUnknownUser, "%q", u)
+	}
+	return usr, err
 }
 
 func lookupGroup(g string) (*user.Group, error) {
-	if isLikelyID(g) {
-		return user.LookupGroupId(g)
+	if _, ok := isLikelyID(g); ok {
+		grp, err := user.LookupGroupId(g)
+		if errors.Is(err, user.UnknownGroupIdError(g)) {
+			return nil, util.WrapErrf(ErrUnknownGroup, "%q", g)
+		}
+		return grp, err
 	}
-	return user.LookupGroup(g)
+	grp, err := user.LookupGroup(g)
+	if errors.Is(err, user.UnknownGroupError(g)) {
+		return nil, util.WrapErrf(ErrUnknownGroup, "%q", g)
+	}
+	return grp, err
 }
 
-func isLikelyID(s string) bool {
-	_, err := strconv.Atoi(s)
-	return err == nil
+func isLikelyID(s string) (int, bool) {
+	id, err := strconv.Atoi(s)
+	return id, err == nil
 }

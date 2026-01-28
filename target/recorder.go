@@ -40,6 +40,14 @@ func (r *Recorder) Chown(ctx context.Context, path string, owner Owner) error {
 	return r.Inner.Chown(ctx, path, owner)
 }
 
+func (r *Recorder) HasUser(ctx context.Context, user string) bool {
+	return r.Inner.HasUser(ctx, user)
+}
+
+func (r *Recorder) HasGroup(ctx context.Context, group string) bool {
+	return r.Inner.HasGroup(ctx, group)
+}
+
 func (r *Recorder) GetOwner(ctx context.Context, path string) (Owner, error) {
 	return r.Inner.GetOwner(ctx, path)
 }

@@ -4,6 +4,7 @@ import (
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/step/copy"
 	"godoit.dev/doit/step/symlink"
+	"godoit.dev/doit/step/template"
 )
 
 type Registry struct {
@@ -17,6 +18,7 @@ func NewRegistry() *Registry {
 	types := []spec.StepType{
 		copy.Copy{},
 		symlink.Symlink{},
+		template.Template{},
 	}
 
 	r := &Registry{}

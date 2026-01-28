@@ -6,7 +6,11 @@ import (
 	"io/fs"
 )
 
-var ErrNotExist = errors.New("path does not exist")
+var (
+	ErrNotExist     = errors.New("path does not exist")
+	ErrUnknownUser  = errors.New("unknown user")
+	ErrUnknownGroup = errors.New("unknown group")
+)
 
 type (
 	// Target represents an execution environment.
@@ -33,10 +37,12 @@ type (
 		Chmod(ctx context.Context, path string, mode fs.FileMode) error
 	}
 	Ownership interface {
+		HasUser(ctx context.Context, user string) bool
+		HasGroup(ctx context.Context, group string) bool
 		GetOwner(ctx context.Context, path string) (Owner, error)
 	}
 )
 
-func IsNotExist(err error) bool {
-	return errors.Is(err, ErrNotExist)
-}
+func IsNotExist(err error) bool     { return errors.Is(err, ErrNotExist) }
+func IsUnknownUser(err error) bool  { return errors.Is(err, ErrUnknownUser) }
+func IsUnknownGroup(err error) bool { return errors.Is(err, ErrUnknownGroup) }

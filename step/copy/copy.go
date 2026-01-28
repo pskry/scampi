@@ -41,7 +41,7 @@ func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		return nil, util.BUG("expected %T got %T", &CopyConfig{}, step.Config)
 	}
 
-	mode, err := parsePerm(cfg.Perm, step.Fields["perm"].Value)
+	mode, err := fileops.ParsePerm(cfg.Perm, step.Fields["perm"].Value)
 	if err != nil {
 		return nil, err
 	}
@@ -76,9 +76,11 @@ func (c *copyAction) Ops() []spec.Op {
 		BaseOp: sharedops.BaseOp{
 			DestSpan: c.step.Fields["dest"].Value,
 		},
-		Path:  c.dest,
-		Owner: c.owner,
-		Group: c.group,
+		Path:      c.dest,
+		Owner:     c.owner,
+		Group:     c.group,
+		OwnerSpan: c.step.Fields["owner"].Value,
+		GroupSpan: c.step.Fields["group"].Value,
 	}
 	chmod := &fileops.EnsureModeOp{
 		BaseOp: sharedops.BaseOp{

@@ -95,6 +95,10 @@ func extractFieldDocs(stepDef cue.Value) []spec.FieldDoc {
 		if strings.HasPrefix(name, "_") {
 			continue
 		}
+		switch name {
+		case "kind":
+			continue
+		}
 
 		// Strip trailing "?" from optional field names
 		name = strings.TrimSuffix(name, "?")

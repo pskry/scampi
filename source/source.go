@@ -16,4 +16,5 @@ type Source interface {
 	WriteFile(ctx context.Context, path string, data []byte) error
 	EnsureDir(ctx context.Context, path string) error
 	Stat(ctx context.Context, path string) (FileMeta, error)
+	LookupEnv(key string) (string, bool)
 }

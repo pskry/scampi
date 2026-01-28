@@ -11,6 +11,7 @@ steps: [
 		group: "group"
 	},
 	{
+		kind:  "copy"
 		desc:  "anon copy action"
 		src:   "./.src1.yml"
 		dest:  "./.dest1.yml"

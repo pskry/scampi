@@ -16,12 +16,29 @@ import (
 
 type EnsureOwnerOp struct {
 	sharedops.BaseOp
-	Path  string
-	Owner string
-	Group string
+	Path      string
+	Owner     string
+	Group     string
+	OwnerSpan spec.SourceSpan
+	GroupSpan spec.SourceSpan
 }
 
 func (op *EnsureOwnerOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
+	if !tgt.HasUser(ctx, op.Owner) {
+		return spec.CheckUnsatisfied, unknownUserError{
+			User:   op.Owner,
+			Source: op.OwnerSpan,
+			Err:    nil,
+		}
+	}
+	if !tgt.HasGroup(ctx, op.Group) {
+		return spec.CheckUnsatisfied, unknownGroupError{
+			Group:  op.Group,
+			Source: op.GroupSpan,
+			Err:    nil,
+		}
+	}
+
 	have, err := tgt.GetOwner(ctx, op.Path)
 	if err != nil {
 		if target.IsNotExist(err) {
@@ -62,6 +79,13 @@ func (op *EnsureOwnerOp) Execute(ctx context.Context, _ source.Source, tgt targe
 	changed := have.User != op.Owner || have.Group != op.Group
 
 	if err := tgt.Chown(ctx, op.Path, target.Owner{User: op.Owner, Group: op.Group}); err != nil {
+		if target.IsUnknownUser(err) {
+			return spec.Result{}, unknownUserError{
+				User:   op.Owner,
+				Source: op.OwnerSpan,
+				Err:    err,
+			}
+		}
 		return spec.Result{}, err
 	}
 
@@ -116,3 +140,57 @@ func (e ownerReadError) EventTemplate() event.Template {
 
 func (ownerReadError) Severity() signal.Severity { return signal.Error }
 func (ownerReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type unknownUserError struct {
+	User   string
+	Source spec.SourceSpan
+	Err    error
+}
+
+func (e unknownUserError) Error() string {
+	return fmt.Sprintf("unknown user %q: %v", e.User, e.Err)
+}
+
+func (e unknownUserError) Unwrap() error {
+	return e.Err
+}
+
+func (e unknownUserError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.unknownUserError",
+		Text:   `unknown user "{{.User}}"`,
+		Hint:   "create user before changing file owner",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (unknownUserError) Severity() signal.Severity { return signal.Error }
+func (unknownUserError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type unknownGroupError struct {
+	Group  string
+	Source spec.SourceSpan
+	Err    error
+}
+
+func (e unknownGroupError) Error() string {
+	return fmt.Sprintf("unknown group %q: %v", e.Group, e.Err)
+}
+
+func (e unknownGroupError) Unwrap() error {
+	return e.Err
+}
+
+func (e unknownGroupError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.unknownGroupError",
+		Text:   `unknown group "{{.Group}}"`,
+		Hint:   "create group before changing file owner",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (unknownGroupError) Severity() signal.Severity { return signal.Error }
+func (unknownGroupError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

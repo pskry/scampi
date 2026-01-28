@@ -10,7 +10,7 @@ package symlink
 		""")
 
 	close({
-		_kind:  "symlink"
+		kind:   "symlink"
 		desc?:  string @doc("Human-readable description")
 		target: string @doc("Path the symlink points to (like ln -s TARGET)")
 		link:   string @doc("Path where symlink is created (like ln -s ... LINK)")

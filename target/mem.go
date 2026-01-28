@@ -110,6 +110,14 @@ func (m *MemTarget) Chown(_ context.Context, path string, owner Owner) error {
 	return nil
 }
 
+func (m *MemTarget) HasUser(_ context.Context, _ string) bool {
+	return true
+}
+
+func (m *MemTarget) HasGroup(_ context.Context, _ string) bool {
+	return true
+}
+
 func (m *MemTarget) GetOwner(_ context.Context, path string) (Owner, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

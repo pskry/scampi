@@ -1,4 +1,4 @@
-package copy
+package fileops
 
 import (
 	"strings"
@@ -39,7 +39,7 @@ func TestParsePerm_InvalidPermissions(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := parsePerm(tc.input, spec.SourceSpan{})
+			_, err := ParsePerm(tc.input, spec.SourceSpan{})
 			if err == nil {
 				t.Fatalf("expected error for input %q", tc.input)
 			}
@@ -89,7 +89,7 @@ func TestParsePerm_ValidPermissions(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := parsePerm(tc.input, spec.SourceSpan{})
+			_, err := ParsePerm(tc.input, spec.SourceSpan{})
 			if err != nil {
 				t.Fatalf("expected success for %q, got %v", tc.input, err)
 			}

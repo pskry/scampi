@@ -13,7 +13,7 @@ package copy
 		""")
 
 	close({
-		_kind: "copy"
+		kind:  "copy"
 		desc?: string @doc("Human-readable description")
 		src:   string @doc("Source file path")
 		dest:  string @doc("Destination file path")

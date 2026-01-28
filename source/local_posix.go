@@ -34,3 +34,7 @@ func (LocalPosixSource) Stat(_ context.Context, path string) (FileMeta, error) {
 		Modified: info.ModTime(),
 	}, nil
 }
+
+func (LocalPosixSource) LookupEnv(key string) (string, bool) {
+	return os.LookupEnv(key)
+}

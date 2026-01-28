@@ -12,12 +12,14 @@ type MemSource struct {
 
 	Files    map[string][]byte
 	ModTimes map[string]time.Time
+	Env      map[string]string
 }
 
 func NewMemSource() *MemSource {
 	return &MemSource{
 		Files:    make(map[string][]byte),
 		ModTimes: make(map[string]time.Time),
+		Env:      make(map[string]string),
 	}
 }
 
@@ -64,4 +66,9 @@ func (m *MemSource) Stat(_ context.Context, path string) (FileMeta, error) {
 		Size:     int64(len(data)),
 		Modified: m.ModTimes[path],
 	}, nil
+}
+
+func (m *MemSource) LookupEnv(key string) (string, bool) {
+	v, ok := m.Env[key]
+	return v, ok
 }

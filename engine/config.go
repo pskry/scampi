@@ -531,7 +531,7 @@ func decodeStep(
 	if err != nil {
 		// engine/schema error – cannot continue safely
 		panic(util.BUG(
-			"resolveStepIdentity returned an unexpected error for step %q (%s): %w",
+			"resolveStepKind returned an unexpected error for step %q (%s): %w",
 			desc,
 			kind,
 			err,
@@ -641,25 +641,19 @@ func decodeStep(
 }
 
 func resolveStepKind(stepVal cue.Value, idx int) (string, string, error) {
-	// Hidden fields require iteration with cue.Hidden(true)
-	iter, err := stepVal.Fields(cue.Hidden(true))
+	kindVal := stepVal.LookupPath(cue.ParsePath("kind"))
+	if err := kindVal.Err(); err != nil {
+		// not found
+		return "", "", nil
+	}
+
+	kind, err := kindVal.String()
 	if err != nil {
 		return "", "", err
 	}
 
-	var kind string
-	for iter.Next() {
-		if iter.Selector().String() == "_kind" {
-			kind, err = iter.Value().String()
-			if err != nil {
-				return "", "", err
-			}
-			break
-		}
-	}
-
 	if kind == "" {
-		return "", "", fmt.Errorf("step at index %d has no _kind field", idx)
+		return "", "", fmt.Errorf("step at index %d has no kind field", idx)
 	}
 
 	// desc is optional - fall back to kind[idx] if not set

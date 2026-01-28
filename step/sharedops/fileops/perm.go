@@ -1,4 +1,4 @@
-package copy
+package fileops
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ var (
 	posixRe = regexp.MustCompile(`^(u|g|o)=[rwx]*(,(u|g|o)=[rwx]*)*$`)
 )
 
-func parsePerm(s string, src spec.SourceSpan) (fs.FileMode, error) {
+func ParsePerm(s string, src spec.SourceSpan) (fs.FileMode, error) {
 	if m, ok := tryOctal(s); ok {
 		return m, nil
 	}
