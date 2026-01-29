@@ -8,10 +8,14 @@ import (
 type Capability uint16
 
 const (
+	None Capability = 0
+	All  Capability = ^Capability(0)
+)
+const (
 	Filesystem Capability = 1 << iota // ReadFile, WriteFile, Stat, Remove
-	Ownership                         // HasUser, HasGroup, GetOwner, Chown
 	FileMode                          // Chmod, mode in Stat
 	Symlink                           // Symlink, Readlink, Lstat
+	Ownership                         // HasUser, HasGroup, GetOwner, Chown
 )
 
 const (

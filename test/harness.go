@@ -366,8 +366,8 @@ func (o fakeOp) OpDescription() spec.OpDescription {
 	return o
 }
 
-func (d fakeOp) PlanTemplate() spec.PlanTemplate {
-	return spec.PlanTemplate{ID: d.name}
+func (o fakeOp) PlanTemplate() spec.PlanTemplate {
+	return spec.PlanTemplate{ID: o.name}
 }
 
 func (fakeOp) RequiredCapabilities() capability.Capability {
@@ -556,46 +556,61 @@ func (f *faultyTarget) getFault(method, path string) error {
 	return f.faults[faultKey{method, path}]
 }
 
-func (f *faultyTarget) ReadFile(ctx context.Context, path string) ([]byte, error) {
-	if err := f.getFault("ReadFile", path); err != nil {
-		return nil, err
-	}
-	return f.Target.ReadFile(ctx, path)
-}
-
-func (f *faultyTarget) WriteFile(ctx context.Context, path string, data []byte, perm fs.FileMode) error {
-	if err := f.getFault("WriteFile", path); err != nil {
-		return err
-	}
-	return f.Target.WriteFile(ctx, path, data, perm)
-}
-
 func (f *faultyTarget) Stat(ctx context.Context, path string) (fs.FileInfo, error) {
 	if err := f.getFault("Stat", path); err != nil {
 		return nil, err
 	}
-	return f.Target.Stat(ctx, path)
+	return target.Must[target.Filesystem]("faultyTarget", f.Target).Stat(ctx, path)
+}
+
+func (f *faultyTarget) ReadFile(ctx context.Context, path string) ([]byte, error) {
+	if err := f.getFault("ReadFile", path); err != nil {
+		return nil, err
+	}
+	return target.Must[target.Filesystem]("faultyTarget", f.Target).ReadFile(ctx, path)
+}
+
+func (f *faultyTarget) WriteFile(ctx context.Context, path string, data []byte) error {
+	if err := f.getFault("WriteFile", path); err != nil {
+		return err
+	}
+	return target.Must[target.Filesystem]("faultyTarget", f.Target).WriteFile(ctx, path, data)
+}
+
+func (f *faultyTarget) Remove(ctx context.Context, path string) error {
+	if err := f.getFault("Remove", path); err != nil {
+		return err
+	}
+	return target.Must[target.Filesystem]("faultyTarget", f.Target).Remove(ctx, path)
 }
 
 func (f *faultyTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) error {
 	if err := f.getFault("Chmod", path); err != nil {
 		return err
 	}
-	return f.Target.Chmod(ctx, path, mode)
+	return target.Must[target.FileMode]("faultyTarget", f.Target).Chmod(ctx, path, mode)
 }
 
 func (f *faultyTarget) Chown(ctx context.Context, path string, owner target.Owner) error {
 	if err := f.getFault("Chown", path); err != nil {
 		return err
 	}
-	return f.Target.Chown(ctx, path, owner)
+	return target.Must[target.Ownership]("faultyTarget", f.Target).Chown(ctx, path, owner)
 }
 
 func (f *faultyTarget) GetOwner(ctx context.Context, path string) (target.Owner, error) {
 	if err := f.getFault("GetOwner", path); err != nil {
 		return target.Owner{}, err
 	}
-	return f.Target.GetOwner(ctx, path)
+	return target.Must[target.Ownership]("faultyTarget", f.Target).GetOwner(ctx, path)
+}
+
+func (f *faultyTarget) HasUser(ctx context.Context, user string) bool {
+	return target.Must[target.Ownership]("faultyTarget", f.Target).HasUser(ctx, user)
+}
+
+func (f *faultyTarget) HasGroup(ctx context.Context, group string) bool {
+	return target.Must[target.Ownership]("faultyTarget", f.Target).HasGroup(ctx, group)
 }
 
 type minimalTarget struct {
@@ -620,4 +635,10 @@ func (m *minimalTarget) HasGroup(_ context.Context, _ string) bool {
 
 func (m *minimalTarget) GetOwner(_ context.Context, _ string) (target.Owner, error) {
 	panic("MinimalTarget.HasUser called - capability check failed")
+}
+
+type allCapNoImplTarget struct{}
+
+func (allCapNoImplTarget) Capabilities() capability.Capability {
+	return capability.All
 }

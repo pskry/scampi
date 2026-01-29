@@ -16,6 +16,8 @@ import (
 	"godoit.dev/doit/target"
 )
 
+const copyFileID = "builtin.copy-file"
+
 type copyFileOp struct {
 	sharedops.BaseOp
 	src  string
@@ -23,6 +25,8 @@ type copyFileOp struct {
 }
 
 func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
+	fsTgt := target.Must[target.Filesystem](copyFileID, tgt)
+
 	// source must exist
 	srcData, err := src.ReadFile(ctx, op.src)
 	if err != nil {
@@ -34,7 +38,7 @@ func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.T
 	}
 
 	// destination parent must exist
-	if _, err := tgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
+	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
 		return spec.CheckUnsatisfied, CopyDestDirMissing{
 			Path:   filepath.Dir(op.dest),
 			Err:    err,
@@ -43,7 +47,7 @@ func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.T
 	}
 
 	// dest file comparison (expected drift)
-	destData, err := tgt.ReadFile(ctx, op.dest)
+	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err != nil {
 		return spec.CheckUnsatisfied, nil
 	}
@@ -56,17 +60,19 @@ func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.T
 }
 
 func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
+	fsTgt := target.Must[target.Filesystem](copyFileID, tgt)
+
 	srcData, err := src.ReadFile(ctx, op.src)
 	if err != nil {
 		return spec.Result{}, err
 	}
 
-	destData, err := tgt.ReadFile(ctx, op.dest)
+	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err == nil && bytes.Equal(srcData, destData) {
 		return spec.Result{Changed: false}, nil
 	}
 
-	if err := tgt.WriteFile(ctx, op.dest, srcData, 0o644); err != nil {
+	if err := fsTgt.WriteFile(ctx, op.dest, srcData); err != nil {
 		return spec.Result{}, err
 	}
 
@@ -84,7 +90,7 @@ type copyFileDesc struct {
 
 func (d copyFileDesc) PlanTemplate() spec.PlanTemplate {
 	return spec.PlanTemplate{
-		ID:   "builtin.copy-file",
+		ID:   copyFileID,
 		Text: `copy "{{.Src}}" -> "{{.Dest}}"`,
 		Data: d,
 	}

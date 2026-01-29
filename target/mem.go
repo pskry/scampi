@@ -44,7 +44,7 @@ func (m *MemTarget) ReadFile(_ context.Context, path string) ([]byte, error) {
 	return cp, nil
 }
 
-func (m *MemTarget) WriteFile(_ context.Context, path string, data []byte, perm fs.FileMode) error {
+func (m *MemTarget) WriteFile(_ context.Context, path string, data []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -52,7 +52,7 @@ func (m *MemTarget) WriteFile(_ context.Context, path string, data []byte, perm 
 	copy(cp, data)
 
 	m.Files[path] = cp
-	m.Modes[path] = perm
+	m.Modes[path] = 0o644
 	m.ModTimes[path] = time.Now()
 	return nil
 }

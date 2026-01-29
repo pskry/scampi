@@ -13,6 +13,8 @@ import (
 	"godoit.dev/doit/target"
 )
 
+const renderTemplateID = "builtin.render-template"
+
 type renderTemplateOp struct {
 	sharedops.BaseOp
 	src     string
@@ -22,6 +24,8 @@ type renderTemplateOp struct {
 }
 
 func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
+	fsTgt := target.Must[target.Filesystem](renderTemplateID, tgt)
+
 	// Merge data with env overrides
 	data, err := mergeData(op.data, src)
 	if err != nil {
@@ -53,7 +57,7 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 	}
 
 	// Destination parent must exist
-	if _, err := tgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
+	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
 		return spec.CheckUnsatisfied, DestDirMissing{
 			Path:   filepath.Dir(op.dest),
 			Err:    err,
@@ -62,7 +66,7 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 	}
 
 	// Compare with existing file
-	destData, err := tgt.ReadFile(ctx, op.dest)
+	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err != nil {
 		return spec.CheckUnsatisfied, nil // expected drift
 	}
@@ -75,6 +79,8 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 }
 
 func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
+	fsTgt := target.Must[target.Filesystem](renderTemplateID, tgt)
+
 	// Merge data with env overrides
 	data, err := mergeData(op.data, src)
 	if err != nil {
@@ -99,13 +105,13 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 	}
 
 	// Check if content matches existing file
-	destData, err := tgt.ReadFile(ctx, op.dest)
+	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err == nil && bytes.Equal(buf.Bytes(), destData) {
 		return spec.Result{Changed: false}, nil
 	}
 
 	// Write rendered content
-	if err := tgt.WriteFile(ctx, op.dest, buf.Bytes(), 0o644); err != nil {
+	if err := fsTgt.WriteFile(ctx, op.dest, buf.Bytes()); err != nil {
 		return spec.Result{}, err
 	}
 
@@ -168,7 +174,7 @@ type renderTemplateDesc struct {
 
 func (d renderTemplateDesc) PlanTemplate() spec.PlanTemplate {
 	return spec.PlanTemplate{
-		ID:   "builtin.render-template",
+		ID:   renderTemplateID,
 		Text: `render "{{.Src}}" -> "{{.Dest}}"`,
 		Data: d,
 	}

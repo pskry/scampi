@@ -141,7 +141,7 @@ func (capabilityTarget) ReadFile(_ context.Context, _ string) ([]byte, error) {
 	panic(errs.BUG("ReadFile called on capability-only target"))
 }
 
-func (capabilityTarget) WriteFile(_ context.Context, _ string, _ []byte, _ fs.FileMode) error {
+func (capabilityTarget) WriteFile(_ context.Context, _ string, _ []byte) error {
 	panic(errs.BUG("WriteFile called on capability-only target"))
 }
 

@@ -19,8 +19,8 @@ func (LocalPosixTarget) ReadFile(_ context.Context, path string) ([]byte, error)
 	return os.ReadFile(path)
 }
 
-func (LocalPosixTarget) WriteFile(_ context.Context, path string, data []byte, mode fs.FileMode) error {
-	return os.WriteFile(path, data, mode)
+func (LocalPosixTarget) WriteFile(_ context.Context, path string, data []byte) error {
+	return os.WriteFile(path, data, 0o644)
 }
 
 func (LocalPosixTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {

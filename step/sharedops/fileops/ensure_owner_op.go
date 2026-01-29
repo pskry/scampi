@@ -15,6 +15,8 @@ import (
 	"godoit.dev/doit/target"
 )
 
+const ensureOwnerID = "builtin.ensure-owner"
+
 type EnsureOwnerOp struct {
 	sharedops.BaseOp
 	Path      string
@@ -25,14 +27,16 @@ type EnsureOwnerOp struct {
 }
 
 func (op *EnsureOwnerOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
-	if !tgt.HasUser(ctx, op.Owner) {
+	owTgt := target.Must[target.Ownership](ensureModeID, tgt)
+
+	if !owTgt.HasUser(ctx, op.Owner) {
 		return spec.CheckUnsatisfied, unknownUserError{
 			User:   op.Owner,
 			Source: op.OwnerSpan,
 			Err:    nil,
 		}
 	}
-	if !tgt.HasGroup(ctx, op.Group) {
+	if !owTgt.HasGroup(ctx, op.Group) {
 		return spec.CheckUnsatisfied, unknownGroupError{
 			Group:  op.Group,
 			Source: op.GroupSpan,
@@ -40,7 +44,7 @@ func (op *EnsureOwnerOp) Check(ctx context.Context, _ source.Source, tgt target.
 		}
 	}
 
-	have, err := tgt.GetOwner(ctx, op.Path)
+	have, err := owTgt.GetOwner(ctx, op.Path)
 	if err != nil {
 		if target.IsNotExist(err) {
 			// file missing -> expected drift, copyFileOp will create it
@@ -63,7 +67,9 @@ func (op *EnsureOwnerOp) Check(ctx context.Context, _ source.Source, tgt target.
 }
 
 func (op *EnsureOwnerOp) Execute(ctx context.Context, _ source.Source, tgt target.Target) (spec.Result, error) {
-	have, err := tgt.GetOwner(ctx, op.Path)
+	owTgt := target.Must[target.Ownership](ensureModeID, tgt)
+
+	have, err := owTgt.GetOwner(ctx, op.Path)
 	if err != nil {
 		if target.IsNotExist(err) {
 			// file should exist - copyFileOp is a dependency and should have created it
@@ -79,7 +85,7 @@ func (op *EnsureOwnerOp) Execute(ctx context.Context, _ source.Source, tgt targe
 
 	changed := have.User != op.Owner || have.Group != op.Group
 
-	if err := tgt.Chown(ctx, op.Path, target.Owner{User: op.Owner, Group: op.Group}); err != nil {
+	if err := owTgt.Chown(ctx, op.Path, target.Owner{User: op.Owner, Group: op.Group}); err != nil {
 		if target.IsUnknownUser(err) {
 			return spec.Result{}, unknownUserError{
 				User:   op.Owner,
@@ -105,7 +111,7 @@ type ensureOwnerDesc struct {
 
 func (d ensureOwnerDesc) PlanTemplate() spec.PlanTemplate {
 	return spec.PlanTemplate{
-		ID:   "builtin.ensure-owner",
+		ID:   ensureOwnerID,
 		Text: `ensure owner "{{.User}}:{{.Group}}" on "{{.Path}}"`,
 		Data: d,
 	}

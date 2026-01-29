@@ -12,6 +12,8 @@ import (
 	"godoit.dev/doit/target"
 )
 
+const id = "builtin.symlink"
+
 type (
 	Symlink       struct{}
 	SymlinkConfig struct {
@@ -102,8 +104,11 @@ func resolveTarget(target, link string) (string, error) {
 }
 
 func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
+	fsTgt := target.Must[target.Filesystem](id, tgt)
+	slTgt := target.Must[target.Symlink](id, tgt)
+
 	// Link parent dir must exist
-	if _, err := tgt.Stat(ctx, filepath.Dir(op.link)); err != nil {
+	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.link)); err != nil {
 		return spec.CheckUnsatisfied, LinkDirMissing{
 			Path:   filepath.Dir(op.link),
 			Err:    err,
@@ -122,7 +127,7 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 	}
 
 	// Check what exists at link path
-	info, err := tgt.Lstat(ctx, op.link)
+	info, err := slTgt.Lstat(ctx, op.link)
 	if err != nil {
 		if target.IsNotExist(err) {
 			return spec.CheckUnsatisfied, nil // expected drift
@@ -144,7 +149,7 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 	}
 
 	// Check symlink target
-	current, err := tgt.Readlink(ctx, op.link)
+	current, err := slTgt.Readlink(ctx, op.link)
 	if err != nil {
 		return spec.CheckUnsatisfied, LinkReadError{
 			Path:   op.link,
@@ -161,6 +166,9 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 }
 
 func (op *ensureSymlinkOp) Execute(ctx context.Context, _ source.Source, tgt target.Target) (spec.Result, error) {
+	fsTgt := target.Must[target.Filesystem](id, tgt)
+	slTgt := target.Must[target.Symlink](id, tgt)
+
 	// Compute relative target path
 	relTarget, err := resolveTarget(op.target, op.link)
 	if err != nil {
@@ -168,25 +176,25 @@ func (op *ensureSymlinkOp) Execute(ctx context.Context, _ source.Source, tgt tar
 	}
 
 	// Check current state
-	info, err := tgt.Lstat(ctx, op.link)
+	info, err := slTgt.Lstat(ctx, op.link)
 	if err == nil {
 		// Something exists
 		if info.Mode()&fs.ModeSymlink != 0 {
 			// It's a symlink - check if correct
-			current, _ := tgt.Readlink(ctx, op.link)
+			current, _ := slTgt.Readlink(ctx, op.link)
 			if current == relTarget {
 				return spec.Result{Changed: false}, nil
 			}
 		}
 
 		// Remove existing (symlink with wrong target, or other file type)
-		if err := tgt.Remove(ctx, op.link); err != nil {
+		if err := fsTgt.Remove(ctx, op.link); err != nil {
 			return spec.Result{}, err
 		}
 	}
 
 	// Create symlink
-	if err := tgt.Symlink(ctx, relTarget, op.link); err != nil {
+	if err := slTgt.Symlink(ctx, relTarget, op.link); err != nil {
 		return spec.Result{}, err
 	}
 

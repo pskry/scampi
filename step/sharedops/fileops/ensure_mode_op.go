@@ -16,6 +16,8 @@ import (
 	"godoit.dev/doit/target"
 )
 
+const ensureModeID = "builtin.ensure-owner"
+
 type EnsureModeOp struct {
 	sharedops.BaseOp
 	Path string
@@ -23,7 +25,9 @@ type EnsureModeOp struct {
 }
 
 func (op *EnsureModeOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
-	info, err := tgt.Stat(ctx, op.Path)
+	fsTgt := target.Must[target.Filesystem](ensureModeID, tgt)
+
+	info, err := fsTgt.Stat(ctx, op.Path)
 	if err != nil {
 		if target.IsNotExist(err) {
 			// file missing -> expected drift, copyFileOp will create it
@@ -46,7 +50,10 @@ func (op *EnsureModeOp) Check(ctx context.Context, _ source.Source, tgt target.T
 }
 
 func (op *EnsureModeOp) Execute(ctx context.Context, _ source.Source, tgt target.Target) (spec.Result, error) {
-	info, err := tgt.Stat(ctx, op.Path)
+	fsTgt := target.Must[target.Filesystem](ensureModeID, tgt)
+	fmTgt := target.Must[target.FileMode](ensureModeID, tgt)
+
+	info, err := fsTgt.Stat(ctx, op.Path)
 	if err != nil {
 		if target.IsNotExist(err) {
 			// file should exist - copyFileOp is a dependency and should have created it
@@ -62,7 +69,7 @@ func (op *EnsureModeOp) Execute(ctx context.Context, _ source.Source, tgt target
 
 	changed := info.Mode() != op.Mode
 
-	if err := tgt.Chmod(ctx, op.Path, op.Mode); err != nil {
+	if err := fmTgt.Chmod(ctx, op.Path, op.Mode); err != nil {
 		return spec.Result{}, err
 	}
 
@@ -80,7 +87,7 @@ type ensureModeDesc struct {
 
 func (d ensureModeDesc) PlanTemplate() spec.PlanTemplate {
 	return spec.PlanTemplate{
-		ID:   "builtin.ensure-mode",
+		ID:   ensureModeID,
 		Text: `ensure mode {{.Mode}} on "{{.Path}}"`,
 		Data: d,
 	}
