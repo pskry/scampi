@@ -98,7 +98,8 @@ var (
 	colPlanFinishedFailedUnit = ansi.Red().Bold()
 	colPlanStepPlanned        = ansi.BrightBlack().Dim()
 
-	colActionHeader            = ansi.Cyan().Bold()
+	colActionKind              = ansi.Cyan().Bold()
+	colActionDesc              = ansi.Cyan()
 	colActionRail              = ansi.Cyan()
 	colActionOps               = ansi.Cyan().Dim()
 	colActionFinishedUnchanged = ansi.Green().Dim()
@@ -750,7 +751,11 @@ func (c *cli) renderPlan(e event.PlanEvent) []renderEvent {
 	for _, act := range dag.Actions {
 		kind := ""
 		if act.Kind != "" {
-			kind = fmt.Sprintf(" %s %s", act.Kind, c.glyphs.actionKindSep)
+			kind = fmt.Sprintf(" %s", act.Kind)
+		}
+		desc := ""
+		if act.Desc != "" {
+			desc = fmt.Sprintf(" %s %s", c.glyphs.actionKindSep, act.Desc)
 		}
 
 		if v == signal.Quiet {
@@ -759,15 +764,17 @@ func (c *cli) renderPlan(e event.PlanEvent) []renderEvent {
 				nOps += len(l)
 			}
 
-			line := c.fmtMsg(colActionRail, " "+c.glyphs.actionStartCollapsed) +
+			line := c.fmtMsg(colActionKind, " "+c.glyphs.actionStartCollapsed) +
 				c.fmtfMsg(
-					colActionHeader,
-					" [%*d]%s %s",
+					colActionKind,
+					" [%*d]%s",
 					indexWidth,
 					act.Index,
 					kind,
-					act.Desc,
 				)
+			if desc != "" {
+				line += c.fmtMsg(colActionDesc, desc)
+			}
 
 			var opLine string
 			switch nOps {
@@ -803,13 +810,15 @@ func (c *cli) renderPlan(e event.PlanEvent) []renderEvent {
 			line := c.fmtMsg(colPlanRail, c.glyphs.planRail+" ") +
 				c.fmtMsg(colActionRail, gutter) +
 				c.fmtfMsg(
-					colActionHeader,
-					" [%*d]%s %s",
+					colActionKind,
+					" [%*d]%s",
 					indexWidth,
 					act.Index,
 					kind,
-					act.Desc,
 				)
+			if desc != "" {
+				line += c.fmtMsg(colActionDesc, desc)
+			}
 			out = append(out, renderEvent{
 				stream: streamOut,
 				line:   line,
