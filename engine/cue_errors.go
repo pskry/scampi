@@ -20,7 +20,7 @@ var (
 
 	// stringMultRe matches string/bytes literal multiplication which can trigger CUE hangs
 	// e.g. "x"*7T, 'x'*something, or 7*"x" (single quotes are byte literals in CUE)
-	stringMultRe = regexp.MustCompile(`(["'][^"']*["']\s*\*|\*\s*["'][^"']*["'])`)
+	stringMultRe = regexp.MustCompile(`(["'][^"']*["']\s*\*|\*\s*\(?\s*["'][^"']*["']\s*\)?)`)
 
 	// unicodeMarkRe matches Unicode combining marks which can cause CUE stack overflow
 	// when used in certain contexts (triggers infinite recursion in error path resolution)

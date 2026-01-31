@@ -25,10 +25,20 @@ steps: []`,
 		`package fuzz
 steps: {}`,
 
-		// missing fields
+		// missing copy fields
 		`package fuzz
 import "godoit.dev/doit/builtin"
 steps: [builtin.copy & { src: "a", dest: "b" }]`,
+
+		// missing template fields
+		`package fuzz
+import "godoit.dev/doit/builtin"
+steps: [builtin.symlink & { target: "a" }]`,
+
+		// missing template fields
+		`package fuzz
+import "godoit.dev/doit/builtin"
+steps: [builtin.template & { src: "a", dest: "b" }]`,
 
 		// garbage
 		`this is not cue`,
