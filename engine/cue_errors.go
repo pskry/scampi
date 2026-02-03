@@ -20,7 +20,9 @@ var (
 
 	// stringMultRe matches string/bytes literal multiplication which can trigger CUE hangs
 	// e.g. "x"*7T, 'x'*something, or 7*"x" (single quotes are byte literals in CUE)
-	stringMultRe = regexp.MustCompile(`(["'][^"']*["']\s*\*|\*\s*\(?\s*["'][^"']*["']\s*\)?)`)
+	stringMultRe = regexp.MustCompile(
+		`(["'][^"']*["']\s*\*\s*[^\s|]+|[A-Za-z0-9_)\]]+\s*\*\s*\(?\s*["'][^"']*["'])`,
+	)
 
 	// unicodeMarkRe matches Unicode combining marks which can cause CUE stack overflow
 	// when used in certain contexts (triggers infinite recursion in error path resolution)
@@ -182,6 +184,7 @@ func (CueDiagnostic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort 
 
 type CueMissingField struct {
 	Field  string
+	Env    *string
 	Source spec.SourceSpan
 }
 
@@ -197,13 +200,15 @@ func (d MissingFieldDiagnostic) EventTemplate() event.Template {
 	m := d.Missing
 	return event.Template{
 		ID:   "config.MissingField",
-		Text: d.Error(),
+		Text: `field {{.Field}} is mandatory`,
+		Hint: `{{- if .Env }}This field may be set using the {{.Env}} environment variable{{end}}`,
 		Source: &spec.SourceSpan{
 			Filename:  m.Source.Filename,
 			StartLine: m.Source.StartLine,
 			StartCol:  m.Source.StartCol,
 			EndCol:    m.Source.EndCol,
 		},
+		Data: m,
 	}
 }
 

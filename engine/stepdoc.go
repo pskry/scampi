@@ -13,6 +13,11 @@ import (
 	"godoit.dev/doit/spec"
 )
 
+const (
+	cueAttrDoc     = "doc"
+	cueAttrExample = "example"
+)
+
 // LoadStepDoc extracts documentation from the CUE schema for a step type.
 // Panics on invariant violations (malformed embedded schemas).
 func LoadStepDoc(kind string) spec.StepDoc {
@@ -54,12 +59,12 @@ func LoadStepDoc(kind string) spec.StepDoc {
 
 	doc := spec.StepDoc{
 		Kind:    kind,
-		Summary: extractAttr(stepDef, "doc"),
+		Summary: extractAttr(stepDef, cueAttrDoc),
 		Fields:  extractFieldDocs(stepDef),
 	}
 
 	// Extract example if present
-	if example := extractAttr(stepDef, "example"); example != "" {
+	if example := extractAttr(stepDef, cueAttrExample); example != "" {
 		doc.Examples = []string{example}
 	}
 
@@ -109,7 +114,7 @@ func extractFieldDocs(stepDef cue.Value) []spec.FieldDoc {
 			Name:     name,
 			Type:     cueKindToString(fv.IncompleteKind()),
 			Required: !iter.IsOptional(),
-			Desc:     extractAttr(fv, "doc"),
+			Desc:     extractAttr(fv, cueAttrDoc),
 		}
 
 		// Extract default value if present

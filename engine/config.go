@@ -154,10 +154,11 @@ func (s sourceFS) Open(name string) (fs.File, error) {
 }
 
 const (
-	cueUnit   = "unit"
-	cueUnitID = "id"
-	cueTarget = "target"
-	cueSteps  = "steps"
+	cueUnit    = "unit"
+	cueUnitID  = "id"
+	cueTarget  = "target"
+	cueSteps   = "steps"
+	cueAttrEnv = "env"
 )
 
 // LoadConfig decodes and validates user configuration.
@@ -372,7 +373,7 @@ func loadConfigWithSourceUnsafe(
 
 	// decode steps
 	// ----------------------------------------------------------------------------
-	tgtInst, err := decodeTarget(cfgVal, userFile, reg)
+	tgtInst, err := decodeTarget(cfgVal, userFile, reg, src)
 	if err != nil {
 		return spec.Config{}, err
 	}
@@ -535,6 +536,7 @@ func decodeTarget(
 	cfgVal cue.Value,
 	userFile *ast.File,
 	reg *Registry,
+	src source.Source,
 ) (spec.TargetInstance, error) {
 	// Resolve target kind
 	// ------------------------------------------------------------
@@ -578,6 +580,13 @@ func decodeTarget(
 			tt.Kind(),
 			tCfg,
 		))
+	}
+
+	// Apply ENV overrides
+	// ------------------------------------------------------------
+	targetVal, err = applyEnvOverrides(targetVal, src)
+	if err != nil {
+		return spec.TargetInstance{}, err
 	}
 
 	// Validation
@@ -630,12 +639,12 @@ func decodeTarget(
 
 	// Success
 	// ------------------------------------------------------------
-	src, fields := extractFieldSpansFromFile(userFile, cueTarget)
+	srcSpan, fieldSpans := extractFieldSpansFromFile(userFile, cueTarget)
 	return spec.TargetInstance{
 		Type:   tt,
 		Config: tCfg,
-		Source: src,
-		Fields: fields,
+		Source: srcSpan,
+		Fields: fieldSpans,
 	}, nil
 }
 
@@ -892,11 +901,12 @@ func findMissingRequiredFields(
 
 func findIncompleteFields(
 	ce cueerr.Error,
-	stepVal cue.Value,
+	val cue.Value,
 	source spec.SourceSpan,
 ) []CueMissingField {
-	var res []CueMissingField
+	envMap := extractEnvMap(val)
 
+	var res []CueMissingField
 	for _, e := range cueerr.Errors(ce) {
 		if !strings.Contains(e.Error(), "incomplete value") {
 			continue
@@ -909,10 +919,15 @@ func findIncompleteFields(
 
 		field := path[len(path)-1]
 
-		v := stepVal.LookupPath(cue.ParsePath(field))
+		v := val.LookupPath(cue.ParsePath(field))
 		if v.Exists() && !v.IsConcrete() {
+			var envVar *string
+			if e, ok := envMap[field]; ok {
+				envVar = &e
+			}
 			res = append(res, CueMissingField{
 				Field:  field,
+				Env:    envVar,
 				Source: source,
 			})
 		}
