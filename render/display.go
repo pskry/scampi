@@ -7,27 +7,9 @@ import (
 
 	"github.com/mattn/go-runewidth"
 	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/spec"
 )
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-
-type Template struct {
-	Name string
-	Text string
-	Hint string
-	Help string
-
-	Data any
-
-	Source *spec.SourceSpan
-}
-
-type RunSummary struct {
-	ChangedCount int
-	FailedCount  int
-	TotalCount   int
-}
 
 type Displayer interface {
 	EmitEngineLifecycle(e event.EngineEvent)

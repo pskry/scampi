@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/x/term"
 	"godoit.dev/doit/diagnostic/event"
@@ -345,7 +343,7 @@ func (c *cli) EmitOpLifecycle(e event.OpEvent) {
 	case event.OpExecuted:
 		c.commitRenderEvents(c.renderOpExecuted(e))
 	default:
-		panic(errs.BUG("OP LC %q", e.Kind))
+		panic(errs.BUG("unknown op event kind %q (0x%02x)", e.Kind, uint8(e.Kind)))
 
 	}
 }
@@ -355,30 +353,12 @@ func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
 		return
 	}
 
-	maxKindWidth := func(steps []event.StepIndexDetail) int {
-		maxLen := 0
-		for _, s := range steps {
-			if w := utf8.RuneCountInString(s.Kind); w > maxLen {
-				maxLen = w
-			}
+	kindWidth := 0
+	for _, step := range e.Steps {
+		if w := visibleLen(step.Kind); w > kindWidth {
+			kindWidth = w
 		}
-		return maxLen
 	}
-	ansiRE := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-
-	visibleLen := func(s string) int {
-		return utf8.RuneCountInString(ansiRE.ReplaceAllString(s, ""))
-	}
-
-	padRight := func(s string, width int) string {
-		n := width - visibleLen(s)
-		if n <= 0 {
-			return s
-		}
-		return s + strings.Repeat(" ", n)
-	}
-
-	kindWidth := maxKindWidth(e.Steps)
 
 	var events []renderEvent
 
@@ -396,8 +376,12 @@ func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
 	for _, step := range e.Steps {
 		kind := c.fmtMsg(ansi.BrightCyan().Bold(), step.Kind)
 		desc := c.fmtMsg(ansi.White(), step.Desc)
+		pad := kindWidth - visibleLen(kind)
+		if pad < 0 {
+			pad = 0
+		}
 
-		line := fmt.Sprintf("  %s  %s", padRight(kind, kindWidth), desc)
+		line := "  " + kind + strings.Repeat(" ", pad) + "  " + desc
 
 		events = append(events, renderEvent{
 			line:   line,
@@ -529,6 +513,7 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 type legendEntry struct {
 	glyph string
 	color ansi.ANSI
+	label string
 	desc  string
 }
 
@@ -545,9 +530,13 @@ func (c *cli) legendSection(header string, entries []legendEntry) []renderEvent 
 	})
 
 	maxGlyphWidth := 0
+	maxLabelWidth := 0
 	for _, e := range entries {
 		if w := visibleLen(c.fmtMsg(e.color, e.glyph)); w > maxGlyphWidth {
 			maxGlyphWidth = w
+		}
+		if w := len(e.label); w > maxLabelWidth {
+			maxLabelWidth = w
 		}
 	}
 
@@ -561,11 +550,20 @@ func (c *cli) legendSection(header string, entries []legendEntry) []renderEvent 
 		}
 
 		styled := c.fmtMsg(e.color, e.glyph)
-		pad := maxGlyphWidth - visibleLen(styled)
-		if pad < 0 {
-			pad = 0
+		glyphPad := maxGlyphWidth - visibleLen(styled)
+		if glyphPad < 0 {
+			glyphPad = 0
 		}
-		line := "  " + styled + strings.Repeat(" ", pad)
+		line := "  " + styled + strings.Repeat(" ", glyphPad)
+
+		if e.label != "" {
+			labelPad := maxLabelWidth - len(e.label)
+			if labelPad < 0 {
+				labelPad = 0
+			}
+			line += "  " + c.fmtMsg(ansi.White(), e.label) + strings.Repeat(" ", labelPad)
+		}
+
 		if e.desc != "" {
 			line += "  " + c.fmtMsg(ansi.White(), e.desc)
 		}
@@ -583,12 +581,12 @@ func (c *cli) EmitLegend() {
 
 	// ─── STATE ───
 	events = append(events, c.legendSection("STATE", []legendEntry{
-		{c.glyphs.change, colActionFinishedChanged, "change    system state was modified"},
-		{c.glyphs.ok, colActionFinishedUnchanged, "ok        already correct, no change needed"},
-		{c.glyphs.exec, colOpExecChanged, "exec      operation executed"},
-		{c.glyphs.warn, colOpCheckUnknown, "warn      non-fatal issue"},
-		{c.glyphs.error, colOpExecFailed, "error     operation failed"},
-		{c.glyphs.fatal, colEngineFinishedFatal, "fatal     unrecoverable failure"},
+		{c.glyphs.change, colActionFinishedChanged, "change", "system state was modified"},
+		{c.glyphs.ok, colActionFinishedUnchanged, "ok", "already correct, no change needed"},
+		{c.glyphs.exec, colOpExecChanged, "exec", "operation executed"},
+		{c.glyphs.warn, colOpCheckUnknown, "warn", "non-fatal issue"},
+		{c.glyphs.error, colOpExecFailed, "error", "operation failed"},
+		{c.glyphs.fatal, colEngineFinishedFatal, "fatal", "unrecoverable failure"},
 	})...)
 	events = append(events, renderEvent{stream: streamOut, line: ""})
 
@@ -618,34 +616,34 @@ func (c *cli) EmitLegend() {
 	)
 
 	events = append(events, c.legendSection("PLAN", []legendEntry{
-		{planBoundary, colPlanRail, "plan boundary (wraps entire execution)"},
-		{c.glyphs.planRail, colPlanRail, "plan rail (actions listed inside)"},
-		{"", ansi.ANSI{}, ""},
-		{actionHeader, colActionKind, "action start (step with ops)"},
-		{opBranch, colOpHeader, "op branch"},
-		{opLast, colOpHeader, "op branch (last)"},
-		{c.glyphs.actionEnd, colActionRail, "action end"},
-		{"", ansi.ANSI{}, ""},
-		{collapsed, colActionKind, "collapsed action (default verbosity)"},
-		{"", ansi.ANSI{}, ""},
-		{"← [N, ...]", colPlanDeps, "depends on action N (must complete first)"},
-		{c.glyphs.parallelTop, colPlanBracket, "parallel execution group"},
-		{c.glyphs.parallelMid, colPlanBracket, ""},
-		{c.glyphs.parallelBot, colPlanBracket, ""},
-		{c.glyphs.parallelLabel, colPlanBracket, "group boundary (engine waits for all)"},
+		{planBoundary, colPlanRail, "", "plan boundary (wraps entire execution)"},
+		{c.glyphs.planRail, colPlanRail, "", "plan rail (actions listed inside)"},
+		{"", ansi.ANSI{}, "", ""},
+		{actionHeader, colActionKind, "", "action start (step with ops)"},
+		{opBranch, colOpHeader, "", "op branch"},
+		{opLast, colOpHeader, "", "op branch (last)"},
+		{c.glyphs.actionEnd, colActionRail, "", "action end"},
+		{"", ansi.ANSI{}, "", ""},
+		{collapsed, colActionKind, "", "collapsed action (default verbosity)"},
+		{"", ansi.ANSI{}, "", ""},
+		{"← [N, ...]", colPlanDeps, "", "depends on action N (must complete first)"},
+		{c.glyphs.parallelTop, colPlanBracket, "", "parallel execution group"},
+		{c.glyphs.parallelMid, colPlanBracket, "", ""},
+		{c.glyphs.parallelBot, colPlanBracket, "", ""},
+		{c.glyphs.parallelLabel, colPlanBracket, "", "group boundary (engine waits for all)"},
 	})...)
 	events = append(events, renderEvent{stream: streamOut, line: ""})
 
 	// ─── COLORS (only meaningful when color is active) ───
 	if c.shouldUseColor() {
 		events = append(events, c.legendSection("COLORS", []legendEntry{
-			{"yellow", ansi.Yellow(), "mutation, system state changed"},
-			{"green", ansi.Green(), "correct, no change needed"},
-			{"red", ansi.Red(), "failure"},
-			{"blue", ansi.Blue(), "engine and plan boundaries"},
-			{"magenta", ansi.Magenta(), "plan structure"},
-			{"cyan", ansi.Cyan(), "action context"},
-			{"dim", ansi.BrightBlack().Dim(), "detail (higher verbosity)"},
+			{"yellow", ansi.Yellow(), "", "mutation, system state changed"},
+			{"green", ansi.Green(), "", "correct, no change needed"},
+			{"red", ansi.Red(), "", "failure"},
+			{"blue", ansi.Blue(), "", "engine and plan boundaries"},
+			{"magenta", ansi.Magenta(), "", "plan structure"},
+			{"cyan", ansi.Cyan(), "", "action context"},
+			{"dim", ansi.BrightBlack().Dim(), "", "detail (higher verbosity)"},
 		})...)
 		events = append(events, renderEvent{stream: streamOut, line: ""})
 	}
@@ -1456,15 +1454,15 @@ func (c *cli) fmtMsgTo(w io.Writer, color ansi.ANSI, msg string) {
 	fprint(w, ansi.Reset)
 }
 
-func (c *cli) fmtfMsgTo(buf *strings.Builder, color ansi.ANSI, format string, args ...any) {
+func (c *cli) fmtfMsgTo(w io.Writer, color ansi.ANSI, format string, args ...any) {
 	if !c.shouldUseColor() {
-		fprintf(buf, format, args...)
+		fprintf(w, format, args...)
 		return
 	}
 
-	buf.WriteString(color.String())
-	fprintf(buf, format, args...)
-	buf.WriteString(ansi.Reset)
+	fprint(w, color)
+	fprintf(w, format, args...)
+	fprint(w, ansi.Reset)
 }
 
 func (c *cli) fmtTemplate(tmpl event.Template, prefix, msg string, glyph string, txtCol, helpCol ansi.ANSI) []string {
