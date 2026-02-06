@@ -28,17 +28,20 @@ func TestImportCapabilities(t *testing.T) {
 	// ---- restricted imports (require explicit capability) ----
 	restrictedImports := []string{
 		"os",
-		"os/exec",
+		"os/*",
 		"runtime",
+		"runtime/*",
 		"syscall",
+		"syscall/*",
 		"net",
-		"net/http",
-		"net/url",
-		"crypto/tls",
+		"net/*",
+		"crypto",
+		"crypto/*",
 
 		"github.com/pkg/sftp",
+		"github.com/pkg/sftp/*",
 		"golang.org/x/crypto/ssh",
-		"golang.org/x/crypto/ssh/agent",
+		"golang.org/x/crypto/ssh/*",
 	}
 
 	allowAll := func() string {
@@ -53,7 +56,7 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "cmd/main.go",
-			allowedImports: "os",
+			allowedImports: "os,os/signal,runtime/debug",
 		},
 		{
 			pattern:        "engine/errors.go",
@@ -69,15 +72,33 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "target/local/posix.go",
+			allowedImports: "os,os/user,syscall",
+		},
+		{
+			pattern:        "target/ssh/errors.go",
+			allowedImports: "golang.org/x/crypto/ssh/knownhosts",
+		},
+		{
+			pattern: "target/ssh/ssh.go",
+			allowedImports: `net,os,
+			golang.org/x/crypto/ssh,
+			golang.org/x/crypto/ssh/agent,
+			golang.org/x/crypto/ssh/knownhosts,
+			github.com/pkg/sftp`,
+		},
+		{
+			pattern: "target/ssh/target.go",
+			allowedImports: `os,
+			golang.org/x/crypto/ssh,
+			github.com/pkg/sftp`,
+		},
+		{
+			pattern:        "osutil/signals_unix.go",
 			allowedImports: "os,syscall",
 		},
 		{
-			pattern:        "target/ssh/*.go",
-			allowedImports: "net,os,golang.org/x/crypto/ssh,golang.org/x/crypto/ssh/agent,github.com/pkg/sftp",
-		},
-		{
-			pattern:        "osutil/*.go",
-			allowedImports: "os,syscall",
+			pattern:        "osutil/signals_windows.go",
+			allowedImports: "os",
 		},
 		{
 			pattern:        "test/harness.go",
@@ -103,6 +124,37 @@ func TestImportCapabilities(t *testing.T) {
 			parts[i] = strings.TrimSpace(parts[i])
 		}
 		return parts
+	}
+
+	// matchImport checks if an import path matches a pattern.
+	// Patterns ending in /* match any sub-import but not the base.
+	// e.g., "os/*" matches "os/exec" but not "os"
+	matchImport := func(pattern, importPath string) bool {
+		if strings.HasSuffix(pattern, "/*") {
+			base := strings.TrimSuffix(pattern, "/*")
+			return strings.HasPrefix(importPath, base+"/")
+		}
+		return pattern == importPath
+	}
+
+	// isRestricted checks if an import matches any restricted pattern
+	isRestricted := func(importPath string) bool {
+		for _, r := range restrictedImports {
+			if matchImport(r, importPath) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// isAllowed checks if an import is allowed by the given allowed list
+	isAllowed := func(importPath string, allowed []string) bool {
+		for _, a := range allowed {
+			if matchImport(a, importPath) {
+				return true
+			}
+		}
+		return false
 	}
 
 	// Track which allowed imports are actually used per rule (by index)
@@ -158,8 +210,8 @@ func TestImportCapabilities(t *testing.T) {
 			}
 
 			// ---- restricted imports need explicit permission ----
-			if slices.Contains(restrictedImports, pathVal) {
-				if !slices.Contains(allowed, pathVal) {
+			if isRestricted(pathVal) {
+				if !isAllowed(pathVal, allowed) {
 					t.Errorf(
 						`illegal import %q in %s (not allowed by capability rules)`,
 						pathVal,
@@ -168,8 +220,10 @@ func TestImportCapabilities(t *testing.T) {
 				} else {
 					// Mark this import as used for all matching rules
 					for _, ruleIdx := range matchingRules {
-						if slices.Contains(splitList(rules[ruleIdx].allowedImports), pathVal) {
-							usedImports[ruleIdx][pathVal] = true
+						for _, allowedPattern := range splitList(rules[ruleIdx].allowedImports) {
+							if matchImport(allowedPattern, pathVal) {
+								usedImports[ruleIdx][allowedPattern] = true
+							}
 						}
 					}
 				}
