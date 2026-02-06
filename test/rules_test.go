@@ -44,7 +44,6 @@ func TestImportCapabilities(t *testing.T) {
 	allowAll := func() string {
 		return strings.Join(restrictedImports, ",")
 	}
-	_ = allowAll
 
 	// ---- capability rules (human-readable policy) ----
 	rules := []capabilityRule{
@@ -106,6 +105,12 @@ func TestImportCapabilities(t *testing.T) {
 		return parts
 	}
 
+	// Track which allowed imports are actually used per rule (by index)
+	usedImports := make([]map[string]bool, len(rules))
+	for i := range rules {
+		usedImports[i] = make(map[string]bool)
+	}
+
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -127,11 +132,13 @@ func TestImportCapabilities(t *testing.T) {
 			return err
 		}
 
-		// compute allowed imports for this file
+		// compute allowed imports for this file and track matching rule indices
 		var allowed []string
-		for _, r := range rules {
+		var matchingRules []int
+		for i, r := range rules {
 			if match, _ := path.Match(r.pattern, rel); match {
 				allowed = append(allowed, splitList(r.allowedImports)...)
+				matchingRules = append(matchingRules, i)
 			}
 		}
 
@@ -151,14 +158,21 @@ func TestImportCapabilities(t *testing.T) {
 			}
 
 			// ---- restricted imports need explicit permission ----
-			if slices.Contains(restrictedImports, pathVal) &&
-				!slices.Contains(allowed, pathVal) {
-
-				t.Errorf(
-					`illegal import %q in %s (not allowed by capability rules)`,
-					pathVal,
-					rel,
-				)
+			if slices.Contains(restrictedImports, pathVal) {
+				if !slices.Contains(allowed, pathVal) {
+					t.Errorf(
+						`illegal import %q in %s (not allowed by capability rules)`,
+						pathVal,
+						rel,
+					)
+				} else {
+					// Mark this import as used for all matching rules
+					for _, ruleIdx := range matchingRules {
+						if slices.Contains(splitList(rules[ruleIdx].allowedImports), pathVal) {
+							usedImports[ruleIdx][pathVal] = true
+						}
+					}
+				}
 			}
 		}
 
@@ -166,5 +180,21 @@ func TestImportCapabilities(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// ---- check for unused allowed imports (excludes allowAll rules) ----
+	for i, r := range rules {
+		if r.allowedImports == allowAll() {
+			continue // skip rules that allow everything
+		}
+		for _, imp := range splitList(r.allowedImports) {
+			if !usedImports[i][imp] {
+				t.Errorf(
+					`unused allowed import %q in rule for %q (remove from allowedImports)`,
+					imp,
+					r.pattern,
+				)
+			}
+		}
 	}
 }
