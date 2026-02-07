@@ -18,6 +18,16 @@ const (
 	sshTestUser = "testuser"
 )
 
+// sharedSSHEnv holds the shared container environment.
+// Initialized by TestMain via startSharedContainer().
+var sharedSSHEnv *SSHTestEnv
+
+// sharedComposeFile is the path to docker-compose.yml for the shared container.
+var sharedComposeFile string
+
+// sharedKnownHostsPath is the path to the temp known_hosts file.
+var sharedKnownHostsPath string
+
 type SSHTestEnv struct {
 	Host    string
 	Port    int
@@ -25,117 +35,130 @@ type SSHTestEnv struct {
 	KeyPath string
 }
 
-// SetupSSHTestEnv starts the SSH container and returns connection details.
-// Call the returned cleanup function when done.
-func SetupSSHTestEnv(t *testing.T) (*SSHTestEnv, func()) {
-	t.Helper()
-
-	// Skip if not running SSH tests
-	if os.Getenv("DOIT_TEST_CONTAINERS") == "" {
-		t.Skip("SSH tests disabled (set DOIT_TEST_CONTAINERS=1 to enable)")
+// startSharedContainer starts the SSH container once for all tests.
+// Called from TestMain.
+func startSharedContainer() error {
+	testDir, err := findTestSSHDirOrErr()
+	if err != nil {
+		return err
 	}
 
-	// Find test directory
-	testDir := findTestSSHDir(t)
 	keyPath := filepath.Join(testDir, "sshd", "testkey")
-
-	// Ensure key exists
 	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-		t.Fatalf("Test key not found at %s - run generate-keys.sh first", keyPath)
+		return fmt.Errorf("test key not found at %s", keyPath)
 	}
+
+	sharedComposeFile = filepath.Join(testDir, "sshd", "docker-compose.yml")
 
 	// Start container
-	composeFile := filepath.Join(testDir, "sshd", "docker-compose.yml")
-	startContainer(t, composeFile)
+	cmd := exec.Command("docker", "compose", "-f", sharedComposeFile, "up", "-d", "--wait")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
 
-	// Wait for SSH to be ready
-	waitForSSH(t, sshTestHost, sshTestPort)
+	// Wait for SSH
+	if err := waitForSSHOrErr(sshTestHost, sshTestPort, 30*time.Second); err != nil {
+		return err
+	}
 
-	// Add host key to known_hosts (for this test only)
-	knownHostsPath := setupKnownHosts(t, sshTestHost, sshTestPort)
+	// Setup known_hosts
+	knownHostsPath, err := setupKnownHostsOrErr(sshTestHost, sshTestPort)
+	if err != nil {
+		return err
+	}
+	sharedKnownHostsPath = knownHostsPath
 
-	env := &SSHTestEnv{
+	sharedSSHEnv = &SSHTestEnv{
 		Host:    sshTestHost,
 		Port:    sshTestPort,
 		User:    sshTestUser,
 		KeyPath: keyPath,
 	}
 
-	cleanup := func() {
-		cmd := exec.Command("docker", "compose", "-f", composeFile, "down", "-v")
-		_ = cmd.Run() // Best effort
-		_ = os.Remove(knownHostsPath)
-	}
-
-	return env, cleanup
+	return nil
 }
 
-func startContainer(t *testing.T, composeFile string) {
-	t.Helper()
-	cmd := exec.Command("docker", "compose", "-f", composeFile, "up", "-d", "--wait")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("Failed to start SSH container: %v", err)
+// stopSharedContainer stops the shared container.
+// Called from TestMain defer.
+func stopSharedContainer() {
+	if sharedComposeFile != "" {
+		cmd := exec.Command("docker", "compose", "-f", sharedComposeFile, "down", "-v")
+		_ = cmd.Run()
+	}
+	if sharedKnownHostsPath != "" {
+		_ = os.Remove(sharedKnownHostsPath)
 	}
 }
 
-func waitForSSH(t *testing.T, host string, port int) {
+// SetupSSHTestEnv returns the shared SSH environment.
+// The container is already running (started by TestMain).
+func SetupSSHTestEnv(t *testing.T) (*SSHTestEnv, func()) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+	if os.Getenv("DOIT_TEST_CONTAINERS") == "" {
+		t.Skip("SSH tests disabled (set DOIT_TEST_CONTAINERS=1 to enable)")
+	}
+
+	if sharedSSHEnv == nil {
+		t.Fatal("sharedSSHEnv not initialized - TestMain should have started container")
+	}
+
+	// No per-test cleanup needed - container stays running
+	return sharedSSHEnv, func() {}
+}
+
+func waitForSSHOrErr(host string, port int, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	for {
 		select {
 		case <-ctx.Done():
-			t.Fatalf("Timeout waiting for SSH at %s", addr)
+			return fmt.Errorf("timeout waiting for SSH at %s", addr)
 		default:
 			conn, err := net.DialTimeout("tcp", addr, time.Second)
 			if err == nil {
 				_ = conn.Close()
-				return
+				return nil
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
 
-func setupKnownHosts(t *testing.T, host string, port int) string {
-	t.Helper()
-
-	// Scan host key
+func setupKnownHostsOrErr(host string, port int) (string, error) {
 	cmd := exec.Command("ssh-keyscan", "-p", fmt.Sprintf("%d", port), host)
 	output, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("Failed to scan host key: %v", err)
+		return "", fmt.Errorf("failed to scan host key: %w", err)
 	}
 
-	// Write to temp known_hosts
 	f, err := os.CreateTemp("", "known_hosts")
 	if err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 	defer func() { _ = f.Close() }()
 
 	if _, err := f.Write(output); err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 
-	return f.Name()
+	return f.Name(), nil
 }
 
-func findTestSSHDir(t *testing.T) string {
-	// Walk up from current dir to find test/sshd
+func findTestSSHDirOrErr() (string, error) {
 	dir, _ := os.Getwd()
 	for {
 		candidate := filepath.Join(dir, "test", "sshd")
 		if _, err := os.Stat(candidate); err == nil {
-			return filepath.Join(dir, "test")
+			return filepath.Join(dir, "test"), nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Fatal("Could not find test/sshd directory")
+			return "", fmt.Errorf("could not find test/sshd directory")
 		}
 		dir = parent
 	}
@@ -158,7 +181,6 @@ func generateTempKey(t *testing.T) string {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
 
-	// Clean up the .pub file too
 	t.Cleanup(func() {
 		_ = os.Remove(keyPath + ".pub")
 	})

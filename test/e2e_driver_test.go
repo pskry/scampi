@@ -172,8 +172,8 @@ func (d *SSHDriver) Available() bool {
 func (d *SSHDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.TargetInstance, func()) {
 	t.Helper()
 
-	// Setup SSH environment (starts container if needed)
-	env, envCleanup := SetupSSHTestEnv(t)
+	// Get shared SSH environment (container already running via TestMain)
+	env, _ := SetupSSHTestEnv(t)
 	d.env = env
 
 	// Connect to SSH
@@ -181,9 +181,20 @@ func (d *SSHDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 
 	ctx := context.Background()
 
-	// Clean up any leftover files from previous runs
-	testPaths := []string{"/tmp/dest.txt", "/tmp/link", "/tmp/dest-a.txt", "/tmp/dest-b.txt"}
-	for _, p := range testPaths {
+	// Clean up any leftover files from previous test runs.
+	// We clean paths that tests commonly use, plus any from initial state.
+	cleanPaths := []string{
+		"/tmp/dest.txt", "/tmp/link", "/tmp/link.txt",
+		"/tmp/dest-a.txt", "/tmp/dest-b.txt",
+		"/tmp/src.txt", "/tmp/target.txt", "/tmp/new-target.txt",
+	}
+	for path := range initial.Files {
+		cleanPaths = append(cleanPaths, path)
+	}
+	for link := range initial.Symlinks {
+		cleanPaths = append(cleanPaths, link)
+	}
+	for _, p := range cleanPaths {
 		_ = d.tgt.Remove(ctx, p)
 	}
 
@@ -213,15 +224,8 @@ func (d *SSHDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 	}
 
 	cleanup := func() {
-		// Clean up test files
-		for path := range initial.Files {
-			_ = d.tgt.Remove(ctx, path)
-		}
-		for link := range initial.Symlinks {
-			_ = d.tgt.Remove(ctx, link)
-		}
+		// Just close the connection - container stays running for next test
 		d.tgt.Close()
-		envCleanup()
 	}
 
 	d.cleanup = cleanup

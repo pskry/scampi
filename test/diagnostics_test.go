@@ -79,7 +79,11 @@ func runDiagnosticsCase(t *testing.T, dir string) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	defer rec.dump(t.Output())
+	defer func() {
+		if t.Failed() {
+			rec.dump(t.Output())
+		}
+	}()
 	assertDiagnostics(t, rec, expect.Diagnostics, cfgPath)
 
 	// AssertTargetUntouched(t, recTgt)

@@ -116,6 +116,10 @@ func TestImportCapabilities(t *testing.T) {
 			pattern:        "test/e2e_driver_test.go",
 			allowedImports: "os",
 		},
+		{
+			pattern:        "test/main_test.go",
+			allowedImports: "os",
+		},
 	}
 
 	splitList := func(s string) []string {
