@@ -16,7 +16,17 @@ func Apply(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *sp
 		return err
 	}
 
-	e, err := New(ctx, src, cfg, em)
+	resolved, err := Resolve(cfg, "", "")
+	if err != nil {
+		if impact, ok := emitEngineDiagnostic(em, cfgPath, err); ok {
+			if impact.ShouldAbort() {
+				return AbortError{Causes: []error{err}}
+			}
+		}
+		return err
+	}
+
+	e, err := New(ctx, src, resolved, em)
 	if err != nil {
 		return err
 	}

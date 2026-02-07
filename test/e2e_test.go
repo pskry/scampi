@@ -132,11 +132,20 @@ func runE2EScenarioWithDriver(t *testing.T, dir string, driver E2EDriver) {
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	// Use the target instance from driver, but override the target
-	cfg.Target = ti
-	cfg.Target.Config = ti.Config
+	// Resolve config to get first deploy block and first target
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		if expect.Error {
+			return // Resolution errors are expected for some tests
+		}
+		t.Fatalf("Resolve failed: %v", err)
+	}
 
-	e, err := engine.NewWithTarget(ctx, src, cfg, em, tgt)
+	// Use the target instance from driver, but override the target
+	resolved.Target = ti
+	resolved.Target.Config = ti.Config
+
+	e, err := engine.NewWithTarget(ctx, src, resolved, em, tgt)
 	if err != nil {
 		t.Fatalf("NewWithTarget failed: %v", err)
 	}

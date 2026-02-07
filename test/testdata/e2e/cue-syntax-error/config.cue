@@ -1,6 +1,10 @@
 package test
 
 // Missing closing brace - syntax error
-steps: [
-	{
-		desc: "broken"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			{
+				desc: "broken"
+

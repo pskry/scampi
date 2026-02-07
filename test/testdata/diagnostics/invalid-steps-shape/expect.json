@@ -2,12 +2,12 @@
   "abort": true,
   "diagnostics": [
     {
-      "id": "core.InvalidStepsShape",
+      "id": "core.TypeMismatch",
       "scope": "ScopeEngine",
       "severity": "Error",
       "kind": "DiagnosticRaised",
       "source": {
-        "line": 3
+        "line": 13
       }
     }
   ]

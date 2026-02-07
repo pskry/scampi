@@ -24,7 +24,7 @@ func TestCheck_RawErrorInOpCheck_PropagatesAndPanics(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -70,7 +70,7 @@ func TestCheck_RawErrorInOpExec_PropagatesAndPanics(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 

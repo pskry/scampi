@@ -398,3 +398,104 @@ func (e UnknownIndexKind) EventTemplate() event.Template {
 
 func (UnknownIndexKind) Severity() signal.Severity { return signal.Error }
 func (UnknownIndexKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+// Resolution errors - emitted when resolving Config to ResolvedConfig
+
+type UnknownDeployBlock struct {
+	Name string
+}
+
+func (e UnknownDeployBlock) Error() string {
+	return fmt.Sprintf("unknown deploy block %q", e.Name)
+}
+
+func (e UnknownDeployBlock) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "config.UnknownDeployBlock",
+		Text: `unknown deploy block "{{.Name}}"`,
+		Hint: "check that the deploy block name is spelled correctly",
+		Data: e,
+	}
+}
+
+func (UnknownDeployBlock) Severity() signal.Severity { return signal.Error }
+func (UnknownDeployBlock) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type NoDeployBlocks struct{}
+
+func (NoDeployBlocks) Error() string {
+	return "no deploy blocks defined"
+}
+
+func (NoDeployBlocks) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "config.NoDeployBlocks",
+		Text: "no deploy blocks defined",
+		Hint: "add at least one deploy block to the configuration",
+	}
+}
+
+func (NoDeployBlocks) Severity() signal.Severity { return signal.Error }
+func (NoDeployBlocks) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type NoTargetsInDeploy struct {
+	Deploy string
+}
+
+func (e NoTargetsInDeploy) Error() string {
+	return fmt.Sprintf("deploy block %q has no targets", e.Deploy)
+}
+
+func (e NoTargetsInDeploy) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "config.NoTargetsInDeploy",
+		Text: `deploy block "{{.Deploy}}" has no targets`,
+		Hint: "add at least one target to the deploy block's targets list",
+		Data: e,
+	}
+}
+
+func (NoTargetsInDeploy) Severity() signal.Severity { return signal.Error }
+func (NoTargetsInDeploy) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type UnknownTarget struct {
+	Name   string
+	Deploy string
+}
+
+func (e UnknownTarget) Error() string {
+	return fmt.Sprintf("unknown target %q referenced in deploy block %q", e.Name, e.Deploy)
+}
+
+func (e UnknownTarget) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "config.UnknownTarget",
+		Text: `unknown target "{{.Name}}" referenced in deploy block "{{.Deploy}}"`,
+		Hint: "check that the target is defined in the targets map",
+		Data: e,
+	}
+}
+
+func (UnknownTarget) Severity() signal.Severity { return signal.Error }
+func (UnknownTarget) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type TargetNotInDeploy struct {
+	Target string
+	Deploy string
+}
+
+func (e TargetNotInDeploy) Error() string {
+	return fmt.Sprintf("target %q is not in deploy block %q's target list", e.Target, e.Deploy)
+}
+
+func (e TargetNotInDeploy) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "config.TargetNotInDeploy",
+		Text: `target "{{.Target}}" is not in deploy block "{{.Deploy}}"'s target list`,
+		Hint: "add the target to the deploy block's targets list or select a different target",
+		Data: e,
+	}
+}
+
+func (TargetNotInDeploy) Severity() signal.Severity { return signal.Error }
+func (TargetNotInDeploy) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

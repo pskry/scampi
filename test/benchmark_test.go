@@ -47,18 +47,27 @@ import (
 	"godoit.dev/doit/builtin"
 )
 
-steps: [
-  for i in list.Range(0, %d, 1) {
-    builtin.copy & {
-      desc:  "step-\(i)"
-      src:   "/tmp/src-\(i)"
-      dest:  "/tmp/dest-\(i)"
-      perm:  "0644"
-      owner: "user"
-      group: "group"
-    }
+targets: {
+  local: builtin.local
+}
+
+deploy: {
+  bench: {
+    targets: ["local"]
+    steps: [
+      for i in list.Range(0, %d, 1) {
+        builtin.copy & {
+          desc:  "step-\(i)"
+          src:   "/tmp/src-\(i)"
+          dest:  "/tmp/dest-\(i)"
+          perm:  "0644"
+          owner: "user"
+          group: "group"
+        }
+      }
+    ]
   }
-]
+}
 `, size)
 			cfgPath := absPath(filepath.Join(tmp, "config.cue"))
 			writeOrDie(cfgPath, []byte(cfg), 0o644)
@@ -112,18 +121,27 @@ import (
 	"godoit.dev/doit/builtin"
 )
 
-steps: [
-	for i in list.Range(0, %d, 1) {
-		builtin.copy & {
-			desc:  "step-\(i)"
-			src:   "/src.txt"
-			dest:  "/dest.txt"
-			perm:  "0644"
-			owner: "perf-owner"
-			group: "perf-group"
-		}
+targets: {
+	local: builtin.local
+}
+
+deploy: {
+	bench: {
+		targets: ["local"]
+		steps: [
+			for i in list.Range(0, %d, 1) {
+				builtin.copy & {
+					desc:  "step-\(i)"
+					src:   "/src.txt"
+					dest:  "/dest.txt"
+					perm:  "0644"
+					owner: "perf-owner"
+					group: "perf-group"
+				}
+			}
+		]
 	}
-]
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -144,9 +162,14 @@ steps: [
 					b.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 				}
 
-				cfg.Target = mockTargetInstance(tgt)
+				resolved, err := engine.Resolve(cfg, "", "")
+				if err != nil {
+					b.Fatalf("engine.Resolve() must not return error, got %v", err)
+				}
 
-				e, err := engine.New(ctx, src, cfg, noopEmitter{})
+				resolved.Target = mockTargetInstance(tgt)
+
+				e, err := engine.New(ctx, src, resolved, noopEmitter{})
 				if err != nil {
 					b.Fatalf("engine.New() must not return error, got %v", err)
 				}
@@ -176,15 +199,24 @@ import (
 	"godoit.dev/doit/builtin"
 )
 
-steps: [
-	for i in list.Range(0, %d, 1) {
-		builtin.symlink & {
-			desc:   "symlink-\(i)"
-			target: "/target.txt"
-			link:   "/link.txt"
-		}
+targets: {
+	local: builtin.local
+}
+
+deploy: {
+	bench: {
+		targets: ["local"]
+		steps: [
+			for i in list.Range(0, %d, 1) {
+				builtin.symlink & {
+					desc:   "symlink-\(i)"
+					target: "/target.txt"
+					link:   "/link.txt"
+				}
+			}
+		]
 	}
-]
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -204,7 +236,12 @@ steps: [
 					b.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 				}
 
-				e, err := engine.New(ctx, source.LocalPosixSource{}, cfg, noopEmitter{})
+				resolved, err := engine.Resolve(cfg, "", "")
+				if err != nil {
+					b.Fatalf("engine.Resolve() must not return error, got %v", err)
+				}
+
+				e, err := engine.New(ctx, source.LocalPosixSource{}, resolved, noopEmitter{})
 				if err != nil {
 					b.Fatalf("engine.New() must not return error, got %v", err)
 				}
@@ -227,7 +264,7 @@ func BenchmarkApplyNoOp_Mixed(b *testing.B) {
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
 			// Half copy, half symlink
-			cfg := fmt.Sprintf(`
+			cfgStr := fmt.Sprintf(`
 package bench
 
 import (
@@ -235,32 +272,41 @@ import (
 	"godoit.dev/doit/builtin"
 )
 
-steps: [
-	for i in list.Range(0, %d, 1) {
-		builtin.copy & {
-			desc:  "copy-\(i)"
-			src:   "/src.txt"
-			dest:  "/dest.txt"
-			perm:  "0644"
-			owner: "perf-owner"
-			group: "perf-group"
-		}
-	},
-	for i in list.Range(0, %d, 1) {
-		builtin.symlink & {
-			desc:   "symlink-\(i)"
-			target: "/target.txt"
-			link:   "/link.txt"
-		}
+targets: {
+	local: builtin.local
+}
+
+deploy: {
+	bench: {
+		targets: ["local"]
+		steps: [
+			for i in list.Range(0, %d, 1) {
+				builtin.copy & {
+					desc:  "copy-\(i)"
+					src:   "/src.txt"
+					dest:  "/dest.txt"
+					perm:  "0644"
+					owner: "perf-owner"
+					group: "perf-group"
+				}
+			},
+			for i in list.Range(0, %d, 1) {
+				builtin.symlink & {
+					desc:   "symlink-\(i)"
+					target: "/target.txt"
+					link:   "/link.txt"
+				}
+			}
+		]
 	}
-]
+}
 `, size, size)
 
 			src := source.NewMemSource()
 			tgt := target.NewMemTarget()
 
 			src.Files["/src.txt"] = []byte("hello")
-			src.Files["/config.cue"] = []byte(cfg)
+			src.Files["/config.cue"] = []byte(cfgStr)
 			tgt.Files["/dest.txt"] = []byte("hello")
 			tgt.Symlinks["/link.txt"] = "/target.txt"
 
@@ -274,7 +320,12 @@ steps: [
 					b.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 				}
 
-				e, err := engine.New(ctx, source.LocalPosixSource{}, cfg, noopEmitter{})
+				resolved, err := engine.Resolve(cfg, "", "")
+				if err != nil {
+					b.Fatalf("engine.Resolve() must not return error, got %v", err)
+				}
+
+				e, err := engine.New(ctx, source.LocalPosixSource{}, resolved, noopEmitter{})
 				if err != nil {
 					b.Fatalf("engine.New() must not return error, got %v", err)
 				}

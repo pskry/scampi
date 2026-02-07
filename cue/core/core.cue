@@ -2,11 +2,20 @@ package core
 
 import "godoit.dev/doit/builtin"
 
-unit?: close({
-	id!:   string
-	desc?: string
-})
+// targets defines available execution environments by name
+targets: {
+	[string]: builtin.#BuiltinTarget
+}
 
-target: builtin.#BuiltinTarget
+// deploy defines what runs where
+deploy: {
+	[string]: #DeployBlock
+}
 
-steps: [...builtin.#BuiltinStep]
+#DeployBlock: {
+	// targets lists target names from the targets map
+	targets: [...string]
+
+	// steps defines the ordered sequence of operations
+	steps: [...builtin.#BuiltinStep]
+}

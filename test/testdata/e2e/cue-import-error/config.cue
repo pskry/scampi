@@ -1,11 +1,19 @@
 package test
 
 import "godoit.dev/doit/nonexistent"
+import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	nonexistent.step & {
-		desc: "broken"
-	},
-]
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			nonexistent.step & {
+				desc: "broken"
+			},
+		]
+	}
+}

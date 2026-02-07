@@ -52,9 +52,14 @@ func runDiagnosticsCase(t *testing.T, dir string) {
 			return err
 		}
 
-		cfg.Target = mockTargetInstance(tgt)
+		resolved, err := engine.Resolve(cfg, "", "")
+		if err != nil {
+			return err
+		}
 
-		e, err := engine.New(ctx, src, cfg, em)
+		resolved.Target = mockTargetInstance(tgt)
+
+		e, err := engine.New(ctx, src, resolved, em)
 		if err != nil {
 			return err
 		}

@@ -46,7 +46,7 @@ func TestCheck_NonAbortingDiagnostics_DoNotAbort(t *testing.T) {
 		},
 	}
 
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(local.POSIXTarget{}),
 	}
 
@@ -128,7 +128,7 @@ func TestCheck_NonAbortDiagnostic_AllowsSiblingOps(t *testing.T) {
 		},
 	}
 
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(local.POSIXTarget{}),
 	}
 
@@ -183,7 +183,7 @@ func TestCheck_AbortDiagnostic_StopsSiblingOps(t *testing.T) {
 		},
 	}
 
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(local.POSIXTarget{}),
 	}
 
@@ -233,7 +233,7 @@ func TestCheck_AbortDiagnostic_StopsActionExecution(t *testing.T) {
 		},
 	}
 
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(local.POSIXTarget{}),
 	}
 
@@ -293,7 +293,7 @@ func TestCheck_NonAbortDiagnostic_AllowsSiblingExecution(t *testing.T) {
 		},
 	}
 
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(local.POSIXTarget{}),
 	}
 
@@ -357,7 +357,7 @@ func TestExecute_FailedOp_BlocksDependentOps(t *testing.T) {
 		},
 	}
 
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(local.POSIXTarget{}),
 	}
 

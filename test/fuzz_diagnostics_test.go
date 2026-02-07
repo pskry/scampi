@@ -19,26 +19,33 @@ func FuzzDiagnostics(f *testing.F) {
 	seeds := []string{
 		// minimal valid-ish
 		`package fuzz
-steps: []`,
+import "godoit.dev/doit/builtin"
+targets: { local: builtin.local }
+deploy: { test: { targets: ["local"], steps: [] } }`,
 
 		// invalid steps shape
 		`package fuzz
-steps: {}`,
+import "godoit.dev/doit/builtin"
+targets: { local: builtin.local }
+deploy: { test: { targets: ["local"], steps: {} } }`,
 
 		// missing copy fields
 		`package fuzz
 import "godoit.dev/doit/builtin"
-steps: [builtin.copy & { src: "a", dest: "b" }]`,
+targets: { local: builtin.local }
+deploy: { test: { targets: ["local"], steps: [builtin.copy & { src: "a", dest: "b" }] } }`,
+
+		// missing symlink fields
+		`package fuzz
+import "godoit.dev/doit/builtin"
+targets: { local: builtin.local }
+deploy: { test: { targets: ["local"], steps: [builtin.symlink & { target: "a" }] } }`,
 
 		// missing template fields
 		`package fuzz
 import "godoit.dev/doit/builtin"
-steps: [builtin.symlink & { target: "a" }]`,
-
-		// missing template fields
-		`package fuzz
-import "godoit.dev/doit/builtin"
-steps: [builtin.template & { src: "a", dest: "b" }]`,
+targets: { local: builtin.local }
+deploy: { test: { targets: ["local"], steps: [builtin.template & { src: "a", dest: "b" }] } }`,
 
 		// garbage
 		`this is not cue`,
@@ -77,9 +84,14 @@ steps: [builtin.template & { src: "a", dest: "b" }]`,
 				return err
 			}
 
-			cfg.Target = mockTargetInstance(tgt)
+			resolved, err := engine.Resolve(cfg, "", "")
+			if err != nil {
+				return err
+			}
 
-			e, err := engine.New(ctx, src, cfg, em)
+			resolved.Target = mockTargetInstance(tgt)
+
+			e, err := engine.New(ctx, src, resolved, em)
 			if err != nil {
 				return err
 			}
@@ -90,9 +102,15 @@ steps: [builtin.template & { src: "a", dest: "b" }]`,
 
 		err := apply()
 		// ---- Error classification invariant ----
+		// All errors should be either:
+		// 1. AbortError (from engine execution)
+		// 2. Diagnostic with ImpactAbort (from config loading/resolution)
 		if err != nil {
 			var abort engine.AbortError
-			if !errors.As(err, &abort) {
+			var diag diagnostic.Diagnostic
+			isAbortError := errors.As(err, &abort)
+			isAbortDiagnostic := errors.As(err, &diag) && diag.Impact() == diagnostic.ImpactAbort
+			if !isAbortError && !isAbortDiagnostic {
 				t.Fatalf("unexpected error type %T: %v", err, err)
 			}
 		}

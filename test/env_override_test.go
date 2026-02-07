@@ -20,14 +20,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     string @env(SSH_HOST)
-	port:     22
-	user:     "testuser"
-	insecure: true
+targets: {
+	remote: builtin.ssh & {
+		host:     string @env(SSH_HOST)
+		port:     22
+		user:     "testuser"
+		insecure: true
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -44,9 +51,9 @@ steps: []
 	}
 
 	// Verify the env value was applied to the SSH config
-	sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+	sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 	if !ok {
-		t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+		t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 	}
 	if sshCfg.Host != "test.example.com" {
 		t.Errorf("expected host=test.example.com, got %q", sshCfg.Host)
@@ -61,14 +68,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     "localhost"
-	port:     2222 @env(SSH_PORT)
-	user:     "testuser"
-	insecure: true
+targets: {
+	remote: builtin.ssh & {
+		host:     "localhost"
+		port:     2222 @env(SSH_PORT)
+		user:     "testuser"
+		insecure: true
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -84,9 +98,9 @@ steps: []
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+	sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 	if !ok {
-		t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+		t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 	}
 	if sshCfg.Port != 3333 {
 		t.Errorf("expected port=3333, got %d", sshCfg.Port)
@@ -101,14 +115,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     "localhost"
-	port:     2222 @env(SSH_PORT)
-	user:     "testuser"
-	insecure: true
+targets: {
+	remote: builtin.ssh & {
+		host:     "localhost"
+		port:     2222 @env(SSH_PORT)
+		user:     "testuser"
+		insecure: true
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -124,9 +145,9 @@ steps: []
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+	sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 	if !ok {
-		t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+		t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 	}
 	if sshCfg.Port != 2222 {
 		t.Errorf("expected port=2222 (config value), got %d", sshCfg.Port)
@@ -141,14 +162,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     *"default.host.com" | string @env(SSH_HOST)
-	port:     22
-	user:     "testuser"
-	insecure: true
+targets: {
+	remote: builtin.ssh & {
+		host:     *"default.host.com" | string @env(SSH_HOST)
+		port:     22
+		user:     "testuser"
+		insecure: true
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	t.Run("env not set uses default", func(t *testing.T) {
 		src := source.NewMemSource()
@@ -165,9 +193,9 @@ steps: []
 			t.Fatalf("LoadConfig failed: %v", err)
 		}
 
-		sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+		sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 		if !ok {
-			t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+			t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 		}
 		if sshCfg.Host != "default.host.com" {
 			t.Errorf("expected host=default.host.com, got %q", sshCfg.Host)
@@ -189,9 +217,9 @@ steps: []
 			t.Fatalf("LoadConfig failed: %v", err)
 		}
 
-		sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+		sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 		if !ok {
-			t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+			t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 		}
 		if sshCfg.Host != "env.host.com" {
 			t.Errorf("expected host=env.host.com, got %q", sshCfg.Host)
@@ -207,14 +235,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     string @env(SSH_HOST)
-	port:     22
-	user:     "testuser"
-	insecure: true
+targets: {
+	remote: builtin.ssh & {
+		host:     string @env(SSH_HOST)
+		port:     22
+		user:     "testuser"
+		insecure: true
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -258,14 +293,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     "localhost"
-	port:     int @env(SSH_PORT)
-	user:     "testuser"
-	insecure: true
+targets: {
+	remote: builtin.ssh & {
+		host:     "localhost"
+		port:     int @env(SSH_PORT)
+		user:     "testuser"
+		insecure: true
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -291,14 +333,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     "localhost"
-	port:     22
-	user:     "testuser"
-	insecure: bool @env(SSH_INSECURE)
+targets: {
+	remote: builtin.ssh & {
+		host:     "localhost"
+		port:     22
+		user:     "testuser"
+		insecure: bool @env(SSH_INSECURE)
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -314,9 +363,9 @@ steps: []
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+	sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 	if !ok {
-		t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+		t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 	}
 	if !sshCfg.Insecure {
 		t.Error("expected insecure=true")
@@ -330,14 +379,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     "localhost"
-	port:     22
-	user:     "testuser"
-	insecure: true @env(SSH_INSECURE)
+targets: {
+	remote: builtin.ssh & {
+		host:     "localhost"
+		port:     22
+		user:     "testuser"
+		insecure: true @env(SSH_INSECURE)
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -353,9 +409,9 @@ steps: []
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+	sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 	if !ok {
-		t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+		t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 	}
 	if sshCfg.Insecure {
 		t.Error("expected insecure=false (env override)")
@@ -369,14 +425,21 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.ssh & {
-	host:     string @env(SSH_HOST)
-	port:     int    @env(SSH_PORT)
-	user:     string @env(SSH_USER)
-	insecure: true
+targets: {
+	remote: builtin.ssh & {
+		host:     string @env(SSH_HOST)
+		port:     int    @env(SSH_PORT)
+		user:     string @env(SSH_USER)
+		insecure: true
+	}
 }
 
-steps: []
+deploy: {
+	test: {
+		targets: ["remote"]
+		steps: []
+	}
+}
 `
 	src := source.NewMemSource()
 	src.Files["/config.cue"] = []byte(cfgStr)
@@ -394,9 +457,9 @@ steps: []
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	sshCfg, ok := cfg.Target.Config.(*ssh.Config)
+	sshCfg, ok := cfg.Targets["remote"].Config.(*ssh.Config)
 	if !ok {
-		t.Fatalf("expected *ssh.Config, got %T", cfg.Target.Config)
+		t.Fatalf("expected *ssh.Config, got %T", cfg.Targets["remote"].Config)
 	}
 
 	if sshCfg.Host != "multi.test.com" {

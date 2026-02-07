@@ -14,6 +14,40 @@ import (
 	"godoit.dev/doit/target"
 )
 
+// loadAndResolve is a helper for integration tests that loads config and resolves
+// with a mock target.
+func loadAndResolve(
+	t *testing.T,
+	cfgStr string,
+	src source.Source,
+	tgt target.Target,
+	em diagnostic.Emitter,
+	store *spec.SourceStore,
+) (*engine.Engine, error) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	memSrc, ok := src.(*source.MemSource)
+	if ok {
+		memSrc.Files["/config.cue"] = []byte(cfgStr)
+	}
+
+	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	if err != nil {
+		return nil, err
+	}
+
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	resolved.Target = mockTargetInstance(tgt)
+
+	return engine.New(ctx, src, resolved, em)
+}
+
 // TestIntegration_FullFlow tests the complete engine flow from config loading
 // through execution using in-memory source and target.
 func TestIntegration_FullFlow(t *testing.T) {
@@ -22,44 +56,42 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "copy-test"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "0644"
-		owner: "testuser"
-		group: "testgroup"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "copy-test"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "0644"
+				owner: "testuser"
+				group: "testgroup"
+			}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
 
 	src.Files["/src.txt"] = []byte("test content")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err != nil {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
@@ -99,24 +131,30 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "idempotent-copy"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "0644"
-		owner: "owner"
-		group: "group"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "idempotent-copy"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "0644"
+				owner: "owner"
+				group: "group"
+			}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
 
 	src.Files["/src.txt"] = []byte("content")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	// Pre-populate target with matching state
 	tgt.Files["/dest.txt"] = []byte("content")
@@ -127,21 +165,13 @@ steps: [
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err != nil {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
@@ -183,53 +213,51 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "copy-1"
-		src:   "/src-a.txt"
-		dest:  "/dest-a.txt"
-		perm:  "0644"
-		owner: "user"
-		group: "group"
-	},
-	builtin.copy & {
-		desc:  "copy-2"
-		src:   "/src-b.txt"
-		dest:  "/dest-b.txt"
-		perm:  "0600"
-		owner: "user"
-		group: "group"
-	},
-]
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "copy-1"
+				src:   "/src-a.txt"
+				dest:  "/dest-a.txt"
+				perm:  "0644"
+				owner: "user"
+				group: "group"
+			},
+			builtin.copy & {
+				desc:  "copy-2"
+				src:   "/src-b.txt"
+				dest:  "/dest-b.txt"
+				perm:  "0600"
+				owner: "user"
+				group: "group"
+			},
+		]
+	}
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
 
 	src.Files["/src-a.txt"] = []byte("file A")
 	src.Files["/src-b.txt"] = []byte("file B")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err != nil {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
@@ -270,25 +298,31 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "will-fail"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "0644"
-		owner: "user"
-		group: "group"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "will-fail"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "0644"
+				owner: "user"
+				group: "group"
+			}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	innerTgt := target.NewMemTarget()
 	tgt := newFaultyTarget(innerTgt)
 
 	src.Files["/src.txt"] = []byte("content")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	// Inject write failure
 	writeErr := errors.New("disk full")
@@ -298,21 +332,13 @@ steps: [
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	// Should fail with AbortError
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -332,18 +358,25 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "source-fail"
-		src:   "/missing.txt"
-		dest:  "/dest.txt"
-		perm:  "0644"
-		owner: "user"
-		group: "group"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "source-fail"
+				src:   "/missing.txt"
+				dest:  "/dest.txt"
+				perm:  "0644"
+				owner: "user"
+				group: "group"
+			}
+		]
 	}
-]
+}
 `
 	innerSrc := source.NewMemSource()
 	src := newFaultySource(innerSrc)
@@ -366,9 +399,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -388,26 +426,33 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "first-fails"
-		src:   "/src-a.txt"
-		dest:  "/dest-a.txt"
-		perm:  "0644"
-		owner: "user"
-		group: "group"
-	},
-	builtin.copy & {
-		desc:  "never-runs"
-		src:   "/src-b.txt"
-		dest:  "/dest-b.txt"
-		perm:  "0644"
-		owner: "user"
-		group: "group"
-	},
-]
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "first-fails"
+				src:   "/src-a.txt"
+				dest:  "/dest-a.txt"
+				perm:  "0644"
+				owner: "user"
+				group: "group"
+			},
+			builtin.copy & {
+				desc:  "never-runs"
+				src:   "/src-b.txt"
+				dest:  "/dest-b.txt"
+				perm:  "0644"
+				owner: "user"
+				group: "group"
+			},
+		]
+	}
+}
 `
 	src := source.NewMemSource()
 	innerTgt := target.NewMemTarget()
@@ -415,7 +460,6 @@ steps: [
 
 	src.Files["/src-a.txt"] = []byte("A")
 	src.Files["/src-b.txt"] = []byte("B")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	// First write fails
 	tgt.injectFault("WriteFile", "/dest-a.txt", errors.New("write failed"))
@@ -424,21 +468,13 @@ steps: [
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -470,24 +506,30 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "update-content"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "0644"
-		owner: "user"
-		group: "group"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "update-content"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "0644"
+				owner: "user"
+				group: "group"
+			}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
 
 	src.Files["/src.txt"] = []byte("new content")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	// Pre-populate target with OLD content
 	tgt.Files["/dest.txt"] = []byte("old content")
@@ -498,21 +540,13 @@ steps: [
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err != nil {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
@@ -550,24 +584,30 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "update-mode"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "0755"
-		owner: "user"
-		group: "group"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "update-mode"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "0755"
+				owner: "user"
+				group: "group"
+			}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
 
 	src.Files["/src.txt"] = []byte("content")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	// Pre-populate target with correct content but WRONG mode
 	tgt.Files["/dest.txt"] = []byte("content")
@@ -578,21 +618,13 @@ steps: [
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err != nil {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
@@ -612,24 +644,30 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "update-owner"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "0644"
-		owner: "newuser"
-		group: "newgroup"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "update-owner"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "0644"
+				owner: "newuser"
+				group: "newgroup"
+			}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
 
 	src.Files["/src.txt"] = []byte("content")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	// Pre-populate target with correct content and mode but WRONG owner
 	tgt.Files["/dest.txt"] = []byte("content")
@@ -640,21 +678,13 @@ steps: [
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err != nil {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
@@ -673,25 +703,31 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "retry-test"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "0644"
-		owner: "user"
-		group: "group"
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "retry-test"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "0644"
+				owner: "user"
+				group: "group"
+			}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	innerTgt := target.NewMemTarget()
 	tgt := newFaultyTarget(innerTgt)
 
 	src.Files["/src.txt"] = []byte("content")
-	src.Files["/config.cue"] = []byte(cfgStr)
 
 	// First attempt: inject fault
 	tgt.injectFault("WriteFile", "/dest.txt", errors.New("temporary failure"))
@@ -700,21 +736,13 @@ steps: [
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
-	}
-
-	cfg.Target = mockTargetInstance(tgt)
-
-	e, err := engine.New(ctx, src, cfg, em)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
 	defer e.Close()
 
-	err = e.Apply(ctx)
+	err = e.Apply(context.Background())
 	if err == nil {
 		t.Fatal("first attempt should fail")
 	}
@@ -726,21 +754,13 @@ steps: [
 	em2 := diagnostic.NewEmitter(diagnostic.Policy{}, rec2)
 	store2 := spec.NewSourceStore()
 
-	ctx2 := context.Background()
-	cfg2, err := engine.LoadConfig(ctx2, em2, "/config.cue", store2, src)
+	e2, err := loadAndResolve(t, cfgStr, src, tgt, em2, store2)
 	if err != nil {
-		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
+		t.Fatalf("setup failed: %v", err)
 	}
+	defer e2.Close()
 
-	cfg2.Target = mockTargetInstance(tgt)
-
-	e2, err := engine.New(ctx, src, cfg2, em2)
-	if err != nil {
-		t.Fatalf("engine.New() must not return error, got %v", err)
-	}
-	defer e.Close()
-
-	err = e2.Apply(ctx2)
+	err = e2.Apply(context.Background())
 	if err != nil {
 		t.Fatalf("second attempt should succeed: %v", err)
 	}

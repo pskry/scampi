@@ -2,15 +2,22 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
-	builtin.copy & {
-		desc:  "copy with bad permission"
-		src:   "/src.txt"
-		dest:  "/dest.txt"
-		perm:  "invalid"
-		owner: "testuser"
-		group: "testgroup"
-	},
-]
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
+			builtin.copy & {
+				desc:  "copy with bad permission"
+				src:   "/src.txt"
+				dest:  "/dest.txt"
+				perm:  "invalid"
+				owner: "testuser"
+				group: "testgroup"
+			},
+		]
+	}
+}

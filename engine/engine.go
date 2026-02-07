@@ -12,11 +12,11 @@ import (
 type Engine struct {
 	src source.Source
 	tgt target.Target
-	cfg spec.Config
+	cfg spec.ResolvedConfig
 	em  diagnostic.Emitter
 }
 
-func New(ctx context.Context, src source.Source, cfg spec.Config, em diagnostic.Emitter) (*Engine, error) {
+func New(ctx context.Context, src source.Source, cfg spec.ResolvedConfig, em diagnostic.Emitter) (*Engine, error) {
 	tgt, err := cfg.Target.Type.Create(ctx, src, cfg.Target)
 	if err != nil {
 		if impact, ok := emitEngineDiagnostic(em, cfg.Path, err); ok {
@@ -40,7 +40,7 @@ func New(ctx context.Context, src source.Source, cfg spec.Config, em diagnostic.
 func NewWithTarget(
 	_ context.Context,
 	src source.Source,
-	cfg spec.Config,
+	cfg spec.ResolvedConfig,
 	em diagnostic.Emitter,
 	tgt target.Target,
 ) (*Engine, error) {

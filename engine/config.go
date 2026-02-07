@@ -9,7 +9,6 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -154,9 +153,8 @@ func (s sourceFS) Open(name string) (fs.File, error) {
 }
 
 const (
-	cueUnit    = "unit"
-	cueUnitID  = "id"
-	cueTarget  = "target"
+	cueTargets = "targets"
+	cueDeploy  = "deploy"
 	cueSteps   = "steps"
 	cueAttrEnv = "env"
 )
@@ -325,7 +323,6 @@ func loadConfigWithSourceUnsafe(
 	if err := cfgVal.Err(); err != nil {
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
-			// unexpected validation failure → engine error
 			panic(errs.BUG(
 				"load.Unify failed with an unaccounted-for error-type %T: %w",
 				err,
@@ -333,20 +330,6 @@ func loadConfigWithSourceUnsafe(
 			))
 		}
 
-		if isErrorWithPath(ce, cueSteps) {
-			return spec.Config{}, InvalidStepsShape{
-				Source: getStepsUnifyErrorSpan(ce, userInst),
-				Have:   describeCueValueShape(userInst, cueSteps),
-				Want:   describeCueSchemaShape(coreInst, cueSteps),
-			}
-		}
-		if isErrorWithPath(ce, cueUnit) {
-			return spec.Config{}, InvalidUnitShape{
-				Source: getStepsUnifyErrorSpan(ce, userInst),
-				Have:   describeCueValueShape(userInst, cueUnit),
-				Want:   describeCueSchemaShape(coreInst, cueUnit),
-			}
-		}
 		if path, ok := isTypeMismatchError(ce); ok {
 			return spec.Config{}, TypeMismatch{
 				Source: getErrorPathSpan(ce, userInst),
@@ -364,70 +347,87 @@ func loadConfigWithSourceUnsafe(
 
 	userFile := userInstance.Files[0]
 
-	// decode unit
-	// ----------------------------------------------------------------------------
-	unitInst, err := decodeUnit(cfgVal, cfgPath, userFile, em)
-	if err != nil {
-		return spec.Config{}, err
-	}
-
-	// decode steps
-	// ----------------------------------------------------------------------------
-	tgtInst, err := decodeTarget(cfgVal, userFile, reg, src)
-	if err != nil {
-		return spec.Config{}, err
-	}
-
-	// decode steps
-	// ----------------------------------------------------------------------------
-	stepsVal := cfgVal.LookupPath(cue.ParsePath(cueSteps))
-	if err := stepsVal.Err(); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.LookupStepsPath failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.LookupStepsPath",
-		}
-	}
-
-	iter, err := stepsVal.List()
-	if err != nil {
-		panic(errs.BUG("steps is not a list after schema unification: %w", err))
-	}
-
 	cfgPath, err = filepath.Abs(cfgPath)
 	if err != nil {
 		panic(errs.BUG("filepath.Abs() failed: %w", err))
 	}
 
 	cfg := spec.Config{
-		Path:   cfgPath,
-		Unit:   unitInst,
-		Target: tgtInst,
+		Path:    cfgPath,
+		Targets: make(map[string]spec.TargetInstance),
+		Deploy:  make(map[string]spec.DeployBlock),
 	}
-	var sawAbort bool
-	for iter.Next() {
-		idx := iter.Selector().Index()
-		stepVal := iter.Value()
-		stepSpan, fields := extractStepFieldSpansFromFile(userFile, idx)
 
-		si, decRes := decodeStep(stepVal, idx, reg, em, stepSpan, fields)
-		if decRes.abort {
+	// decode targets map
+	// ----------------------------------------------------------------------------
+	targetsVal := cfgVal.LookupPath(cue.ParsePath(cueTargets))
+	if err := targetsVal.Err(); err != nil {
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(errs.BUG(
+				"load.LookupTargetsPath failed with an unaccounted-for error-type %T: %w",
+				err,
+				err,
+			))
+		}
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.LookupTargetsPath",
+		}
+	}
+
+	targetsIter, err := targetsVal.Fields()
+	if err != nil {
+		panic(errs.BUG("targets is not a struct after schema unification: %w", err))
+	}
+
+	for targetsIter.Next() {
+		targetName := targetsIter.Selector().String()
+		targetVal := targetsIter.Value()
+
+		tgtInst, err := decodeTargetValue(targetVal, userFile, targetName, reg, src)
+		if err != nil {
+			return spec.Config{}, err
+		}
+		cfg.Targets[targetName] = tgtInst
+	}
+
+	// decode deploy blocks
+	// ----------------------------------------------------------------------------
+	deployVal := cfgVal.LookupPath(cue.ParsePath(cueDeploy))
+	if err := deployVal.Err(); err != nil {
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(errs.BUG(
+				"load.LookupDeployPath failed with an unaccounted-for error-type %T: %w",
+				err,
+				err,
+			))
+		}
+		return spec.Config{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "load.LookupDeployPath",
+		}
+	}
+
+	deployIter, err := deployVal.Fields()
+	if err != nil {
+		panic(errs.BUG("deploy is not a struct after schema unification: %w", err))
+	}
+
+	var sawAbort bool
+	for deployIter.Next() {
+		blockName := deployIter.Selector().String()
+		blockVal := deployIter.Value()
+
+		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, userFile, reg, em)
+		if err != nil {
+			return spec.Config{}, err
+		}
+		if blockAbort {
 			sawAbort = true
 		}
-
-		if !decRes.ok {
-			continue
-		}
-
-		cfg.Steps = append(cfg.Steps, si)
+		cfg.Deploy[blockName] = block
 	}
 
 	if sawAbort {
@@ -435,224 +435,6 @@ func loadConfigWithSourceUnsafe(
 	}
 
 	return cfg, nil
-}
-
-func decodeUnit(
-	cfgVal cue.Value,
-	cfgPath string,
-	userFile *ast.File,
-	em diagnostic.Emitter,
-) (spec.UnitInstance, error) {
-	unitVal := cfgVal.LookupPath(cue.ParsePath(cueUnit))
-	if err := unitVal.Err(); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			// unexpected validation failure → engine error
-			panic(errs.BUG(
-				"load.LookupUnitPath failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-
-		// if no unit is defined, we just default to "anonymous unit"
-		if strings.Contains(ce.Error(), "field not found") {
-			// return spec.UnitInstance{
-			// 	ID:   "anonymous",
-			// 	Desc: "automatically generated anonymous unit",
-			// }, nil
-			return spec.UnitInstance{}, nil
-		}
-
-		return spec.UnitInstance{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.LookupUnitPath",
-		}
-	}
-
-	// Validate
-	// ------------------------------------------------------------
-	if err := unitVal.Validate(cue.Concrete(true), cue.All()); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.ValidateUnit failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-
-		if isUnitRequiredFieldError(ce) {
-			span := extractSpanFromFile(userFile, cueUnit)
-
-			missing := findMissingRequiredFields(ce, unitVal, span)
-			if len(missing) > 0 {
-				var abort bool
-				for _, m := range missing {
-					impact, _ := emitEngineDiagnostic(em, cfgPath, MissingFieldDiagnostic{Missing: m})
-					if impact.ShouldAbort() {
-						abort = true
-					}
-				}
-				if abort {
-					return spec.UnitInstance{}, AbortError{Causes: []error{err}}
-				}
-			}
-
-			impact, _ := emitEngineDiagnostic(em, cfgPath, CueDiagnostic{
-				Err:   ce,
-				Phase: "decode",
-			})
-
-			if impact.ShouldAbort() {
-				return spec.UnitInstance{}, AbortError{Causes: []error{err}}
-			}
-			return spec.UnitInstance{}, nil
-		}
-
-		return spec.UnitInstance{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.ValidateUnit",
-		}
-
-	}
-
-	// Decode
-	// ------------------------------------------------------------
-	var unitInst spec.UnitInstance
-	if err := unitVal.Decode(&unitInst); err != nil {
-		// If Validate passed, Decode MUST NOT fail.
-		// This is a hard invariant violation.
-		panic(errs.BUG(
-			"unitVal.Decode failed after successful validation: %w",
-			err,
-		))
-	}
-
-	return unitInst, nil
-}
-
-func decodeTarget(
-	cfgVal cue.Value,
-	userFile *ast.File,
-	reg *Registry,
-	src source.Source,
-) (spec.TargetInstance, error) {
-	// Resolve target kind
-	// ------------------------------------------------------------
-	targetVal := cfgVal.LookupPath(cue.ParsePath(cueTarget))
-	kindVal := targetVal.LookupPath(cue.ParsePath("kind"))
-	kind, err := kindVal.String()
-	if err != nil || kind == "" {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"decodeTarget.kindVal.String() failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-
-		return spec.TargetInstance{}, MissingTargetKind{
-			Source: extractSpanFromFile(userFile, cueTarget),
-		}
-	}
-
-	targetSpan := extractSpanFromFile(userFile, cueTarget)
-
-	// Resolve target
-	// ------------------------------------------------------------
-	tt, ok := reg.TargetType(kind)
-	if !ok {
-		return spec.TargetInstance{}, UnknownTargetKind{
-			Kind:   kind,
-			Source: targetSpan,
-		}
-	}
-
-	// Instantiate config
-	// ------------------------------------------------------------
-	tCfg := tt.NewConfig()
-	rv := reflect.ValueOf(tCfg)
-	if rv.Kind() != reflect.Pointer {
-		panic(errs.BUG(
-			"StepType['%s'].NewConfig() must return a pointer (got %T)",
-			tt.Kind(),
-			tCfg,
-		))
-	}
-
-	// Extract env map and fill non-concrete fields from env (before validation)
-	// ------------------------------------------------------------
-	envMap := extractEnvMap(targetVal)
-	targetVal, err = fillNonConcreteFromEnv(targetVal, envMap, src)
-	if err != nil {
-		return spec.TargetInstance{}, err
-	}
-
-	// Validation
-	// ------------------------------------------------------------
-	if err := targetVal.Validate(cue.Concrete(true), cue.All()); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			// unexpected validation failure → engine error
-			panic(errs.BUG(
-				"targetVal.Validate failed with an unaccounted-for error-type %T for target %q: %w",
-				err,
-				kind,
-				err,
-			))
-		}
-
-		missing := findIncompleteFields(
-			ce,
-			targetVal,
-			targetSpan,
-		)
-
-		if len(missing) > 0 {
-			var diags diagnostic.Diagnostics
-			for _, m := range missing {
-				d := MissingFieldDiagnostic{Missing: m}
-				diags = append(diags, d)
-			}
-			return spec.TargetInstance{}, diags
-		}
-
-		// generic cue validation error, still user-facing
-		return spec.TargetInstance{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "decode",
-		}
-	}
-
-	// Decode
-	// ------------------------------------------------------------
-	if err := targetVal.Decode(tCfg); err != nil {
-		// If Validate passed, Decode MUST NOT fail.
-		// This is a hard invariant violation.
-		panic(errs.BUG(
-			"stepVal.Decode failed after successful validation for step %q: %w",
-			kind,
-			err,
-		))
-	}
-
-	// Apply ENV overrides to Go struct (after decode, so concrete values work)
-	// ------------------------------------------------------------
-	if err := applyEnvOverridesToStruct(tCfg, envMap, src); err != nil {
-		return spec.TargetInstance{}, err
-	}
-
-	// Success
-	// ------------------------------------------------------------
-	srcSpan, fieldSpans := extractFieldSpansFromFile(userFile, cueTarget)
-	return spec.TargetInstance{
-		Type:   tt,
-		Config: tCfg,
-		Source: srcSpan,
-		Fields: fieldSpans,
-	}, nil
 }
 
 type decodeResult struct {
@@ -781,6 +563,183 @@ func decodeStep(
 	}
 }
 
+func decodeTargetValue(
+	targetVal cue.Value,
+	userFile *ast.File,
+	_ string, // targetName - reserved for future use
+	reg *Registry,
+	src source.Source,
+) (spec.TargetInstance, error) {
+	// Resolve target kind
+	kindVal := targetVal.LookupPath(cue.ParsePath("kind"))
+	kind, err := kindVal.String()
+	if err != nil || kind == "" {
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(errs.BUG(
+				"decodeTargetValue.kindVal.String() failed with an unaccounted-for error-type %T: %w",
+				err,
+				err,
+			))
+		}
+		return spec.TargetInstance{}, MissingTargetKind{
+			Source: extractSpanFromFile(userFile, cueTargets),
+		}
+	}
+
+	// Resolve target type from registry
+	tt, ok := reg.TargetType(kind)
+	if !ok {
+		return spec.TargetInstance{}, UnknownTargetKind{
+			Kind:   kind,
+			Source: extractSpanFromFile(userFile, cueTargets),
+		}
+	}
+
+	// Instantiate config
+	tCfg := tt.NewConfig()
+	rv := reflect.ValueOf(tCfg)
+	if rv.Kind() != reflect.Pointer {
+		panic(errs.BUG(
+			"TargetType['%s'].NewConfig() must return a pointer (got %T)",
+			tt.Kind(),
+			tCfg,
+		))
+	}
+
+	// Extract env map and fill non-concrete fields from env
+	envMap := extractEnvMap(targetVal)
+	targetVal, err = fillNonConcreteFromEnv(targetVal, envMap, src)
+	if err != nil {
+		return spec.TargetInstance{}, err
+	}
+
+	// Validation
+	if err := targetVal.Validate(cue.Concrete(true), cue.All()); err != nil {
+		var ce cueerr.Error
+		if !errors.As(err, &ce) {
+			panic(errs.BUG(
+				"targetVal.Validate failed with an unaccounted-for error-type %T for target %q: %w",
+				err,
+				kind,
+				err,
+			))
+		}
+
+		targetSpan := extractSpanFromFile(userFile, cueTargets)
+		missing := findIncompleteFields(ce, targetVal, targetSpan)
+
+		if len(missing) > 0 {
+			var diags diagnostic.Diagnostics
+			for _, m := range missing {
+				d := MissingFieldDiagnostic{Missing: m}
+				diags = append(diags, d)
+			}
+			return spec.TargetInstance{}, diags
+		}
+
+		return spec.TargetInstance{}, CueDiagnostic{
+			Err:   ce,
+			Phase: "decode",
+		}
+	}
+
+	// Decode
+	if err := targetVal.Decode(tCfg); err != nil {
+		panic(errs.BUG(
+			"targetVal.Decode failed after successful validation for target %q: %w",
+			kind,
+			err,
+		))
+	}
+
+	// Apply ENV overrides
+	if err := applyEnvOverridesToStruct(tCfg, envMap, src); err != nil {
+		return spec.TargetInstance{}, err
+	}
+
+	return spec.TargetInstance{
+		Type:   tt,
+		Config: tCfg,
+	}, nil
+}
+
+func decodeDeployBlock(
+	blockVal cue.Value,
+	blockName string,
+	_ *ast.File, // userFile - reserved for future use
+	reg *Registry,
+	em diagnostic.Emitter,
+) (spec.DeployBlock, bool, error) {
+	block := spec.DeployBlock{
+		Name: blockName,
+	}
+
+	// Decode targets list (strings referencing target names)
+	targetsVal := blockVal.LookupPath(cue.ParsePath("targets"))
+	if err := targetsVal.Err(); err != nil {
+		var ce cueerr.Error
+		if errors.As(err, &ce) {
+			return block, false, CueDiagnostic{
+				Err:   ce,
+				Phase: "decode.deploy.targets",
+			}
+		}
+		panic(errs.BUG("deploy block targets lookup failed: %w", err))
+	}
+
+	targetsIter, err := targetsVal.List()
+	if err != nil {
+		panic(errs.BUG("deploy block targets is not a list: %w", err))
+	}
+
+	for targetsIter.Next() {
+		targetName, err := targetsIter.Value().String()
+		if err != nil {
+			panic(errs.BUG("deploy block target name is not a string: %w", err))
+		}
+		block.Targets = append(block.Targets, targetName)
+	}
+
+	// Decode steps
+	stepsVal := blockVal.LookupPath(cue.ParsePath(cueSteps))
+	if err := stepsVal.Err(); err != nil {
+		var ce cueerr.Error
+		if errors.As(err, &ce) {
+			return block, false, CueDiagnostic{
+				Err:   ce,
+				Phase: "decode.deploy.steps",
+			}
+		}
+		panic(errs.BUG("deploy block steps lookup failed: %w", err))
+	}
+
+	stepsIter, err := stepsVal.List()
+	if err != nil {
+		panic(errs.BUG("deploy block steps is not a list: %w", err))
+	}
+
+	var sawAbort bool
+	for stepsIter.Next() {
+		idx := stepsIter.Selector().Index()
+		stepVal := stepsIter.Value()
+		// TODO: extract proper spans for deploy block steps
+		stepSpan := spec.SourceSpan{}
+		fields := make(map[string]spec.FieldSpan)
+
+		si, decRes := decodeStep(stepVal, idx, reg, em, stepSpan, fields)
+		if decRes.abort {
+			sawAbort = true
+		}
+		if !decRes.ok {
+			continue
+		}
+		block.Steps = append(block.Steps, si)
+	}
+
+	return block, sawAbort, nil
+}
+
 func resolveStepKind(stepVal cue.Value, idx int) (string, string, error) {
 	kindVal := stepVal.LookupPath(cue.ParsePath("kind"))
 	if err := kindVal.Err(); err != nil {
@@ -804,26 +763,6 @@ func resolveStepKind(stepVal cue.Value, idx int) (string, string, error) {
 	}
 
 	return kind, desc, nil
-}
-
-func isErrorWithPath(ce cueerr.Error, searchPath string) bool {
-	for _, e := range cueerr.Errors(ce) {
-		path := cueerr.Path(e)
-		if len(path) == 1 && path[0] == searchPath {
-			return true
-		}
-	}
-	return false
-}
-
-func isUnitRequiredFieldError(ce cueerr.Error) bool {
-	for _, e := range cueerr.Errors(ce) {
-		path := cueerr.Path(e)
-		if len(path) == 2 && path[0] == cueUnit && path[1] == cueUnitID {
-			return true
-		}
-	}
-	return false
 }
 
 func isTypeMismatchError(ce cueerr.Error) (string, bool) {
@@ -850,60 +789,6 @@ func getErrorPathSpan(err cueerr.Error, userInst cue.Value) spec.SourceSpan {
 	path := cue.ParsePath(strings.Join(cueerr.Path(err), "."))
 	v := userInst.LookupPath(path)
 	return spanFromPos(v.Pos())
-}
-
-func getStepsUnifyErrorSpan(err cueerr.Error, userInst cue.Value) spec.SourceSpan {
-	path := cueerr.Path(err)
-
-	// Case 1: error is inside steps[<idx>]
-	if len(path) >= 2 && path[0] == cueSteps {
-		if idx, err := strconv.Atoi(path[1]); err == nil {
-			v := userInst.LookupPath(
-				cue.MakePath(cue.Str(cueSteps), cue.Index(idx)),
-			)
-			return spanFromPos(v.Pos())
-		}
-	}
-
-	// Case 2: error is about top-level structure (e.g. steps itself)
-	if len(path) > 0 {
-		v := userInst.LookupPath(cue.MakePath(cue.Str(path[0])))
-		return spanFromPos(v.Pos())
-	}
-
-	// Case 3: fallback → start-of-file
-	return spanFromPos(userInst.Pos())
-}
-
-func findMissingRequiredFields(
-	ce cueerr.Error,
-	stepVal cue.Value,
-	stepSource spec.SourceSpan,
-) []CueMissingField {
-	var res []CueMissingField
-
-	for _, e := range cueerr.Errors(ce) {
-		if !strings.Contains(e.Error(), "required but not present") {
-			continue
-		}
-
-		path := cueerr.Path(e)
-		if len(path) == 0 {
-			continue
-		}
-
-		field := path[len(path)-1]
-
-		v := stepVal.LookupPath(cue.ParsePath(field))
-		if !v.Exists() && !v.IsConcrete() {
-			res = append(res, CueMissingField{
-				Field:  field,
-				Source: stepSource,
-			})
-		}
-	}
-
-	return res
 }
 
 func findIncompleteFields(
@@ -1016,102 +901,6 @@ func extractSpanFromFile(f *ast.File, declName string) spec.SourceSpan {
 	return spanFromNode(field)
 }
 
-func extractFieldSpansFromFile(
-	f *ast.File,
-	declName string,
-) (spec.SourceSpan, map[string]spec.FieldSpan) {
-	var field *ast.Field
-
-	for _, d := range f.Decls {
-		fd, ok := d.(*ast.Field)
-		if !ok {
-			continue
-		}
-		id, ok := fd.Label.(*ast.Ident)
-		if !ok || id.Name != declName {
-			continue
-		}
-
-		field = fd
-		break
-	}
-
-	if field == nil {
-		return spec.SourceSpan{}, map[string]spec.FieldSpan{}
-	}
-
-	return spanFromNode(field), extractFieldSpans(field.Value)
-}
-
-func extractStepFieldSpansFromFile(
-	f *ast.File,
-	stepIndex int,
-) (spec.SourceSpan, map[string]spec.FieldSpan) {
-	// 1. locate `steps: [...]`
-	var steps *ast.ListLit
-
-	for _, d := range f.Decls {
-		fd, ok := d.(*ast.Field)
-		if !ok {
-			continue
-		}
-		id, ok := fd.Label.(*ast.Ident)
-		if !ok || id.Name != cueSteps {
-			continue
-		}
-		list, ok := fd.Value.(*ast.ListLit)
-		if !ok {
-			return spec.SourceSpan{}, map[string]spec.FieldSpan{}
-		}
-		steps = list
-		break
-	}
-
-	if steps == nil || stepIndex >= len(steps.Elts) {
-		return spec.SourceSpan{}, map[string]spec.FieldSpan{}
-	}
-
-	stepExpr := steps.Elts[stepIndex]
-	return spanFromNode(stepExpr), extractFieldSpans(stepExpr)
-}
-
-func extractFieldSpans(stepExpr ast.Expr) map[string]spec.FieldSpan {
-	var st *ast.StructLit
-
-	switch e := stepExpr.(type) {
-	case *ast.StructLit:
-		st = e
-	case *ast.BinaryExpr:
-		if rhs, ok := e.Y.(*ast.StructLit); ok {
-			st = rhs
-		}
-	}
-
-	if st == nil {
-		return map[string]spec.FieldSpan{}
-	}
-
-	fields := make(map[string]spec.FieldSpan)
-	for _, elt := range st.Elts {
-		fd, ok := elt.(*ast.Field)
-		if !ok {
-			continue
-		}
-
-		label, ok := fd.Label.(*ast.Ident)
-		if !ok {
-			continue
-		}
-
-		fields[label.Name] = spec.FieldSpan{
-			Field: spanFromNode(label),
-			Value: spanFromNode(fd.Value),
-		}
-	}
-
-	return fields
-}
-
 func normalizeVirtualPath(path string) string {
 	parts := strings.Split(path, "/")
 
@@ -1124,4 +913,72 @@ func normalizeVirtualPath(path string) string {
 	}
 
 	return "/" + strings.Join(out, "/")
+}
+
+// Resolve produces a ResolvedConfig from a Config by selecting a specific
+// deploy block and target. If deployName or targetName are empty, the first
+// available is selected.
+func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfig, error) {
+	// Select deploy block
+	var block spec.DeployBlock
+	if deployName != "" {
+		var ok bool
+		block, ok = cfg.Deploy[deployName]
+		if !ok {
+			return spec.ResolvedConfig{}, UnknownDeployBlock{Name: deployName}
+		}
+	} else {
+		// Pick first deploy block (map iteration order is random, but for
+		// single-block configs this is fine)
+		for name, b := range cfg.Deploy {
+			block = b
+			deployName = name
+			break
+		}
+		if deployName == "" {
+			return spec.ResolvedConfig{}, NoDeployBlocks{}
+		}
+	}
+
+	// Select target
+	if targetName == "" {
+		// Use first target from the deploy block's target list
+		if len(block.Targets) == 0 {
+			return spec.ResolvedConfig{}, NoTargetsInDeploy{Deploy: deployName}
+		}
+		targetName = block.Targets[0]
+	}
+
+	// Verify target exists in config
+	tgt, ok := cfg.Targets[targetName]
+	if !ok {
+		return spec.ResolvedConfig{}, UnknownTarget{
+			Name:   targetName,
+			Deploy: deployName,
+		}
+	}
+
+	// Verify target is in the deploy block's target list
+	var found bool
+	for _, t := range block.Targets {
+		if t == targetName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return spec.ResolvedConfig{}, TargetNotInDeploy{
+			Target: targetName,
+			Deploy: deployName,
+		}
+	}
+
+	return spec.ResolvedConfig{
+		Path:       cfg.Path,
+		DeployName: deployName,
+		TargetName: targetName,
+		Target:     tgt,
+		Steps:      block.Steps,
+		Sources:    cfg.Sources,
+	}, nil
 }

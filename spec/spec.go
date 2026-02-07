@@ -10,12 +10,31 @@ import (
 )
 
 type (
+	// Config is the parsed CUE configuration (new structure)
 	Config struct {
 		Path    string
-		Unit    UnitInstance
-		Target  TargetInstance
-		Steps   []StepInstance
+		Targets map[string]TargetInstance // named targets
+		Deploy  map[string]DeployBlock    // deploy blocks
 		Sources SourceStore
+	}
+
+	// DeployBlock represents a single deploy block from CUE
+	DeployBlock struct {
+		Name    string         // block name (key from deploy map)
+		Targets []string       // references target names
+		Steps   []StepInstance // ordered steps
+		Source  SourceSpan     // source location
+	}
+
+	// ResolvedConfig is what the engine works with - a resolved view
+	// of Config for a specific deploy block and target
+	ResolvedConfig struct {
+		Path       string
+		DeployName string         // which deploy block
+		TargetName string         // which target
+		Target     TargetInstance // resolved target
+		Steps      []StepInstance // steps from the deploy block
+		Sources    SourceStore
 	}
 
 	TargetType interface {

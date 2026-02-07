@@ -20,9 +20,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:  "render-test"
 		src:   "/tmpl.txt"
@@ -36,8 +41,10 @@ steps: [
 		perm:  "0644"
 		owner: "testuser"
 		group: "testgroup"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -55,9 +62,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -104,9 +116,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "inline-template"
 		content: "Inline: {{.msg}}"
@@ -119,8 +136,10 @@ steps: [
 		perm:  "0600"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -137,9 +156,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -167,9 +191,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "env-override"
 		content: "Port: {{.port}}"
@@ -185,8 +214,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -204,9 +235,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -235,9 +271,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "env-default"
 		content: "Port: {{.port}}"
@@ -253,8 +294,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource() // No env vars
 	tgt := target.NewMemTarget()
@@ -271,9 +314,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -302,9 +350,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "idempotent"
 		content: "static content"
@@ -312,8 +365,10 @@ steps: [
 		perm:    "0644"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -335,9 +390,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -374,9 +434,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "content-change"
 		content: "new content"
@@ -384,8 +449,10 @@ steps: [
 		perm:    "0644"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -407,9 +474,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -450,9 +522,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "parse-error"
 		content: "{{.unclosed"
@@ -460,8 +537,10 @@ steps: [
 		perm:    "0644"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -478,9 +557,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -513,9 +597,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "exec-error"
 		content: "{{len .missing}}"
@@ -523,8 +612,10 @@ steps: [
 		perm:    "0644"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -541,9 +632,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -574,9 +670,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:  "source-missing"
 		src:   "/nonexistent.txt"
@@ -584,8 +685,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -603,9 +706,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -636,9 +744,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "env-key-missing"
 		content: "{{.port}}"
@@ -654,8 +767,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -673,9 +788,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -706,9 +826,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "dest-dir-missing"
 		content: "content"
@@ -716,8 +841,10 @@ steps: [
 		perm:    "0644"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -734,9 +861,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -767,9 +899,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "mode-change"
 		content: "content"
@@ -777,8 +914,10 @@ steps: [
 		perm:    "0755"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -800,9 +939,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -826,9 +970,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "owner-change"
 		content: "content"
@@ -836,8 +985,10 @@ steps: [
 		perm:    "0644"
 		owner:   "newuser"
 		group:   "newgroup"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -859,9 +1010,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -886,9 +1042,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "multi-values"
 		content: "{{.host}}:{{.port}} - {{.name}}"
@@ -903,8 +1064,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -921,9 +1084,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -947,9 +1115,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "no-data"
 		content: "static template"
@@ -957,8 +1130,10 @@ steps: [
 		perm:    "0644"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -975,9 +1150,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -1001,9 +1181,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "nested"
 		content: "{{.server.host}}:{{.server.port}}"
@@ -1019,8 +1204,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1037,9 +1224,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -1063,9 +1255,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "multi-env"
 		content: "{{.host}}:{{.port}}"
@@ -1083,8 +1280,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1103,9 +1302,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -1129,9 +1333,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "partial-env"
 		content: "{{.host}}:{{.port}}"
@@ -1149,8 +1358,10 @@ steps: [
 		perm:  "0644"
 		owner: "user"
 		group: "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1169,9 +1380,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}
@@ -1196,9 +1412,14 @@ package test
 
 import "godoit.dev/doit/builtin"
 
-target: builtin.local
+targets: {
+	local: builtin.local
+}
 
-steps: [
+deploy: {
+	test: {
+		targets: ["local"]
+		steps: [
 	builtin.template & {
 		desc:    "write-fail"
 		content: "content"
@@ -1206,8 +1427,10 @@ steps: [
 		perm:    "0644"
 		owner:   "user"
 		group:   "group"
+		}
+		]
 	}
-]
+}
 `
 	src := source.NewMemSource()
 	innerTgt := target.NewMemTarget()
@@ -1228,9 +1451,14 @@ steps: [
 		t.Fatalf("engine.LoadConfig() must not return error, got %v", err)
 	}
 
-	cfg.Target = mockTargetInstance(tgt)
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("engine.Resolve() must not return error, got %v", err)
+	}
 
-	e, err := engine.New(ctx, src, cfg, em)
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
 	if err != nil {
 		t.Fatalf("engine.New() must not return error, got %v", err)
 	}

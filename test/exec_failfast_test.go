@@ -55,7 +55,7 @@ func TestExecuteAction_AllOpsSkipped(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -123,7 +123,7 @@ func TestExecuteAction_LinearSuccess(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -198,7 +198,7 @@ func TestExecuteAction_FailFast_MiddleOfChain(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -289,7 +289,7 @@ func TestExecuteAction_BranchFailure(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -348,7 +348,7 @@ func TestExecuteAction_CheckDiagnostic_Continues(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -409,7 +409,7 @@ func TestExecuteAction_AbortDuringCheck(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -473,7 +473,7 @@ func TestExecuteAction_AbortDuringExecution(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 
@@ -534,7 +534,7 @@ func TestExecuteAction_SkippedUpstream_ExecutesDownstream(t *testing.T) {
 	em := noopEmitter{}
 
 	ctx := context.Background()
-	cfg := spec.Config{
+	cfg := spec.ResolvedConfig{
 		Target: mockTargetInstance(tgt),
 	}
 

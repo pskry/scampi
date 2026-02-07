@@ -22,7 +22,18 @@ func Plan(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *spe
 		return err
 	}
 
-	e, err := New(ctx, src, cfg, em)
+	// Resolve config to pick first deploy block and first target
+	resolved, err := Resolve(cfg, "", "")
+	if err != nil {
+		if impact, ok := emitEngineDiagnostic(em, cfgPath, err); ok {
+			if impact.ShouldAbort() {
+				return AbortError{Causes: []error{err}}
+			}
+		}
+		return err
+	}
+
+	e, err := New(ctx, src, resolved, em)
 	if err != nil {
 		return err
 	}
@@ -53,10 +64,11 @@ func (e *Engine) Plan(_ context.Context) error {
 }
 
 func plan(
-	cfg spec.Config, em diagnostic.Emitter, tgtCaps capability.Capability,
+	cfg spec.ResolvedConfig, em diagnostic.Emitter, tgtCaps capability.Capability,
 ) (spec.Plan, diagnostic.ActionDeps, error) {
 	start := time.Now()
-	em.EmitPlanLifecycle(diagnostic.PlanStarted(cfg.Unit.ID))
+	unitID := spec.UnitID(cfg.DeployName)
+	em.EmitPlanLifecycle(diagnostic.PlanStarted(unitID))
 
 	var (
 		causes  []error
@@ -65,8 +77,8 @@ func plan(
 
 	plan := spec.Plan{
 		Unit: spec.Unit{
-			ID:   cfg.Unit.ID,
-			Desc: cfg.Unit.Desc,
+			ID:   unitID,
+			Desc: cfg.DeployName,
 		},
 	}
 
