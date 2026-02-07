@@ -46,6 +46,12 @@ const (
 	flagColor     = "color"
 	flagVerbosity = "v"
 
+	// Resolve options flags
+	flagOnly      = "only"
+	flagTargets   = "targets"
+	flagInventory = "i"
+	flagEnv       = "env"
+
 	ctxGlobalOpts = ctxKey("globalOpts")
 )
 
@@ -115,6 +121,7 @@ func applyCmd() *cli.Command {
 		UseShortOptionHandling: true,
 		Suggest:                true,
 		HideHelp:               false,
+		Flags:                  resolveFlags(),
 		Arguments: []cli.Argument{
 			&cli.StringArg{
 				Name:        "config",
@@ -129,7 +136,7 @@ required operations to converge the system to the desired state.
 The command is idempotent: running it multiple times only applies
 changes when the current state differs from the declared state.`,
 		Before: requireArgs(1),
-		Action: func(ctx context.Context, _ *cli.Command) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
 			pol := diagnostic.Policy{
@@ -145,8 +152,9 @@ changes when the current state differs from the declared state.`,
 				recoverAndReport(recover())
 			}()
 
+			resolveOpts := parseResolveOpts(cmd)
 			em := diagnostic.NewEmitter(pol, displ)
-			err := engine.Apply(ctx, em, cfg, store)
+			err := engine.Apply(ctx, em, cfg, store, resolveOpts)
 			if err != nil {
 				var abort engine.AbortError
 				if !errors.As(err, &abort) {
@@ -171,6 +179,7 @@ func checkCmd() *cli.Command {
 		UseShortOptionHandling: true,
 		Suggest:                true,
 		HideHelp:               false,
+		Flags:                  resolveFlags(),
 		Arguments: []cli.Argument{
 			&cli.StringArg{
 				Name:        "config",
@@ -186,7 +195,7 @@ which would need to execute.
 No changes are made to the system. Unlike 'plan', this command evaluates
 the actual system state.`,
 		Before: requireArgs(1),
-		Action: func(ctx context.Context, _ *cli.Command) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
 			pol := diagnostic.Policy{
@@ -202,8 +211,9 @@ the actual system state.`,
 				recoverAndReport(recover())
 			}()
 
+			resolveOpts := parseResolveOpts(cmd)
 			em := diagnostic.NewEmitter(pol, displ)
-			err := engine.Check(ctx, em, cfg, store)
+			err := engine.Check(ctx, em, cfg, store, resolveOpts)
 			if err != nil {
 				var abort engine.AbortError
 				if !errors.As(err, &abort) {
@@ -228,6 +238,7 @@ func planCmd() *cli.Command {
 		UseShortOptionHandling: true,
 		Suggest:                true,
 		HideHelp:               false,
+		Flags:                  resolveFlags(),
 		Arguments: []cli.Argument{
 			&cli.StringArg{
 				Name:        "config",
@@ -242,7 +253,7 @@ execution plan without applying any changes.
 The plan shows the operations that would be executed by 'apply', but
 does not inspect or modify the target system.`,
 		Before: requireArgs(1),
-		Action: func(ctx context.Context, _ *cli.Command) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
 			pol := diagnostic.Policy{
@@ -258,9 +269,10 @@ does not inspect or modify the target system.`,
 				recoverAndReport(recover())
 			}()
 
+			resolveOpts := parseResolveOpts(cmd)
 			em := diagnostic.NewEmitter(pol, displ)
 
-			err := engine.Plan(ctx, em, cfg, store)
+			err := engine.Plan(ctx, em, cfg, store, resolveOpts)
 			if err != nil {
 				var abort engine.AbortError
 				if !errors.As(err, &abort) {
@@ -406,6 +418,58 @@ func newDisplayer(opts globalOpts, store *spec.SourceStore) render.Displayer {
 		},
 		store,
 	)
+}
+
+func resolveFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:  flagOnly,
+			Usage: "filter to specific deploy blocks (comma-separated)",
+		},
+		&cli.StringFlag{
+			Name:  flagTargets,
+			Usage: "filter to specific targets (comma-separated)",
+		},
+		&cli.StringFlag{
+			Name:    flagInventory,
+			Aliases: []string{"inventory"},
+			Usage:   "explicit inventory file path",
+		},
+		&cli.StringFlag{
+			Name:  flagEnv,
+			Usage: "environment name (loads inventory/<name>.cue and vars/<name>.cue)",
+		},
+	}
+}
+
+func parseResolveOpts(cmd *cli.Command) spec.ResolveOptions {
+	opts := spec.ResolveOptions{}
+
+	if s := cmd.String(flagOnly); s != "" {
+		opts.DeployNames = splitComma(s)
+	}
+	if s := cmd.String(flagTargets); s != "" {
+		opts.TargetNames = splitComma(s)
+	}
+	opts.InventoryPath = cmd.String(flagInventory)
+	opts.EnvName = cmd.String(flagEnv)
+
+	return opts
+}
+
+func splitComma(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 func recoverAndReport(r any) {

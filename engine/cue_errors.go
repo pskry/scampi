@@ -499,3 +499,23 @@ func (e TargetNotInDeploy) EventTemplate() event.Template {
 
 func (TargetNotInDeploy) Severity() signal.Severity { return signal.Error }
 func (TargetNotInDeploy) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type InventoryNotFound struct {
+	Path string
+}
+
+func (e InventoryNotFound) Error() string {
+	return fmt.Sprintf("inventory file not found: %s", e.Path)
+}
+
+func (e InventoryNotFound) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "config.InventoryNotFound",
+		Text: `inventory file not found: {{.Path}}`,
+		Hint: "check that the inventory file path is correct",
+		Data: e,
+	}
+}
+
+func (InventoryNotFound) Severity() signal.Severity { return signal.Error }
+func (InventoryNotFound) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

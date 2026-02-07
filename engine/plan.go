@@ -15,15 +15,20 @@ import (
 	"godoit.dev/doit/target/local"
 )
 
-func Plan(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) error {
+func Plan(
+	ctx context.Context,
+	em diagnostic.Emitter,
+	cfgPath string,
+	store *spec.SourceStore,
+	opts spec.ResolveOptions,
+) error {
 	src := source.WithRoot(cfgPath, source.LocalPosixSource{})
-	cfg, err := LoadConfig(ctx, em, cfgPath, store, src)
+	cfg, err := LoadConfigWithOptions(ctx, em, cfgPath, store, src, opts)
 	if err != nil {
 		return err
 	}
 
-	// Resolve config to pick first deploy block and first target
-	resolved, err := Resolve(cfg, "", "")
+	resolved, err := ResolveMultiple(cfg, opts)
 	if err != nil {
 		if impact, ok := emitEngineDiagnostic(em, cfgPath, err); ok {
 			if impact.ShouldAbort() {
@@ -33,18 +38,26 @@ func Plan(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *spe
 		return err
 	}
 
-	e, err := New(ctx, src, resolved, em)
-	if err != nil {
-		return err
-	}
-	defer e.Close()
+	// Execute each resolved config sequentially
+	for _, res := range resolved {
+		e, err := New(ctx, src, res, em)
+		if err != nil {
+			return err
+		}
 
-	// Plan must NEVER touch target, not even reads
-	e.tgt = capabilityTarget{
-		caps: local.POSIXTarget{}.Capabilities(),
+		// Plan must NEVER touch target, not even reads
+		e.tgt = capabilityTarget{
+			caps: local.POSIXTarget{}.Capabilities(),
+		}
+
+		if err := e.Plan(ctx); err != nil {
+			e.Close()
+			return err
+		}
+		e.Close()
 	}
 
-	return e.Plan(ctx)
+	return nil
 }
 
 func (e *Engine) Plan(_ context.Context) error {

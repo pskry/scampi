@@ -133,3 +133,15 @@ const (
 	CheckSatisfied
 	CheckUnsatisfied
 )
+
+// ResolveOptions controls deploy block and target selection.
+type ResolveOptions struct {
+	// DeployNames filters to specific deploy blocks (empty = all)
+	DeployNames []string
+	// TargetNames filters to specific targets (empty = all in deploy block)
+	TargetNames []string
+	// InventoryPath is an explicit inventory file path
+	InventoryPath string
+	// EnvName loads inventory/<name>.cue and vars/<name>.cue
+	EnvName string
+}

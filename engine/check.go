@@ -9,14 +9,20 @@ import (
 	"godoit.dev/doit/spec"
 )
 
-func Check(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *spec.SourceStore) error {
+func Check(
+	ctx context.Context,
+	em diagnostic.Emitter,
+	cfgPath string,
+	store *spec.SourceStore,
+	opts spec.ResolveOptions,
+) error {
 	src := source.WithRoot(cfgPath, source.LocalPosixSource{})
-	cfg, err := LoadConfig(ctx, em, cfgPath, store, src)
+	cfg, err := LoadConfigWithOptions(ctx, em, cfgPath, store, src, opts)
 	if err != nil {
 		return err
 	}
 
-	resolved, err := Resolve(cfg, "", "")
+	resolved, err := ResolveMultiple(cfg, opts)
 	if err != nil {
 		if impact, ok := emitEngineDiagnostic(em, cfgPath, err); ok {
 			if impact.ShouldAbort() {
@@ -26,13 +32,21 @@ func Check(ctx context.Context, em diagnostic.Emitter, cfgPath string, store *sp
 		return err
 	}
 
-	e, err := New(ctx, src, resolved, em)
-	if err != nil {
-		return err
-	}
-	defer e.Close()
+	// Execute each resolved config sequentially
+	for _, res := range resolved {
+		e, err := New(ctx, src, res, em)
+		if err != nil {
+			return err
+		}
 
-	return e.Check(ctx)
+		if err := e.Check(ctx); err != nil {
+			e.Close()
+			return err
+		}
+		e.Close()
+	}
+
+	return nil
 }
 
 func (e *Engine) Check(ctx context.Context) error {
