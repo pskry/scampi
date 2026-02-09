@@ -8,7 +8,7 @@ import (
 )
 
 func Render(name, tmpl string, data any) (string, bool) {
-	// TODO: parsing way too late
+	// FIXME: templates parsed at render time — syntax errors only surface during output
 	t, err := template.
 		New(name).
 		Funcs(template.FuncMap{

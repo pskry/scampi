@@ -11,17 +11,38 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
+type NoKnownHostsError struct {
+	Path string
+	Err  error
+}
+
+func (e NoKnownHostsError) Error() string {
+	return fmt.Sprintf("known_hosts file not found: %s", e.Path)
+}
+
+func (e NoKnownHostsError) Unwrap() error { return e.Err }
+
+func (e NoKnownHostsError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "ssh.NoKnownHostsError",
+		Text: `known_hosts file "{{.Path}}" not found`,
+		Hint: "create the file or use insecure: true to skip host key verification",
+		Help: "without a known_hosts file, host key verification cannot proceed",
+		Data: e,
+	}
+}
+
+func (NoKnownHostsError) Severity() signal.Severity { return signal.Error }
+func (NoKnownHostsError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
 type NoSuchHostError struct {
 	Host   string
 	Source spec.SourceSpan
-	Err    error
 }
 
 func (e NoSuchHostError) Error() string {
-	return fmt.Sprintf("no such host %s: %v", e.Host, e.Err)
+	return fmt.Sprintf("no such host %s", e.Host)
 }
-
-func (e NoSuchHostError) Unwrap() error { return e.Err }
 
 func (e NoSuchHostError) EventTemplate() event.Template {
 	return event.Template{

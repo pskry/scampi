@@ -221,7 +221,7 @@ func (t *SSHTarget) runCommand(cmd string) (string, error) {
 	defer func() { _ = session.Close() }()
 
 	output, err := session.CombinedOutput(cmd)
-	// TODO: wrap_err
+	// FIXME: unwrapped SSH session error — loses context about which command failed
 	return string(output), err
 }
 

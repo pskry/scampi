@@ -16,7 +16,7 @@ import (
 	"godoit.dev/doit/target"
 )
 
-const ensureModeID = "builtin.ensure-owner"
+const ensureModeID = "builtin.ensure-mode"
 
 type EnsureModeOp struct {
 	sharedops.BaseOp

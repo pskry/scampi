@@ -723,7 +723,7 @@ func decodeDeployBlock(
 	for stepsIter.Next() {
 		idx := stepsIter.Selector().Index()
 		stepVal := stepsIter.Value()
-		// TODO: extract proper spans for deploy block steps
+		// FIXME: empty SourceSpan — diagnostics will show no source location for deploy block steps
 		stepSpan := spec.SourceSpan{}
 		fields := make(map[string]spec.FieldSpan)
 

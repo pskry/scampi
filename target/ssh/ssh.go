@@ -163,9 +163,7 @@ func buildSSHConfig(ctx context.Context, src source.Source, c *Config) (*ssh.Cli
 		var err error
 		hostKeyCallback, err = knownhosts.New(khPath)
 		if err != nil {
-			// Fall back to insecure if known_hosts doesn't exist
-			// TODO: Make this configurable
-			hostKeyCallback = ssh.InsecureIgnoreHostKey()
+			return nil, closeAgent, NoKnownHostsError{Path: khPath, Err: err}
 		}
 	}
 
@@ -173,7 +171,7 @@ func buildSSHConfig(ctx context.Context, src source.Source, c *Config) (*ssh.Cli
 		User:            c.User,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		// TODO: ahrdcoded timeout
+		// FIXME: hardcoded timeout — should come from Config
 		Timeout: 1 * time.Second,
 	}, closeAgent, nil
 }
