@@ -10,6 +10,7 @@ import (
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/diagnostic/event"
 	"godoit.dev/doit/engine"
+	"godoit.dev/doit/render/template"
 	"godoit.dev/doit/spec"
 )
 
@@ -297,9 +298,7 @@ func extractCyclePaths(diags []event.PlanDiagnostic) [][]string {
 			continue
 		}
 
-		d := ev.Detail
-
-		hint := d.Template.Hint
+		hint, _ := template.Render(ev.Detail.Template.HintField())
 		paths = append(paths, strings.Split(hint, " -> "))
 	}
 

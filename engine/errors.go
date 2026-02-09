@@ -39,13 +39,10 @@ func (e CapabilityMismatch) Error() string {
 
 func (e CapabilityMismatch) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "engine.CapabilityMismatch",
-		Text: `step "{{.StepKind}}" requires capabilities not provided by target`,
-		Hint: "use a different target or remove incompatible steps",
-		Help: fmt.Sprintf(
-			"missing:  %s\nrequired: %s\nprovided: %s",
-			e.MissingCaps, e.RequiredCaps, e.ProvidedCaps,
-		),
+		ID:     "engine.CapabilityMismatch",
+		Text:   `step "{{.StepKind}}" requires capabilities not provided by target`,
+		Hint:   "use a different target or remove incompatible steps",
+		Help:   "missing:  {{.MissingCaps}}\nrequired: {{.RequiredCaps}}\nprovided: {{.ProvidedCaps}}",
 		Data:   e,
 		Source: &e.Source,
 	}

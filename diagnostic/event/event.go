@@ -158,3 +158,17 @@ type Template struct {
 
 	Source *spec.SourceSpan
 }
+
+// Field is a single renderable text within a Template.
+type Field struct {
+	id, text string
+	data     any
+}
+
+func (f Field) TemplateID() string   { return f.id }
+func (f Field) TemplateText() string { return f.text }
+func (f Field) TemplateData() any    { return f.data }
+
+func (t Template) TextField() Field { return Field{t.ID + ".Text", t.Text, t.Data} }
+func (t Template) HintField() Field { return Field{t.ID + ".Hint", t.Hint, t.Data} }
+func (t Template) HelpField() Field { return Field{t.ID + ".Help", t.Help, t.Data} }

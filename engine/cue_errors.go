@@ -137,7 +137,8 @@ func (e MalformedInput) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.MalformedInput",
 		Text: "malformed configuration input",
-		Hint: e.Reason,
+		Hint: "{{.Reason}}",
+		Data: e,
 	}
 }
 
@@ -174,7 +175,8 @@ func (d CueDiagnostic) EventTemplate() event.Template {
 
 	return event.Template{
 		ID:     "cue." + d.Phase,
-		Text:   msg,
+		Text:   "{{.}}",
+		Data:   msg,
 		Source: src,
 	}
 }

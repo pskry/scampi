@@ -68,7 +68,7 @@ func (f *formatter) fmtTemplate(
 ) []string {
 	var buf strings.Builder
 
-	if text, ok := template.Render(tmpl.ID+".Text", tmpl.Text, tmpl.Data); ok {
+	if text, ok := template.Render(tmpl.TextField()); ok {
 		f.fmtfMsgTo(&buf, txtCol, "[%s]%s %s%s", prefix, glyphR(glyph), text, msg)
 	}
 
@@ -77,7 +77,7 @@ func (f *formatter) fmtTemplate(
 		fmt.Fprint(&buf, snippet)
 	}
 
-	if hint, ok := template.Render(tmpl.ID+".Hint", tmpl.Hint, tmpl.Data); ok {
+	if hint, ok := template.Render(tmpl.HintField()); ok {
 		hint = strings.TrimSpace(hint)
 		if hint != "" {
 			fmt.Fprint(&buf, "\n    ")
@@ -89,7 +89,7 @@ func (f *formatter) fmtTemplate(
 		}
 	}
 
-	if help, ok := template.Render(tmpl.ID+".Help", tmpl.Help, tmpl.Data); ok {
+	if help, ok := template.Render(tmpl.HelpField()); ok {
 		help = strings.TrimSpace(help)
 		if help != "" {
 			fmt.Fprint(&buf, "\n    ")

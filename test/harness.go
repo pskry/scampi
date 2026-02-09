@@ -411,13 +411,10 @@ func (d fakeDiagnostic) Error() string {
 func (d fakeDiagnostic) Unwrap() error { return d.cause }
 
 func (d fakeDiagnostic) EventTemplate() event.Template {
-	text := "test diagnostic"
-	if d.cause != nil {
-		text = d.cause.Error()
-	}
 	return event.Template{
 		ID:   "test.FakeDiagnostic",
-		Text: text,
+		Text: "{{if .}}{{.}}{{else}}test diagnostic{{end}}",
+		Data: d.cause,
 	}
 }
 

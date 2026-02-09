@@ -304,7 +304,7 @@ func (p *planRenderer) collectOpTreeLines(
 	line += p.fmt.fmtMsg(colOpHeader, op.DisplayID)
 
 	if v >= signal.VV && op.Template != nil {
-		if text, ok := template.Render(op.Template.ID, op.Template.Text, op.Template.Data); ok {
+		if text, ok := template.Render(*op.Template); ok {
 			line += p.fmt.fmtfMsg(colOpDesc, " (%s)", text)
 		}
 	}

@@ -7,10 +7,23 @@ import (
 	"godoit.dev/doit/errs"
 )
 
-func Render(name, tmpl string, data any) (string, bool) {
-	// FIXME: templates parsed at render time — syntax errors only surface during output
+// Renderable is the contract for anything the template renderer can render.
+// Every caller supplies its own concrete type; the renderer never accepts
+// bare strings.  Contract tested in test/template_render_test.go.
+type Renderable interface {
+	TemplateID() string
+	TemplateText() string
+	TemplateData() any
+}
+
+func Render(r Renderable) (string, bool) {
+	name := r.TemplateID()
+	tmpl := r.TemplateText()
+	data := r.TemplateData()
+
 	t, err := template.
 		New(name).
+		Option("missingkey=error").
 		Funcs(template.FuncMap{
 			"join": join,
 		}).

@@ -41,7 +41,8 @@ func (e CyclicDependency) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "engine.CyclicDependency",
 		Text: "cyclic dependency detected",
-		Hint: strings.Join(ids, " -> "),
+		Hint: `{{join " -> " .}}`,
+		Data: ids,
 	}
 }
 
@@ -190,7 +191,8 @@ func (e ActionCyclicDependency) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "engine.ActionCyclicDependency",
 		Text: "cyclic action dependency detected",
-		Hint: strings.Join(ids, " -> "),
+		Hint: `{{join " -> " .}}`,
+		Data: ids,
 	}
 }
 

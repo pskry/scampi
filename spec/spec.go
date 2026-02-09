@@ -121,10 +121,15 @@ type (
 		Text string
 		Data any
 	}
-	Result struct {
-		Changed bool
-	}
 )
+
+func (t PlanTemplate) TemplateID() string   { return t.ID }
+func (t PlanTemplate) TemplateText() string { return t.Text }
+func (t PlanTemplate) TemplateData() any    { return t.Data }
+
+type Result struct {
+	Changed bool
+}
 
 type CheckResult uint8
 
