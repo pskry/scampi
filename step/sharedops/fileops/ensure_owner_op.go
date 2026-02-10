@@ -157,7 +157,7 @@ func (e ownerReadError) Unwrap() error {
 
 func (e ownerReadError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.copy.OwnerReadError",
+		ID:     "builtin.OwnerRead",
 		Text:   `cannot read ownership of "{{.Path}}"`,
 		Hint:   "check file permissions and ensure the path is accessible",
 		Data:   e,

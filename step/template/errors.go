@@ -72,7 +72,7 @@ func (e TemplateParseError) Unwrap() error {
 
 func (e TemplateParseError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.template.ParseError",
+		ID:     "builtin.template.Parse",
 		Text:   "template parse error: {{.Err}}",
 		Hint:   "check template syntax",
 		Help:   "templates use Go text/template syntax",
@@ -99,7 +99,7 @@ func (e TemplateExecError) Unwrap() error {
 
 func (e TemplateExecError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.template.ExecError",
+		ID:     "builtin.template.Exec",
 		Text:   "template execution error: {{.Err}}",
 		Hint:   "check that all referenced variables exist in data",
 		Help:   "template execution failed, usually due to missing or mistyped variable names",

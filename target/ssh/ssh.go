@@ -118,7 +118,7 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	if err != nil {
 		_ = closeAgent()
 		_ = client.Close()
-		return nil, SFTPError{Err: err}
+		return nil, SFTPSessionError{Err: err}
 	}
 
 	return &SSHTarget{

@@ -2,7 +2,7 @@
   "abort": true,
   "diagnostics": [
     {
-      "id": "builtin.RelativePathError",
+      "id": "builtin.RelativePath",
       "scope": "ScopePlan",
       "severity": "Error",
       "kind": "DiagnosticRaised",

@@ -125,7 +125,7 @@ func (e modeReadError) Unwrap() error {
 
 func (e modeReadError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.copy.ModeReadError",
+		ID:     "builtin.ModeRead",
 		Text:   `cannot read mode of "{{.Path}}"`,
 		Hint:   "check file permissions and ensure the path is accessible",
 		Data:   e,

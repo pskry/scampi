@@ -578,13 +578,13 @@ deploy: {
 	// Check for diagnostic with correct ID
 	found := false
 	for _, d := range rec.opDiagnostics {
-		if d.Detail.Template.ID == "builtin.template.ParseError" {
+		if d.Detail.Template.ID == "builtin.template.Parse" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("expected builtin.template.ParseError diagnostic, got: %s", rec)
+		t.Errorf("expected builtin.template.Parse diagnostic, got: %s", rec)
 	}
 }
 
@@ -653,13 +653,13 @@ deploy: {
 	// Check for diagnostic with correct ID
 	found := false
 	for _, d := range rec.opDiagnostics {
-		if d.Detail.Template.ID == "builtin.template.ExecError" {
+		if d.Detail.Template.ID == "builtin.template.Exec" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("expected builtin.template.ExecError diagnostic, got: %s", rec)
+		t.Errorf("expected builtin.template.Exec diagnostic, got: %s", rec)
 	}
 }
 

@@ -49,7 +49,7 @@ func (e LinkReadError) Unwrap() error {
 
 func (e LinkReadError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.symlink.LinkReadError",
+		ID:     "builtin.symlink.LinkRead",
 		Text:   `cannot read link "{{.Path}}"`,
 		Hint:   "check file permissions and ensure the path is accessible",
 		Data:   e,

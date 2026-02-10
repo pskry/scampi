@@ -25,7 +25,7 @@ func (e InvalidPermissionError) Error() string {
 
 func (e InvalidPermissionError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "builtin.copy.InvalidPermission",
+		ID:   "builtin.InvalidPermission",
 		Text: "invalid file permission '{{.Value}}'",
 		Hint: "expected octal, ls-style, or posix permissions\nnext\nline",
 		Help: `supported formats:

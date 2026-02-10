@@ -24,7 +24,7 @@ func (e NoKnownHostsError) Unwrap() error { return e.Err }
 
 func (e NoKnownHostsError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.NoKnownHostsError",
+		ID:   "ssh.NoKnownHosts",
 		Text: `known_hosts file "{{.Path}}" not found`,
 		Hint: "create the file or use insecure: true to skip host key verification",
 		Help: "without a known_hosts file, host key verification cannot proceed",
@@ -46,7 +46,7 @@ func (e NoSuchHostError) Error() string {
 
 func (e NoSuchHostError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "ssh.NoSuchHostError",
+		ID:     "ssh.NoSuchHost",
 		Text:   "no such host {{.Host}}",
 		Hint:   "make sure the host is reachable",
 		Source: &e.Source,
@@ -71,7 +71,7 @@ func (e ConnectionError) Unwrap() error { return e.Err }
 
 func (e ConnectionError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.ConnectionError",
+		ID:   "ssh.Connection",
 		Text: "failed to connect to {{.Host}}:{{.Port}}",
 		Hint: "make sure the host is reachable and SSH is running on the given port",
 		Help: "underlying error was: {{.Err}}",
@@ -94,7 +94,7 @@ func (e UnknownKeyError) Unwrap() error { return e.Err }
 
 func (e UnknownKeyError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.UnknownKeyError",
+		ID:   "ssh.UnknownKey",
 		Text: "unknown host SSH-key",
 		Hint: "make sure the host SSH-key is known",
 	}
@@ -153,7 +153,7 @@ func (e KeyMismatchError) Unwrap() error { return e.Err }
 
 func (e KeyMismatchError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.KeyMismatchError",
+		ID:   "ssh.KeyMismatch",
 		Text: "host SSH-key mismatch",
 		Hint: "make sure the host SSH-key is correct",
 		Help: `known host keys:
@@ -180,7 +180,7 @@ func (e KeyRevokedError) Unwrap() error { return e.Err }
 
 func (e KeyRevokedError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.KeyRevokedError",
+		ID:   "ssh.KeyRevoked",
 		Text: "host SSH-key revoked",
 		Hint: "make sure the host SSH-key is up-to-date",
 		Help: `revoked host key:
@@ -203,7 +203,7 @@ func (e KeyReadError) Error() string {
 
 func (e KeyReadError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.KeyReadError",
+		ID:   "ssh.KeyRead",
 		Text: "failed to read SSH-key file {{.Path}}",
 		Data: e,
 	}
@@ -224,7 +224,7 @@ func (e KeyParseError) Error() string {
 
 func (e KeyParseError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.KeyParseError",
+		ID:   "ssh.KeyParse",
 		Text: "failed to parse SSH-key file {{.Path}}",
 		Hint: "the provided key-file must contain a valid *private* SSH-key",
 		Help: `{{if .IsPublicKey}}found valid *public* SSH-key, while a *private* SSH-key is required{{end}}`,
@@ -243,7 +243,7 @@ func (NoAuthMethodError) Error() string {
 
 func (e NoAuthMethodError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.NoAuthMethodError",
+		ID:   "ssh.NoAuthMethod",
 		Text: "no SSH authentication method available",
 		Hint: "no key specified and SSH agent unavailable",
 		Help: "specify a key and/or start SSH agent",
@@ -266,7 +266,7 @@ func (e AuthError) Unwrap() error { return e.Err }
 
 func (e AuthError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.AuthError",
+		ID:   "ssh.Auth",
 		Text: "authentication failed: {{.Err}}",
 		Data: e,
 	}
@@ -289,7 +289,7 @@ func (e InvalidTimeoutError) Unwrap() error { return e.Err }
 
 func (e InvalidTimeoutError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "ssh.InvalidTimeoutError",
+		ID:     "ssh.InvalidTimeout",
 		Text:   `invalid timeout "{{.Value}}"`,
 		Hint:   `use a human-readable duration like "2s", "1m30s", or "500ms"`,
 		Source: &e.Source,
@@ -300,23 +300,23 @@ func (e InvalidTimeoutError) EventTemplate() event.Template {
 func (InvalidTimeoutError) Severity() signal.Severity { return signal.Error }
 func (InvalidTimeoutError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type SFTPError struct {
+type SFTPSessionError struct {
 	Err error
 }
 
-func (e SFTPError) Error() string {
+func (e SFTPSessionError) Error() string {
 	return fmt.Sprintf("failed to start SFTP session: %v", e.Err)
 }
 
-func (e SFTPError) Unwrap() error { return e.Err }
+func (e SFTPSessionError) Unwrap() error { return e.Err }
 
-func (e SFTPError) EventTemplate() event.Template {
+func (e SFTPSessionError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "ssh.SFTPError",
+		ID:   "ssh.SFTPSession",
 		Text: "failed to start SFTP session: {{.Err}}",
 		Data: e,
 	}
 }
 
-func (SFTPError) Severity() signal.Severity { return signal.Error }
-func (SFTPError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (SFTPSessionError) Severity() signal.Severity { return signal.Error }
+func (SFTPSessionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

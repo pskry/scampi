@@ -25,7 +25,7 @@ func (e UnknownUserError) Unwrap() error {
 
 func (e UnknownUserError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.UnknownUserError",
+		ID:     "builtin.UnknownUser",
 		Text:   `unknown user "{{.User}}"`,
 		Hint:   "create user before changing file owner",
 		Data:   e,
@@ -52,7 +52,7 @@ func (e UnknownGroupError) Unwrap() error {
 
 func (e UnknownGroupError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.UnknownGroupError",
+		ID:     "builtin.UnknownGroup",
 		Text:   `unknown group "{{.Group}}"`,
 		Hint:   "create group before changing file owner",
 		Data:   e,
@@ -79,7 +79,7 @@ func (e PermissionDeniedError) Unwrap() error {
 
 func (e PermissionDeniedError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.PermissionDeniedError",
+		ID:     "builtin.PermissionDenied",
 		Text:   `permission denied for operation "{{.Operation}}"`,
 		Hint:   "make sure you have the necessary permissions for this operation",
 		Data:   e,
@@ -102,7 +102,7 @@ func (e RelativePathError) Error() string {
 
 func (e RelativePathError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.RelativePathError",
+		ID:     "builtin.RelativePath",
 		Text:   `{{.Field}}: relative path not allowed`,
 		Hint:   "target paths must be absolute (start with /)",
 		Data:   e,
