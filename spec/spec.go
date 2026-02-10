@@ -10,7 +10,6 @@ import (
 )
 
 type (
-	// Config is the parsed CUE configuration (new structure)
 	Config struct {
 		Path    string
 		Targets map[string]TargetInstance // named targets
@@ -18,7 +17,6 @@ type (
 		Sources SourceStore
 	}
 
-	// DeployBlock represents a single deploy block from CUE
 	DeployBlock struct {
 		Name    string         // block name (key from deploy map)
 		Targets []string       // references target names
@@ -26,8 +24,6 @@ type (
 		Source  SourceSpan     // source location
 	}
 
-	// ResolvedConfig is what the engine works with - a resolved view
-	// of Config for a specific deploy block and target
 	ResolvedConfig struct {
 		Path       string
 		DeployName string         // which deploy block
@@ -37,6 +33,7 @@ type (
 		Sources    SourceStore
 	}
 
+	// TargetType is the Go handler for a CUE target kind (one per kind).
 	TargetType interface {
 		Kind() string
 		NewConfig() any
@@ -60,6 +57,7 @@ type (
 		Source SourceSpan
 		Fields map[string]FieldSpan
 	}
+	// StepType is the Go handler for a CUE step kind (one per kind).
 	StepType interface {
 		Kind() string
 		// NewConfig MUST return a pointer to a freshly allocated config struct.
@@ -89,6 +87,7 @@ type (
 		Target  target.Target
 		Actions []Action
 	}
+	// Action groups the ops for a single step into a parallel execution DAG.
 	Action interface {
 		Desc() string // optional human description
 		Kind() string
@@ -102,6 +101,8 @@ type (
 		// OutputPaths returns paths this action writes to (target only)
 		OutputPaths() []string
 	}
+	// Op is the smallest idempotent unit of work. Ops receive both
+	// Source (host/config state) and Target (system being converged).
 	Op interface {
 		Action() Action
 		Check(ctx context.Context, src source.Source, tgt target.Target) (CheckResult, error)
