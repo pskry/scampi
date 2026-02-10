@@ -31,6 +31,7 @@ type (
 		User     string
 		Key      string
 		Insecure bool // Skip host key verification
+		Timeout  string
 	}
 )
 
@@ -46,7 +47,20 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 		cfg.Port = 22
 	}
 
-	sshCfg, closeAgent, err := buildSSHConfig(ctx, src, cfg)
+	if cfg.Timeout == "" {
+		cfg.Timeout = "5s"
+	}
+
+	timeout, err := time.ParseDuration(cfg.Timeout)
+	if err != nil {
+		return nil, InvalidTimeoutError{
+			Value:  cfg.Timeout,
+			Source: tgt.Fields["timeout"].Value,
+			Err:    err,
+		}
+	}
+
+	sshCfg, closeAgent, err := buildSSHConfig(ctx, src, cfg, timeout)
 	if err != nil {
 		_ = closeAgent()
 		return nil, err
@@ -115,7 +129,9 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	}, nil
 }
 
-func buildSSHConfig(ctx context.Context, src source.Source, c *Config) (*ssh.ClientConfig, func() error, error) {
+func buildSSHConfig(
+	ctx context.Context, src source.Source, c *Config, timeout time.Duration,
+) (*ssh.ClientConfig, func() error, error) {
 	var authMethods []ssh.AuthMethod
 	closeAgent := func() error { return nil }
 
@@ -171,8 +187,7 @@ func buildSSHConfig(ctx context.Context, src source.Source, c *Config) (*ssh.Cli
 		User:            c.User,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		// FIXME: hardcoded timeout — should come from Config
-		Timeout: 1 * time.Second,
+		Timeout:         timeout,
 	}, closeAgent, nil
 }
 

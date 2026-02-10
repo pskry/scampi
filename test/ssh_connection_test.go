@@ -101,6 +101,41 @@ func TestSSH_Connect_NoSuchHost(t *testing.T) {
 	}
 }
 
+func TestSSH_Connect_InvalidTimeout(t *testing.T) {
+	sshType := ssh.SSH{}
+	cfg := &ssh.Config{
+		Host:     "localhost",
+		Port:     22,
+		User:     "nobody",
+		Timeout:  "not-a-duration",
+		Insecure: true,
+	}
+
+	_, err := sshType.Create(context.Background(), source.NewMemSource(), spec.TargetInstance{
+		Config: cfg,
+		Fields: map[string]spec.FieldSpan{
+			"timeout": {Value: spec.SourceSpan{Filename: "test.cue", StartLine: 5}},
+		},
+	})
+
+	if err == nil {
+		t.Fatal("Expected error for invalid timeout, got nil")
+	}
+
+	var timeoutErr ssh.InvalidTimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("Expected InvalidTimeoutError, got %T: %v", err, err)
+	}
+
+	if timeoutErr.Value != "not-a-duration" {
+		t.Errorf("Expected value %q, got %q", "not-a-duration", timeoutErr.Value)
+	}
+
+	if timeoutErr.Source.StartLine != 5 {
+		t.Errorf("Expected source line 5, got %d", timeoutErr.Source.StartLine)
+	}
+}
+
 func TestSSH_Connect_PublicKeyAsPrivate(t *testing.T) {
 	env, cleanup := SetupSSHTestEnv(t)
 	defer cleanup()

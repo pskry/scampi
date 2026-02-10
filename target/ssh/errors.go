@@ -275,6 +275,31 @@ func (e AuthError) EventTemplate() event.Template {
 func (AuthError) Severity() signal.Severity { return signal.Error }
 func (AuthError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
+type InvalidTimeoutError struct {
+	Value  string
+	Source spec.SourceSpan
+	Err    error
+}
+
+func (e InvalidTimeoutError) Error() string {
+	return fmt.Sprintf("invalid timeout %q: %v", e.Value, e.Err)
+}
+
+func (e InvalidTimeoutError) Unwrap() error { return e.Err }
+
+func (e InvalidTimeoutError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "ssh.InvalidTimeoutError",
+		Text:   `invalid timeout "{{.Value}}"`,
+		Hint:   `use a human-readable duration like "2s", "1m30s", or "500ms"`,
+		Source: &e.Source,
+		Data:   e,
+	}
+}
+
+func (InvalidTimeoutError) Severity() signal.Severity { return signal.Error }
+func (InvalidTimeoutError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
 type SFTPError struct {
 	Err error
 }
