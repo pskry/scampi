@@ -198,12 +198,26 @@ func (op *ensureSymlinkOp) Execute(ctx context.Context, _ source.Source, tgt tar
 
 		// Remove existing (symlink with wrong target, or other file type)
 		if err := fsTgt.Remove(ctx, op.link); err != nil {
+			if target.IsPermission(err) {
+				return spec.Result{}, sharedops.PermissionDeniedError{
+					Operation: "remove " + op.link,
+					Source:    op.linkSpan,
+					Err:       err,
+				}
+			}
 			return spec.Result{}, err
 		}
 	}
 
 	// Create symlink
 	if err := slTgt.Symlink(ctx, relTarget, op.link); err != nil {
+		if target.IsPermission(err) {
+			return spec.Result{}, sharedops.PermissionDeniedError{
+				Operation: "symlink " + op.link,
+				Source:    op.linkSpan,
+				Err:       err,
+			}
+		}
 		return spec.Result{}, err
 	}
 

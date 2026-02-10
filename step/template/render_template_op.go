@@ -101,6 +101,13 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 	}
 
 	if err := fsTgt.WriteFile(ctx, op.dest, buf.Bytes()); err != nil {
+		if target.IsPermission(err) {
+			return spec.Result{}, sharedops.PermissionDeniedError{
+				Operation: "write " + op.dest,
+				Source:    op.DestSpan,
+				Err:       err,
+			}
+		}
 		return spec.Result{}, err
 	}
 
