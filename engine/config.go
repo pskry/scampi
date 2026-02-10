@@ -466,7 +466,7 @@ func loadConfigPipeline(
 		blockName := deployIter.Selector().String()
 		blockVal := deployIter.Value()
 
-		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, reg, em)
+		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, reg, em, userFile)
 		if err != nil {
 			return spec.Config{}, err
 		}
@@ -707,6 +707,7 @@ func decodeDeployBlock(
 	blockName string,
 	reg *Registry,
 	em diagnostic.Emitter,
+	userFile *ast.File,
 ) (spec.DeployBlock, bool, error) {
 	block := spec.DeployBlock{
 		Name: blockName,
@@ -754,13 +755,22 @@ func decodeDeployBlock(
 		panic(errs.BUG("deploy block steps is not a list: %w", err))
 	}
 
+	stepNodes := findStepNodes(userFile, blockName)
+
 	var sawAbort bool
 	for stepsIter.Next() {
 		idx := stepsIter.Selector().Index()
 		stepVal := stepsIter.Value()
-		// FIXME: empty SourceSpan — diagnostics will show no source location for deploy block steps
-		stepSpan := spec.SourceSpan{}
-		fields := make(map[string]spec.FieldSpan)
+
+		var stepSpan spec.SourceSpan
+		var fields map[string]spec.FieldSpan
+		if idx < len(stepNodes) {
+			stepSpan = spanFromNode(stepNodes[idx])
+			fields = extractFieldSpansFromAST(stepNodes[idx])
+		}
+		if len(fields) == 0 {
+			fields = extractFieldSpans(stepVal)
+		}
 
 		si, decRes := decodeStep(stepVal, idx, reg, em, stepSpan, fields)
 		if decRes.abort {
@@ -910,6 +920,116 @@ func spanFromPosRange(start, end token.Pos) spec.SourceSpan {
 		StartCol:  sp.Column,
 		EndCol:    ep.Column,
 	}
+}
+
+func extractFieldSpans(v cue.Value) map[string]spec.FieldSpan {
+	fields := make(map[string]spec.FieldSpan)
+	iter, err := v.Fields()
+	if err != nil {
+		return fields
+	}
+	for iter.Next() {
+		name := iter.Selector().String()
+		fields[name] = spec.FieldSpan{
+			Value: spanFromPos(iter.Value().Pos()),
+		}
+	}
+	return fields
+}
+
+// findStepNodes locates the AST list elements for deploy.<blockName>.steps
+// in the user's source file. Returns nil if the path cannot be resolved.
+func findStepNodes(f *ast.File, blockName string) []ast.Expr {
+	deployLit := findFieldStruct(f.Decls, "deploy")
+	if deployLit == nil {
+		return nil
+	}
+	blockLit := findFieldStruct(deployLit.Elts, blockName)
+	if blockLit == nil {
+		return nil
+	}
+	stepsField := findFieldValue(blockLit.Elts, cueSteps)
+	if stepsField == nil {
+		return nil
+	}
+	list, ok := stepsField.(*ast.ListLit)
+	if !ok {
+		return nil
+	}
+	return list.Elts
+}
+
+// findFieldStruct looks up a field by name and returns its value as a StructLit.
+func findFieldStruct(decls []ast.Decl, name string) *ast.StructLit {
+	v := findFieldValue(decls, name)
+	if v == nil {
+		return nil
+	}
+	sl, ok := v.(*ast.StructLit)
+	if !ok {
+		return nil
+	}
+	return sl
+}
+
+// findFieldValue looks up a field by name and returns its value expression.
+func findFieldValue(decls []ast.Decl, name string) ast.Expr {
+	for _, d := range decls {
+		fd, ok := d.(*ast.Field)
+		if !ok {
+			continue
+		}
+		id, ok := fd.Label.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if id.Name == name {
+			return fd.Value
+		}
+	}
+	return nil
+}
+
+// extractFieldSpansFromAST extracts field spans from a step's AST node.
+// It finds the struct literal (possibly nested inside a unification expr)
+// and maps each field label to a FieldSpan with the value's source position.
+func extractFieldSpansFromAST(expr ast.Expr) map[string]spec.FieldSpan {
+	sl := findStructLit(expr)
+	if sl == nil {
+		return nil
+	}
+	fields := make(map[string]spec.FieldSpan, len(sl.Elts))
+	for _, d := range sl.Elts {
+		fd, ok := d.(*ast.Field)
+		if !ok {
+			continue
+		}
+		id, ok := fd.Label.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		fields[id.Name] = spec.FieldSpan{
+			Value: spanFromNode(fd.Value),
+		}
+	}
+	return fields
+}
+
+// findStructLit finds the struct literal in an expression, descending into
+// the right-hand side of binary expressions (e.g. builtin.copy & { ... }).
+func findStructLit(expr ast.Expr) *ast.StructLit {
+	switch v := expr.(type) {
+	case *ast.StructLit:
+		return v
+	case *ast.BinaryExpr:
+		if sl, ok := v.Y.(*ast.StructLit); ok {
+			return sl
+		}
+		if sl, ok := v.X.(*ast.StructLit); ok {
+			return sl
+		}
+	}
+	return nil
 }
 
 func extractSpanFromFile(f *ast.File, declName string) spec.SourceSpan {
