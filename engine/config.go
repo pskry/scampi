@@ -392,10 +392,17 @@ func loadConfigPipeline(
 			}
 		}
 
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.Unify",
+		if path, ok := isFieldNotAllowedError(ce); ok {
+			return spec.Config{}, FieldNotAllowedError{
+				Source: getErrorPathSpan(ce, userInst),
+				Path:   path,
+			}
 		}
+
+		panic(errs.BUG(
+			"load.Unify produced an unclassified CUE error: %w",
+			ce,
+		))
 	}
 
 	// Decode config
@@ -511,14 +518,11 @@ func decodeStep(
 	// -----------------------------------------------------------------------------
 	st, ok := reg.StepType(kind)
 	if !ok {
-		impact, _ := emitPlanDiagnostic(em, stepIdx, kind, desc, UnknownStepKindError{
-			Kind:   kind,
-			Source: stepSpan,
-		})
-		return spec.StepInstance{}, decodeResult{
-			abort: impact.ShouldAbort(),
-			ok:    false,
-		}
+		panic(errs.BUG(
+			"unknown step kind %q passed CUE schema validation for step %q",
+			kind,
+			desc,
+		))
 	}
 
 	// Instantiate config
@@ -618,25 +622,18 @@ func decodeTargetValue(
 	kindVal := targetVal.LookupPath(cue.ParsePath("kind"))
 	kind, err := kindVal.String()
 	if err != nil || kind == "" {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"decodeTargetValue.kindVal.String() failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-		return spec.TargetInstance{}, MissingTargetKindError{
-			Source: extractSpanFromFile(userFile, cueTargets),
-		}
+		panic(errs.BUG(
+			"target missing kind after CUE schema validation: %w",
+			err,
+		))
 	}
 
 	tt, ok := reg.TargetType(kind)
 	if !ok {
-		return spec.TargetInstance{}, UnknownTargetKindError{
-			Kind:   kind,
-			Source: extractSpanFromFile(userFile, cueTargets),
-		}
+		panic(errs.BUG(
+			"unknown target kind %q passed CUE schema validation",
+			kind,
+		))
 	}
 
 	tCfg := tt.NewConfig()
@@ -813,6 +810,15 @@ func resolveStepKind(stepVal cue.Value, idx int) (string, string, error) {
 func isTypeMismatchError(ce cueerr.Error) (string, bool) {
 	for _, e := range cueerr.Errors(ce) {
 		if strings.Contains(e.Error(), "mismatched types") {
+			return strings.Join(cueerr.Path(e), "."), true
+		}
+	}
+	return "", false
+}
+
+func isFieldNotAllowedError(ce cueerr.Error) (string, bool) {
+	for _, e := range cueerr.Errors(ce) {
+		if strings.Contains(e.Error(), "field not allowed") {
 			return strings.Join(cueerr.Path(e), "."), true
 		}
 	}

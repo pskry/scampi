@@ -1,0 +1,14 @@
+{
+  "abort": true,
+  "diagnostics": [
+    {
+      "id": "core.FieldNotAllowed",
+      "scope": "ScopeEngine",
+      "severity": "Error",
+      "kind": "DiagnosticRaised",
+      "source": {
+        "line": 12
+      }
+    }
+  ]
+}

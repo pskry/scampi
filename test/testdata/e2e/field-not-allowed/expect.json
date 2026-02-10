@@ -4,5 +4,5 @@
   },
   "changed": 0,
   "error": true,
-  "diagnostics": ["core.InvalidUnitShape"]
+  "diagnostics": ["core.FieldNotAllowed"]
 }

@@ -241,121 +241,27 @@ func (e TypeMismatchError) EventTemplate() event.Template {
 func (e TypeMismatchError) Severity() signal.Severity { return signal.Error }
 func (TypeMismatchError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
-type InvalidUnitShapeError struct {
+type FieldNotAllowedError struct {
 	Source spec.SourceSpan
-	Have   string
-	Want   string
+	Path   string
 }
 
-func (e InvalidUnitShapeError) Error() string {
-	return fmt.Sprintf("invalid unit declaration: have %q, want %q", e.Have, e.Want)
+func (e FieldNotAllowedError) Error() string {
+	return fmt.Sprintf("field not allowed: %s", e.Path)
 }
 
-func (e InvalidUnitShapeError) EventTemplate() event.Template {
+func (e FieldNotAllowedError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "core.InvalidUnitShape",
-		Text:   "invalid 'unit' declaration, expected {{.Want}}",
-		Hint:   "expected {{.Want}}, have {{.Have}}",
-		Help:   `the 'unit' field must be a {{.Want}}, e.g. unit: {id: "...", desc: "..." }`,
+		ID:     "core.FieldNotAllowed",
+		Text:   "field '{{.Path}}' is not allowed here",
+		Hint:   "remove the unknown field or check for typos",
 		Source: &e.Source,
 		Data:   e,
 	}
 }
 
-func (e InvalidUnitShapeError) Severity() signal.Severity { return signal.Error }
-func (InvalidUnitShapeError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
-
-type InvalidStepsShapeError struct {
-	Source spec.SourceSpan
-	Have   string
-	Want   string
-}
-
-func (e InvalidStepsShapeError) Error() string {
-	return fmt.Sprintf("invalid steps declaration: have %q, want %q", e.Have, e.Want)
-}
-
-func (e InvalidStepsShapeError) EventTemplate() event.Template {
-	return event.Template{
-		ID:     "core.InvalidStepsShape",
-		Text:   "invalid 'steps' declaration, expected {{.Want}}",
-		Hint:   "expected {{.Want}}, have {{.Have}}",
-		Help:   "the 'steps' field must be a {{.Want}}, e.g. steps: [ {...}, {...} ]",
-		Source: &e.Source,
-		Data:   e,
-	}
-}
-
-func (e InvalidStepsShapeError) Severity() signal.Severity { return signal.Error }
-func (InvalidStepsShapeError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
-
-type UnknownStepKindError struct {
-	Kind   string
-	Source spec.SourceSpan
-}
-
-func (e UnknownStepKindError) Error() string {
-	return fmt.Sprintf("unknown step kind %q", e.Kind)
-}
-
-func (e UnknownStepKindError) EventTemplate() event.Template {
-	return event.Template{
-		ID:     "config.UnknownStepKind",
-		Text:   `unknown step kind "{{.Kind}}"`,
-		Hint:   "check that the step kind is spelled correctly",
-		Help:   "available kinds are registered in the engine; run `doit index` for supported step types",
-		Source: &e.Source,
-		Data:   e,
-	}
-}
-
-func (UnknownStepKindError) Severity() signal.Severity { return signal.Error }
-func (UnknownStepKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
-type MissingTargetKindError struct {
-	Source spec.SourceSpan
-}
-
-func (e MissingTargetKindError) Error() string {
-	return "missing target kind"
-}
-
-func (e MissingTargetKindError) EventTemplate() event.Template {
-	return event.Template{
-		ID:     "config.MissingTargetKind",
-		Text:   "missing target kind",
-		Hint:   "ensure that the target provides a kind field",
-		Help:   "available kinds are registered in the engine; run `doit index` for supported target types",
-		Source: &e.Source,
-		Data:   e,
-	}
-}
-
-func (MissingTargetKindError) Severity() signal.Severity { return signal.Error }
-func (MissingTargetKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
-type UnknownTargetKindError struct {
-	Kind   string
-	Source spec.SourceSpan
-}
-
-func (e UnknownTargetKindError) Error() string {
-	return fmt.Sprintf("unknown target kind %q", e.Kind)
-}
-
-func (e UnknownTargetKindError) EventTemplate() event.Template {
-	return event.Template{
-		ID:     "config.UnknownTargetKind",
-		Text:   `unknown target kind "{{.Kind}}"`,
-		Hint:   "check that the target kind is spelled correctly",
-		Help:   "available kinds are registered in the engine; run `doit index` for supported target types",
-		Source: &e.Source,
-		Data:   e,
-	}
-}
-
-func (UnknownTargetKindError) Severity() signal.Severity { return signal.Error }
-func (UnknownTargetKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (FieldNotAllowedError) Severity() signal.Severity { return signal.Error }
+func (FieldNotAllowedError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 // CuePanicError wraps a panic recovered from the CUE library.
 // This handles (un-)known upstream bugs where CUE panics on malformed input.

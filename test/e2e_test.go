@@ -124,41 +124,44 @@ func runE2EScenarioWithDriver(t *testing.T, dir string, driver E2EDriver) {
 	store := spec.NewSourceStore()
 
 	ctx := context.Background()
-	cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
-	if err != nil {
-		if expect.Error {
-			return // Config errors are expected for some tests
+
+	run := func() error {
+		cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+		if err != nil {
+			return err
 		}
-		t.Fatalf("LoadConfig failed: %v", err)
-	}
 
-	// Resolve config to get first deploy block and first target
-	resolved, err := engine.Resolve(cfg, "", "")
-	if err != nil {
-		if expect.Error {
-			return // Resolution errors are expected for some tests
+		resolved, err := engine.Resolve(cfg, "", "")
+		if err != nil {
+			return err
 		}
-		t.Fatalf("Resolve failed: %v", err)
+
+		resolved.Target = ti
+		resolved.Target.Config = ti.Config
+
+		e, err := engine.NewWithTarget(ctx, src, resolved, em, tgt)
+		if err != nil {
+			return err
+		}
+
+		return e.Apply(ctx)
 	}
 
-	// Use the target instance from driver, but override the target
-	resolved.Target = ti
-	resolved.Target.Config = ti.Config
+	err := run()
 
-	e, err := engine.NewWithTarget(ctx, src, resolved, em, tgt)
-	if err != nil {
-		t.Fatalf("NewWithTarget failed: %v", err)
+	// Assert diagnostics first — they're recorded regardless of error/success
+	if len(expect.Diagnostics) > 0 {
+		gotDiags := rec.collectDiagnosticIDs()
+		if !stringSlicesEqual(gotDiags, expect.Diagnostics) {
+			t.Fatalf("diagnostics: got %v, want %v", gotDiags, expect.Diagnostics)
+		}
 	}
-	// Don't defer e.Close() here - the driver cleanup will close the target
-
-	err = e.Apply(ctx)
 
 	// Assert error expectation
 	if expect.Error {
 		if err == nil {
 			t.Fatalf("expected error, got success\n%s", rec)
 		}
-		// Error tests don't verify target state
 		return
 	}
 	if err != nil {
@@ -172,14 +175,6 @@ func runE2EScenarioWithDriver(t *testing.T, dir string, driver E2EDriver) {
 	gotChanged := rec.countChangedOps()
 	if gotChanged != expect.Changed {
 		t.Errorf("changed count: got %d, want %d", gotChanged, expect.Changed)
-	}
-
-	// Assert diagnostics (if specified)
-	if len(expect.Diagnostics) > 0 {
-		gotDiags := rec.collectDiagnosticIDs()
-		if !stringSlicesEqual(gotDiags, expect.Diagnostics) {
-			t.Errorf("diagnostics: got %v, want %v", gotDiags, expect.Diagnostics)
-		}
 	}
 }
 
