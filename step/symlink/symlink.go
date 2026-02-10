@@ -119,7 +119,7 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 	slTgt := target.Must[target.Symlink](id, tgt)
 
 	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.link)); err != nil {
-		return spec.CheckUnsatisfied, LinkDirMissing{
+		return spec.CheckUnsatisfied, LinkDirMissingError{
 			Path:   filepath.Dir(op.link),
 			Err:    err,
 			Source: op.linkSpan,
@@ -149,7 +149,7 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 	}
 
 	if info.Mode()&fs.ModeSymlink == 0 {
-		return spec.CheckUnsatisfied, NotASymlink{
+		return spec.CheckUnsatisfied, NotASymlinkError{
 			Path:   op.link,
 			Source: op.linkSpan,
 		}
@@ -184,7 +184,7 @@ func (op *ensureSymlinkOp) Execute(ctx context.Context, _ source.Source, tgt tar
 	if err == nil {
 		if info.Mode()&fs.ModeSymlink == 0 {
 			// Dest exists but is not a symlink, we won't touch those
-			return spec.Result{}, NotASymlink{
+			return spec.Result{}, NotASymlinkError{
 				Path:   op.link,
 				Source: op.linkSpan,
 			}

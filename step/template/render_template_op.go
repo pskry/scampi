@@ -53,7 +53,7 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 	}
 
 	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
-		return spec.CheckUnsatisfied, DestDirMissing{
+		return spec.CheckUnsatisfied, DestDirMissingError{
 			Path:   filepath.Dir(op.dest),
 			Err:    err,
 			Source: op.DestSpan,
@@ -118,7 +118,7 @@ func (op *renderTemplateOp) getTemplateContent(ctx context.Context, src source.S
 
 	data, err := src.ReadFile(ctx, op.src)
 	if err != nil {
-		return nil, TemplateSourceMissing{
+		return nil, TemplateSourceMissingError{
 			Path:   op.src,
 			Err:    err,
 			Source: op.SrcSpan,
@@ -140,7 +140,7 @@ func mergeData(cfg DataConfig, src source.Source) (map[string]any, error) {
 	for envVar, key := range cfg.Env {
 		// Check that key exists in values (schema validation)
 		if _, exists := data[key]; !exists {
-			return data, EnvKeyNotInValues{
+			return data, EnvKeyNotInValuesError{
 				EnvVar: envVar,
 				Key:    key,
 			}

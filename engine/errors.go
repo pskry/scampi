@@ -21,7 +21,7 @@ func (AbortError) Error() string {
 	return "execution aborted"
 }
 
-type CapabilityMismatch struct {
+type CapabilityMismatchError struct {
 	StepIndex    int
 	StepKind     string
 	RequiredCaps capability.Capability
@@ -30,14 +30,14 @@ type CapabilityMismatch struct {
 	Source       spec.SourceSpan
 }
 
-func (e CapabilityMismatch) Error() string {
+func (e CapabilityMismatchError) Error() string {
 	return fmt.Sprintf(
 		"step %q requires %s, but target only provides %s (missing: %s)",
 		e.StepKind, e.RequiredCaps, e.ProvidedCaps, e.MissingCaps,
 	)
 }
 
-func (e CapabilityMismatch) EventTemplate() event.Template {
+func (e CapabilityMismatchError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "engine.CapabilityMismatch",
 		Text:   `step "{{.StepKind}}" requires capabilities not provided by target`,
@@ -48,11 +48,11 @@ func (e CapabilityMismatch) EventTemplate() event.Template {
 	}
 }
 
-func (e CapabilityMismatch) Severity() signal.Severity {
+func (e CapabilityMismatchError) Severity() signal.Severity {
 	return signal.Error
 }
 
-func (e CapabilityMismatch) Impact() diagnostic.Impact {
+func (e CapabilityMismatchError) Impact() diagnostic.Impact {
 	return diagnostic.ImpactAbort
 }
 

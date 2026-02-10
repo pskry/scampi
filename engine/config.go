@@ -196,7 +196,7 @@ func loadConfigWithSource(
 	// Convert to a user-facing diagnostic rather than crashing.
 	defer func() {
 		if r := recover(); r != nil {
-			panicErr := CuePanic{Recovered: r}
+			panicErr := CuePanicError{Recovered: r}
 			_, _ = emitEngineDiagnostic(em, cfgPath, panicErr)
 			err = AbortError{Causes: []error{panicErr}}
 		}
@@ -281,12 +281,12 @@ func loadConfigPipeline(
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return spec.Config{}, InventoryNotFound{Path: addPath}
+			return spec.Config{}, InventoryNotFoundError{Path: addPath}
 		}
 
 		addInstances := load.Instances([]string{addPath}, loaderCfg)
 		if len(addInstances) == 0 {
-			return spec.Config{}, InventoryNotFound{Path: addPath}
+			return spec.Config{}, InventoryNotFoundError{Path: addPath}
 		}
 		addInstance := addInstances[0]
 		if err := addInstance.Err; err != nil {
@@ -384,7 +384,7 @@ func loadConfigPipeline(
 		}
 
 		if path, ok := isTypeMismatchError(ce); ok {
-			return spec.Config{}, TypeMismatch{
+			return spec.Config{}, TypeMismatchError{
 				Source: getErrorPathSpan(ce, userInst),
 				Path:   path,
 				Have:   describeCueValueShape(userInst, path),
@@ -511,7 +511,7 @@ func decodeStep(
 	// -----------------------------------------------------------------------------
 	st, ok := reg.StepType(kind)
 	if !ok {
-		impact, _ := emitPlanDiagnostic(em, stepIdx, kind, desc, UnknownStepKind{
+		impact, _ := emitPlanDiagnostic(em, stepIdx, kind, desc, UnknownStepKindError{
 			Kind:   kind,
 			Source: stepSpan,
 		})
@@ -626,14 +626,14 @@ func decodeTargetValue(
 				err,
 			))
 		}
-		return spec.TargetInstance{}, MissingTargetKind{
+		return spec.TargetInstance{}, MissingTargetKindError{
 			Source: extractSpanFromFile(userFile, cueTargets),
 		}
 	}
 
 	tt, ok := reg.TargetType(kind)
 	if !ok {
-		return spec.TargetInstance{}, UnknownTargetKind{
+		return spec.TargetInstance{}, UnknownTargetKindError{
 			Kind:   kind,
 			Source: extractSpanFromFile(userFile, cueTargets),
 		}
@@ -1020,7 +1020,7 @@ func loadConfigWithAdditionalFiles(
 	// Guard against panics in the CUE library
 	defer func() {
 		if r := recover(); r != nil {
-			panicErr := CuePanic{Recovered: r}
+			panicErr := CuePanicError{Recovered: r}
 			_, _ = emitEngineDiagnostic(em, cfgPath, panicErr)
 			err = AbortError{Causes: []error{panicErr}}
 		}
@@ -1036,7 +1036,7 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 	if len(opts.DeployNames) > 0 {
 		for _, name := range opts.DeployNames {
 			if _, ok := cfg.Deploy[name]; !ok {
-				return nil, UnknownDeployBlock{Name: name}
+				return nil, UnknownDeployBlockError{Name: name}
 			}
 		}
 		deployNames = opts.DeployNames
@@ -1047,7 +1047,7 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 	}
 
 	if len(deployNames) == 0 {
-		return nil, NoDeployBlocks{}
+		return nil, NoDeployBlocksError{}
 	}
 
 	var results []spec.ResolvedConfig
@@ -1074,13 +1074,13 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 		}
 
 		if len(targetNames) == 0 {
-			return nil, NoTargetsInDeploy{Deploy: deployName}
+			return nil, NoTargetsInDeployError{Deploy: deployName}
 		}
 
 		for _, targetName := range targetNames {
 			tgt, ok := cfg.Targets[targetName]
 			if !ok {
-				return nil, UnknownTarget{
+				return nil, UnknownTargetError{
 					Name:   targetName,
 					Deploy: deployName,
 				}
@@ -1098,7 +1098,7 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 	}
 
 	if len(results) == 0 {
-		return nil, NoDeployBlocks{}
+		return nil, NoDeployBlocksError{}
 	}
 
 	return results, nil
@@ -1113,7 +1113,7 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 		var ok bool
 		block, ok = cfg.Deploy[deployName]
 		if !ok {
-			return spec.ResolvedConfig{}, UnknownDeployBlock{Name: deployName}
+			return spec.ResolvedConfig{}, UnknownDeployBlockError{Name: deployName}
 		}
 	} else {
 		// Pick first deploy block (map iteration order is random, but for
@@ -1124,13 +1124,13 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 			break
 		}
 		if deployName == "" {
-			return spec.ResolvedConfig{}, NoDeployBlocks{}
+			return spec.ResolvedConfig{}, NoDeployBlocksError{}
 		}
 	}
 
 	if targetName == "" {
 		if len(block.Targets) == 0 {
-			return spec.ResolvedConfig{}, NoTargetsInDeploy{Deploy: deployName}
+			return spec.ResolvedConfig{}, NoTargetsInDeployError{Deploy: deployName}
 		}
 		targetName = block.Targets[0]
 	}
@@ -1138,7 +1138,7 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 	// Verify target exists in config
 	tgt, ok := cfg.Targets[targetName]
 	if !ok {
-		return spec.ResolvedConfig{}, UnknownTarget{
+		return spec.ResolvedConfig{}, UnknownTargetError{
 			Name:   targetName,
 			Deploy: deployName,
 		}
@@ -1153,7 +1153,7 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 		}
 	}
 	if !found {
-		return spec.ResolvedConfig{}, TargetNotInDeploy{
+		return spec.ResolvedConfig{}, TargetNotInDeployError{
 			Target: targetName,
 			Deploy: deployName,
 		}

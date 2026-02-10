@@ -13,17 +13,17 @@ import (
 	"godoit.dev/doit/spec"
 )
 
-type InvalidPermission struct {
+type InvalidPermissionError struct {
 	Value  string
 	Hint   string
 	Source spec.SourceSpan
 }
 
-func (e InvalidPermission) Error() string {
+func (e InvalidPermissionError) Error() string {
 	return fmt.Sprintf("invalid permission %q", e.Value)
 }
 
-func (e InvalidPermission) EventTemplate() event.Template {
+func (e InvalidPermissionError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "builtin.copy.InvalidPermission",
 		Text: "invalid file permission '{{.Value}}'",
@@ -37,8 +37,8 @@ func (e InvalidPermission) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidPermission) Severity() signal.Severity { return signal.Error }
-func (InvalidPermission) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (InvalidPermissionError) Severity() signal.Severity { return signal.Error }
+func (InvalidPermissionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 var (
 	octalRe = regexp.MustCompile(`^0[0-7]{3}$`)
@@ -57,7 +57,7 @@ func ParsePerm(s string, src spec.SourceSpan) (fs.FileMode, error) {
 		return m, nil
 	}
 
-	return 0, InvalidPermission{
+	return 0, InvalidPermissionError{
 		Value:  s,
 		Source: src,
 	}

@@ -9,17 +9,17 @@ import (
 	"godoit.dev/doit/spec"
 )
 
-type LinkDirMissing struct {
+type LinkDirMissingError struct {
 	Path   string
 	Source spec.SourceSpan
 	Err    error
 }
 
-func (e LinkDirMissing) Error() string {
+func (e LinkDirMissingError) Error() string {
 	return fmt.Sprintf("link directory %q does not exist", e.Path)
 }
 
-func (e LinkDirMissing) EventTemplate() event.Template {
+func (e LinkDirMissingError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.symlink.LinkDirMissing",
 		Text:   `link directory "{{.Path}}" does not exist`,
@@ -30,8 +30,8 @@ func (e LinkDirMissing) EventTemplate() event.Template {
 	}
 }
 
-func (LinkDirMissing) Severity() signal.Severity { return signal.Error }
-func (LinkDirMissing) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (LinkDirMissingError) Severity() signal.Severity { return signal.Error }
+func (LinkDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type LinkReadError struct {
 	Path   string
@@ -60,16 +60,16 @@ func (e LinkReadError) EventTemplate() event.Template {
 func (LinkReadError) Severity() signal.Severity { return signal.Error }
 func (LinkReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type NotASymlink struct {
+type NotASymlinkError struct {
 	Path   string
 	Source spec.SourceSpan
 }
 
-func (e NotASymlink) Error() string {
+func (e NotASymlinkError) Error() string {
 	return fmt.Sprintf("path %q exists but is not a symlink", e.Path)
 }
 
-func (e NotASymlink) EventTemplate() event.Template {
+func (e NotASymlinkError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.symlink.NotASymlink",
 		Text:   `path "{{.Path}}" exists but is not a symlink`,
@@ -80,5 +80,5 @@ func (e NotASymlink) EventTemplate() event.Template {
 	}
 }
 
-func (NotASymlink) Severity() signal.Severity { return signal.Error }
-func (NotASymlink) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (NotASymlinkError) Severity() signal.Severity { return signal.Error }
+func (NotASymlinkError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

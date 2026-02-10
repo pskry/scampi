@@ -10,7 +10,7 @@ import (
 	"godoit.dev/doit/spec"
 )
 
-type CyclicDependency struct {
+type CyclicDependencyError struct {
 	Cycle []spec.Op
 }
 
@@ -24,7 +24,7 @@ func opID(op spec.Op) string {
 	return fmt.Sprintf("%p", op)
 }
 
-func (e CyclicDependency) Error() string {
+func (e CyclicDependencyError) Error() string {
 	ids := make([]string, 0, len(e.Cycle))
 	for _, op := range e.Cycle {
 		ids = append(ids, opID(op))
@@ -32,7 +32,7 @@ func (e CyclicDependency) Error() string {
 	return "cyclic dependency: " + strings.Join(ids, " -> ")
 }
 
-func (e CyclicDependency) EventTemplate() event.Template {
+func (e CyclicDependencyError) EventTemplate() event.Template {
 	ids := make([]string, 0, len(e.Cycle))
 	for _, op := range e.Cycle {
 		ids = append(ids, opID(op))
@@ -46,15 +46,15 @@ func (e CyclicDependency) EventTemplate() event.Template {
 	}
 }
 
-func (e CyclicDependency) Severity() signal.Severity { return signal.Error }
-func (CyclicDependency) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+func (e CyclicDependencyError) Severity() signal.Severity { return signal.Error }
+func (CyclicDependencyError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
 func DetectPlanCycles(em diagnostic.Emitter, plan spec.Plan) error {
 	cycles := detectPlanCycles(plan)
 	if len(cycles) > 0 {
 		var err AbortError
 		for _, cycle := range cycles {
-			cd := CyclicDependency{Cycle: cycle}
+			cd := CyclicDependencyError{Cycle: cycle}
 			err.Causes = append(err.Causes, cd)
 
 			em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(
@@ -162,8 +162,8 @@ func ptr(op spec.Op) string {
 	return fmt.Sprintf("%p", op)
 }
 
-// ActionCyclicDependency represents a cycle in the action dependency graph.
-type ActionCyclicDependency struct {
+// ActionCyclicDependencyError represents a cycle in the action dependency graph.
+type ActionCyclicDependencyError struct {
 	Cycle []spec.Action
 }
 
@@ -174,7 +174,7 @@ func actionID(act spec.Action) string {
 	return fmt.Sprintf("%s@%p", act.Kind(), act)
 }
 
-func (e ActionCyclicDependency) Error() string {
+func (e ActionCyclicDependencyError) Error() string {
 	ids := make([]string, 0, len(e.Cycle))
 	for _, act := range e.Cycle {
 		ids = append(ids, actionID(act))
@@ -182,7 +182,7 @@ func (e ActionCyclicDependency) Error() string {
 	return "cyclic action dependency: " + strings.Join(ids, " -> ")
 }
 
-func (e ActionCyclicDependency) EventTemplate() event.Template {
+func (e ActionCyclicDependencyError) EventTemplate() event.Template {
 	ids := make([]string, 0, len(e.Cycle))
 	for _, act := range e.Cycle {
 		ids = append(ids, actionID(act))
@@ -196,8 +196,8 @@ func (e ActionCyclicDependency) EventTemplate() event.Template {
 	}
 }
 
-func (e ActionCyclicDependency) Severity() signal.Severity { return signal.Error }
-func (ActionCyclicDependency) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+func (e ActionCyclicDependencyError) Severity() signal.Severity { return signal.Error }
+func (ActionCyclicDependencyError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
 // DetectActionCycles checks for cycles in the action dependency graph.
 func DetectActionCycles(em diagnostic.Emitter, nodes []*actionNode) error {
@@ -205,7 +205,7 @@ func DetectActionCycles(em diagnostic.Emitter, nodes []*actionNode) error {
 	if len(cycles) > 0 {
 		var err AbortError
 		for _, cycle := range cycles {
-			cd := ActionCyclicDependency{Cycle: cycle}
+			cd := ActionCyclicDependencyError{Cycle: cycle}
 			err.Causes = append(err.Causes, cd)
 
 			em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(

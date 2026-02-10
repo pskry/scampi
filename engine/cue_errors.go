@@ -35,29 +35,29 @@ var (
 func ValidateCueInput(data []byte) error {
 	// Reject invalid UTF-8 - CUE hangs on certain malformed byte sequences
 	if !utf8.Valid(data) {
-		return MalformedInput{Reason: "invalid UTF-8 encoding"}
+		return MalformedInputError{Reason: "invalid UTF-8 encoding"}
 	}
 	// Reject Unicode control characters (C0 and C1 ranges) except tab, newline, CR
 	// CUE hangs or crashes on certain control characters
 	if hasDisallowedControlChars(data) {
-		return MalformedInput{Reason: "disallowed control characters"}
+		return MalformedInputError{Reason: "disallowed control characters"}
 	}
 	// Reject Unicode combining marks which cause CUE stack overflow
 	if unicodeMarkRe.Match(data) {
-		return MalformedInput{Reason: "Unicode combining marks trigger CUE stack overflow"}
+		return MalformedInputError{Reason: "Unicode combining marks trigger CUE stack overflow"}
 	}
 	if resourceBombRe.Match(data) {
-		return MalformedInput{Reason: "resource exhaustion pattern detected (large multiplier)"}
+		return MalformedInputError{Reason: "resource exhaustion pattern detected (large multiplier)"}
 	}
 	if stringMultRe.Match(data) {
-		return MalformedInput{Reason: "string literal multiplication triggers CUE hang"}
+		return MalformedInputError{Reason: "string literal multiplication triggers CUE hang"}
 	}
 	// Normalize whitespace before checking hang pattern
 	normalized := whitespaceRe.ReplaceAll(data, nil)
 	// Check if input lacks structural braces (outside of strings) and has at least one colon
 	// These patterns trigger CUE evaluator bugs
 	if !hasStructuralBraces(normalized) && countColons(normalized) >= 1 {
-		return MalformedInput{Reason: "pattern triggers CUE evaluator bug (upstream issue #4231)"}
+		return MalformedInputError{Reason: "pattern triggers CUE evaluator bug (upstream issue #4231)"}
 	}
 	return nil
 }
@@ -125,15 +125,15 @@ func countColons(data []byte) int {
 	return n
 }
 
-type MalformedInput struct {
+type MalformedInputError struct {
 	Reason string
 }
 
-func (e MalformedInput) Error() string {
+func (e MalformedInputError) Error() string {
 	return fmt.Sprintf("malformed input: %s", e.Reason)
 }
 
-func (e MalformedInput) EventTemplate() event.Template {
+func (e MalformedInputError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.MalformedInput",
 		Text: "malformed configuration input",
@@ -142,8 +142,8 @@ func (e MalformedInput) EventTemplate() event.Template {
 	}
 }
 
-func (MalformedInput) Severity() signal.Severity { return signal.Error }
-func (MalformedInput) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (MalformedInputError) Severity() signal.Severity { return signal.Error }
+func (MalformedInputError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type CueDiagnostic struct {
 	Err   cueerr.Error
@@ -217,18 +217,18 @@ func (d MissingFieldDiagnostic) EventTemplate() event.Template {
 func (MissingFieldDiagnostic) Severity() signal.Severity { return signal.Error }
 func (MissingFieldDiagnostic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type TypeMismatch struct {
+type TypeMismatchError struct {
 	Source spec.SourceSpan
 	Path   string
 	Have   string
 	Want   string
 }
 
-func (e TypeMismatch) Error() string {
+func (e TypeMismatchError) Error() string {
 	return fmt.Sprintf("type mismatch in %q: have %q, want %q", e.Path, e.Have, e.Want)
 }
 
-func (e TypeMismatch) EventTemplate() event.Template {
+func (e TypeMismatchError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "core.TypeMismatch",
 		Text:   "type mismatch in '{{.Path}}', expected {{.Want}}",
@@ -238,20 +238,20 @@ func (e TypeMismatch) EventTemplate() event.Template {
 	}
 }
 
-func (e TypeMismatch) Severity() signal.Severity { return signal.Error }
-func (TypeMismatch) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+func (e TypeMismatchError) Severity() signal.Severity { return signal.Error }
+func (TypeMismatchError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
-type InvalidUnitShape struct {
+type InvalidUnitShapeError struct {
 	Source spec.SourceSpan
 	Have   string
 	Want   string
 }
 
-func (e InvalidUnitShape) Error() string {
+func (e InvalidUnitShapeError) Error() string {
 	return fmt.Sprintf("invalid unit declaration: have %q, want %q", e.Have, e.Want)
 }
 
-func (e InvalidUnitShape) EventTemplate() event.Template {
+func (e InvalidUnitShapeError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "core.InvalidUnitShape",
 		Text:   "invalid 'unit' declaration, expected {{.Want}}",
@@ -262,20 +262,20 @@ func (e InvalidUnitShape) EventTemplate() event.Template {
 	}
 }
 
-func (e InvalidUnitShape) Severity() signal.Severity { return signal.Error }
-func (InvalidUnitShape) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+func (e InvalidUnitShapeError) Severity() signal.Severity { return signal.Error }
+func (InvalidUnitShapeError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
-type InvalidStepsShape struct {
+type InvalidStepsShapeError struct {
 	Source spec.SourceSpan
 	Have   string
 	Want   string
 }
 
-func (e InvalidStepsShape) Error() string {
+func (e InvalidStepsShapeError) Error() string {
 	return fmt.Sprintf("invalid steps declaration: have %q, want %q", e.Have, e.Want)
 }
 
-func (e InvalidStepsShape) EventTemplate() event.Template {
+func (e InvalidStepsShapeError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "core.InvalidStepsShape",
 		Text:   "invalid 'steps' declaration, expected {{.Want}}",
@@ -286,19 +286,19 @@ func (e InvalidStepsShape) EventTemplate() event.Template {
 	}
 }
 
-func (e InvalidStepsShape) Severity() signal.Severity { return signal.Error }
-func (InvalidStepsShape) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
+func (e InvalidStepsShapeError) Severity() signal.Severity { return signal.Error }
+func (InvalidStepsShapeError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
-type UnknownStepKind struct {
+type UnknownStepKindError struct {
 	Kind   string
 	Source spec.SourceSpan
 }
 
-func (e UnknownStepKind) Error() string {
+func (e UnknownStepKindError) Error() string {
 	return fmt.Sprintf("unknown step kind %q", e.Kind)
 }
 
-func (e UnknownStepKind) EventTemplate() event.Template {
+func (e UnknownStepKindError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "config.UnknownStepKind",
 		Text:   `unknown step kind "{{.Kind}}"`,
@@ -309,18 +309,18 @@ func (e UnknownStepKind) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownStepKind) Severity() signal.Severity { return signal.Error }
-func (UnknownStepKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (UnknownStepKindError) Severity() signal.Severity { return signal.Error }
+func (UnknownStepKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type MissingTargetKind struct {
+type MissingTargetKindError struct {
 	Source spec.SourceSpan
 }
 
-func (e MissingTargetKind) Error() string {
+func (e MissingTargetKindError) Error() string {
 	return "missing target kind"
 }
 
-func (e MissingTargetKind) EventTemplate() event.Template {
+func (e MissingTargetKindError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "config.MissingTargetKind",
 		Text:   "missing target kind",
@@ -331,19 +331,19 @@ func (e MissingTargetKind) EventTemplate() event.Template {
 	}
 }
 
-func (MissingTargetKind) Severity() signal.Severity { return signal.Error }
-func (MissingTargetKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (MissingTargetKindError) Severity() signal.Severity { return signal.Error }
+func (MissingTargetKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type UnknownTargetKind struct {
+type UnknownTargetKindError struct {
 	Kind   string
 	Source spec.SourceSpan
 }
 
-func (e UnknownTargetKind) Error() string {
+func (e UnknownTargetKindError) Error() string {
 	return fmt.Sprintf("unknown target kind %q", e.Kind)
 }
 
-func (e UnknownTargetKind) EventTemplate() event.Template {
+func (e UnknownTargetKindError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "config.UnknownTargetKind",
 		Text:   `unknown target kind "{{.Kind}}"`,
@@ -354,20 +354,20 @@ func (e UnknownTargetKind) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownTargetKind) Severity() signal.Severity { return signal.Error }
-func (UnknownTargetKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (UnknownTargetKindError) Severity() signal.Severity { return signal.Error }
+func (UnknownTargetKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-// CuePanic wraps a panic recovered from the CUE library.
+// CuePanicError wraps a panic recovered from the CUE library.
 // This handles (un-)known upstream bugs where CUE panics on malformed input.
-type CuePanic struct {
+type CuePanicError struct {
 	Recovered any
 }
 
-func (e CuePanic) Error() string {
+func (e CuePanicError) Error() string {
 	return fmt.Sprintf("cue panic: %v", e.Recovered)
 }
 
-func (e CuePanic) EventTemplate() event.Template {
+func (e CuePanicError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "cue.InternalError",
 		Text: "CUE encountered an internal error while parsing configuration",
@@ -377,19 +377,19 @@ func (e CuePanic) EventTemplate() event.Template {
 	}
 }
 
-func (CuePanic) Severity() signal.Severity { return signal.Error }
-func (CuePanic) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (CuePanicError) Severity() signal.Severity { return signal.Error }
+func (CuePanicError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-// UnknownIndexKind is emitted when a user requests documentation for an unknown step kind.
-type UnknownIndexKind struct {
+// UnknownIndexKindError is emitted when a user requests documentation for an unknown step kind.
+type UnknownIndexKindError struct {
 	Kind string
 }
 
-func (e UnknownIndexKind) Error() string {
+func (e UnknownIndexKindError) Error() string {
 	return fmt.Sprintf("unknown step kind %q", e.Kind)
 }
 
-func (e UnknownIndexKind) EventTemplate() event.Template {
+func (e UnknownIndexKindError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "index.UnknownKind",
 		Text: `unknown step kind "{{.Kind}}"`,
@@ -398,20 +398,20 @@ func (e UnknownIndexKind) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownIndexKind) Severity() signal.Severity { return signal.Error }
-func (UnknownIndexKind) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (UnknownIndexKindError) Severity() signal.Severity { return signal.Error }
+func (UnknownIndexKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 // Resolution errors - emitted when resolving Config to ResolvedConfig
 
-type UnknownDeployBlock struct {
+type UnknownDeployBlockError struct {
 	Name string
 }
 
-func (e UnknownDeployBlock) Error() string {
+func (e UnknownDeployBlockError) Error() string {
 	return fmt.Sprintf("unknown deploy block %q", e.Name)
 }
 
-func (e UnknownDeployBlock) EventTemplate() event.Template {
+func (e UnknownDeployBlockError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.UnknownDeployBlock",
 		Text: `unknown deploy block "{{.Name}}"`,
@@ -420,16 +420,16 @@ func (e UnknownDeployBlock) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownDeployBlock) Severity() signal.Severity { return signal.Error }
-func (UnknownDeployBlock) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (UnknownDeployBlockError) Severity() signal.Severity { return signal.Error }
+func (UnknownDeployBlockError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type NoDeployBlocks struct{}
+type NoDeployBlocksError struct{}
 
-func (NoDeployBlocks) Error() string {
+func (NoDeployBlocksError) Error() string {
 	return "no deploy blocks defined"
 }
 
-func (NoDeployBlocks) EventTemplate() event.Template {
+func (NoDeployBlocksError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.NoDeployBlocks",
 		Text: "no deploy blocks defined",
@@ -437,18 +437,18 @@ func (NoDeployBlocks) EventTemplate() event.Template {
 	}
 }
 
-func (NoDeployBlocks) Severity() signal.Severity { return signal.Error }
-func (NoDeployBlocks) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (NoDeployBlocksError) Severity() signal.Severity { return signal.Error }
+func (NoDeployBlocksError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type NoTargetsInDeploy struct {
+type NoTargetsInDeployError struct {
 	Deploy string
 }
 
-func (e NoTargetsInDeploy) Error() string {
+func (e NoTargetsInDeployError) Error() string {
 	return fmt.Sprintf("deploy block %q has no targets", e.Deploy)
 }
 
-func (e NoTargetsInDeploy) EventTemplate() event.Template {
+func (e NoTargetsInDeployError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.NoTargetsInDeploy",
 		Text: `deploy block "{{.Deploy}}" has no targets`,
@@ -457,19 +457,19 @@ func (e NoTargetsInDeploy) EventTemplate() event.Template {
 	}
 }
 
-func (NoTargetsInDeploy) Severity() signal.Severity { return signal.Error }
-func (NoTargetsInDeploy) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (NoTargetsInDeployError) Severity() signal.Severity { return signal.Error }
+func (NoTargetsInDeployError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type UnknownTarget struct {
+type UnknownTargetError struct {
 	Name   string
 	Deploy string
 }
 
-func (e UnknownTarget) Error() string {
+func (e UnknownTargetError) Error() string {
 	return fmt.Sprintf("unknown target %q referenced in deploy block %q", e.Name, e.Deploy)
 }
 
-func (e UnknownTarget) EventTemplate() event.Template {
+func (e UnknownTargetError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.UnknownTarget",
 		Text: `unknown target "{{.Name}}" referenced in deploy block "{{.Deploy}}"`,
@@ -478,19 +478,19 @@ func (e UnknownTarget) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownTarget) Severity() signal.Severity { return signal.Error }
-func (UnknownTarget) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (UnknownTargetError) Severity() signal.Severity { return signal.Error }
+func (UnknownTargetError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type TargetNotInDeploy struct {
+type TargetNotInDeployError struct {
 	Target string
 	Deploy string
 }
 
-func (e TargetNotInDeploy) Error() string {
+func (e TargetNotInDeployError) Error() string {
 	return fmt.Sprintf("target %q is not in deploy block %q's target list", e.Target, e.Deploy)
 }
 
-func (e TargetNotInDeploy) EventTemplate() event.Template {
+func (e TargetNotInDeployError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.TargetNotInDeploy",
 		Text: `target "{{.Target}}" is not in deploy block "{{.Deploy}}"'s target list`,
@@ -499,18 +499,18 @@ func (e TargetNotInDeploy) EventTemplate() event.Template {
 	}
 }
 
-func (TargetNotInDeploy) Severity() signal.Severity { return signal.Error }
-func (TargetNotInDeploy) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (TargetNotInDeployError) Severity() signal.Severity { return signal.Error }
+func (TargetNotInDeployError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type InventoryNotFound struct {
+type InventoryNotFoundError struct {
 	Path string
 }
 
-func (e InventoryNotFound) Error() string {
+func (e InventoryNotFoundError) Error() string {
 	return fmt.Sprintf("inventory file not found: %s", e.Path)
 }
 
-func (e InventoryNotFound) EventTemplate() event.Template {
+func (e InventoryNotFoundError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "config.InventoryNotFound",
 		Text: `inventory file not found: {{.Path}}`,
@@ -519,5 +519,5 @@ func (e InventoryNotFound) EventTemplate() event.Template {
 	}
 }
 
-func (InventoryNotFound) Severity() signal.Severity { return signal.Error }
-func (InventoryNotFound) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (InventoryNotFoundError) Severity() signal.Severity { return signal.Error }
+func (InventoryNotFoundError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

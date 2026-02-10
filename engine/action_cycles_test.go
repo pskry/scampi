@@ -63,7 +63,7 @@ func TestActionCyclicDependency_Error(t *testing.T) {
 	a := &mockPatherAction{desc: "action-A"}
 	b := &mockPatherAction{desc: "action-B"}
 
-	err := ActionCyclicDependency{
+	err := ActionCyclicDependencyError{
 		Cycle: []spec.Action{a, b, a},
 	}
 

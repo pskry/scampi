@@ -24,7 +24,7 @@ func IndexStep(_ context.Context, stepKind string, em diagnostic.Emitter) error 
 	reg := NewRegistry()
 	_, ok := reg.StepType(stepKind)
 	if !ok {
-		emitIndexDiagnostic(em, UnknownIndexKind{Kind: stepKind})
+		emitIndexDiagnostic(em, UnknownIndexKindError{Kind: stepKind})
 		return AbortError{}
 	}
 

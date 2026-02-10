@@ -75,7 +75,7 @@ func plan(
 
 		reqCaps := collectRequiredCaps(act)
 		if misCaps := reqCaps &^ tgtCaps; misCaps != 0 {
-			err := CapabilityMismatch{
+			err := CapabilityMismatchError{
 				StepIndex:    i,
 				StepKind:     act.Kind(),
 				RequiredCaps: reqCaps,

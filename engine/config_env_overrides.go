@@ -72,21 +72,21 @@ func parseEnvValForKind(kind cue.Kind, envVar, envVal string) (any, diagnostic.D
 	case kind.IsAnyOf(cue.IntKind):
 		n, err := strconv.ParseInt(envVal, 0, 64)
 		if err != nil {
-			return nil, InvalidEnvVar{Key: envVar, Value: envVal, Kind: "int", Err: err}
+			return nil, InvalidEnvVarError{Key: envVar, Value: envVal, Kind: "int", Err: err}
 		}
 		return n, nil
 
 	case kind.IsAnyOf(cue.FloatKind):
 		f, err := strconv.ParseFloat(envVal, 64)
 		if err != nil {
-			return nil, InvalidEnvVar{Key: envVar, Value: envVal, Kind: "float", Err: err}
+			return nil, InvalidEnvVarError{Key: envVar, Value: envVal, Kind: "float", Err: err}
 		}
 		return f, nil
 
 	case kind.IsAnyOf(cue.BoolKind):
 		b, err := strconv.ParseBool(envVal)
 		if err != nil {
-			return nil, InvalidEnvVar{Key: envVar, Value: envVal, Kind: "bool", Err: err}
+			return nil, InvalidEnvVarError{Key: envVar, Value: envVal, Kind: "bool", Err: err}
 		}
 		return b, nil
 	}
@@ -131,7 +131,7 @@ func applyEnvOverridesToStruct(cfg any, envMap map[string]string, src source.Sou
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			n, err := strconv.ParseInt(envVal, 0, 64)
 			if err != nil {
-				diags = append(diags, InvalidEnvVar{
+				diags = append(diags, InvalidEnvVarError{
 					Key:   envVar,
 					Value: envVal,
 					Kind:  "int",
@@ -144,7 +144,7 @@ func applyEnvOverridesToStruct(cfg any, envMap map[string]string, src source.Sou
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			n, err := strconv.ParseUint(envVal, 0, 64)
 			if err != nil {
-				diags = append(diags, InvalidEnvVar{
+				diags = append(diags, InvalidEnvVarError{
 					Key:   envVar,
 					Value: envVal,
 					Kind:  "uint",
@@ -157,7 +157,7 @@ func applyEnvOverridesToStruct(cfg any, envMap map[string]string, src source.Sou
 		case reflect.Float32, reflect.Float64:
 			f, err := strconv.ParseFloat(envVal, 64)
 			if err != nil {
-				diags = append(diags, InvalidEnvVar{
+				diags = append(diags, InvalidEnvVarError{
 					Key:   envVar,
 					Value: envVal,
 					Kind:  "float",
@@ -170,7 +170,7 @@ func applyEnvOverridesToStruct(cfg any, envMap map[string]string, src source.Sou
 		case reflect.Bool:
 			b, err := strconv.ParseBool(envVal)
 			if err != nil {
-				diags = append(diags, InvalidEnvVar{
+				diags = append(diags, InvalidEnvVarError{
 					Key:   envVar,
 					Value: envVal,
 					Kind:  "bool",
@@ -188,18 +188,18 @@ func applyEnvOverridesToStruct(cfg any, envMap map[string]string, src source.Sou
 	return nil
 }
 
-type InvalidEnvVar struct {
+type InvalidEnvVarError struct {
 	Key   string
 	Value string
 	Kind  string
 	Err   error
 }
 
-func (e InvalidEnvVar) Error() string {
+func (e InvalidEnvVarError) Error() string {
 	return fmt.Sprintf("invalid environment variable %q (%q): %v", e.Key, e.Value, e.Err)
 }
 
-func (e InvalidEnvVar) EventTemplate() event.Template {
+func (e InvalidEnvVarError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "env.InvalidEnvVar",
 		Text: `failed to parse ENV "{{.Key}}"`,
@@ -209,5 +209,5 @@ func (e InvalidEnvVar) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidEnvVar) Severity() signal.Severity { return signal.Warning }
-func (InvalidEnvVar) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (InvalidEnvVarError) Severity() signal.Severity { return signal.Warning }
+func (InvalidEnvVarError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

@@ -29,7 +29,7 @@ func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.T
 
 	srcData, err := src.ReadFile(ctx, op.src)
 	if err != nil {
-		return spec.CheckUnsatisfied, CopySourceMissing{
+		return spec.CheckUnsatisfied, CopySourceMissingError{
 			Path:   op.src,
 			Err:    err,
 			Source: op.SrcSpan,
@@ -37,7 +37,7 @@ func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.T
 	}
 
 	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
-		return spec.CheckUnsatisfied, CopyDestDirMissing{
+		return spec.CheckUnsatisfied, CopyDestDirMissingError{
 			Path:   filepath.Dir(op.dest),
 			Err:    err,
 			Source: op.DestSpan,
@@ -100,17 +100,17 @@ func (op *copyFileOp) OpDescription() spec.OpDescription {
 	}
 }
 
-type CopySourceMissing struct {
+type CopySourceMissingError struct {
 	Path   string
 	Source spec.SourceSpan
 	Err    error
 }
 
-func (e CopySourceMissing) Error() string {
+func (e CopySourceMissingError) Error() string {
 	return fmt.Sprintf("source file %q does not exist", e.Path)
 }
 
-func (e CopySourceMissing) EventTemplate() event.Template {
+func (e CopySourceMissingError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.copy.SourceMissing",
 		Text:   `source file "{{.Path}}" does not exist`,
@@ -121,20 +121,20 @@ func (e CopySourceMissing) EventTemplate() event.Template {
 	}
 }
 
-func (CopySourceMissing) Severity() signal.Severity { return signal.Error }
-func (CopySourceMissing) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (CopySourceMissingError) Severity() signal.Severity { return signal.Error }
+func (CopySourceMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type CopyDestDirMissing struct {
+type CopyDestDirMissingError struct {
 	Path   string
 	Source spec.SourceSpan
 	Err    error
 }
 
-func (e CopyDestDirMissing) Error() string {
+func (e CopyDestDirMissingError) Error() string {
 	return fmt.Sprintf("destination directory %q does not exist", e.Path)
 }
 
-func (e CopyDestDirMissing) EventTemplate() event.Template {
+func (e CopyDestDirMissingError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.copy.DestDirMissing",
 		Text:   `destination directory "{{.Path}}" does not exist`,
@@ -145,5 +145,5 @@ func (e CopyDestDirMissing) EventTemplate() event.Template {
 	}
 }
 
-func (CopyDestDirMissing) Severity() signal.Severity { return signal.Error }
-func (CopyDestDirMissing) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (CopyDestDirMissingError) Severity() signal.Severity { return signal.Error }
+func (CopyDestDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

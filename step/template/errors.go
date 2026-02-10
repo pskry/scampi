@@ -9,17 +9,17 @@ import (
 	"godoit.dev/doit/spec"
 )
 
-type EnvKeyNotInValues struct {
+type EnvKeyNotInValuesError struct {
 	EnvVar string
 	Key    string
 	Source spec.SourceSpan
 }
 
-func (e EnvKeyNotInValues) Error() string {
+func (e EnvKeyNotInValuesError) Error() string {
 	return fmt.Sprintf("env var %q maps to key %q which is not defined in values", e.EnvVar, e.Key)
 }
 
-func (e EnvKeyNotInValues) EventTemplate() event.Template {
+func (e EnvKeyNotInValuesError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.template.EnvKeyNotInValues",
 		Text:   `env var "{{.EnvVar}}" maps to key "{{.Key}}" which is not defined in values`,
@@ -30,20 +30,20 @@ func (e EnvKeyNotInValues) EventTemplate() event.Template {
 	}
 }
 
-func (EnvKeyNotInValues) Severity() signal.Severity { return signal.Error }
-func (EnvKeyNotInValues) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (EnvKeyNotInValuesError) Severity() signal.Severity { return signal.Error }
+func (EnvKeyNotInValuesError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type TemplateSourceMissing struct {
+type TemplateSourceMissingError struct {
 	Path   string
 	Source spec.SourceSpan
 	Err    error
 }
 
-func (e TemplateSourceMissing) Error() string {
+func (e TemplateSourceMissingError) Error() string {
 	return fmt.Sprintf("template source %q does not exist", e.Path)
 }
 
-func (e TemplateSourceMissing) EventTemplate() event.Template {
+func (e TemplateSourceMissingError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.template.SourceMissing",
 		Text:   `template source "{{.Path}}" does not exist`,
@@ -54,8 +54,8 @@ func (e TemplateSourceMissing) EventTemplate() event.Template {
 	}
 }
 
-func (TemplateSourceMissing) Severity() signal.Severity { return signal.Error }
-func (TemplateSourceMissing) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (TemplateSourceMissingError) Severity() signal.Severity { return signal.Error }
+func (TemplateSourceMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type TemplateParseError struct {
 	Err    error
@@ -111,17 +111,17 @@ func (e TemplateExecError) EventTemplate() event.Template {
 func (TemplateExecError) Severity() signal.Severity { return signal.Error }
 func (TemplateExecError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
-type DestDirMissing struct {
+type DestDirMissingError struct {
 	Path   string
 	Source spec.SourceSpan
 	Err    error
 }
 
-func (e DestDirMissing) Error() string {
+func (e DestDirMissingError) Error() string {
 	return fmt.Sprintf("destination directory %q does not exist", e.Path)
 }
 
-func (e DestDirMissing) EventTemplate() event.Template {
+func (e DestDirMissingError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.template.DestDirMissing",
 		Text:   `destination directory "{{.Path}}" does not exist`,
@@ -132,5 +132,5 @@ func (e DestDirMissing) EventTemplate() event.Template {
 	}
 }
 
-func (DestDirMissing) Severity() signal.Severity { return signal.Error }
-func (DestDirMissing) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (DestDirMissingError) Severity() signal.Severity { return signal.Error }
+func (DestDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
