@@ -118,7 +118,6 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 	fsTgt := target.Must[target.Filesystem](id, tgt)
 	slTgt := target.Must[target.Symlink](id, tgt)
 
-	// Link parent dir must exist
 	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.link)); err != nil {
 		return spec.CheckUnsatisfied, LinkDirMissing{
 			Path:   filepath.Dir(op.link),
@@ -127,7 +126,6 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 		}
 	}
 
-	// Compute relative target path
 	relTarget, err := resolveTarget(op.target, op.link)
 	if err != nil {
 		return spec.CheckUnsatisfied, LinkReadError{
@@ -137,7 +135,6 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 		}
 	}
 
-	// Check what exists at link path
 	info, err := slTgt.Lstat(ctx, op.link)
 	if err != nil {
 		if target.IsNotExist(err) {
@@ -151,7 +148,6 @@ func (op *ensureSymlinkOp) Check(ctx context.Context, _ source.Source, tgt targe
 		}
 	}
 
-	// Must be a symlink (not regular file/dir)
 	if info.Mode()&fs.ModeSymlink == 0 {
 		return spec.CheckUnsatisfied, NotASymlink{
 			Path:   op.link,

@@ -43,7 +43,7 @@ func Render(r Renderable) (string, bool) {
 }
 
 // Template funcs
-// ===============================================
+// -----------------------------------------------------------------------------
 
 func join(sep string, s []string) string {
 	return strings.Join(s, sep)

@@ -79,7 +79,6 @@ func (s *sourceCapturingFS) Open(name string) (fs.File, error) {
 		}
 	}
 
-	// Give CUE a fresh file
 	return s.fs.Open(name)
 }
 
@@ -227,7 +226,6 @@ func loadConfigWithSourceUnsafe(
 		panic(errs.BUG("embedded schema FS corrupted: %w", err))
 	}
 
-	// One loader config for both schema and user config
 	loaderCfg := &load.Config{
 		FS: overlayFS{
 			Embedded: embFS,
@@ -317,8 +315,8 @@ func loadConfigWithSourceUnsafe(
 		}
 	}
 
-	// apply schema
-	// ----------------------------------------------------------------------------
+	// Apply schema
+	// --------------------------------------------------------------------------------------------
 	cfgVal := coreInst.Value().Unify(userInst)
 	if err := cfgVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -358,8 +356,8 @@ func loadConfigWithSourceUnsafe(
 		Deploy:  make(map[string]spec.DeployBlock),
 	}
 
-	// decode targets map
-	// ----------------------------------------------------------------------------
+	// Decode targets map
+	// --------------------------------------------------------------------------------------------
 	targetsVal := cfgVal.LookupPath(cue.ParsePath(cueTargets))
 	if err := targetsVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -385,15 +383,15 @@ func loadConfigWithSourceUnsafe(
 		targetName := targetsIter.Selector().String()
 		targetVal := targetsIter.Value()
 
-		tgtInst, err := decodeTargetValue(targetVal, userFile, targetName, reg, src)
+		tgtInst, err := decodeTargetValue(targetVal, userFile, reg, src)
 		if err != nil {
 			return spec.Config{}, err
 		}
 		cfg.Targets[targetName] = tgtInst
 	}
 
-	// decode deploy blocks
-	// ----------------------------------------------------------------------------
+	// Decode deploy blocks
+	// --------------------------------------------------------------------------------------------
 	deployVal := cfgVal.LookupPath(cue.ParsePath(cueDeploy))
 	if err := deployVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -420,7 +418,7 @@ func loadConfigWithSourceUnsafe(
 		blockName := deployIter.Selector().String()
 		blockVal := deployIter.Value()
 
-		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, userFile, reg, em)
+		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, reg, em)
 		if err != nil {
 			return spec.Config{}, err
 		}
@@ -462,7 +460,7 @@ func decodeStep(
 	}
 
 	// Resolve step type
-	// ------------------------------------------------------------
+	// -----------------------------------------------------------------------------
 	st, ok := reg.StepType(kind)
 	if !ok {
 		impact, _ := emitPlanDiagnostic(em, stepIdx, kind, desc, UnknownStepKind{
@@ -476,7 +474,7 @@ func decodeStep(
 	}
 
 	// Instantiate config
-	// ------------------------------------------------------------
+	// -----------------------------------------------------------------------------
 	tCfg := st.NewConfig()
 	rv := reflect.ValueOf(tCfg)
 	if rv.Kind() != reflect.Pointer {
@@ -488,7 +486,7 @@ func decodeStep(
 	}
 
 	// Validation
-	// ------------------------------------------------------------
+	// -----------------------------------------------------------------------------
 	if err := stepVal.Validate(cue.Concrete(true), cue.All()); err != nil {
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
@@ -535,7 +533,7 @@ func decodeStep(
 	}
 
 	// Decode
-	// ------------------------------------------------------------
+	// -----------------------------------------------------------------------------
 	if err := stepVal.Decode(tCfg); err != nil {
 		// If Validate passed, Decode MUST NOT fail.
 		// This is a hard invariant violation.
@@ -548,7 +546,7 @@ func decodeStep(
 	}
 
 	// Success
-	// ------------------------------------------------------------
+	// -----------------------------------------------------------------------------
 	si := spec.StepInstance{
 		Desc:   desc,
 		Type:   st,
@@ -566,11 +564,9 @@ func decodeStep(
 func decodeTargetValue(
 	targetVal cue.Value,
 	userFile *ast.File,
-	_ string, // targetName - reserved for future use
 	reg *Registry,
 	src source.Source,
 ) (spec.TargetInstance, error) {
-	// Resolve target kind
 	kindVal := targetVal.LookupPath(cue.ParsePath("kind"))
 	kind, err := kindVal.String()
 	if err != nil || kind == "" {
@@ -587,7 +583,6 @@ func decodeTargetValue(
 		}
 	}
 
-	// Resolve target type from registry
 	tt, ok := reg.TargetType(kind)
 	if !ok {
 		return spec.TargetInstance{}, UnknownTargetKind{
@@ -596,7 +591,6 @@ func decodeTargetValue(
 		}
 	}
 
-	// Instantiate config
 	tCfg := tt.NewConfig()
 	rv := reflect.ValueOf(tCfg)
 	if rv.Kind() != reflect.Pointer {
@@ -607,14 +601,12 @@ func decodeTargetValue(
 		))
 	}
 
-	// Extract env map and fill non-concrete fields from env
 	envMap := extractEnvMap(targetVal)
 	targetVal, err = fillNonConcreteFromEnv(targetVal, envMap, src)
 	if err != nil {
 		return spec.TargetInstance{}, err
 	}
 
-	// Validation
 	if err := targetVal.Validate(cue.Concrete(true), cue.All()); err != nil {
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
@@ -644,7 +636,6 @@ func decodeTargetValue(
 		}
 	}
 
-	// Decode
 	if err := targetVal.Decode(tCfg); err != nil {
 		panic(errs.BUG(
 			"targetVal.Decode failed after successful validation for target %q: %w",
@@ -653,7 +644,6 @@ func decodeTargetValue(
 		))
 	}
 
-	// Apply ENV overrides
 	if err := applyEnvOverridesToStruct(tCfg, envMap, src); err != nil {
 		return spec.TargetInstance{}, err
 	}
@@ -667,7 +657,6 @@ func decodeTargetValue(
 func decodeDeployBlock(
 	blockVal cue.Value,
 	blockName string,
-	_ *ast.File, // userFile - reserved for future use
 	reg *Registry,
 	em diagnostic.Emitter,
 ) (spec.DeployBlock, bool, error) {
@@ -675,7 +664,6 @@ func decodeDeployBlock(
 		Name: blockName,
 	}
 
-	// Decode targets list (strings referencing target names)
 	targetsVal := blockVal.LookupPath(cue.ParsePath("targets"))
 	if err := targetsVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -701,7 +689,6 @@ func decodeDeployBlock(
 		block.Targets = append(block.Targets, targetName)
 	}
 
-	// Decode steps
 	stepsVal := blockVal.LookupPath(cue.ParsePath(cueSteps))
 	if err := stepsVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -929,7 +916,6 @@ func LoadConfigWithOptions(
 		panic(errs.BUG("filepath.Abs() failed: %w", absErr))
 	}
 
-	// Collect additional files to load
 	additionalPaths := collectAdditionalPaths(cfgPath, opts)
 
 	if len(additionalPaths) == 0 {
@@ -1015,7 +1001,6 @@ func loadConfigWithAdditionalFiles(
 		Dir: ".",
 	}
 
-	// Load main user config
 	userInstances := load.Instances([]string{cfgPath}, loaderCfg)
 	if len(userInstances) == 0 {
 		panic(errs.BUG("load.Instances returned zero instances for '%s'", cfgPath))
@@ -1052,12 +1037,9 @@ func loadConfigWithAdditionalFiles(
 		}
 	}
 
-	// Load and unify additional files
 	for _, addPath := range additionalPaths {
-		// Check if file exists (some files like vars are optional)
 		if _, err := src.ReadFile(ctx, addPath); err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
-				// Skip optional files (vars files)
 				continue
 			}
 			return spec.Config{}, InventoryNotFound{Path: addPath}
@@ -1099,7 +1081,6 @@ func loadConfigWithAdditionalFiles(
 			}
 		}
 
-		// Unify the additional file with the user config
 		userInst = userInst.Unify(addInst)
 		if err := userInst.Err(); err != nil {
 			var ce cueerr.Error
@@ -1117,7 +1098,6 @@ func loadConfigWithAdditionalFiles(
 		}
 	}
 
-	// Load core schema
 	coreInstances := load.Instances([]string{"godoit.dev/doit/core"}, loaderCfg)
 	if len(coreInstances) == 0 {
 		panic(errs.BUG("load.Instances returned zero core-instances"))
@@ -1151,7 +1131,6 @@ func loadConfigWithAdditionalFiles(
 		}
 	}
 
-	// Apply schema
 	cfgVal := coreInst.Value().Unify(userInst)
 	if err := cfgVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -1186,7 +1165,6 @@ func loadConfigWithAdditionalFiles(
 		Deploy:  make(map[string]spec.DeployBlock),
 	}
 
-	// Decode targets
 	targetsVal := cfgVal.LookupPath(cue.ParsePath(cueTargets))
 	if err := targetsVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -1212,14 +1190,13 @@ func loadConfigWithAdditionalFiles(
 		targetName := targetsIter.Selector().String()
 		targetVal := targetsIter.Value()
 
-		tgtInst, err := decodeTargetValue(targetVal, userFile, targetName, reg, src)
+		tgtInst, err := decodeTargetValue(targetVal, userFile, reg, src)
 		if err != nil {
 			return spec.Config{}, err
 		}
 		cfg.Targets[targetName] = tgtInst
 	}
 
-	// Decode deploy blocks
 	deployVal := cfgVal.LookupPath(cue.ParsePath(cueDeploy))
 	if err := deployVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -1246,7 +1223,7 @@ func loadConfigWithAdditionalFiles(
 		blockName := deployIter.Selector().String()
 		blockVal := deployIter.Value()
 
-		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, userFile, reg, em)
+		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, reg, em)
 		if err != nil {
 			return spec.Config{}, err
 		}
@@ -1266,10 +1243,8 @@ func loadConfigWithAdditionalFiles(
 // ResolveMultiple produces ResolvedConfigs for all matching (deploy, target)
 // combinations based on the provided options.
 func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.ResolvedConfig, error) {
-	// Determine which deploy blocks to process
 	var deployNames []string
 	if len(opts.DeployNames) > 0 {
-		// Validate that all requested deploy blocks exist
 		for _, name := range opts.DeployNames {
 			if _, ok := cfg.Deploy[name]; !ok {
 				return nil, UnknownDeployBlock{Name: name}
@@ -1277,7 +1252,6 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 		}
 		deployNames = opts.DeployNames
 	} else {
-		// Use all deploy blocks
 		for name := range cfg.Deploy {
 			deployNames = append(deployNames, name)
 		}
@@ -1292,10 +1266,8 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 	for _, deployName := range deployNames {
 		block := cfg.Deploy[deployName]
 
-		// Determine which targets to process for this deploy block
 		var targetNames []string
 		if len(opts.TargetNames) > 0 {
-			// Filter to targets that are both requested and in this deploy block
 			blockTargets := make(map[string]bool)
 			for _, t := range block.Targets {
 				blockTargets[t] = true
@@ -1305,12 +1277,10 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 					targetNames = append(targetNames, t)
 				}
 			}
-			// If none of the requested targets are in this block, skip it
 			if len(targetNames) == 0 {
 				continue
 			}
 		} else {
-			// Use all targets from the deploy block
 			targetNames = block.Targets
 		}
 
@@ -1318,7 +1288,6 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 			return nil, NoTargetsInDeploy{Deploy: deployName}
 		}
 
-		// Create a ResolvedConfig for each target
 		for _, targetName := range targetNames {
 			tgt, ok := cfg.Targets[targetName]
 			if !ok {
@@ -1350,7 +1319,6 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 // deploy block and target. If deployName or targetName are empty, the first
 // available is selected.
 func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfig, error) {
-	// Select deploy block
 	var block spec.DeployBlock
 	if deployName != "" {
 		var ok bool
@@ -1371,9 +1339,7 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 		}
 	}
 
-	// Select target
 	if targetName == "" {
-		// Use first target from the deploy block's target list
 		if len(block.Targets) == 0 {
 			return spec.ResolvedConfig{}, NoTargetsInDeploy{Deploy: deployName}
 		}

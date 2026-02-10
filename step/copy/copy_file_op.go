@@ -27,7 +27,6 @@ type copyFileOp struct {
 func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	fsTgt := target.Must[target.Filesystem](copyFileID, tgt)
 
-	// source must exist
 	srcData, err := src.ReadFile(ctx, op.src)
 	if err != nil {
 		return spec.CheckUnsatisfied, CopySourceMissing{
@@ -37,7 +36,6 @@ func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.T
 		}
 	}
 
-	// destination parent must exist
 	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
 		return spec.CheckUnsatisfied, CopyDestDirMissing{
 			Path:   filepath.Dir(op.dest),
@@ -46,7 +44,6 @@ func (op *copyFileOp) Check(ctx context.Context, src source.Source, tgt target.T
 		}
 	}
 
-	// dest file comparison (expected drift)
 	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err != nil {
 		return spec.CheckUnsatisfied, nil

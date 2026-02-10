@@ -26,19 +26,16 @@ type renderTemplateOp struct {
 func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt target.Target) (spec.CheckResult, error) {
 	fsTgt := target.Must[target.Filesystem](renderTemplateID, tgt)
 
-	// Merge data with env overrides
 	data, err := mergeData(op.data, src)
 	if err != nil {
 		return spec.CheckUnsatisfied, err
 	}
 
-	// Get template content
 	tmplContent, err := op.getTemplateContent(ctx, src)
 	if err != nil {
 		return spec.CheckUnsatisfied, err
 	}
 
-	// Parse template (catches syntax errors early)
 	tmpl, err := template.New("template").Parse(string(tmplContent))
 	if err != nil {
 		return spec.CheckUnsatisfied, TemplateParseError{
@@ -47,7 +44,6 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 		}
 	}
 
-	// Render template to check for execution errors
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return spec.CheckUnsatisfied, TemplateExecError{
@@ -56,7 +52,6 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 		}
 	}
 
-	// Destination parent must exist
 	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
 		return spec.CheckUnsatisfied, DestDirMissing{
 			Path:   filepath.Dir(op.dest),
@@ -65,7 +60,6 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 		}
 	}
 
-	// Compare with existing file
 	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err != nil {
 		return spec.CheckUnsatisfied, nil // expected drift
@@ -81,19 +75,16 @@ func (op *renderTemplateOp) Check(ctx context.Context, src source.Source, tgt ta
 func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
 	fsTgt := target.Must[target.Filesystem](renderTemplateID, tgt)
 
-	// Merge data with env overrides
 	data, err := mergeData(op.data, src)
 	if err != nil {
 		return spec.Result{}, err
 	}
 
-	// Get template content
 	tmplContent, err := op.getTemplateContent(ctx, src)
 	if err != nil {
 		return spec.Result{}, err
 	}
 
-	// Parse and execute template
 	tmpl, err := template.New("template").Parse(string(tmplContent))
 	if err != nil {
 		return spec.Result{}, err
@@ -104,13 +95,11 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 		return spec.Result{}, err
 	}
 
-	// Check if content matches existing file
 	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err == nil && bytes.Equal(buf.Bytes(), destData) {
 		return spec.Result{Changed: false}, nil
 	}
 
-	// Write rendered content
 	if err := fsTgt.WriteFile(ctx, op.dest, buf.Bytes()); err != nil {
 		return spec.Result{}, err
 	}
@@ -139,7 +128,6 @@ func (op *renderTemplateOp) getTemplateContent(ctx context.Context, src source.S
 	return data, nil
 }
 
-// mergeData merges values with environment variable overrides.
 func mergeData(cfg DataConfig, src source.Source) (map[string]any, error) {
 	data := make(map[string]any)
 

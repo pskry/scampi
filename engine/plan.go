@@ -38,7 +38,6 @@ func Plan(
 		return err
 	}
 
-	// Execute each resolved config sequentially
 	for _, res := range resolved {
 		e, err := New(ctx, src, res, em)
 		if err != nil {
@@ -143,13 +142,11 @@ func plan(
 		return spec.Plan{}, nil, err
 	}
 
-	// Build action graph and detect cycles
 	nodes := buildActionGraph(plan.Unit.Actions)
 	if err := DetectActionCycles(em, nodes); err != nil {
 		return spec.Plan{}, nil, err
 	}
 
-	// Extract action dependencies for rendering
 	actionDeps := extractActionDeps(nodes)
 
 	return plan, actionDeps, nil

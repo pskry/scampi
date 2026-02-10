@@ -32,7 +32,6 @@ func Apply(
 		return err
 	}
 
-	// Execute each resolved config sequentially
 	for _, res := range resolved {
 		e, err := New(ctx, src, res, em)
 		if err != nil {
@@ -60,7 +59,6 @@ func (e *Engine) Apply(ctx context.Context) error {
 
 	rep, err := e.ExecutePlan(ctx, plan)
 	if err != nil {
-		// fail-fast preserved
 		return err
 	}
 

@@ -225,7 +225,6 @@ func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.Execution
 	var scheduleNode func(n *actionNode)
 	scheduleNode = func(n *actionNode) {
 		grp.Go(func() error {
-			// Check if context was cancelled before starting
 			if err := gctx.Err(); err != nil {
 				return err
 			}
@@ -253,7 +252,6 @@ func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.Execution
 		})
 	}
 
-	// Schedule actions with no dependencies
 	mu.Lock()
 	for _, n := range nodes {
 		if n.pending == 0 {
@@ -348,7 +346,6 @@ func (e *Engine) runCheckAction(ctx context.Context, idx int, act spec.Action) (
 		}
 	}
 
-	// Build ActionReport
 	var rep model.ActionReport
 	rep.Action = act
 
@@ -398,7 +395,6 @@ func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (model.Executi
 	var scheduleNode func(n *actionNode)
 	scheduleNode = func(n *actionNode) {
 		grp.Go(func() error {
-			// Check if context was cancelled before starting
 			if err := gctx.Err(); err != nil {
 				return err
 			}
@@ -426,7 +422,6 @@ func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (model.Executi
 		})
 	}
 
-	// Schedule actions with no dependencies
 	mu.Lock()
 	for _, n := range nodes {
 		if n.pending == 0 {
@@ -509,7 +504,6 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 
 	// First error wins
 	err := cmp.Or(checkErr, execErr)
-	// Mark any ops without outcome as aborted
 	if err != nil {
 		for _, n := range nodes {
 			if n.outcome == opOutcomeUnknown {
@@ -534,7 +528,6 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 		}
 	}
 
-	// Build ActionReport
 	var rep model.ActionReport
 	rep.Action = act
 

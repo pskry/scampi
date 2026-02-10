@@ -39,7 +39,8 @@ func (t *SSHTarget) Close() {
 	}
 }
 
-// --- Filesystem ---
+// Filesystem
+// -----------------------------------------------------------------------------
 
 func (t *SSHTarget) ReadFile(_ context.Context, path string) ([]byte, error) {
 	f, err := t.sftp.Open(path)
@@ -75,13 +76,15 @@ func (t *SSHTarget) Remove(_ context.Context, path string) error {
 	return normalizeError(t.sftp.Remove(path))
 }
 
-// --- FileMode ---
+// FileMode
+// -----------------------------------------------------------------------------
 
 func (t *SSHTarget) Chmod(_ context.Context, path string, mode fs.FileMode) error {
 	return normalizeError(t.sftp.Chmod(path, mode))
 }
 
-// --- Symlinks ---
+// Symlinks
+// -----------------------------------------------------------------------------
 
 func (t *SSHTarget) Lstat(_ context.Context, path string) (fs.FileInfo, error) {
 	info, err := t.sftp.Lstat(path)
@@ -100,7 +103,8 @@ func (t *SSHTarget) Symlink(_ context.Context, target, link string) error {
 	return normalizeError(t.sftp.Symlink(target, link))
 }
 
-// --- Ownership ---
+// Ownership
+// -----------------------------------------------------------------------------
 
 func (t *SSHTarget) HasUser(_ context.Context, user string) bool {
 	_, err := t.resolveUser(user)
@@ -143,7 +147,8 @@ func (t *SSHTarget) Chown(_ context.Context, path string, owner target.Owner) er
 	return normalizeError(t.sftp.Chown(path, uid, gid))
 }
 
-// --- User/Group Resolution ---
+// User and group resolution
+// -----------------------------------------------------------------------------
 
 func (t *SSHTarget) resolveUser(user string) (int, error) {
 	// Try numeric first

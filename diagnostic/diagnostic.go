@@ -2,7 +2,6 @@
 package diagnostic
 
 import (
-	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -70,10 +69,20 @@ type (
 )
 
 func (d Diagnostics) Diagnostics() []Diagnostic { return d }
-func (d Diagnostics) Error() string             { return fmt.Sprintf("%#v", d) }
+func (d Diagnostics) Error() string {
+	msgs := make([]string, len(d))
+	for i, diag := range d {
+		if e, ok := diag.(error); ok {
+			msgs[i] = e.Error()
+		} else {
+			msgs[i] = diag.EventTemplate().Text
+		}
+	}
+	return strings.Join(msgs, "; ")
+}
 
 // Engine lifecycle
-// ===============================================
+// -----------------------------------------------------------------------------
 
 func EngineStarted() event.EngineEvent {
 	return event.EngineEvent{
@@ -124,7 +133,7 @@ func EngineFinished(rep model.ExecutionReport, dur time.Duration, err error, che
 }
 
 // Plan lifecycle
-// ===============================================
+// -----------------------------------------------------------------------------
 
 func PlanStarted(unitID spec.UnitID) event.PlanEvent {
 	return event.PlanEvent{
@@ -185,9 +194,8 @@ func StepPlanned(index int, desc string, kind string) event.PlanEvent {
 type ActionDeps [][]int
 
 func PlanProduced(plan spec.Plan, actionDeps ActionDeps) event.PlanEvent {
-	// ------------------------------------------------------------
-	// 1. Flatten all ops and assign GLOBAL indices
-	// ------------------------------------------------------------
+	// Flatten all ops and assign global indices
+	// -----------------------------------------------------------------------------
 	var allOps []spec.Op
 	opIndex := make(map[spec.Op]int)
 	actionOpBase := make(map[int]int) // action index → first op index
@@ -199,9 +207,8 @@ func PlanProduced(plan spec.Plan, actionDeps ActionDeps) event.PlanEvent {
 		}
 	}
 
-	// ------------------------------------------------------------
-	// 2. Build PlannedOps with dependency indices
-	// ------------------------------------------------------------
+	// Build PlannedOps with dependency indices
+	// -----------------------------------------------------------------------------
 	plannedOps := make([]event.PlannedOp, len(allOps))
 	for i, op := range allOps {
 		var tmpl *spec.PlanTemplate
@@ -226,9 +233,8 @@ func PlanProduced(plan spec.Plan, actionDeps ActionDeps) event.PlanEvent {
 		}
 	}
 
-	// ------------------------------------------------------------
-	// 3. Re-slice ops back into PlannedActions
-	// ------------------------------------------------------------
+	// Re-slice ops back into PlannedActions
+	// -----------------------------------------------------------------------------
 	var detail event.PlanDetail
 	for i, act := range plan.Unit.Actions {
 		start := actionOpBase[i]
@@ -258,7 +264,7 @@ func PlanProduced(plan spec.Plan, actionDeps ActionDeps) event.PlanEvent {
 }
 
 // Action lifecycle
-// ===============================================
+// -----------------------------------------------------------------------------
 
 func ActionStarted(idx int, kind, desc string) event.ActionEvent {
 	return event.ActionEvent{
@@ -317,7 +323,7 @@ func ActionFinished(
 }
 
 // Op lifecycle
-// ===============================================
+// -----------------------------------------------------------------------------
 
 func OpCheckStarted(stepIdx int, stepKind, stepDesc, displayID string) event.OpEvent {
 	return event.OpEvent{
@@ -469,7 +475,7 @@ func IndexStepProduced(doc spec.StepDoc) event.IndexStepEvent {
 }
 
 // Diagnostics
-// ===============================================
+// -----------------------------------------------------------------------------
 
 func RaiseEngineDiagnostic(cfgPath string, d Diagnostic) event.EngineDiagnostic {
 	return event.EngineDiagnostic{

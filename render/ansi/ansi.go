@@ -15,7 +15,8 @@ const (
 	Reset = "\x1b[0m"
 )
 
-// ---- internals ----
+// Internals
+// -----------------------------------------------------------------------------
 
 func (a ANSI) add(p int) ANSI {
 	if slices.Contains(a.params, p) {
@@ -51,14 +52,16 @@ func (a ANSI) Wrap(s string) string {
 	return a.String() + s + Reset
 }
 
-// ---- styles (universally supported) ----
+// Styles
+// -----------------------------------------------------------------------------
 
 func (a ANSI) Bold() ANSI      { return a.add(1) }
 func (a ANSI) Dim() ANSI       { return a.add(2) }
 func (a ANSI) Underline() ANSI { return a.add(4) }
 func (a ANSI) Reverse() ANSI   { return a.add(7) }
 
-// ---- foreground colors ----
+// Foreground colors
+// -----------------------------------------------------------------------------
 
 func Black() ANSI   { return ANSI{}.add(30) }
 func Red() ANSI     { return ANSI{}.add(31) }
@@ -69,7 +72,8 @@ func Magenta() ANSI { return ANSI{}.add(35) }
 func Cyan() ANSI    { return ANSI{}.add(36) }
 func White() ANSI   { return ANSI{}.add(37) }
 
-// ---- bright foreground colors ----
+// Bright foreground colors
+// -----------------------------------------------------------------------------
 
 func BrightBlack() ANSI   { return ANSI{}.add(90) }
 func BrightRed() ANSI     { return ANSI{}.add(91) }
@@ -80,7 +84,8 @@ func BrightMagenta() ANSI { return ANSI{}.add(95) }
 func BrightCyan() ANSI    { return ANSI{}.add(96) }
 func BrightWhite() ANSI   { return ANSI{}.add(97) }
 
-// ---- background colors ----
+// Background colors
+// -----------------------------------------------------------------------------
 
 func (a ANSI) BgBlack() ANSI   { return a.add(40) }
 func (a ANSI) BgRed() ANSI     { return a.add(41) }
@@ -91,7 +96,8 @@ func (a ANSI) BgMagenta() ANSI { return a.add(45) }
 func (a ANSI) BgCyan() ANSI    { return a.add(46) }
 func (a ANSI) BgWhite() ANSI   { return a.add(47) }
 
-// ---- bright background colors ----
+// Bright background colors
+// -----------------------------------------------------------------------------
 
 func (a ANSI) BgBrightBlack() ANSI   { return a.add(100) }
 func (a ANSI) BgBrightRed() ANSI     { return a.add(101) }

@@ -30,3 +30,7 @@ func (r *Recorder) Stat(ctx context.Context, path string) (FileMeta, error) {
 	r.Stats = append(r.Stats, path)
 	return r.Inner.Stat(ctx, path)
 }
+
+func (r *Recorder) LookupEnv(key string) (string, bool) {
+	return r.Inner.LookupEnv(key)
+}
