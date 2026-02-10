@@ -61,8 +61,24 @@ func (m *MemTarget) WriteFile(_ context.Context, path string, data []byte) error
 	return nil
 }
 
+// isImplicitDir reports whether path is a parent of any file or symlink.
+// Caller must hold mu.RLock.
+func (m *MemTarget) isImplicitDir(path string) bool {
+	dirPrefix := path + "/"
+	for p := range m.Files {
+		if len(p) > len(dirPrefix) && p[:len(dirPrefix)] == dirPrefix {
+			return true
+		}
+	}
+	for p := range m.Symlinks {
+		if len(p) > len(dirPrefix) && p[:len(dirPrefix)] == dirPrefix {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *MemTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
-	// Root directory always exists
 	if path == "/" {
 		return memFileInfo{
 			name:  "/",
@@ -74,39 +90,22 @@ func (m *MemTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Check if it's a regular file
 	data, ok := m.Files[path]
 	if ok {
-		mode := m.Modes[path]
-		mod := m.ModTimes[path]
-
 		return memFileInfo{
 			name:    path,
 			size:    int64(len(data)),
-			mode:    mode,
-			modTime: mod,
+			mode:    m.Modes[path],
+			modTime: m.ModTimes[path],
 		}, nil
 	}
 
-	// Check if path is an implicit directory (files exist under it)
-	dirPrefix := path + "/"
-	for filePath := range m.Files {
-		if len(filePath) > len(dirPrefix) && filePath[:len(dirPrefix)] == dirPrefix {
-			return memFileInfo{
-				name:  path,
-				mode:  fs.ModeDir | 0o755,
-				isDir: true,
-			}, nil
-		}
-	}
-	for symlinkPath := range m.Symlinks {
-		if len(symlinkPath) > len(dirPrefix) && symlinkPath[:len(dirPrefix)] == dirPrefix {
-			return memFileInfo{
-				name:  path,
-				mode:  fs.ModeDir | 0o755,
-				isDir: true,
-			}, nil
-		}
+	if m.isImplicitDir(path) {
+		return memFileInfo{
+			name:  path,
+			mode:  fs.ModeDir | 0o755,
+			isDir: true,
+		}, nil
 	}
 
 	return nil, errs.WrapErrf(ErrNotExist, "%q", path)
@@ -168,7 +167,6 @@ func (m *MemTarget) Lstat(_ context.Context, path string) (fs.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Check if it's a symlink first
 	if target, ok := m.Symlinks[path]; ok {
 		return memFileInfo{
 			name: path,
@@ -177,39 +175,22 @@ func (m *MemTarget) Lstat(_ context.Context, path string) (fs.FileInfo, error) {
 		}, nil
 	}
 
-	// Check if it's a regular file
 	data, ok := m.Files[path]
 	if ok {
-		mode := m.Modes[path]
-		mod := m.ModTimes[path]
-
 		return memFileInfo{
 			name:    path,
 			size:    int64(len(data)),
-			mode:    mode,
-			modTime: mod,
+			mode:    m.Modes[path],
+			modTime: m.ModTimes[path],
 		}, nil
 	}
 
-	// Check if path is an implicit directory (files/symlinks exist under it)
-	dirPrefix := path + "/"
-	for filePath := range m.Files {
-		if len(filePath) > len(dirPrefix) && filePath[:len(dirPrefix)] == dirPrefix {
-			return memFileInfo{
-				name:  path,
-				mode:  fs.ModeDir | 0o755,
-				isDir: true,
-			}, nil
-		}
-	}
-	for symlinkPath := range m.Symlinks {
-		if len(symlinkPath) > len(dirPrefix) && symlinkPath[:len(dirPrefix)] == dirPrefix {
-			return memFileInfo{
-				name:  path,
-				mode:  fs.ModeDir | 0o755,
-				isDir: true,
-			}, nil
-		}
+	if m.isImplicitDir(path) {
+		return memFileInfo{
+			name:  path,
+			mode:  fs.ModeDir | 0o755,
+			isDir: true,
+		}, nil
 	}
 
 	return nil, errs.WrapErrf(ErrNotExist, "%q", path)

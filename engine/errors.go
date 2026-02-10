@@ -72,13 +72,9 @@ func panicIfNotAbortError(err error) error {
 	panic(wrap)
 }
 
-// emitEngineDiagnostic emits a diagnostic for engine-level errors.
-// Returns the impact and whether a diagnostic was emitted.
-func emitEngineDiagnostic(
-	em diagnostic.Emitter,
-	cfgPath string,
-	err error,
-) (diagnostic.Impact, bool) {
+// emitScopedDiagnostic extracts diagnostic(s) from err and passes each to emit.
+// Returns the max impact and whether any diagnostic was emitted.
+func emitScopedDiagnostic(err error, emit func(diagnostic.Diagnostic)) (diagnostic.Impact, bool) {
 	if err == nil {
 		return 0, false
 	}
@@ -87,12 +83,11 @@ func emitEngineDiagnostic(
 	if errors.As(err, &ds) {
 		impact := diagnostic.ImpactNone
 		for _, d := range ds {
-			em.EmitEngineDiagnostic(diagnostic.RaiseEngineDiagnostic(cfgPath, d))
+			emit(d)
 			if d.Impact() > impact {
 				impact = d.Impact()
 			}
 		}
-
 		return impact, true
 	}
 
@@ -101,124 +96,36 @@ func emitEngineDiagnostic(
 		return 0, false
 	}
 
-	em.EmitEngineDiagnostic(diagnostic.RaiseEngineDiagnostic(cfgPath, d))
+	emit(d)
 	return d.Impact(), true
 }
 
-// emitPlanDiagnostic emits a diagnostic for plan-level errors.
-// Returns the impact and whether a diagnostic was emitted.
+func emitEngineDiagnostic(em diagnostic.Emitter, cfgPath string, err error) (diagnostic.Impact, bool) {
+	return emitScopedDiagnostic(err, func(d diagnostic.Diagnostic) {
+		em.EmitEngineDiagnostic(diagnostic.RaiseEngineDiagnostic(cfgPath, d))
+	})
+}
+
 func emitPlanDiagnostic(
-	em diagnostic.Emitter,
-	stepIndex int,
-	stepKind string,
-	stepDesc string,
-	err error,
+	em diagnostic.Emitter, stepIndex int, stepKind, stepDesc string, err error,
 ) (diagnostic.Impact, bool) {
-	if err == nil {
-		return 0, false
-	}
-
-	var ds diagnostic.Diagnostics
-	if errors.As(err, &ds) {
-		impact := diagnostic.ImpactNone
-		for _, d := range ds {
-			em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(
-				stepIndex, stepKind, stepDesc, d,
-			))
-			if d.Impact() > impact {
-				impact = d.Impact()
-			}
-		}
-
-		return impact, true
-	}
-
-	var d diagnostic.Diagnostic
-	if !errors.As(err, &d) {
-		return 0, false
-	}
-
-	em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(
-		stepIndex, stepKind, stepDesc, d,
-	))
-	return d.Impact(), true
+	return emitScopedDiagnostic(err, func(d diagnostic.Diagnostic) {
+		em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(stepIndex, stepKind, stepDesc, d))
+	})
 }
 
-// emitActionDiagnostic emits a diagnostic for action-level errors.
-// Returns the impact and whether a diagnostic was emitted.
 func emitActionDiagnostic(
-	em diagnostic.Emitter,
-	stepIndex int,
-	stepKind string,
-	stepDesc string,
-	err error,
+	em diagnostic.Emitter, stepIndex int, stepKind, stepDesc string, err error,
 ) (diagnostic.Impact, bool) {
-	if err == nil {
-		return 0, false
-	}
-
-	var ds diagnostic.Diagnostics
-	if errors.As(err, &ds) {
-		impact := diagnostic.ImpactNone
-		for _, d := range ds {
-			em.EmitActionDiagnostic(diagnostic.RaiseActionDiagnostic(
-				stepIndex, stepKind, stepDesc, d,
-			))
-			if d.Impact() > impact {
-				impact = d.Impact()
-			}
-		}
-
-		return impact, true
-	}
-
-	var d diagnostic.Diagnostic
-	if !errors.As(err, &d) {
-		return 0, false
-	}
-
-	em.EmitActionDiagnostic(diagnostic.RaiseActionDiagnostic(
-		stepIndex, stepKind, stepDesc, d,
-	))
-	return d.Impact(), true
+	return emitScopedDiagnostic(err, func(d diagnostic.Diagnostic) {
+		em.EmitActionDiagnostic(diagnostic.RaiseActionDiagnostic(stepIndex, stepKind, stepDesc, d))
+	})
 }
 
-// emitOpDiagnostic emits a diagnostic for op-level errors.
-// Returns the impact and whether a diagnostic was emitted.
 func emitOpDiagnostic(
-	em diagnostic.Emitter,
-	stepIndex int,
-	stepKind string,
-	stepDesc string,
-	displayID string,
-	err error,
+	em diagnostic.Emitter, stepIndex int, stepKind, stepDesc, displayID string, err error,
 ) (diagnostic.Impact, bool) {
-	if err == nil {
-		return 0, false
-	}
-
-	var ds diagnostic.Diagnostics
-	if errors.As(err, &ds) {
-		impact := diagnostic.ImpactNone
-		for _, d := range ds {
-			em.EmitOpDiagnostic(diagnostic.RaiseOpDiagnostic(
-				stepIndex, stepKind, stepDesc, displayID, d,
-			))
-			if d.Impact() > impact {
-				impact = d.Impact()
-			}
-		}
-
-		return impact, true
-	}
-
-	var d diagnostic.Diagnostic
-	if !errors.As(err, &d) {
-		return 0, false
-	}
-
-	em.EmitOpDiagnostic(diagnostic.RaiseOpDiagnostic(
-		stepIndex, stepKind, stepDesc, displayID, d,
-	))
-	return d.Impact(), true
+	return emitScopedDiagnostic(err, func(d diagnostic.Diagnostic) {
+		em.EmitOpDiagnostic(diagnostic.RaiseOpDiagnostic(stepIndex, stepKind, stepDesc, displayID, d))
+	})
 }

@@ -9,10 +9,8 @@ import (
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/errs"
 	"godoit.dev/doit/model"
-	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/local"
 )
 
 func Plan(
@@ -22,41 +20,13 @@ func Plan(
 	store *spec.SourceStore,
 	opts spec.ResolveOptions,
 ) error {
-	src := source.WithRoot(cfgPath, source.LocalPosixSource{})
-	cfg, err := LoadConfigWithOptions(ctx, em, cfgPath, store, src, opts)
-	if err != nil {
-		return err
-	}
-
-	resolved, err := ResolveMultiple(cfg, opts)
-	if err != nil {
-		if impact, ok := emitEngineDiagnostic(em, cfgPath, err); ok {
-			if impact.ShouldAbort() {
-				return AbortError{Causes: []error{err}}
-			}
-		}
-		return err
-	}
-
-	for _, res := range resolved {
-		e, err := New(ctx, src, res, em)
-		if err != nil {
-			return err
-		}
-
+	return runForEachResolved(ctx, em, cfgPath, store, opts, func(ctx context.Context, e *Engine) error {
 		// Plan must NEVER touch target, not even reads
 		e.tgt = capabilityTarget{
-			caps: local.POSIXTarget{}.Capabilities(),
+			caps: capability.All,
 		}
-
-		if err := e.Plan(ctx); err != nil {
-			e.Close()
-			return err
-		}
-		e.Close()
-	}
-
-	return nil
+		return e.Plan(ctx)
+	})
 }
 
 func (e *Engine) Plan(_ context.Context) error {
@@ -175,9 +145,7 @@ type capabilityTarget struct {
 	caps capability.Capability
 }
 
-func (t capabilityTarget) Capabilities() capability.Capability {
-	return t.caps
-}
+func (t capabilityTarget) Capabilities() capability.Capability { return t.caps }
 
 func (capabilityTarget) ReadFile(_ context.Context, _ string) ([]byte, error) {
 	panic(errs.BUG("ReadFile called on capability-only target"))
@@ -196,7 +164,7 @@ func (capabilityTarget) Lstat(_ context.Context, _ string) (fs.FileInfo, error) 
 }
 
 func (capabilityTarget) Readlink(_ context.Context, _ string) (string, error) {
-	panic(errs.BUG("ReadLink called on capability-only target"))
+	panic(errs.BUG("Readlink called on capability-only target"))
 }
 
 func (capabilityTarget) Symlink(_ context.Context, _, _ string) error {

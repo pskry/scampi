@@ -57,3 +57,43 @@ func (e *Engine) Close() {
 		closer.Close()
 	}
 }
+
+func runForEachResolved(
+	ctx context.Context,
+	em diagnostic.Emitter,
+	cfgPath string,
+	store *spec.SourceStore,
+	opts spec.ResolveOptions,
+	run func(ctx context.Context, e *Engine) error,
+) error {
+	src := source.WithRoot(cfgPath, source.LocalPosixSource{})
+	cfg, err := LoadConfigWithOptions(ctx, em, cfgPath, store, src, opts)
+	if err != nil {
+		return err
+	}
+
+	resolved, err := ResolveMultiple(cfg, opts)
+	if err != nil {
+		if impact, ok := emitEngineDiagnostic(em, cfgPath, err); ok {
+			if impact.ShouldAbort() {
+				return AbortError{Causes: []error{err}}
+			}
+		}
+		return err
+	}
+
+	for _, res := range resolved {
+		e, err := New(ctx, src, res, em)
+		if err != nil {
+			return err
+		}
+
+		if err := run(ctx, e); err != nil {
+			e.Close()
+			return err
+		}
+		e.Close()
+	}
+
+	return nil
+}

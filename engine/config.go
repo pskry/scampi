@@ -202,24 +202,20 @@ func loadConfigWithSource(
 		}
 	}()
 
-	cfg, err = loadConfigWithSourceUnsafe(ctx, em, cfgPath, store, src)
+	cfg, err = loadConfigPipeline(ctx, em, cfgPath, nil, store, src)
 	return
 }
 
-func loadConfigWithSourceUnsafe(
+func loadConfigPipeline(
 	ctx context.Context,
 	em diagnostic.Emitter,
 	cfgPath string,
+	additionalPaths []string,
 	store *spec.SourceStore,
 	src source.Source,
 ) (spec.Config, error) {
 	reg := NewRegistry()
 	cueCtx := cuecontext.New()
-
-	cfgPath, err := filepath.Abs(cfgPath)
-	if err != nil {
-		panic(errs.BUG("filepath.Abs() failed: %w", err))
-	}
 
 	embFS, err := fs.Sub(doit.EmbeddedSchemaModule, "cue")
 	if err != nil {
@@ -240,6 +236,8 @@ func loadConfigWithSourceUnsafe(
 		Dir: ".",
 	}
 
+	// Load user config
+	// -----------------------------------------------------------------------------
 	userInstances := load.Instances([]string{cfgPath}, loaderCfg)
 	if len(userInstances) == 0 {
 		panic(errs.BUG("load.Instances returned zero instances for '%s'", cfgPath))
@@ -254,7 +252,6 @@ func loadConfigWithSourceUnsafe(
 				err,
 			))
 		}
-
 		return spec.Config{}, CueDiagnostic{
 			Err:   ce,
 			Phase: "load.userInstances",
@@ -271,13 +268,77 @@ func loadConfigWithSourceUnsafe(
 				err,
 			))
 		}
-
 		return spec.Config{}, CueDiagnostic{
 			Err:   ce,
 			Phase: "load.BuildUserInstance",
 		}
 	}
 
+	// Unify additional files (inventory, vars) if any
+	// -----------------------------------------------------------------------------
+	for _, addPath := range additionalPaths {
+		if _, err := src.ReadFile(ctx, addPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return spec.Config{}, InventoryNotFound{Path: addPath}
+		}
+
+		addInstances := load.Instances([]string{addPath}, loaderCfg)
+		if len(addInstances) == 0 {
+			return spec.Config{}, InventoryNotFound{Path: addPath}
+		}
+		addInstance := addInstances[0]
+		if err := addInstance.Err; err != nil {
+			var ce cueerr.Error
+			if !errors.As(err, &ce) {
+				panic(errs.BUG(
+					"load.Instances returned an unexpected error for additional path %q: %w",
+					addPath,
+					err,
+				))
+			}
+			return spec.Config{}, CueDiagnostic{
+				Err:   ce,
+				Phase: "load.additionalInstances",
+			}
+		}
+
+		addInst := cueCtx.BuildInstance(addInstance)
+		if err := addInst.Err(); err != nil {
+			var ce cueerr.Error
+			if !errors.As(err, &ce) {
+				panic(errs.BUG(
+					"load.BuildAdditionalInstance returned an unexpected error for %q: %w",
+					addPath,
+					err,
+				))
+			}
+			return spec.Config{}, CueDiagnostic{
+				Err:   ce,
+				Phase: "load.BuildAdditionalInstance",
+			}
+		}
+
+		userInst = userInst.Unify(addInst)
+		if err := userInst.Err(); err != nil {
+			var ce cueerr.Error
+			if !errors.As(err, &ce) {
+				panic(errs.BUG(
+					"unify failed with an unaccounted-for error-type %T: %w",
+					err,
+					err,
+				))
+			}
+			return spec.Config{}, CueDiagnostic{
+				Err:   ce,
+				Phase: "load.UnifyAdditional",
+			}
+		}
+	}
+
+	// Load core schema and apply
+	// -----------------------------------------------------------------------------
 	coreInstances := load.Instances([]string{"godoit.dev/doit/core"}, loaderCfg)
 	if len(coreInstances) == 0 {
 		panic(errs.BUG("load.Instances returned zero core-instances"))
@@ -286,12 +347,10 @@ func loadConfigWithSourceUnsafe(
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
 			panic(errs.BUG(
-				"load.CoreInstances returned an unexpected error for cfgPath %q: %w",
-				cfgPath,
+				"load.CoreInstances returned an unexpected error: %w",
 				err,
 			))
 		}
-
 		return spec.Config{}, CueDiagnostic{
 			Err:   ce,
 			Phase: "load.CoreInstances",
@@ -303,20 +362,16 @@ func loadConfigWithSourceUnsafe(
 		var ce cueerr.Error
 		if !errors.As(err, &ce) {
 			panic(errs.BUG(
-				"load.BuildCoreInstance returned an unexpected error for cfgPath %q: %w",
-				cfgPath,
+				"load.BuildCoreInstance returned an unexpected error: %w",
 				err,
 			))
 		}
-
 		return spec.Config{}, CueDiagnostic{
 			Err:   ce,
 			Phase: "load.BuildCoreInstance",
 		}
 	}
 
-	// Apply schema
-	// --------------------------------------------------------------------------------------------
 	cfgVal := coreInst.Value().Unify(userInst)
 	if err := cfgVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -343,12 +398,9 @@ func loadConfigWithSourceUnsafe(
 		}
 	}
 
+	// Decode config
+	// -----------------------------------------------------------------------------
 	userFile := userInstance.Files[0]
-
-	cfgPath, err = filepath.Abs(cfgPath)
-	if err != nil {
-		panic(errs.BUG("filepath.Abs() failed: %w", err))
-	}
 
 	cfg := spec.Config{
 		Path:    cfgPath,
@@ -356,8 +408,6 @@ func loadConfigWithSourceUnsafe(
 		Deploy:  make(map[string]spec.DeployBlock),
 	}
 
-	// Decode targets map
-	// --------------------------------------------------------------------------------------------
 	targetsVal := cfgVal.LookupPath(cue.ParsePath(cueTargets))
 	if err := targetsVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -390,8 +440,6 @@ func loadConfigWithSourceUnsafe(
 		cfg.Targets[targetName] = tgtInst
 	}
 
-	// Decode deploy blocks
-	// --------------------------------------------------------------------------------------------
 	deployVal := cfgVal.LookupPath(cue.ParsePath(cueDeploy))
 	if err := deployVal.Err(); err != nil {
 		var ce cueerr.Error
@@ -961,7 +1009,6 @@ func collectAdditionalPaths(cfgPath string, opts spec.ResolveOptions) []string {
 	return paths
 }
 
-// loadConfigWithAdditionalFiles loads the main config and unifies with additional files.
 func loadConfigWithAdditionalFiles(
 	ctx context.Context,
 	em diagnostic.Emitter,
@@ -979,265 +1026,7 @@ func loadConfigWithAdditionalFiles(
 		}
 	}()
 
-	reg := NewRegistry()
-	cueCtx := cuecontext.New()
-
-	embFS, err := fs.Sub(doit.EmbeddedSchemaModule, "cue")
-	if err != nil {
-		panic(errs.BUG("embedded schema FS corrupted: %w", err))
-	}
-
-	loaderCfg := &load.Config{
-		FS: overlayFS{
-			Embedded: embFS,
-			Host: &sourceCapturingFS{
-				fs: sourceFS{
-					ctx: ctx,
-					src: src,
-				},
-				store: store,
-			},
-		},
-		Dir: ".",
-	}
-
-	userInstances := load.Instances([]string{cfgPath}, loaderCfg)
-	if len(userInstances) == 0 {
-		panic(errs.BUG("load.Instances returned zero instances for '%s'", cfgPath))
-	}
-	userInstance := userInstances[0]
-	if err := userInstance.Err; err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.Instances returned an unexpected error for cfgPath %q: %w",
-				cfgPath,
-				err,
-			))
-		}
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.userInstances",
-		}
-	}
-
-	userInst := cueCtx.BuildInstance(userInstance)
-	if err := userInst.Err(); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.BuildUserInstance returned an unexpected error for cfgPath %q: %w",
-				cfgPath,
-				err,
-			))
-		}
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.BuildUserInstance",
-		}
-	}
-
-	for _, addPath := range additionalPaths {
-		if _, err := src.ReadFile(ctx, addPath); err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-			return spec.Config{}, InventoryNotFound{Path: addPath}
-		}
-
-		addInstances := load.Instances([]string{addPath}, loaderCfg)
-		if len(addInstances) == 0 {
-			return spec.Config{}, InventoryNotFound{Path: addPath}
-		}
-		addInstance := addInstances[0]
-		if err := addInstance.Err; err != nil {
-			var ce cueerr.Error
-			if !errors.As(err, &ce) {
-				panic(errs.BUG(
-					"load.Instances returned an unexpected error for additional path %q: %w",
-					addPath,
-					err,
-				))
-			}
-			return spec.Config{}, CueDiagnostic{
-				Err:   ce,
-				Phase: "load.additionalInstances",
-			}
-		}
-
-		addInst := cueCtx.BuildInstance(addInstance)
-		if err := addInst.Err(); err != nil {
-			var ce cueerr.Error
-			if !errors.As(err, &ce) {
-				panic(errs.BUG(
-					"load.BuildAdditionalInstance returned an unexpected error for %q: %w",
-					addPath,
-					err,
-				))
-			}
-			return spec.Config{}, CueDiagnostic{
-				Err:   ce,
-				Phase: "load.BuildAdditionalInstance",
-			}
-		}
-
-		userInst = userInst.Unify(addInst)
-		if err := userInst.Err(); err != nil {
-			var ce cueerr.Error
-			if !errors.As(err, &ce) {
-				panic(errs.BUG(
-					"unify failed with an unaccounted-for error-type %T: %w",
-					err,
-					err,
-				))
-			}
-			return spec.Config{}, CueDiagnostic{
-				Err:   ce,
-				Phase: "load.UnifyAdditional",
-			}
-		}
-	}
-
-	coreInstances := load.Instances([]string{"godoit.dev/doit/core"}, loaderCfg)
-	if len(coreInstances) == 0 {
-		panic(errs.BUG("load.Instances returned zero core-instances"))
-	}
-	if err := coreInstances[0].Err; err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.CoreInstances returned an unexpected error: %w",
-				err,
-			))
-		}
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.CoreInstances",
-		}
-	}
-
-	coreInst := cueCtx.BuildInstance(coreInstances[0])
-	if err := coreInst.Err(); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.BuildCoreInstance returned an unexpected error: %w",
-				err,
-			))
-		}
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.BuildCoreInstance",
-		}
-	}
-
-	cfgVal := coreInst.Value().Unify(userInst)
-	if err := cfgVal.Err(); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.Unify failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-
-		if path, ok := isTypeMismatchError(ce); ok {
-			return spec.Config{}, TypeMismatch{
-				Source: getErrorPathSpan(ce, userInst),
-				Path:   path,
-				Have:   describeCueValueShape(userInst, path),
-				Want:   describeCueSchemaShape(coreInst, path),
-			}
-		}
-
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.Unify",
-		}
-	}
-
-	userFile := userInstance.Files[0]
-
-	cfg = spec.Config{
-		Path:    cfgPath,
-		Targets: make(map[string]spec.TargetInstance),
-		Deploy:  make(map[string]spec.DeployBlock),
-	}
-
-	targetsVal := cfgVal.LookupPath(cue.ParsePath(cueTargets))
-	if err := targetsVal.Err(); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.LookupTargetsPath failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.LookupTargetsPath",
-		}
-	}
-
-	targetsIter, err := targetsVal.Fields()
-	if err != nil {
-		panic(errs.BUG("targets is not a struct after schema unification: %w", err))
-	}
-
-	for targetsIter.Next() {
-		targetName := targetsIter.Selector().String()
-		targetVal := targetsIter.Value()
-
-		tgtInst, err := decodeTargetValue(targetVal, userFile, reg, src)
-		if err != nil {
-			return spec.Config{}, err
-		}
-		cfg.Targets[targetName] = tgtInst
-	}
-
-	deployVal := cfgVal.LookupPath(cue.ParsePath(cueDeploy))
-	if err := deployVal.Err(); err != nil {
-		var ce cueerr.Error
-		if !errors.As(err, &ce) {
-			panic(errs.BUG(
-				"load.LookupDeployPath failed with an unaccounted-for error-type %T: %w",
-				err,
-				err,
-			))
-		}
-		return spec.Config{}, CueDiagnostic{
-			Err:   ce,
-			Phase: "load.LookupDeployPath",
-		}
-	}
-
-	deployIter, err := deployVal.Fields()
-	if err != nil {
-		panic(errs.BUG("deploy is not a struct after schema unification: %w", err))
-	}
-
-	var sawAbort bool
-	for deployIter.Next() {
-		blockName := deployIter.Selector().String()
-		blockVal := deployIter.Value()
-
-		block, blockAbort, err := decodeDeployBlock(blockVal, blockName, reg, em)
-		if err != nil {
-			return spec.Config{}, err
-		}
-		if blockAbort {
-			sawAbort = true
-		}
-		cfg.Deploy[blockName] = block
-	}
-
-	if sawAbort {
-		return spec.Config{}, AbortError{}
-	}
-
-	return cfg, nil
+	return loadConfigPipeline(ctx, em, cfgPath, additionalPaths, store, src)
 }
 
 // ResolveMultiple produces ResolvedConfigs for all matching (deploy, target)
