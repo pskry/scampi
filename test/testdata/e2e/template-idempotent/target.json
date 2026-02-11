@@ -1,0 +1,14 @@
+{
+  "files": {
+    "/tmp/out.txt": "hello"
+  },
+  "perms": {
+    "/tmp/out.txt": "0644"
+  },
+  "owners": {
+    "/tmp/out.txt": {
+      "user": "testuser",
+      "group": "testgroup"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "target": {
+    "files": {
+      "/tmp/config.txt": "server=localhost:8080"
+    },
+    "perms": {
+      "/tmp/config.txt": "0600"
+    }
+  },
+  "changed": 2
+}

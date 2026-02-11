@@ -1,0 +1,5 @@
+{
+  "files": {
+    "/tmpl/greeting.txt": "Hello, {{.name}}! Count: {{.count}}"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "target": {
+    "files": {
+      "/tmp/out.txt": "hello"
+    }
+  },
+  "changed": 0
+}

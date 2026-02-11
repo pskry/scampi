@@ -1,0 +1,11 @@
+{
+  "target": {
+    "files": {
+      "/tmp/greeting.txt": "Hello, world! Count: 3"
+    },
+    "perms": {
+      "/tmp/greeting.txt": "0644"
+    }
+  },
+  "changed": 1
+}
