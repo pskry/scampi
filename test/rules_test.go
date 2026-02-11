@@ -72,7 +72,7 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "target/local/posix.go",
-			allowedImports: "os,os/user,syscall",
+			allowedImports: "os,os/exec,os/user,syscall",
 		},
 		{
 			pattern:        "target/ssh/errors.go",

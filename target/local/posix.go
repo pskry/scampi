@@ -1,10 +1,12 @@
 package local
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"os/user"
 	"strconv"
 	"syscall"
@@ -122,6 +124,30 @@ func (POSIXTarget) GetOwner(_ context.Context, path string) (target.Owner, error
 	}
 
 	return target.Owner{User: usr.Name, Group: grp.Name}, nil
+}
+
+func (POSIXTarget) RunCommand(ctx context.Context, cmd string) (target.CommandResult, error) {
+	c := exec.CommandContext(ctx, "sh", "-c", cmd)
+	var stdout, stderr bytes.Buffer
+	c.Stdout = &stdout
+	c.Stderr = &stderr
+	err := c.Run()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return target.CommandResult{
+				Stdout:   stdout.String(),
+				Stderr:   stderr.String(),
+				ExitCode: exitErr.ExitCode(),
+			}, nil
+		}
+		return target.CommandResult{}, err
+	}
+	return target.CommandResult{
+		Stdout:   stdout.String(),
+		Stderr:   stderr.String(),
+		ExitCode: 0,
+	}, nil
 }
 
 func (POSIXTarget) Capabilities() capability.Capability {

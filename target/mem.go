@@ -10,6 +10,10 @@ import (
 	"godoit.dev/doit/errs"
 )
 
+type CommandCall struct {
+	Cmd string
+}
+
 type MemTarget struct {
 	mu sync.RWMutex
 
@@ -19,6 +23,9 @@ type MemTarget struct {
 	ModTimes map[string]time.Time
 	Symlinks map[string]string
 	Pkgs     map[string]bool
+
+	Commands    []CommandCall
+	CommandFunc func(cmd string) (CommandResult, error)
 }
 
 func NewMemTarget() *MemTarget {
@@ -266,6 +273,18 @@ func (m *MemTarget) RemovePkgs(_ context.Context, pkgs []string) error {
 		delete(m.Pkgs, pkg)
 	}
 	return nil
+}
+
+func (m *MemTarget) RunCommand(_ context.Context, cmd string) (CommandResult, error) {
+	m.mu.Lock()
+	m.Commands = append(m.Commands, CommandCall{Cmd: cmd})
+	fn := m.CommandFunc
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(cmd)
+	}
+	return CommandResult{ExitCode: 127, Stderr: "command not found"}, nil
 }
 
 type memFileInfo struct {

@@ -131,7 +131,7 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 
 	// OS detection for package manager support.
 	// Phase 1: kernel via uname -s
-	if result, err := sshTgt.runCommand("uname -s"); err == nil {
+	if result, err := sshTgt.RunCommand(ctx, "uname -s"); err == nil {
 		sshTgt.osInfo.Kernel = strings.TrimSpace(result.Stdout)
 	}
 

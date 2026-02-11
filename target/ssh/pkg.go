@@ -6,22 +6,22 @@ import (
 	"strings"
 )
 
-func (t *SSHTarget) IsInstalled(_ context.Context, pkg string) (bool, error) {
+func (t *SSHTarget) IsInstalled(ctx context.Context, pkg string) (bool, error) {
 	cmd := fmt.Sprintf(t.pkgBackend.IsInstalled, shellQuote(pkg))
-	result, err := t.runCommand(cmd)
+	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return false, err
 	}
 	return result.ExitCode == 0, nil
 }
 
-func (t *SSHTarget) InstallPkgs(_ context.Context, pkgs []string) error {
+func (t *SSHTarget) InstallPkgs(ctx context.Context, pkgs []string) error {
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		quoted[i] = shellQuote(p)
 	}
 	cmd := fmt.Sprintf(t.pkgBackend.Install, strings.Join(quoted, " "))
-	result, err := t.runCommand(cmd)
+	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -35,13 +35,13 @@ func (t *SSHTarget) InstallPkgs(_ context.Context, pkgs []string) error {
 	return nil
 }
 
-func (t *SSHTarget) RemovePkgs(_ context.Context, pkgs []string) error {
+func (t *SSHTarget) RemovePkgs(ctx context.Context, pkgs []string) error {
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		quoted[i] = shellQuote(p)
 	}
 	cmd := fmt.Sprintf(t.pkgBackend.Remove, strings.Join(quoted, " "))
-	result, err := t.runCommand(cmd)
+	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
 	}

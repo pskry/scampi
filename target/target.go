@@ -56,6 +56,14 @@ type (
 		InstallPkgs(ctx context.Context, pkgs []string) error
 		RemovePkgs(ctx context.Context, pkgs []string) error
 	}
+	CommandResult struct {
+		Stdout   string
+		Stderr   string
+		ExitCode int
+	}
+	Commander interface {
+		RunCommand(ctx context.Context, cmd string) (CommandResult, error)
+	}
 )
 
 func IsNotExist(err error) bool        { return errors.Is(err, ErrNotExist) }

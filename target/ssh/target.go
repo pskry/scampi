@@ -115,17 +115,17 @@ func (t *SSHTarget) Symlink(_ context.Context, target, link string) error {
 // Ownership
 // -----------------------------------------------------------------------------
 
-func (t *SSHTarget) HasUser(_ context.Context, user string) bool {
-	_, err := t.resolveUser(user)
+func (t *SSHTarget) HasUser(ctx context.Context, user string) bool {
+	_, err := t.resolveUser(ctx, user)
 	return err == nil
 }
 
-func (t *SSHTarget) HasGroup(_ context.Context, group string) bool {
-	_, err := t.resolveGroup(group)
+func (t *SSHTarget) HasGroup(ctx context.Context, group string) bool {
+	_, err := t.resolveGroup(ctx, group)
 	return err == nil
 }
 
-func (t *SSHTarget) GetOwner(_ context.Context, path string) (target.Owner, error) {
+func (t *SSHTarget) GetOwner(ctx context.Context, path string) (target.Owner, error) {
 	info, err := t.sftp.Stat(path)
 	if err != nil {
 		return target.Owner{}, normalizeError(err)
@@ -138,18 +138,18 @@ func (t *SSHTarget) GetOwner(_ context.Context, path string) (target.Owner, erro
 	}
 
 	return target.Owner{
-		User:  t.resolveUID(int(stat.UID)),
-		Group: t.resolveGID(int(stat.GID)),
+		User:  t.resolveUID(ctx, int(stat.UID)),
+		Group: t.resolveGID(ctx, int(stat.GID)),
 	}, nil
 }
 
-func (t *SSHTarget) Chown(_ context.Context, path string, owner target.Owner) error {
+func (t *SSHTarget) Chown(ctx context.Context, path string, owner target.Owner) error {
 	// SFTP Chown requires numeric UID/GID
-	uid, err := t.resolveUser(owner.User)
+	uid, err := t.resolveUser(ctx, owner.User)
 	if err != nil {
 		return err
 	}
-	gid, err := t.resolveGroup(owner.Group)
+	gid, err := t.resolveGroup(ctx, owner.Group)
 	if err != nil {
 		return err
 	}
@@ -159,14 +159,14 @@ func (t *SSHTarget) Chown(_ context.Context, path string, owner target.Owner) er
 // User and group resolution
 // -----------------------------------------------------------------------------
 
-func (t *SSHTarget) resolveUser(user string) (int, error) {
+func (t *SSHTarget) resolveUser(ctx context.Context, user string) (int, error) {
 	// Try numeric first
 	if uid, err := strconv.Atoi(user); err == nil {
 		return uid, nil
 	}
 
 	// Use `id` command
-	result, err := t.runCommand(fmt.Sprintf("id -u %s", shellQuote(user)))
+	result, err := t.RunCommand(ctx, fmt.Sprintf("id -u %s", shellQuote(user)))
 	if err != nil {
 		return 0, err
 	}
@@ -184,14 +184,14 @@ func (t *SSHTarget) resolveUser(user string) (int, error) {
 	return uid, nil
 }
 
-func (t *SSHTarget) resolveGroup(group string) (int, error) {
+func (t *SSHTarget) resolveGroup(ctx context.Context, group string) (int, error) {
 	// Try numeric first
 	if gid, err := strconv.Atoi(group); err == nil {
 		return gid, nil
 	}
 
 	// Use `getent` command
-	result, err := t.runCommand(fmt.Sprintf("getent group %s", shellQuote(group)))
+	result, err := t.RunCommand(ctx, fmt.Sprintf("getent group %s", shellQuote(group)))
 	if err != nil {
 		return 0, err
 	}
@@ -215,8 +215,8 @@ func (t *SSHTarget) resolveGroup(group string) (int, error) {
 	return gid, nil
 }
 
-func (t *SSHTarget) resolveUID(uid int) string {
-	result, err := t.runCommand(fmt.Sprintf("getent passwd %d", uid))
+func (t *SSHTarget) resolveUID(ctx context.Context, uid int) string {
+	result, err := t.RunCommand(ctx, fmt.Sprintf("getent passwd %d", uid))
 	if err != nil || result.ExitCode != 0 {
 		return fmt.Sprintf("%d", uid) // Fall back to numeric
 	}
@@ -227,8 +227,8 @@ func (t *SSHTarget) resolveUID(uid int) string {
 	return fmt.Sprintf("%d", uid)
 }
 
-func (t *SSHTarget) resolveGID(gid int) string {
-	result, err := t.runCommand(fmt.Sprintf("getent group %d", gid))
+func (t *SSHTarget) resolveGID(ctx context.Context, gid int) string {
+	result, err := t.RunCommand(ctx, fmt.Sprintf("getent group %d", gid))
 	if err != nil || result.ExitCode != 0 {
 		return fmt.Sprintf("%d", gid) // Fall back to numeric
 	}
@@ -241,16 +241,10 @@ func (t *SSHTarget) resolveGID(gid int) string {
 
 var errSession = errors.New("ssh session")
 
-type cmdResult struct {
-	Stdout   string
-	Stderr   string
-	ExitCode int
-}
-
-func (t *SSHTarget) runCommand(cmd string) (cmdResult, error) {
+func (t *SSHTarget) RunCommand(_ context.Context, cmd string) (target.CommandResult, error) {
 	session, err := t.client.NewSession()
 	if err != nil {
-		return cmdResult{}, errs.WrapErrf(errSession, "%v", err)
+		return target.CommandResult{}, errs.WrapErrf(errSession, "%v", err)
 	}
 	defer func() { _ = session.Close() }()
 
@@ -262,16 +256,16 @@ func (t *SSHTarget) runCommand(cmd string) (cmdResult, error) {
 	if err != nil {
 		var exitErr *ssh.ExitError
 		if errors.As(err, &exitErr) {
-			return cmdResult{
+			return target.CommandResult{
 				Stdout:   stdout.String(),
 				Stderr:   stderr.String(),
 				ExitCode: exitErr.ExitStatus(),
 			}, nil
 		}
-		return cmdResult{}, errs.WrapErrf(errSession, "%v", err)
+		return target.CommandResult{}, errs.WrapErrf(errSession, "%v", err)
 	}
 
-	return cmdResult{
+	return target.CommandResult{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
 		ExitCode: 0,
