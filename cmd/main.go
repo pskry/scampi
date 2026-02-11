@@ -77,6 +77,7 @@ func main() {
 		Commands: []*cli.Command{
 			applyCmd(),
 			checkCmd(),
+			inspectCmd(),
 			planCmd(),
 			indexCmd(),
 			legendCmd(),
@@ -225,6 +226,70 @@ the actual system state.`,
 			}
 
 			return nil
+		},
+	}
+}
+
+func inspectCmd() *cli.Command {
+	var cfg string
+
+	return &cli.Command{
+		Name:                   "inspect",
+		Usage:                  "Compare desired file content against the current target state",
+		UseShortOptionHandling: true,
+		Suggest:                true,
+		HideHelp:               false,
+		Flags: append(resolveFlags(), &cli.StringFlag{
+			Name:  "step",
+			Usage: "filter to a specific file op by destination path (substring match)",
+		}),
+		Arguments: []cli.Argument{
+			&cli.StringArg{
+				Name:        "config",
+				Config:      cli.StringConfig{TrimSpace: true},
+				Destination: &cfg,
+			},
+		},
+		ArgsUsage: "<config>",
+		Description: `Reads a declarative configuration file, extracts file content
+from inspectable ops (e.g. copy), and opens a diff tool to compare
+the desired state against what currently exists on the target.
+
+Set DOIT_DIFFTOOL, DIFFTOOL, or EDITOR to choose your diff tool.
+Falls back to plain diff(1).`,
+		Before: requireArgs(1),
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			opts := mustGlobalOpts(ctx)
+
+			pol := diagnostic.Policy{
+				WarningsAsErrors: false,
+				Verbosity:        opts.verbosity,
+			}
+
+			store := spec.NewSourceStore()
+
+			displ := newDisplayer(opts, store)
+			defer func() {
+				displ.Close()
+				recoverAndReport(recover())
+			}()
+
+			resolveOpts := parseResolveOpts(cmd)
+			em := diagnostic.NewEmitter(pol, displ)
+
+			stepFilter := cmd.String("step")
+			result, err := engine.Inspect(ctx, em, cfg, store, resolveOpts, stepFilter)
+			if err != nil {
+				var abort engine.AbortError
+				if !errors.As(err, &abort) {
+					panic(errs.BUG("engine.Inspect returned unexpected error: %w", err))
+				}
+
+				return cli.Exit("", exitUserError)
+			}
+
+			tool := osutil.ResolveDiffTool()
+			return osutil.RunDiffTool(ctx, tool, result.DestPath, result.Current, result.Desired)
 		},
 	}
 }

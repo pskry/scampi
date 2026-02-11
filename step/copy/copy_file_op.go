@@ -80,6 +80,19 @@ func (copyFileOp) RequiredCapabilities() capability.Capability {
 	return capability.Filesystem
 }
 
+func (op *copyFileOp) DesiredContent(ctx context.Context, src source.Source) ([]byte, error) {
+	return src.ReadFile(ctx, op.src)
+}
+
+func (op *copyFileOp) CurrentContent(ctx context.Context, _ source.Source, tgt target.Target) ([]byte, error) {
+	fsTgt := target.Must[target.Filesystem](copyFileID, tgt)
+	return fsTgt.ReadFile(ctx, op.dest)
+}
+
+func (op *copyFileOp) DestPath() string {
+	return op.dest
+}
+
 type copyFileDesc struct {
 	Src  string
 	Dest string

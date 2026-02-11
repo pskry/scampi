@@ -59,6 +59,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os,os/signal,runtime/debug",
 		},
 		{
+			pattern:        "osutil/diff.go",
+			allowedImports: "os,os/exec",
+		},
+		{
 			pattern:        "engine/errors.go",
 			allowedImports: "runtime",
 		},

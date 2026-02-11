@@ -659,3 +659,37 @@ func mockTargetInstance(tgt target.Target) spec.TargetInstance {
 		},
 	}
 }
+
+// stubStepType returns a pre-built action from Plan, bypassing real config
+// parsing. Useful when tests need to control exactly which ops are planned.
+type stubStepType struct {
+	kind   string
+	action spec.Action
+}
+
+func (s *stubStepType) Kind() string   { return s.kind }
+func (s *stubStepType) NewConfig() any { return &struct{}{} }
+func (s *stubStepType) Plan(_ int, _ spec.StepInstance) (spec.Action, error) {
+	return s.action, nil
+}
+
+// inspectableFakeOp is a fakeOp that also implements spec.Inspectable.
+type inspectableFakeOp struct {
+	fakeOp
+	desired []byte
+	current []byte
+	currErr error
+	dest    string
+}
+
+func (o *inspectableFakeOp) DesiredContent(_ context.Context, _ source.Source) ([]byte, error) {
+	return o.desired, nil
+}
+
+func (o *inspectableFakeOp) CurrentContent(_ context.Context, _ source.Source, _ target.Target) ([]byte, error) {
+	return o.current, o.currErr
+}
+
+func (o *inspectableFakeOp) DestPath() string {
+	return o.dest
+}

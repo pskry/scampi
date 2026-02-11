@@ -110,6 +110,13 @@ type (
 		DependsOn() []Op
 		RequiredCapabilities() capability.Capability
 	}
+	// Inspectable is an optional interface that ops producing file content
+	// can implement to support `doit inspect`.
+	Inspectable interface {
+		DesiredContent(ctx context.Context, src source.Source) ([]byte, error)
+		CurrentContent(ctx context.Context, src source.Source, tgt target.Target) ([]byte, error)
+		DestPath() string
+	}
 	OpDescriber interface {
 		OpDescription() OpDescription
 	}
