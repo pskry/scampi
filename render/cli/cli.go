@@ -97,9 +97,7 @@ func (c *cli) shouldRender(chatty event.Chattiness) bool {
 
 func (c *cli) commitRenderEvents(events []renderEvent) {
 	for i := range events {
-		if strings.ContainsAny(events[i].line, "\n\r") {
-			panic(errs.BUG("renderEvent.line must neither contain '\\n' nor '\\r'"))
-		}
+		events[i].line = strings.NewReplacer("\n", " ", "\r", "").Replace(events[i].line)
 		events[i].line = layout.FitLine(events[i].line, c.width)
 		if c.shouldUseColor() {
 			events[i].line += ansi.Reset
