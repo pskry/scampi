@@ -24,6 +24,20 @@ type ensurePkgOp struct {
 func (op *ensurePkgOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
 	pm := target.Must[target.PkgManager](ensurePkgID, tgt)
 
+	// For latest, refresh the cache so upgrade checks are accurate.
+	if op.state == StateLatest {
+		pu, ok := tgt.(target.PkgUpdater)
+		if !ok {
+			return spec.CheckUnsatisfied, fmt.Errorf("target %T does not support upgrade checks", tgt)
+		}
+		if err := pu.UpdateCache(ctx); err != nil {
+			return spec.CheckUnsatisfied, PkgCacheError{
+				Stderr: err.Error(),
+				Source: op.pkgsSource,
+			}
+		}
+	}
+
 	for _, pkg := range op.packages {
 		installed, err := pm.IsInstalled(ctx, pkg)
 		if err != nil {
@@ -37,6 +51,18 @@ func (op *ensurePkgOp) Check(ctx context.Context, _ source.Source, tgt target.Ta
 			}
 		case StateAbsent:
 			if installed {
+				return spec.CheckUnsatisfied, nil
+			}
+		case StateLatest:
+			if !installed {
+				return spec.CheckUnsatisfied, nil
+			}
+			pu := tgt.(target.PkgUpdater) // safe: asserted above
+			upgradable, err := pu.IsUpgradable(ctx, pkg)
+			if err != nil {
+				return spec.CheckUnsatisfied, err
+			}
+			if upgradable {
 				return spec.CheckUnsatisfied, nil
 			}
 		}
@@ -56,10 +82,28 @@ func (op *ensurePkgOp) Execute(ctx context.Context, _ source.Source, tgt target.
 			return spec.Result{}, err
 		}
 
-		needsAction := (op.state == StatePresent && !installed) ||
-			(op.state == StateAbsent && installed)
-		if needsAction {
-			actionable = append(actionable, pkg)
+		switch op.state {
+		case StatePresent:
+			if !installed {
+				actionable = append(actionable, pkg)
+			}
+		case StateAbsent:
+			if installed {
+				actionable = append(actionable, pkg)
+			}
+		case StateLatest:
+			if !installed {
+				actionable = append(actionable, pkg)
+			} else {
+				pu := tgt.(target.PkgUpdater) // safe: Check already asserted
+				upgradable, err := pu.IsUpgradable(ctx, pkg)
+				if err != nil {
+					return spec.Result{}, err
+				}
+				if upgradable {
+					actionable = append(actionable, pkg)
+				}
+			}
 		}
 	}
 
@@ -68,7 +112,7 @@ func (op *ensurePkgOp) Execute(ctx context.Context, _ source.Source, tgt target.
 	}
 
 	switch op.state {
-	case StatePresent:
+	case StatePresent, StateLatest:
 		if err := pm.InstallPkgs(ctx, actionable); err != nil {
 			return spec.Result{}, PkgInstallError{
 				Pkgs:   actionable,

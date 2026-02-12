@@ -17,12 +17,13 @@ type CommandCall struct {
 type MemTarget struct {
 	mu sync.RWMutex
 
-	Files    map[string][]byte
-	Modes    map[string]fs.FileMode
-	Owners   map[string]Owner
-	ModTimes map[string]time.Time
-	Symlinks map[string]string
-	Pkgs     map[string]bool
+	Files      map[string][]byte
+	Modes      map[string]fs.FileMode
+	Owners     map[string]Owner
+	ModTimes   map[string]time.Time
+	Symlinks   map[string]string
+	Pkgs       map[string]bool
+	Upgradable map[string]bool
 
 	Commands    []CommandCall
 	CommandFunc func(cmd string) (CommandResult, error)
@@ -30,12 +31,13 @@ type MemTarget struct {
 
 func NewMemTarget() *MemTarget {
 	return &MemTarget{
-		Files:    make(map[string][]byte),
-		Modes:    make(map[string]fs.FileMode),
-		Owners:   make(map[string]Owner),
-		ModTimes: make(map[string]time.Time),
-		Symlinks: make(map[string]string),
-		Pkgs:     make(map[string]bool),
+		Files:      make(map[string][]byte),
+		Modes:      make(map[string]fs.FileMode),
+		Owners:     make(map[string]Owner),
+		ModTimes:   make(map[string]time.Time),
+		Symlinks:   make(map[string]string),
+		Pkgs:       make(map[string]bool),
+		Upgradable: make(map[string]bool),
 	}
 }
 
@@ -273,6 +275,16 @@ func (m *MemTarget) RemovePkgs(_ context.Context, pkgs []string) error {
 		delete(m.Pkgs, pkg)
 	}
 	return nil
+}
+
+func (m *MemTarget) UpdateCache(_ context.Context) error {
+	return nil
+}
+
+func (m *MemTarget) IsUpgradable(_ context.Context, pkg string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.Upgradable[pkg], nil
 }
 
 func (m *MemTarget) RunCommand(_ context.Context, cmd string) (CommandResult, error) {

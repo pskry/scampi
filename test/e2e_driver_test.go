@@ -82,6 +82,9 @@ func (d *MemDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 	for pkg, installed := range initial.Pkgs {
 		d.tgt.Pkgs[pkg] = installed
 	}
+	for pkg, upgradable := range initial.Upgradable {
+		d.tgt.Upgradable[pkg] = upgradable
+	}
 
 	ti := mockTargetInstance(d.tgt)
 

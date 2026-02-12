@@ -58,6 +58,10 @@ type (
 		InstallPkgs(ctx context.Context, pkgs []string) error
 		RemovePkgs(ctx context.Context, pkgs []string) error
 	}
+	PkgUpdater interface {
+		UpdateCache(ctx context.Context) error
+		IsUpgradable(ctx context.Context, pkg string) (bool, error)
+	}
 	CommandResult struct {
 		Stdout   string
 		Stderr   string

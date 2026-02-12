@@ -404,3 +404,78 @@ func TestInstallPkgs_NoEscalationWithoutNeedsRoot(t *testing.T) {
 		t.Fatalf("expected no escalation, got: %q", log)
 	}
 }
+
+// --- UpdateCache escalation ---
+
+func TestUpdateCache_NoEscalationErrorWhenNoTool(t *testing.T) {
+	tgt := POSIXTarget{
+		pkgBackend: &pkgmgr.Backend{
+			Name:           "apt",
+			UpdateCache:    "apt-get update -qq",
+			CacheNeedsRoot: true,
+		},
+	}
+
+	err := tgt.UpdateCache(context.Background())
+
+	var noEsc target.NoEscalationError
+	if !errors.As(err, &noEsc) {
+		t.Fatalf("expected NoEscalationError, got %T: %v", err, err)
+	}
+	if noEsc.Op != "apt update-cache" {
+		t.Fatalf("expected op %q, got %q", "apt update-cache", noEsc.Op)
+	}
+}
+
+func TestUpdateCache_Escalated(t *testing.T) {
+	tgt, readLog := newCaptureTarget(t)
+	tgt.pkgBackend = &pkgmgr.Backend{
+		UpdateCache:    "echo update-cache",
+		CacheNeedsRoot: true,
+	}
+
+	err := tgt.UpdateCache(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := readLog()
+	if !strings.Contains(cmd, "echo update-cache") {
+		t.Fatalf("expected escalated update-cache, got: %q", cmd)
+	}
+}
+
+func TestUpdateCache_NoEscalationWithoutCacheNeedsRoot(t *testing.T) {
+	tgt, readLog := newCaptureTarget(t)
+	tgt.pkgBackend = &pkgmgr.Backend{
+		UpdateCache:    "echo update-cache",
+		CacheNeedsRoot: false,
+	}
+
+	err := tgt.UpdateCache(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if log := readLog(); log != "" {
+		t.Fatalf("expected no escalation, got: %q", log)
+	}
+}
+
+func TestUpdateCache_CacheUpdateError(t *testing.T) {
+	tgt := newFailTarget(t)
+	tgt.pkgBackend = &pkgmgr.Backend{
+		UpdateCache:    "false",
+		CacheNeedsRoot: false,
+	}
+
+	err := tgt.UpdateCache(context.Background())
+
+	var cacheErr CacheUpdateError
+	if !errors.As(err, &cacheErr) {
+		t.Fatalf("expected CacheUpdateError, got %T: %v", err, err)
+	}
+	if cacheErr.ExitCode != 1 {
+		t.Fatalf("expected exit 1, got %d", cacheErr.ExitCode)
+	}
+}

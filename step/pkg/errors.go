@@ -61,3 +61,27 @@ func (e PkgRemoveError) EventTemplate() event.Template {
 
 func (PkgRemoveError) Severity() signal.Severity { return signal.Error }
 func (PkgRemoveError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+// PkgCacheError is emitted when a package cache update fails.
+type PkgCacheError struct {
+	Stderr string
+	Source spec.SourceSpan
+}
+
+func (e PkgCacheError) Error() string {
+	return fmt.Sprintf("failed to update package cache: %s", e.Stderr)
+}
+
+func (e PkgCacheError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.pkg.CacheUpdateFailed",
+		Text:   `failed to update package cache: {{.Stderr}}`,
+		Hint:   "check network connectivity and package manager configuration",
+		Help:   "the cache refresh command exited with a non-zero status",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (PkgCacheError) Severity() signal.Severity { return signal.Error }
+func (PkgCacheError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

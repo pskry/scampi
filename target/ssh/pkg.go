@@ -69,6 +69,36 @@ func (t *SSHTarget) RemovePkgs(ctx context.Context, pkgs []string) error {
 	return nil
 }
 
+func (t *SSHTarget) UpdateCache(ctx context.Context) error {
+	if t.pkgBackend.CacheNeedsRoot && !t.isRoot && t.escalate == "" {
+		return target.NoEscalationError{Op: t.pkgBackend.Name + " update-cache"}
+	}
+	cmd := t.pkgBackend.UpdateCache
+	if t.pkgBackend.CacheNeedsRoot && t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
+	result, err := t.RunCommand(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return CacheUpdateError{
+			Stderr:   result.Stderr,
+			ExitCode: result.ExitCode,
+		}
+	}
+	return nil
+}
+
+func (t *SSHTarget) IsUpgradable(ctx context.Context, pkg string) (bool, error) {
+	cmd := fmt.Sprintf(t.pkgBackend.IsUpgradable, shellQuote(pkg))
+	result, err := t.RunCommand(ctx, cmd)
+	if err != nil {
+		return false, err
+	}
+	return result.ExitCode == 0, nil
+}
+
 // PkgInstallError is returned when a package install command fails.
 type PkgInstallError struct {
 	Pkgs     []string
@@ -89,4 +119,14 @@ type PkgRemoveError struct {
 
 func (e PkgRemoveError) Error() string {
 	return fmt.Sprintf("pkg remove failed (exit %d): %s", e.ExitCode, e.Stderr)
+}
+
+// CacheUpdateError is returned when a package cache refresh command fails.
+type CacheUpdateError struct {
+	Stderr   string
+	ExitCode int
+}
+
+func (e CacheUpdateError) Error() string {
+	return fmt.Sprintf("pkg cache update failed (exit %d): %s", e.ExitCode, e.Stderr)
 }

@@ -10,6 +10,7 @@ import (
 const (
 	StatePresent = "present"
 	StateAbsent  = "absent"
+	StateLatest  = "latest"
 )
 
 type (

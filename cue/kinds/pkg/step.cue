@@ -1,7 +1,7 @@
 package pkg
 
 #Step: {
-	@doc("Ensure packages are present or absent on the target")
+	@doc("Ensure packages are present, absent, or at the latest version on the target")
 	@example("""
 		builtin.pkg & {
 		    packages: ["nginx", "curl", "git"]
@@ -13,11 +13,17 @@ package pkg
 		    state:    "absent"
 		}
 		""")
+	@example("""
+		builtin.pkg & {
+		    packages: ["nginx"]
+		    state:    "latest"
+		}
+		""")
 
 	close({
-		kind:     "pkg"
-		desc?:    string @doc("Human-readable description")
-		packages: [...string] & [_, ...] @doc("Packages to ensure present or absent")
-		state:    *"present" | "absent" @doc("Desired package state")
+		kind:  "pkg"
+		desc?: string @doc("Human-readable description")
+		packages: [...string] & [_, ...] @doc("Packages to manage")
+		state: *"present" | "absent" | "latest" @doc("Desired package state")
 	})
 }
