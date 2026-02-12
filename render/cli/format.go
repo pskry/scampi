@@ -75,17 +75,17 @@ func (f *formatter) fmtTemplate(
 	}
 
 	if snippet, ok := f.renderSnippet(tmpl.Source); ok {
-		fmt.Fprintln(&buf)
-		fmt.Fprint(&buf, snippet)
+		buf.WriteString("\n")
+		buf.WriteString(snippet)
 	}
 
 	if hint, ok := template.Render(tmpl.HintField()); ok {
 		hint = strings.TrimSpace(hint)
 		if hint != "" {
-			fmt.Fprint(&buf, "\n    ")
+			buf.WriteString("\n    ")
 			f.fmtfMsgTo(&buf, helpCol, "%s hint:", glyphL(f.glyphs.hint))
 			for l := range strings.SplitSeq(hint, "\n") {
-				fmt.Fprint(&buf, "\n    ")
+				buf.WriteString("\n    ")
 				f.fmtfMsgTo(&buf, helpCol, "     %s", l)
 			}
 		}
@@ -94,10 +94,10 @@ func (f *formatter) fmtTemplate(
 	if help, ok := template.Render(tmpl.HelpField()); ok {
 		help = strings.TrimSpace(help)
 		if help != "" {
-			fmt.Fprint(&buf, "\n    ")
+			buf.WriteString("\n    ")
 			f.fmtfMsgTo(&buf, helpCol, "%s help:", glyphL(f.glyphs.help))
 			for l := range strings.SplitSeq(help, "\n") {
-				fmt.Fprint(&buf, "\n    ")
+				buf.WriteString("\n    ")
 				f.fmtfMsgTo(&buf, helpCol, "     %s", l)
 			}
 		}
@@ -113,7 +113,7 @@ func (f *formatter) renderSnippet(src *spec.SourceSpan) (string, bool) {
 	v := f.loadSourceLine(src)
 	var b strings.Builder
 	f.renderSourceHeader(&b, v)
-	fmt.Fprintln(&b)
+	b.WriteString("\n")
 	f.renderSourceBody(&b, v)
 	return b.String(), true
 }

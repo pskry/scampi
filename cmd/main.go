@@ -443,7 +443,7 @@ and color semantics used in doit CLI output.`,
 }
 
 func onUsageError(_ context.Context, cmd *cli.Command, err error, _ bool) error {
-	fmt.Fprintf(os.Stderr, "Incorrect Usage: %s\n\n", err)
+	_, _ = fmt.Fprintf(os.Stderr, "Incorrect Usage: %s\n\n", err)
 	_ = cli.ShowSubcommandHelp(cmd)
 	return cli.Exit("", exitUserError)
 }

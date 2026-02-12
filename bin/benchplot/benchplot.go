@@ -49,7 +49,7 @@ type key struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: benchplot.go <benchmark files>")
+		_, _ = fmt.Fprintln(os.Stderr, "usage: benchplot.go <benchmark files>")
 		os.Exit(1)
 	}
 
@@ -63,7 +63,7 @@ func main() {
 		parseFile(path, ts, values)
 	}
 
-	fmt.Println("benchmark,timestamp,median_ms")
+	_, _ = fmt.Println("benchmark,timestamp,median_ms")
 
 	// stable output
 	var keys []key

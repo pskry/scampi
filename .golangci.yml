@@ -56,7 +56,11 @@ linters:
         - name: redefines-builtin-id # [BUG]    prevent shadowing built-ins
         - name: unexported-return #    [BUG]    prevent leaking unexported types
         - name: unhandled-error #      [BUG]    enforce error handling on calls
-          arguments: ["fmt.Printf"]
+          arguments:
+            - "strings.Builder.Write"
+            - "strings.Builder.WriteByte"
+            - "strings.Builder.WriteRune"
+            - "strings.Builder.WriteString"
         - name: unreachable-code #     [BUG]    detect dead or impossible code paths
 
 formatters:
