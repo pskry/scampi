@@ -1,5 +1,5 @@
 GOLANGCI_LINT_VERSION := `go list -m -f '{{.Version}}' github.com/golangci/golangci-lint/v2`
-BENCHSTAT_VERSION := `go list -m -f '{{.Version}}' golang.org/x/perf`
+BENCHSTAT_VERSION     := `go list -m -f '{{.Version}}' golang.org/x/perf`
 
 build_dir := "./build"
 bin_dir   := f"{{build_dir}}/bin"
@@ -96,12 +96,12 @@ benchplot suffix:
 [doc("Format all code")]
 fmt:
   go fmt ./...
-  cue fmt --files cue/
+  go run cuelang.org/go/cmd/cue fmt --files cue/
 
 [doc("Lint project")]
 lint:
   golangci-lint run
-  cue fmt --check --files cue/
+  go run cuelang.org/go/cmd/cue fmt --check --files cue/
   just license-check
 
 [doc("Check SPDX license headers")]

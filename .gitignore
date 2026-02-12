@@ -3,6 +3,9 @@
 !.gitignore
 !.golangci.yml
 
+# Github workflows
+!/.github/
+
 # Developer environments
 !.dev/
 
