@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package dag provides DAG utilities for plan rendering.
 package dag
 

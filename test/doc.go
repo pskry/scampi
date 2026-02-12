@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package test contains black-box and white-box tests for doit.
 //
 // Tests assert execution semantics, diagnostics behavior, and invariant

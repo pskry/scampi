@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package local defines targets that operate on the local system.
 //
 // Local targets perform side-effecting operations against the host system the

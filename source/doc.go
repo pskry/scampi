@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package source defines read-only access to system state.
 //
 // Sources provide inspection capabilities used during checks and execution.

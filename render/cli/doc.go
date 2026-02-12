@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package cli implements the terminal-based CLI renderer for doit.
 //
 // This package provides the implementation details for the CLI displayer,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package render defines presentation logic for diagnostic events.
 //
 // Renderers consume diagnostic events and transform them into user-facing

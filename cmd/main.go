@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package main defines the CLI surface of doit.
 //
 // It wires user-facing commands to engine execution, diagnostics, and rendering.

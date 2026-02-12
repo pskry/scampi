@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 package core
 
 import "godoit.dev/doit/builtin"

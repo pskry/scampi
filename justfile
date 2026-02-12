@@ -102,6 +102,36 @@ fmt:
 lint:
   golangci-lint run
   cue fmt --check --files cue/
+  just license-check
+
+[doc("Check SPDX license headers")]
+license-check:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  header="// SPDX-License-Identifier: GPL-3.0-only"
+  missing=()
+  stray=()
+  while IFS= read -r f; do
+    if [[ "$(head -1 "$f")" != "$header" ]]; then
+      missing+=("$f")
+    fi
+    count=$(grep -c 'SPDX-License-Identifier' "$f")
+    if [[ "$count" -gt 1 ]]; then
+      stray+=("$f (${count}x)")
+    fi
+  done < <(find . -name '*.go' -not -path './vendor/*' && find ./cue -name '*.cue')
+  ok=true
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "Missing SPDX header:"
+    printf '  %s\n' "${missing[@]}"
+    ok=false
+  fi
+  if [[ ${#stray[@]} -gt 0 ]]; then
+    echo "Duplicate SPDX header:"
+    printf '  %s\n' "${stray[@]}"
+    ok=false
+  fi
+  [[ "$ok" == true ]]
 
 [doc("Clean project")]
 clean:

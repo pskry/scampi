@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package pkgmgr provides package manager detection and command templates.
 package pkgmgr
 

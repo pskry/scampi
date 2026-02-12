@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package layout provides terminal layout utilities for renderers.
 package layout
 

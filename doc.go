@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package doit provides embedded resources and top-level wiring for the doit
 // application.
 //

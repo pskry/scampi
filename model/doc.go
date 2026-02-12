@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package model defines shared execution data models.
 //
 // These types represent execution outcomes and summaries that are safe to share

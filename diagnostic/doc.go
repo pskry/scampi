@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package diagnostic defines the diagnostics emission layer of doit.
 //
 // It translates execution facts into structured events according to policy.

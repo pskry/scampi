@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package template provides a thin wrapper around text/template rendering.
 //
 // It is used by renderers to expand small formatting templates with helper

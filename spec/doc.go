@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package spec defines the declarative execution model of doit.
 //
 // It contains interfaces and data structures for actions, operations, plans,

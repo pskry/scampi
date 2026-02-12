@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 package spec
 
 // StepDoc contains documentation for a step type, extracted from CUE schema.

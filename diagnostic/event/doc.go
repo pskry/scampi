@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package event defines the structured diagnostic event model.
 //
 // Events are immutable records carrying timing, scope, severity, and typed

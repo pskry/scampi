@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package signal defines diagnostic severity levels and signaling primitives.
 //
 // Signals express user-facing importance and intent (e.g. info, warning,

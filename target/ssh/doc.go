@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package ssh defines targets that operate on remote systems via SSH.
 //
 // SSH targets perform side-effecting operations against a remote host using SSH

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 // Package capability defines execution guarantees used during planning.
 //
 // A capability represents a concrete guarantee that a target provides and that a
