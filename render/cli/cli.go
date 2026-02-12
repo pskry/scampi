@@ -264,20 +264,36 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 	}
 
 	if len(doc.Examples) > 0 && c.opts.Verbosity >= signal.V {
+		showAll := len(doc.Examples) == 1 || c.opts.Verbosity >= signal.VV
+		visible := doc.Examples
+		if !showAll {
+			visible = doc.Examples[:1]
+		}
+
+		header := "EXAMPLE" + strings.ToUpper(layout.Plural(len(visible)))
 		events = append(events, renderEvent{line: "", stream: streamOut})
 		events = append(events, renderEvent{
-			line:   c.formatter.fmtMsg(ansi.BrightBlack(), "EXAMPLE"),
+			line:   c.formatter.fmtMsg(ansi.BrightBlack(), header),
 			stream: streamOut,
 		})
 		events = append(events, renderEvent{line: "", stream: streamOut})
 
-		for _, example := range doc.Examples {
+		for _, example := range visible {
 			for l := range strings.SplitSeq(example, "\n") {
 				events = append(events, renderEvent{
 					line:   c.formatter.fmtMsg(ansi.BrightBlue(), "  "+l),
 					stream: streamOut,
 				})
 			}
+		}
+
+		if !showAll {
+			events = append(events, renderEvent{line: "", stream: streamOut})
+			events = append(events, renderEvent{
+				line: c.formatter.fmtMsg(ansi.BrightBlack(),
+					fmt.Sprintf("Use -vv to see all %d examples.", len(doc.Examples))),
+				stream: streamOut,
+			})
 		}
 	} else if len(doc.Examples) > 0 {
 		events = append(events, renderEvent{line: "", stream: streamOut})

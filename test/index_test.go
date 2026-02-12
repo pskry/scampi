@@ -51,11 +51,12 @@ func TestIndexAll_EmitsWellFormedEvent(t *testing.T) {
 
 func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
 	tests := []struct {
-		kind           string
-		wantSummary    string
-		wantFields     []string
-		wantFieldCount int
-		wantExample    bool
+		kind             string
+		wantSummary      string
+		wantFields       []string
+		wantFieldCount   int
+		wantExample      bool
+		wantExampleCount int // 0 means just check non-empty
 	}{
 		{
 			kind:           "copy",
@@ -70,6 +71,14 @@ func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
 			wantFields:     []string{"target", "link"},
 			wantFieldCount: 3, // includes desc
 			wantExample:    true,
+		},
+		{
+			kind:             "pkg",
+			wantSummary:      "Ensure packages are present, absent, or at the latest version on the target",
+			wantFields:       []string{"packages", "state"},
+			wantFieldCount:   3, // includes desc
+			wantExample:      true,
+			wantExampleCount: 3,
 		},
 	}
 
@@ -131,6 +140,9 @@ func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
 			}
 			if tt.wantExample && len(doc.Examples) > 0 && doc.Examples[0] == "" {
 				t.Error("example is empty string")
+			}
+			if tt.wantExampleCount > 0 && len(doc.Examples) != tt.wantExampleCount {
+				t.Errorf("len(Examples) = %d, want %d", len(doc.Examples), tt.wantExampleCount)
 			}
 		})
 	}

@@ -63,10 +63,8 @@ func LoadStepDoc(kind string) spec.StepDoc {
 		Fields:  extractFieldDocs(stepDef),
 	}
 
-	// Extract example if present
-	if example := extractAttr(stepDef, cueAttrExample); example != "" {
-		doc.Examples = []string{example}
-	}
+	// Extract examples if present
+	doc.Examples = extractAttrs(stepDef, cueAttrExample)
 
 	return doc
 }
@@ -80,6 +78,20 @@ func extractAttr(v cue.Value, name string) string {
 		}
 	}
 	return ""
+}
+
+// extractAttrs collects the first argument of every attribute with the given name.
+func extractAttrs(v cue.Value, name string) []string {
+	var out []string
+	for _, attr := range v.Attributes(cue.ValueAttr) {
+		if attr.Name() == name && attr.NumArgs() > 0 {
+			s, _ := attr.String(0)
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
 }
 
 // extractFieldDocs iterates over struct fields and extracts their documentation.
