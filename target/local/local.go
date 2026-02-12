@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"godoit.dev/doit/source"
@@ -33,7 +34,25 @@ func (Local) Create(ctx context.Context, _ source.Source, _ spec.TargetInstance)
 	}
 
 	tgt.pkgBackend = pkgmgr.Detect(osInfo)
+
+	// Privilege escalation detection.
+	tgt.isRoot = os.Getuid() == 0
+	tgt.escalate = detectEscalation(ctx, tgt)
+
 	return tgt, nil
+}
+
+func detectEscalation(ctx context.Context, tgt *POSIXTarget) string {
+	if tgt.isRoot {
+		return ""
+	}
+	if result, err := tgt.RunCommand(ctx, "command -v sudo"); err == nil && result.ExitCode == 0 {
+		return "sudo"
+	}
+	if result, err := tgt.RunCommand(ctx, "command -v doas"); err == nil && result.ExitCode == 0 {
+		return "doas"
+	}
+	return ""
 }
 
 type Config struct{}

@@ -3,7 +3,9 @@ package target
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
+	"strings"
 
 	"godoit.dev/doit/capability"
 	"godoit.dev/doit/errs"
@@ -79,3 +81,51 @@ func Must[T any](reqID string, tgt Target) T {
 	}
 	return res
 }
+
+// EscalationError is returned when a privilege-escalated command fails
+// (password required, not in sudoers, command denied, etc).
+type EscalationError struct {
+	Tool     string // "sudo" or "doas"
+	Op       string // "cat", "cp", "rm", "chmod", "chown", "ln"
+	Path     string
+	Stderr   string
+	ExitCode int
+}
+
+func (e EscalationError) Error() string {
+	stderr := strings.TrimSpace(e.Stderr)
+	if stderr != "" {
+		return fmt.Sprintf(
+			"%s %s %s: exit %d: %s",
+			e.Tool, e.Op, e.Path, e.ExitCode, stderr,
+		)
+	}
+	return fmt.Sprintf(
+		"%s %s %s: exit %d",
+		e.Tool, e.Op, e.Path, e.ExitCode,
+	)
+}
+
+// NoEscalationError is returned when an operation requires root
+// but the user is not root and no escalation tool (sudo/doas) was found.
+type NoEscalationError struct {
+	Op   string // "read", "write", "chmod", "apk install", …
+	Path string
+}
+
+func (e NoEscalationError) Error() string {
+	return fmt.Sprintf("%s %s: no escalation tool found (sudo/doas)", e.Op, e.Path)
+}
+
+// StagingError is returned when writing a temp file for
+// escalated copy fails.
+type StagingError struct {
+	Path string // destination path the staged file was for
+	Err  error
+}
+
+func (e StagingError) Error() string {
+	return fmt.Sprintf("stage temp file for %s: %s", e.Path, e.Err)
+}
+
+func (e StagingError) Unwrap() error { return e.Err }

@@ -8,6 +8,7 @@ type Backend struct {
 	IsInstalled string // exit 0 = installed
 	Install     string
 	Remove      string
+	NeedsRoot   bool // true when install/remove require root privileges
 }
 
 // backendsByFamily maps os-release ID/ID_LIKE values (and lowercased kernel
@@ -18,53 +19,62 @@ var backendsByFamily = map[string]Backend{
 		IsInstalled: "brew list %s",
 		Install:     "brew install %s",
 		Remove:      "brew uninstall %s",
+		NeedsRoot:   false,
 	},
 	"freebsd": {
 		Name:        "pkg",
 		IsInstalled: "pkg info %s",
 		Install:     "pkg install -y %s",
 		Remove:      "pkg remove -y %s",
+		NeedsRoot:   true,
 	},
 	"debian": {
 		Name:        "apt",
 		IsInstalled: "dpkg -s %s",
 		Install:     "DEBIAN_FRONTEND=noninteractive apt-get install -y %s",
 		Remove:      "DEBIAN_FRONTEND=noninteractive apt-get remove -y %s",
+		NeedsRoot:   true,
 	},
 	"ubuntu": {
 		Name:        "apt",
 		IsInstalled: "dpkg -s %s",
 		Install:     "DEBIAN_FRONTEND=noninteractive apt-get install -y %s",
 		Remove:      "DEBIAN_FRONTEND=noninteractive apt-get remove -y %s",
+		NeedsRoot:   true,
 	},
 	"alpine": {
 		Name:        "apk",
 		IsInstalled: "apk info -e %s",
 		Install:     "apk add %s",
 		Remove:      "apk del %s",
+		NeedsRoot:   true,
 	},
 	"fedora": {
 		Name:        "dnf",
 		IsInstalled: "rpm -q %s",
 		Install:     "dnf install -y %s",
 		Remove:      "dnf remove -y %s",
+		NeedsRoot:   true,
 	},
 	"rhel": {
 		Name:        "dnf",
 		IsInstalled: "rpm -q %s",
 		Install:     "dnf install -y %s",
 		Remove:      "dnf remove -y %s",
+		NeedsRoot:   true,
 	},
 	"arch": {
 		Name:        "pacman",
 		IsInstalled: "pacman -Q %s",
 		Install:     "pacman -S --noconfirm %s",
 		Remove:      "pacman -R --noconfirm %s",
+		NeedsRoot:   true,
 	},
 	"suse": {
 		Name:        "zypper",
 		IsInstalled: "rpm -q %s",
 		Install:     "zypper install -y %s",
 		Remove:      "zypper remove -y %s",
+		NeedsRoot:   true,
 	},
 }

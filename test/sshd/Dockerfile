@@ -1,6 +1,6 @@
 FROM alpine:3.19
 
-RUN apk add --no-cache openssh-server shadow
+RUN apk add --no-cache openssh-server shadow sudo
 
 # Create test users and groups (set placeholder password to unlock accounts for SSH)
 RUN addgroup -g 1000 testgroup && \
@@ -8,7 +8,8 @@ RUN addgroup -g 1000 testgroup && \
   addgroup -g 1001 othergroup && \
   adduser -D -u 1001 -G othergroup otheruser && \
   echo "testuser:testpass" | chpasswd && \
-  echo "otheruser:testpass" | chpasswd
+  echo "otheruser:testpass" | chpasswd && \
+  echo "testuser ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/testuser
 
 # Setup SSH
 RUN mkdir -p /var/run/sshd && \

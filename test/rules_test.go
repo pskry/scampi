@@ -75,12 +75,20 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
+			pattern:        "target/local/local.go",
+			allowedImports: "os",
+		},
+		{
 			pattern:        "target/local/posix.go",
-			allowedImports: "os,os/exec,os/user,syscall",
+			allowedImports: "os,os/exec,os/user,syscall,crypto/rand",
 		},
 		{
 			pattern:        "target/local/local_test.go",
 			allowedImports: "runtime",
+		},
+		{
+			pattern:        "target/local/escalate_test.go",
+			allowedImports: "os",
 		},
 		{
 			pattern:        "target/ssh/errors.go",
@@ -96,7 +104,7 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern: "target/ssh/target.go",
-			allowedImports: `os,
+			allowedImports: `os,crypto/rand,
 			golang.org/x/crypto/ssh,
 			github.com/pkg/sftp`,
 		},

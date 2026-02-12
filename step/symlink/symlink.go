@@ -205,7 +205,7 @@ func (op *ensureSymlinkOp) Execute(ctx context.Context, _ source.Source, tgt tar
 					Err:       err,
 				}
 			}
-			return spec.Result{}, err
+			return spec.Result{}, sharedops.DiagnoseTargetError(err)
 		}
 	}
 
@@ -218,7 +218,7 @@ func (op *ensureSymlinkOp) Execute(ctx context.Context, _ source.Source, tgt tar
 				Err:       err,
 			}
 		}
-		return spec.Result{}, err
+		return spec.Result{}, sharedops.DiagnoseTargetError(err)
 	}
 
 	return spec.Result{Changed: true}, nil

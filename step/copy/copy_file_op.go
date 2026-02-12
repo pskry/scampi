@@ -70,7 +70,7 @@ func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target
 	}
 
 	if err := fsTgt.WriteFile(ctx, op.dest, srcData); err != nil {
-		return spec.Result{}, err
+		return spec.Result{}, sharedops.DiagnoseTargetError(err)
 	}
 
 	return spec.Result{Changed: true}, nil

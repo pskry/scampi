@@ -79,7 +79,7 @@ func (op *EnsureModeOp) Execute(ctx context.Context, _ source.Source, tgt target
 				Err:       err,
 			}
 		}
-		return spec.Result{}, err
+		return spec.Result{}, sharedops.DiagnoseTargetError(err)
 	}
 
 	return spec.Result{Changed: changed}, nil

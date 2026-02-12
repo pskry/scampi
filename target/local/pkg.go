@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"godoit.dev/doit/target"
 )
 
 func (t POSIXTarget) IsInstalled(ctx context.Context, pkg string) (bool, error) {
@@ -16,11 +18,17 @@ func (t POSIXTarget) IsInstalled(ctx context.Context, pkg string) (bool, error) 
 }
 
 func (t POSIXTarget) InstallPkgs(ctx context.Context, pkgs []string) error {
+	if t.pkgBackend.NeedsRoot && !t.isRoot && t.escalate == "" {
+		return target.NoEscalationError{Op: t.pkgBackend.Name + " install"}
+	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		quoted[i] = shellQuote(p)
 	}
 	cmd := fmt.Sprintf(t.pkgBackend.Install, strings.Join(quoted, " "))
+	if t.pkgBackend.NeedsRoot && t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
@@ -36,11 +44,17 @@ func (t POSIXTarget) InstallPkgs(ctx context.Context, pkgs []string) error {
 }
 
 func (t POSIXTarget) RemovePkgs(ctx context.Context, pkgs []string) error {
+	if t.pkgBackend.NeedsRoot && !t.isRoot && t.escalate == "" {
+		return target.NoEscalationError{Op: t.pkgBackend.Name + " remove"}
+	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		quoted[i] = shellQuote(p)
 	}
 	cmd := fmt.Sprintf(t.pkgBackend.Remove, strings.Join(quoted, " "))
+	if t.pkgBackend.NeedsRoot && t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err

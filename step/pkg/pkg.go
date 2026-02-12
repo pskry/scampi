@@ -51,8 +51,9 @@ func (a *pkgAction) Kind() string { return "pkg" }
 
 func (a *pkgAction) Ops() []spec.Op {
 	op := &ensurePkgOp{
-		packages: a.packages,
-		state:    a.state,
+		packages:   a.packages,
+		state:      a.state,
+		pkgsSource: a.step.Fields["packages"].Value,
 	}
 	op.SetAction(a)
 	return []spec.Op{op}

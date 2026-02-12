@@ -108,7 +108,7 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 				Err:       err,
 			}
 		}
-		return spec.Result{}, err
+		return spec.Result{}, sharedops.DiagnoseTargetError(err)
 	}
 
 	return spec.Result{Changed: true}, nil

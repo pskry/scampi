@@ -16,8 +16,9 @@ const ensurePkgID = "builtin.ensure-pkg"
 
 type ensurePkgOp struct {
 	sharedops.BaseOp
-	packages []string
-	state    string
+	packages   []string
+	state      string
+	pkgsSource spec.SourceSpan
 }
 
 func (op *ensurePkgOp) Check(ctx context.Context, _ source.Source, tgt target.Target) (spec.CheckResult, error) {
@@ -69,11 +70,19 @@ func (op *ensurePkgOp) Execute(ctx context.Context, _ source.Source, tgt target.
 	switch op.state {
 	case StatePresent:
 		if err := pm.InstallPkgs(ctx, actionable); err != nil {
-			return spec.Result{}, err
+			return spec.Result{}, PkgInstallError{
+				Pkgs:   actionable,
+				Stderr: err.Error(),
+				Source: op.pkgsSource,
+			}
 		}
 	case StateAbsent:
 		if err := pm.RemovePkgs(ctx, actionable); err != nil {
-			return spec.Result{}, err
+			return spec.Result{}, PkgRemoveError{
+				Pkgs:   actionable,
+				Stderr: err.Error(),
+				Source: op.pkgsSource,
+			}
 		}
 	}
 

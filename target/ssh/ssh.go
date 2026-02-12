@@ -146,7 +146,26 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 
 	sshTgt.pkgBackend = pkgmgr.Detect(sshTgt.osInfo)
 
+	// Privilege escalation detection.
+	if result, err := sshTgt.RunCommand(ctx, "id -u"); err == nil {
+		sshTgt.isRoot = strings.TrimSpace(result.Stdout) == "0"
+	}
+	sshTgt.escalate = detectEscalation(ctx, sshTgt)
+
 	return sshTgt, nil
+}
+
+func detectEscalation(ctx context.Context, tgt *SSHTarget) string {
+	if tgt.isRoot {
+		return ""
+	}
+	if result, err := tgt.RunCommand(ctx, "command -v sudo"); err == nil && result.ExitCode == 0 {
+		return "sudo"
+	}
+	if result, err := tgt.RunCommand(ctx, "command -v doas"); err == nil && result.ExitCode == 0 {
+		return "doas"
+	}
+	return ""
 }
 
 func buildSSHConfig(

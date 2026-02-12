@@ -109,7 +109,7 @@ func (op *EnsureOwnerOp) Execute(ctx context.Context, _ source.Source, tgt targe
 				Err:       err,
 			}
 		}
-		return spec.Result{}, err
+		return spec.Result{}, sharedops.DiagnoseTargetError(err)
 	}
 
 	return spec.Result{Changed: changed}, nil
