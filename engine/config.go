@@ -27,6 +27,7 @@ import (
 	"godoit.dev/doit/errs"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
+	"godoit.dev/doit/star"
 )
 
 type overlayFS struct {
@@ -173,6 +174,18 @@ func LoadConfig(
 	cfgPath, absErr := filepath.Abs(cfgPath)
 	if absErr != nil {
 		panic(errs.BUG("filepath.Abs() failed: %w", absErr))
+	}
+
+	if strings.HasSuffix(cfgPath, ".star") {
+		cfg, err = star.Eval(ctx, cfgPath, store, src)
+		if err != nil {
+			impact, _ := emitEngineDiagnostic(em, cfgPath, err)
+			if impact.ShouldAbort() {
+				return spec.Config{}, AbortError{Causes: []error{err}}
+			}
+			return spec.Config{}, err
+		}
+		return cfg, nil
 	}
 
 	cfg, err = loadConfigWithSource(ctx, em, cfgPath, store, src)
@@ -1140,6 +1153,11 @@ func LoadConfigWithOptions(
 	cfgPath, absErr := filepath.Abs(cfgPath)
 	if absErr != nil {
 		panic(errs.BUG("filepath.Abs() failed: %w", absErr))
+	}
+
+	// Starlark configs don't use inventory/vars — dispatch directly.
+	if strings.HasSuffix(cfgPath, ".star") {
+		return LoadConfig(ctx, em, cfgPath, store, src)
 	}
 
 	additionalPaths := collectAdditionalPaths(cfgPath, opts)

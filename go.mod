@@ -10,6 +10,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/pkg/sftp v1.13.10
 	github.com/urfave/cli/v3 v3.6.1
+	go.starlark.net v0.0.0-20260210143700-b62fd896b91b
 	golang.org/x/crypto v0.48.0
 	golang.org/x/perf v0.0.0-20260112171951-5abaabe9f1bd
 	golang.org/x/sync v0.19.0
