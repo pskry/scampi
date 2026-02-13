@@ -30,7 +30,8 @@ func callSpan(thread *starlark.Thread) spec.SourceSpan {
 }
 
 // kwargsFieldSpans produces a FieldSpan map from kwargs. Each field gets the
-// call-site position (field-level refinement is future work).
+// call-site position. TODO: resolve per-kwarg source positions from the
+// Starlark AST so diagnostics point at the offending field, not the call site.
 func kwargsFieldSpans(pos spec.SourceSpan, names ...string) map[string]spec.FieldSpan {
 	fields := make(map[string]spec.FieldSpan, len(names))
 	for _, name := range names {

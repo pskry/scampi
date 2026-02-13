@@ -89,7 +89,11 @@ func extractSteps(
 				fn, i, v.Type(),
 			)
 		}
-		out = append(out, step.Instance)
+		inst := step.Instance
+		if inst.Desc == "" && inst.Type != nil {
+			inst.Desc = fmt.Sprintf("%s[%d]", inst.Type.Kind(), i)
+		}
+		out = append(out, inst)
 	}
 	return out, nil
 }

@@ -17,10 +17,14 @@ import (
 
 // E2EScenario defines a data-driven E2E test case.
 // Each scenario is a directory under testdata/e2e/ containing:
-//   - config.cue     (required) - the doit configuration
+//   - config.cue     (optional) - CUE configuration
+//   - config.star    (optional) - Starlark configuration
 //   - source.json    (required) - source files to populate
 //   - target.json    (optional) - pre-existing target state
 //   - expect.json    (required) - expected outcomes
+//
+// At least one config file must be present. When both exist,
+// the scenario runs once per format.
 type E2EScenario struct {
 	Source E2EFiles  `json:"source"`
 	Target E2EFiles  `json:"target"`
@@ -78,18 +82,42 @@ func TestE2E(t *testing.T) {
 		name := e.Name()
 		scenarioDir := filepath.Join(root, name)
 
-		// Run scenario with each driver
-		for _, driver := range drivers {
-			driverName := driver.Name()
-			t.Run(name+"/"+driverName, func(t *testing.T) {
-				runE2EScenarioWithDriver(t, scenarioDir, driver)
-			})
+		configs := discoverConfigs(scenarioDir)
+		if len(configs) == 0 {
+			t.Errorf("%s: no config.cue or config.star found", name)
+			continue
+		}
+
+		for _, cfg := range configs {
+			for _, driver := range drivers {
+				t.Run(name+"/"+cfg.format+"/"+driver.Name(), func(t *testing.T) {
+					runE2EScenarioWithDriver(t, scenarioDir, cfg.filename, driver)
+				})
+			}
 		}
 	}
 }
 
-func runE2EScenarioWithDriver(t *testing.T, dir string, driver E2EDriver) {
-	cfgPath := filepath.Join(dir, "config.cue")
+type configFile struct {
+	filename string // "config.cue" or "config.star"
+	format   string // "cue" or "star"
+}
+
+func discoverConfigs(dir string) []configFile {
+	var configs []configFile
+	for _, c := range []configFile{
+		{"config.cue", "cue"},
+		{"config.star", "star"},
+	} {
+		if _, err := readFileSafe(filepath.Join(dir, c.filename)); err == nil {
+			configs = append(configs, c)
+		}
+	}
+	return configs
+}
+
+func runE2EScenarioWithDriver(t *testing.T, dir string, cfgFilename string, driver E2EDriver) {
+	cfgPath := filepath.Join(dir, cfgFilename)
 	sourcePath := filepath.Join(dir, "source.json")
 	targetPath := filepath.Join(dir, "target.json")
 	expectPath := filepath.Join(dir, "expect.json")
@@ -118,7 +146,8 @@ func runE2EScenarioWithDriver(t *testing.T, dir string, driver E2EDriver) {
 	// Build MemSource with config + source files
 	src := source.NewMemSource()
 	cfgData := readOrDie(cfgPath)
-	src.Files["/config.cue"] = cfgData
+	memCfgPath := "/" + cfgFilename
+	src.Files[memCfgPath] = cfgData
 	for path, content := range srcFiles.Files {
 		src.Files[path] = []byte(content)
 	}
@@ -131,7 +160,7 @@ func runE2EScenarioWithDriver(t *testing.T, dir string, driver E2EDriver) {
 	ctx := context.Background()
 
 	run := func() error {
-		cfg, err := engine.LoadConfig(ctx, em, "/config.cue", store, src)
+		cfg, err := engine.LoadConfig(ctx, em, memCfgPath, store, src)
 		if err != nil {
 			return err
 		}

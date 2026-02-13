@@ -27,15 +27,25 @@ func TestDiagnostics(t *testing.T) {
 		}
 
 		name := e.Name()
-		t.Run(name, func(t *testing.T) {
-			runDiagnosticsCase(t, filepath.Join(root, name))
-		})
+		dir := filepath.Join(root, name)
+
+		configs := discoverConfigs(dir)
+		for _, cfg := range configs {
+			t.Run(name+"/"+cfg.format, func(t *testing.T) {
+				runDiagnosticsCase(t, dir, cfg.filename, cfg.format)
+			})
+		}
 	}
 }
 
-func runDiagnosticsCase(t *testing.T, dir string) {
-	cfgPath := filepath.Join(dir, "config.cue")
-	expectPath := filepath.Join(dir, "expect.json")
+func runDiagnosticsCase(t *testing.T, dir string, cfgFilename string, format string) {
+	cfgPath := filepath.Join(dir, cfgFilename)
+
+	// Prefer format-specific expect file, fall back to default
+	expectPath := filepath.Join(dir, "expect-"+format+".json")
+	if _, err := readFileSafe(expectPath); err != nil {
+		expectPath = filepath.Join(dir, "expect.json")
+	}
 
 	expect := loadExpected(t, expectPath)
 
