@@ -4,6 +4,7 @@ package star
 
 import (
 	"go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
@@ -18,6 +19,7 @@ type Collector struct {
 	deploy  map[string]spec.DeployBlock
 	sources *spec.SourceStore
 	src     source.Source
+	files   map[string]*syntax.File
 }
 
 func newCollector(path string, sources *spec.SourceStore, src source.Source) *Collector {
@@ -27,11 +29,20 @@ func newCollector(path string, sources *spec.SourceStore, src source.Source) *Co
 		deploy:  make(map[string]spec.DeployBlock),
 		sources: sources,
 		src:     src,
+		files:   make(map[string]*syntax.File),
 	}
 }
 
 func threadCollector(thread *starlark.Thread) *Collector {
 	return thread.Local(collectorKey).(*Collector)
+}
+
+func (c *Collector) AddAST(name string, f *syntax.File) {
+	c.files[name] = f
+}
+
+func (c *Collector) AST(name string) *syntax.File {
+	return c.files[name]
 }
 
 // AddTarget registers a target instance. Returns an error if the name

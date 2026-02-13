@@ -213,6 +213,9 @@ func assertDiagnostics(
 			if tmpl.Source.StartLine != exp.Source.Line {
 				t.Fatalf("[%d] expected line %d, got %d", i, exp.Source.Line, tmpl.Source.StartLine)
 			}
+			if exp.Source.Col != 0 && tmpl.Source.StartCol != exp.Source.Col {
+				t.Fatalf("[%d] expected col %d, got %d", i, exp.Source.Col, tmpl.Source.StartCol)
+			}
 		}
 
 		if exp.Step != nil {

@@ -51,7 +51,7 @@ func builtinTargetSSH(
 	}
 
 	span := callSpan(thread)
-	fields := kwargsFieldSpans(span,
+	fields := kwargsFieldSpans(thread,
 		"host", "user", "port", "key", "insecure", "timeout")
 
 	inst := spec.TargetInstance{

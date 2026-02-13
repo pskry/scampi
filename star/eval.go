@@ -53,9 +53,15 @@ func Eval(
 		Recursion: true,
 	}
 
-	_, err = starlark.ExecFileOptions(fOpts, thread, cfgPath, data, predeclared())
+	f, prog, err := starlark.SourceProgramOptions(fOpts, cfgPath, data, predeclared().Has)
 	if err != nil {
-		return spec.Config{}, wrapStarlarkError(err)
+		return spec.Config{}, wrapStarlarkError(err, collector)
+	}
+	collector.AddAST(cfgPath, f)
+
+	_, err = prog.Init(thread, predeclared())
+	if err != nil {
+		return spec.Config{}, wrapStarlarkError(err, collector)
 	}
 
 	return collector.Config(), nil
@@ -143,7 +149,13 @@ func execModule(
 		Recursion: true,
 	}
 
-	globals, err := starlark.ExecFileOptions(fOpts, childThread, absPath, data, predeclared())
+	f, prog, err := starlark.SourceProgramOptions(fOpts, absPath, data, predeclared().Has)
+	if err != nil {
+		return nil, err
+	}
+	threadCollector(parentThread).AddAST(absPath, f)
+
+	globals, err := prog.Init(childThread, predeclared())
 	if err != nil {
 		return nil, err
 	}

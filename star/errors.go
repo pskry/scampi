@@ -6,6 +6,7 @@ package star
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"go.starlark.net/starlark"
 
@@ -45,7 +46,7 @@ func (e StarlarkError) Impact() diagnostic.Impact {
 // If the underlying cause already implements diagnostic.Diagnostic, it is
 // returned directly (with Source filled from the backtrace if empty).
 // Otherwise the error is wrapped in a generic StarlarkError.
-func wrapStarlarkError(err error) error {
+func wrapStarlarkError(err error, c *Collector) error {
 	var evalErr *starlark.EvalError
 	if ok := isEvalError(err, &evalErr); ok && evalErr != nil {
 		bt := evalErr.CallStack
@@ -61,9 +62,71 @@ func wrapStarlarkError(err error) error {
 			return cause
 		}
 
+		if uf, ok := asUnknownFieldError(c, span, cause); ok {
+			return uf
+		}
+
 		return StarlarkError{Err: err, Source: span}
 	}
 	return StarlarkError{Err: err}
+}
+
+// asUnknownFieldError attempts to convert an UnpackArgs "unexpected keyword
+// argument" error into an UnknownFieldError with precise source position.
+func asUnknownFieldError(c *Collector, callSite spec.SourceSpan, cause error) (*UnknownFieldError, bool) {
+	if c == nil || cause == nil {
+		return nil, false
+	}
+	field, suggestion := parseUnexpectedKwarg(cause.Error())
+	if field == "" {
+		return nil, false
+	}
+
+	source := callSite
+	if f := c.AST(callSite.Filename); f != nil {
+		pos := posFromSpan(callSite)
+		if call := findCallExpr(f, pos); call != nil {
+			if refined, ok := kwargKeySpan(call, field); ok {
+				source = refined
+			}
+		}
+	}
+
+	return &UnknownFieldError{
+		Field:      field,
+		Suggestion: suggestion,
+		Source:     source,
+	}, true
+}
+
+// parseUnexpectedKwarg extracts the field name and optional suggestion from an
+// UnpackArgs error like `pkg: unexpected keyword argument "packagess" (did you mean packages?)`.
+func parseUnexpectedKwarg(msg string) (field, suggestion string) {
+	const marker = "unexpected keyword argument "
+	idx := strings.Index(msg, marker)
+	if idx < 0 {
+		return "", ""
+	}
+	rest := msg[idx+len(marker):]
+
+	// Extract the field name (quoted by Starlark's String.String())
+	if i := strings.IndexByte(rest, ' '); i >= 0 {
+		field = strings.Trim(rest[:i], `"`)
+		rest = rest[i:]
+	} else {
+		return strings.Trim(rest, `"`), ""
+	}
+
+	// Extract "did you mean X?" suggestion
+	const didYouMean = "(did you mean "
+	if i := strings.Index(rest, didYouMean); i >= 0 {
+		s := rest[i+len(didYouMean):]
+		if j := strings.IndexByte(s, '?'); j >= 0 {
+			suggestion = s[:j]
+		}
+	}
+
+	return field, suggestion
 }
 
 // spanFromBacktrace walks the call stack from innermost to outermost and
@@ -100,6 +163,41 @@ func isEvalError(err error, target **starlark.EvalError) bool {
 // backtrace on diagnostic types that left it empty.
 type sourceSettable interface {
 	setSource(spec.SourceSpan)
+}
+
+// UnknownFieldError is raised when a call contains an unrecognized field name.
+type UnknownFieldError struct {
+	Field      string
+	Suggestion string
+	Source     spec.SourceSpan
+}
+
+func (e UnknownFieldError) Error() string {
+	if e.Suggestion != "" {
+		return fmt.Sprintf("unknown field %q (did you mean %q?)", e.Field, e.Suggestion)
+	}
+	return fmt.Sprintf("unknown field %q", e.Field)
+}
+
+func (e UnknownFieldError) EventTemplate() event.Template {
+	tmpl := event.Template{
+		ID:     "star.UnknownField",
+		Text:   `unknown field "{{.Field}}"`,
+		Data:   e,
+		Source: &e.Source,
+	}
+	if e.Suggestion != "" {
+		tmpl.Hint = fmt.Sprintf("did you mean %q?", e.Suggestion)
+	}
+	return tmpl
+}
+
+func (e UnknownFieldError) Severity() signal.Severity {
+	return signal.Error
+}
+
+func (e UnknownFieldError) Impact() diagnostic.Impact {
+	return diagnostic.ImpactAbort
 }
 
 // DuplicateTargetError is raised when a target name is registered twice.

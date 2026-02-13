@@ -74,7 +74,7 @@ func builtinCopy(
 			Type:   stepcopy.Copy{},
 			Config: &stepcopy.CopyConfig{Desc: desc, Src: src, Dest: dest, Perm: perm, Owner: owner, Group: group},
 			Source: span,
-			Fields: kwargsFieldSpans(span, "src", "dest", "perm", "owner", "group"),
+			Fields: kwargsFieldSpans(thread, "src", "dest", "perm", "owner", "group"),
 		},
 	}, nil
 }
@@ -112,7 +112,7 @@ func builtinDir(
 			Type:   dir.Dir{},
 			Config: &dir.DirConfig{Desc: desc, Path: path, Perm: perm, Owner: owner, Group: group},
 			Source: span,
-			Fields: kwargsFieldSpans(span, "path", "perm", "owner", "group"),
+			Fields: kwargsFieldSpans(thread, "path", "perm", "owner", "group"),
 		},
 	}, nil
 }
@@ -151,7 +151,7 @@ func builtinPkg(
 			Type:   pkg.Pkg{},
 			Config: &pkg.PkgConfig{Desc: desc, Packages: pkgs, State: state},
 			Source: span,
-			Fields: kwargsFieldSpans(span, "packages"),
+			Fields: kwargsFieldSpans(thread, "packages"),
 		},
 	}, nil
 }
@@ -185,7 +185,7 @@ func builtinSymlink(
 			Type:   symlink.Symlink{},
 			Config: &symlink.SymlinkConfig{Desc: desc, Target: target, Link: link},
 			Source: span,
-			Fields: kwargsFieldSpans(span, "target", "link"),
+			Fields: kwargsFieldSpans(thread, "target", "link"),
 		},
 	}, nil
 }
@@ -237,7 +237,7 @@ func builtinTemplate(
 				Data: dataCfg, Perm: perm, Owner: owner, Group: group,
 			},
 			Source: span,
-			Fields: kwargsFieldSpans(span,
+			Fields: kwargsFieldSpans(thread,
 				"dest", "perm", "owner", "group", "src", "content"),
 		},
 	}, nil
