@@ -42,6 +42,10 @@ test:
 test-containers:
   DOIT_TEST_CONTAINERS=1 go test -v ./test/...
 
+[doc("Run all tests with race-detector and containers")]
+test-all:
+  DOIT_TEST_CONTAINERS=1 go test -race -v ./...
+
 [doc("Run tests with race-detector")]
 race:
   go test -race ./...
