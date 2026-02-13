@@ -187,7 +187,7 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 	for i, ae := range actions {
 		depsStrs[i] = fmtDeps(ae.deps)
 		if ae.layerSize > 1 {
-			if w := len(depsStrs[i]); w > maxParDepsWidth {
+			if w := layout.VisibleLen(depsStrs[i]); w > maxParDepsWidth {
 				maxParDepsWidth = w
 			}
 		}
@@ -239,7 +239,7 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 				if isHeader {
 					currentWidth = maxHeaderWidth
 					if depsStrs[i] != "" {
-						currentWidth += 2 + len(depsStrs[i])
+						currentWidth += 2 + layout.VisibleLen(depsStrs[i])
 					}
 				} else {
 					currentWidth = layout.VisibleLen(innerLine)
