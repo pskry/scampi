@@ -47,11 +47,11 @@ func (op *EnsureModeOp) Check(
 		}
 	}
 
-	if info.Mode() != op.Mode {
+	if info.Mode().Perm() != op.Mode.Perm() {
 		return spec.CheckUnsatisfied, []spec.DriftDetail{{
 			Field:   "perm",
-			Current: info.Mode().String(),
-			Desired: op.Mode.String(),
+			Current: info.Mode().Perm().String(),
+			Desired: op.Mode.Perm().String(),
 		}}, nil
 	}
 
@@ -76,7 +76,7 @@ func (op *EnsureModeOp) Execute(ctx context.Context, _ source.Source, tgt target
 		}
 	}
 
-	changed := info.Mode() != op.Mode
+	changed := info.Mode().Perm() != op.Mode.Perm()
 
 	if err := fmTgt.Chmod(ctx, op.Path, op.Mode); err != nil {
 		// Can't catch during Check: file may not exist yet, and probing

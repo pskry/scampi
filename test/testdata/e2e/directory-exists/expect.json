@@ -1,0 +1,8 @@
+{
+  "target": {
+    "dirs": {
+      "/tmp/mydir": true
+    }
+  },
+  "changed": 0
+}

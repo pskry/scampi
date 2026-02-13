@@ -20,6 +20,7 @@ type MemTarget struct {
 	mu sync.RWMutex
 
 	Files      map[string][]byte
+	Dirs       map[string]fs.FileMode
 	Modes      map[string]fs.FileMode
 	Owners     map[string]Owner
 	ModTimes   map[string]time.Time
@@ -34,6 +35,7 @@ type MemTarget struct {
 func NewMemTarget() *MemTarget {
 	return &MemTarget{
 		Files:      make(map[string][]byte),
+		Dirs:       make(map[string]fs.FileMode),
 		Modes:      make(map[string]fs.FileMode),
 		Owners:     make(map[string]Owner),
 		ModTimes:   make(map[string]time.Time),
@@ -113,6 +115,14 @@ func (m *MemTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
 		}, nil
 	}
 
+	if dirMode, ok := m.Dirs[path]; ok {
+		return memFileInfo{
+			name:  path,
+			mode:  fs.ModeDir | dirMode,
+			isDir: true,
+		}, nil
+	}
+
 	if m.isImplicitDir(path) {
 		return memFileInfo{
 			name:  path,
@@ -124,16 +134,33 @@ func (m *MemTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
 	return nil, errs.WrapErrf(ErrNotExist, "%q", path)
 }
 
+func (m *MemTarget) Mkdir(_ context.Context, path string, mode fs.FileMode) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.Dirs[path] = mode
+	m.Modes[path] = mode
+	if _, exists := m.Owners[path]; !exists {
+		m.Owners[path] = Owner{User: "testuser", Group: "testgroup"}
+	}
+	return nil
+}
+
 func (m *MemTarget) Chmod(_ context.Context, path string, mode fs.FileMode) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, ok := m.Files[path]; !ok {
+	_, isFile := m.Files[path]
+	_, isDir := m.Dirs[path]
+	if !isFile && !isDir {
 		return errs.WrapErrf(ErrNotExist, "%q", path)
 	}
 
 	m.Modes[path] = mode
 	m.ModTimes[path] = time.Now()
+	if isDir {
+		m.Dirs[path] = mode
+	}
 	return nil
 }
 
@@ -141,7 +168,9 @@ func (m *MemTarget) Chown(_ context.Context, path string, owner Owner) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, ok := m.Files[path]; !ok {
+	_, isFile := m.Files[path]
+	_, isDir := m.Dirs[path]
+	if !isFile && !isDir {
 		return errs.WrapErrf(ErrNotExist, "%q", path)
 	}
 
@@ -161,7 +190,9 @@ func (m *MemTarget) GetOwner(_ context.Context, path string) (Owner, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if _, ok := m.Files[path]; !ok {
+	_, isFile := m.Files[path]
+	_, isDir := m.Dirs[path]
+	if !isFile && !isDir {
 		return Owner{}, errs.WrapErrf(ErrNotExist, "%q", path)
 	}
 

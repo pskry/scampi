@@ -5,6 +5,7 @@ package engine
 import (
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/step/copy"
+	"godoit.dev/doit/step/dir"
 	"godoit.dev/doit/step/pkg"
 	"godoit.dev/doit/step/symlink"
 	"godoit.dev/doit/step/template"
@@ -24,6 +25,7 @@ func NewRegistry() *Registry {
 
 	stepTypes := []spec.StepType{
 		copy.Copy{},
+		dir.Dir{},
 		pkg.Pkg{},
 		symlink.Symlink{},
 		template.Template{},

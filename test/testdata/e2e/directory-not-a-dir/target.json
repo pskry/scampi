@@ -1,0 +1,5 @@
+{
+  "files": {
+    "/tmp/mydir": "I am a regular file, not a directory"
+  }
+}

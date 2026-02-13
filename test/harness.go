@@ -587,6 +587,13 @@ func (f *faultyTarget) Remove(ctx context.Context, path string) error {
 	return target.Must[target.Filesystem]("faultyTarget", f.Target).Remove(ctx, path)
 }
 
+func (f *faultyTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) error {
+	if err := f.getFault("Mkdir", path); err != nil {
+		return err
+	}
+	return target.Must[target.Filesystem]("faultyTarget", f.Target).Mkdir(ctx, path, mode)
+}
+
 func (f *faultyTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) error {
 	if err := f.getFault("Chmod", path); err != nil {
 		return err

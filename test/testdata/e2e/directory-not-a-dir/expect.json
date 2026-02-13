@@ -1,0 +1,10 @@
+{
+  "target": {
+    "files": {
+      "/tmp/mydir": "I am a regular file, not a directory"
+    }
+  },
+  "changed": 0,
+  "error": true,
+  "diagnostics": ["builtin.dir.NotADirectory"]
+}

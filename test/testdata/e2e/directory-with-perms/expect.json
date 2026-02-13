@@ -1,0 +1,11 @@
+{
+  "target": {
+    "dirs": {
+      "/tmp/mydir": true
+    },
+    "perms": {
+      "/tmp/mydir": "0700"
+    }
+  },
+  "changed": 2
+}

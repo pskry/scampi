@@ -40,6 +40,7 @@ type (
 		ReadFile(ctx context.Context, path string) ([]byte, error)
 		WriteFile(ctx context.Context, path string, data []byte) error
 		Remove(ctx context.Context, path string) error
+		Mkdir(ctx context.Context, path string, mode fs.FileMode) error
 	}
 	FileMode interface {
 		Chmod(ctx context.Context, path string, mode fs.FileMode) error

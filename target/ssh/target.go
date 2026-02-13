@@ -116,6 +116,22 @@ func (t *SSHTarget) Remove(ctx context.Context, path string) error {
 	return normalizeError(err)
 }
 
+func (t *SSHTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) error {
+	err := t.sftp.MkdirAll(path)
+	if err != nil {
+		if os.IsPermission(err) {
+			if t.escalate != "" {
+				return t.escalatedMkdir(ctx, path, mode)
+			}
+			if !t.isRoot {
+				return target.NoEscalationError{Op: "mkdir", Path: path}
+			}
+		}
+		return normalizeError(err)
+	}
+	return normalizeError(t.sftp.Chmod(path, mode))
+}
+
 // FileMode
 // -----------------------------------------------------------------------------
 
@@ -428,6 +444,23 @@ func (t *SSHTarget) escalatedSymlink(ctx context.Context, tgt, link string) erro
 	if result.ExitCode != 0 {
 		return target.EscalationError{
 			Tool: t.escalate, Op: "ln", Path: link,
+			Stderr: result.Stderr, ExitCode: result.ExitCode,
+		}
+	}
+	return nil
+}
+
+func (t *SSHTarget) escalatedMkdir(ctx context.Context, path string, mode fs.FileMode) error {
+	octal := fmt.Sprintf("%04o", mode.Perm())
+	cmd := t.escalate + " mkdir -p " + shellQuote(path) +
+		" && " + t.escalate + " chmod " + octal + " " + shellQuote(path)
+	result, err := t.RunCommand(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return target.EscalationError{
+			Tool: t.escalate, Op: "mkdir", Path: path,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}

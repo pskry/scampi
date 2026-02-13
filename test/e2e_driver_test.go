@@ -78,6 +78,11 @@ func (d *MemDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 	for path, owner := range initial.Owners {
 		d.tgt.Owners[path] = target.Owner{User: owner.User, Group: owner.Group}
 	}
+	for path := range initial.Dirs {
+		d.tgt.Dirs[path] = 0o755
+		d.tgt.Modes[path] = 0o755
+		d.tgt.Owners[path] = target.Owner{User: "testuser", Group: "testgroup"}
+	}
 	for link, linkTarget := range initial.Symlinks {
 		d.tgt.Symlinks[link] = linkTarget
 	}
@@ -105,6 +110,13 @@ func (d *MemDriver) Verify(t *testing.T, expect E2EFiles) {
 		}
 		if string(got) != wantContent {
 			t.Errorf("target file %q: got %q, want %q", path, got, wantContent)
+		}
+	}
+
+	// Verify directories
+	for path := range expect.Dirs {
+		if _, ok := d.tgt.Dirs[path]; !ok {
+			t.Errorf("expected directory %q to exist", path)
 		}
 	}
 
@@ -226,6 +238,11 @@ func (d *SSHDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 			t.Fatalf("failed to chmod initial file %q: %v", path, err)
 		}
 	}
+	for path := range initial.Dirs {
+		if err := d.tgt.Mkdir(ctx, path, 0o755); err != nil {
+			t.Fatalf("failed to mkdir initial dir %q: %v", path, err)
+		}
+	}
 	for link, linkTarget := range initial.Symlinks {
 		if err := d.tgt.Symlink(ctx, linkTarget, link); err != nil {
 			t.Fatalf("failed to create initial symlink %q: %v", link, err)
@@ -261,6 +278,18 @@ func (d *SSHDriver) Verify(t *testing.T, expect E2EFiles) {
 		}
 		if string(got) != wantContent {
 			t.Errorf("target file %q: got %q, want %q", path, got, wantContent)
+		}
+	}
+
+	// Verify directories
+	for path := range expect.Dirs {
+		info, err := d.tgt.Stat(ctx, path)
+		if err != nil {
+			t.Errorf("expected directory %q to exist: %v", path, err)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("expected %q to be a directory, got mode %v", path, info.Mode())
 		}
 	}
 
