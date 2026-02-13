@@ -34,10 +34,32 @@ type (
 func (Pkg) Kind() string   { return "pkg" }
 func (Pkg) NewConfig() any { return &PkgConfig{} }
 
+func (c *PkgConfig) Validate(step spec.StepInstance) error {
+	if len(c.Packages) == 0 {
+		return EmptyPackagesError{
+			Source: step.Source,
+		}
+	}
+	switch c.State {
+	case StatePresent, StateAbsent, StateLatest:
+	default:
+		return InvalidStateError{
+			Got:     c.State,
+			Allowed: []string{StatePresent, StateAbsent, StateLatest},
+			Source:  step.Source,
+		}
+	}
+	return nil
+}
+
 func (p Pkg) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*PkgConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &PkgConfig{}, step.Config)
+	}
+
+	if err := cfg.Validate(step); err != nil {
+		return nil, err
 	}
 
 	return &pkgAction{

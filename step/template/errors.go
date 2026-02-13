@@ -4,6 +4,7 @@ package template
 
 import (
 	"fmt"
+	"strings"
 
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/diagnostic/event"
@@ -136,3 +137,37 @@ func (e DestDirMissingError) EventTemplate() event.Template {
 
 func (DestDirMissingError) Severity() signal.Severity { return signal.Error }
 func (DestDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+// MutuallyExclusiveError is raised when exactly one of a set of fields is
+// required but zero or more than one were provided.
+type MutuallyExclusiveError struct {
+	Fields []string
+	Got    []string
+	Source spec.SourceSpan
+}
+
+func (e MutuallyExclusiveError) Error() string {
+	return fmt.Sprintf("requires exactly one of %s", strings.Join(e.Fields, ", "))
+}
+
+func (e MutuallyExclusiveError) EventTemplate() event.Template {
+	if len(e.Got) > 1 {
+		return event.Template{
+			ID:     "builtin.template.MutuallyExclusive",
+			Text:   `requires exactly one of {{join ", " .Fields}}`,
+			Hint:   "both were provided",
+			Data:   e,
+			Source: &e.Source,
+		}
+	}
+	return event.Template{
+		ID:     "builtin.template.MutuallyExclusive",
+		Text:   `requires exactly one of {{join ", " .Fields}}`,
+		Hint:   "neither was provided",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (MutuallyExclusiveError) Severity() signal.Severity { return signal.Error }
+func (MutuallyExclusiveError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

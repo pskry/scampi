@@ -46,10 +46,31 @@ type (
 func (Template) Kind() string   { return "template" }
 func (Template) NewConfig() any { return &TemplateConfig{} }
 
+func (c *TemplateConfig) Validate(step spec.StepInstance) error {
+	hasSrc := c.Src != ""
+	hasContent := c.Content != ""
+	if hasSrc == hasContent {
+		var got []string
+		if hasSrc {
+			got = []string{"src", "content"}
+		}
+		return MutuallyExclusiveError{
+			Fields: []string{"src", "content"},
+			Got:    got,
+			Source: step.Source,
+		}
+	}
+	return nil
+}
+
 func (t Template) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*TemplateConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &TemplateConfig{}, step.Config)
+	}
+
+	if err := cfg.Validate(step); err != nil {
+		return nil, err
 	}
 
 	if !filepath.IsAbs(cfg.Dest) {
