@@ -224,7 +224,7 @@ func builtinTemplate(
 
 	dataCfg, err := convertDataConfig(data)
 	if err != nil {
-		return nil, fmt.Errorf("template: %w", err)
+		return nil, err
 	}
 
 	span := callSpan(thread)
@@ -256,10 +256,11 @@ func stringList(
 	for i := 0; i < list.Len(); i++ {
 		s, ok := starlark.AsString(list.Index(i))
 		if !ok {
-			return nil, fmt.Errorf(
-				"%s: %s[%d] must be a string, got %s",
-				fn, arg, i, list.Index(i).Type(),
-			)
+			return nil, &TypeError{
+				Context:  fmt.Sprintf("%s: %s[%d]", fn, arg, i),
+				Expected: "string",
+				Got:      list.Index(i).Type(),
+			}
 		}
 		out[i] = s
 	}
@@ -275,56 +276,65 @@ func convertDataConfig(data *starlark.Dict) (template.DataConfig, error) {
 	for _, item := range data.Items() {
 		key, ok := starlark.AsString(item[0])
 		if !ok {
-			return dc, fmt.Errorf(
-				"data key must be a string, got %s", item[0].Type(),
-			)
+			return dc, &TypeError{
+				Context:  "data key",
+				Expected: "string",
+				Got:      item[0].Type(),
+			}
 		}
 
 		switch key {
 		case "values":
 			dict, ok := item[1].(*starlark.Dict)
 			if !ok {
-				return dc, fmt.Errorf(
-					"data.values must be a dict, got %s", item[1].Type(),
-				)
+				return dc, &TypeError{
+					Context:  "data.values",
+					Expected: "dict",
+					Got:      item[1].Type(),
+				}
 			}
-			vals, err := starlarkDictToMap(dict)
+			vals, err := starlarkDictToMap(dict, "data.values")
 			if err != nil {
-				return dc, fmt.Errorf("data.values: %w", err)
+				return dc, err
 			}
 			dc.Values = vals
 
 		case "env":
 			dict, ok := item[1].(*starlark.Dict)
 			if !ok {
-				return dc, fmt.Errorf(
-					"data.env must be a dict, got %s", item[1].Type(),
-				)
+				return dc, &TypeError{
+					Context:  "data.env",
+					Expected: "dict",
+					Got:      item[1].Type(),
+				}
 			}
-			envMap, err := starlarkDictToStringMap(dict)
+			envMap, err := starlarkDictToStringMap(dict, "data.env")
 			if err != nil {
-				return dc, fmt.Errorf("data.env: %w", err)
+				return dc, err
 			}
 			dc.Env = envMap
 
 		default:
-			return dc, fmt.Errorf(
-				"unknown data key %q (expected 'values' or 'env')", key,
-			)
+			return dc, &UnknownKeyError{
+				Key:     key,
+				Allowed: []string{"values", "env"},
+			}
 		}
 	}
 
 	return dc, nil
 }
 
-func starlarkDictToMap(dict *starlark.Dict) (map[string]any, error) {
+func starlarkDictToMap(dict *starlark.Dict, ctx string) (map[string]any, error) {
 	result := make(map[string]any, dict.Len())
 	for _, item := range dict.Items() {
 		key, ok := starlark.AsString(item[0])
 		if !ok {
-			return nil, fmt.Errorf(
-				"key must be a string, got %s", item[0].Type(),
-			)
+			return nil, &TypeError{
+				Context:  ctx + " key",
+				Expected: "string",
+				Got:      item[0].Type(),
+			}
 		}
 		result[key] = starlarkToGo(item[1])
 	}
@@ -332,22 +342,25 @@ func starlarkDictToMap(dict *starlark.Dict) (map[string]any, error) {
 }
 
 func starlarkDictToStringMap(
-	dict *starlark.Dict,
+	dict *starlark.Dict, ctx string,
 ) (map[string]string, error) {
 	result := make(map[string]string, dict.Len())
 	for _, item := range dict.Items() {
 		key, ok := starlark.AsString(item[0])
 		if !ok {
-			return nil, fmt.Errorf(
-				"key must be a string, got %s", item[0].Type(),
-			)
+			return nil, &TypeError{
+				Context:  ctx + " key",
+				Expected: "string",
+				Got:      item[0].Type(),
+			}
 		}
 		val, ok := starlark.AsString(item[1])
 		if !ok {
-			return nil, fmt.Errorf(
-				"value for %q must be a string, got %s",
-				key, item[1].Type(),
-			)
+			return nil, &TypeError{
+				Context:  fmt.Sprintf("%s value for %q", ctx, key),
+				Expected: "string",
+				Got:      item[1].Type(),
+			}
 		}
 		result[key] = val
 	}
@@ -372,7 +385,7 @@ func starlarkToGo(v starlark.Value) any {
 		}
 		return out
 	case *starlark.Dict:
-		m, _ := starlarkDictToMap(v)
+		m, _ := starlarkDictToMap(v, "dict")
 		return m
 	case starlark.NoneType:
 		return nil

@@ -1,0 +1,14 @@
+{
+  "abort": true,
+  "diagnostics": [
+    {
+      "id": "star.FileRead",
+      "scope": "ScopeEngine",
+      "severity": "Error",
+      "kind": "DiagnosticRaised",
+      "source": {
+        "line": 1
+      }
+    }
+  ]
+}

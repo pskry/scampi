@@ -4,6 +4,7 @@
 package star
 
 import (
+	"errors"
 	"fmt"
 
 	"go.starlark.net/starlark"
@@ -40,20 +41,44 @@ func (e StarlarkError) Impact() diagnostic.Impact {
 	return diagnostic.ImpactAbort
 }
 
-// wrapStarlarkError converts a starlark.EvalError into a StarlarkError with
-// source position extracted from the backtrace, or wraps any other error.
-func wrapStarlarkError(err error) StarlarkError {
+// wrapStarlarkError converts a starlark.EvalError into a diagnostic error.
+// If the underlying cause already implements diagnostic.Diagnostic, it is
+// returned directly (with Source filled from the backtrace if empty).
+// Otherwise the error is wrapped in a generic StarlarkError.
+func wrapStarlarkError(err error) error {
 	var evalErr *starlark.EvalError
 	if ok := isEvalError(err, &evalErr); ok && evalErr != nil {
 		bt := evalErr.CallStack
-		if len(bt) > 0 {
-			return StarlarkError{
-				Err:    err,
-				Source: posToSpan(bt[len(bt)-1].Pos),
+		span := spanFromBacktrace(bt)
+
+		cause := evalErr.Unwrap()
+
+		var diag diagnostic.Diagnostic
+		if errors.As(cause, &diag) {
+			if ss, ok := diag.(sourceSettable); ok {
+				ss.setSource(span)
 			}
+			return cause
 		}
+
+		return StarlarkError{Err: err, Source: span}
 	}
 	return StarlarkError{Err: err}
+}
+
+// spanFromBacktrace walks the call stack from innermost to outermost and
+// returns the first frame with a real source file (skipping <builtin> etc).
+func spanFromBacktrace(bt starlark.CallStack) spec.SourceSpan {
+	for i := len(bt) - 1; i >= 0; i-- {
+		pos := bt[i].Pos
+		if pos.Filename() != "" && pos.Filename() != "<builtin>" {
+			return posToSpan(pos)
+		}
+	}
+	if len(bt) > 0 {
+		return posToSpan(bt[len(bt)-1].Pos)
+	}
+	return spec.SourceSpan{}
 }
 
 func isEvalError(err error, target **starlark.EvalError) bool {
@@ -69,6 +94,12 @@ func isEvalError(err error, target **starlark.EvalError) bool {
 		}
 	}
 	return false
+}
+
+// sourceSettable allows wrapStarlarkError to fill Source from the EvalError
+// backtrace on diagnostic types that left it empty.
+type sourceSettable interface {
+	setSource(spec.SourceSpan)
 }
 
 // DuplicateTargetError is raised when a target name is registered twice.
@@ -99,6 +130,12 @@ func (e DuplicateTargetError) Impact() diagnostic.Impact {
 	return diagnostic.ImpactAbort
 }
 
+func (e *DuplicateTargetError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
 // DuplicateDeployError is raised when a deploy block name is registered twice.
 type DuplicateDeployError struct {
 	Name   string
@@ -125,6 +162,12 @@ func (e DuplicateDeployError) Severity() signal.Severity {
 
 func (e DuplicateDeployError) Impact() diagnostic.Impact {
 	return diagnostic.ImpactAbort
+}
+
+func (e *DuplicateDeployError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
 }
 
 // MissingArgError is raised when a required argument is not provided.
@@ -155,6 +198,12 @@ func (e MissingArgError) Impact() diagnostic.Impact {
 	return diagnostic.ImpactAbort
 }
 
+func (e *MissingArgError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
 // EnvVarRequiredError is raised when a required env var is unset.
 type EnvVarRequiredError struct {
 	Key    string
@@ -181,4 +230,163 @@ func (e EnvVarRequiredError) Severity() signal.Severity {
 
 func (e EnvVarRequiredError) Impact() diagnostic.Impact {
 	return diagnostic.ImpactAbort
+}
+
+func (e *EnvVarRequiredError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
+// FileReadError is raised when a configuration file cannot be read.
+type FileReadError struct {
+	Path   string
+	Cause  error
+	Source spec.SourceSpan
+}
+
+func (e FileReadError) Error() string {
+	return fmt.Sprintf("reading %s: %s", e.Path, e.Cause)
+}
+
+func (e FileReadError) Unwrap() error { return e.Cause }
+
+func (e FileReadError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.FileRead",
+		Text:   "reading {{.Path}}: {{.Cause}}",
+		Hint:   "check that the file exists and is readable",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (e FileReadError) Severity() signal.Severity {
+	return signal.Error
+}
+
+func (e FileReadError) Impact() diagnostic.Impact {
+	return diagnostic.ImpactAbort
+}
+
+func (e *FileReadError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
+// TypeError is raised when a value has the wrong Starlark type.
+type TypeError struct {
+	Context  string
+	Expected string
+	Got      string
+	Source   spec.SourceSpan
+}
+
+func (e TypeError) Error() string {
+	if e.Context != "" {
+		return fmt.Sprintf("%s: expected %s, got %s", e.Context, e.Expected, e.Got)
+	}
+	return fmt.Sprintf("expected %s, got %s", e.Expected, e.Got)
+}
+
+func (e TypeError) EventTemplate() event.Template {
+	if e.Context != "" {
+		return event.Template{
+			ID:     "star.TypeError",
+			Text:   "{{.Context}}: expected {{.Expected}}, got {{.Got}}",
+			Hint:   "expected {{.Expected}}, got {{.Got}}",
+			Data:   e,
+			Source: &e.Source,
+		}
+	}
+	return event.Template{
+		ID:     "star.TypeError",
+		Text:   "expected {{.Expected}}, got {{.Got}}",
+		Hint:   "expected {{.Expected}}, got {{.Got}}",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (e TypeError) Severity() signal.Severity {
+	return signal.Error
+}
+
+func (e TypeError) Impact() diagnostic.Impact {
+	return diagnostic.ImpactAbort
+}
+
+func (e *TypeError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
+// EnvError is raised for invalid env() builtin usage.
+type EnvError struct {
+	Detail string
+	Source spec.SourceSpan
+}
+
+func (e EnvError) Error() string {
+	return fmt.Sprintf("env: %s", e.Detail)
+}
+
+func (e EnvError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.EnvError",
+		Text:   "env: {{.Detail}}",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (e EnvError) Severity() signal.Severity {
+	return signal.Error
+}
+
+func (e EnvError) Impact() diagnostic.Impact {
+	return diagnostic.ImpactAbort
+}
+
+func (e *EnvError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
+// UnknownKeyError is raised when a dict contains an unrecognized key.
+type UnknownKeyError struct {
+	Key     string
+	Allowed []string
+	Source  spec.SourceSpan
+}
+
+func (e UnknownKeyError) Error() string {
+	return fmt.Sprintf("unknown key %q", e.Key)
+}
+
+func (e UnknownKeyError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.UnknownKey",
+		Text:   `unknown key "{{.Key}}"`,
+		Hint:   `expected one of: {{join ", " .Allowed}}`,
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (e UnknownKeyError) Severity() signal.Severity {
+	return signal.Error
+}
+
+func (e UnknownKeyError) Impact() diagnostic.Impact {
+	return diagnostic.ImpactAbort
+}
+
+func (e *UnknownKeyError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
 }

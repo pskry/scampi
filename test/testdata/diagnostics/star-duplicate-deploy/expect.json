@@ -1,0 +1,14 @@
+{
+  "abort": true,
+  "diagnostics": [
+    {
+      "id": "star.DuplicateDeploy",
+      "scope": "ScopeEngine",
+      "severity": "Error",
+      "kind": "DiagnosticRaised",
+      "source": {
+        "line": 3
+      }
+    }
+  ]
+}

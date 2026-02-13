@@ -38,7 +38,7 @@ func threadCollector(thread *starlark.Thread) *Collector {
 // is already taken.
 func (c *Collector) AddTarget(name string, inst spec.TargetInstance, span spec.SourceSpan) error {
 	if _, exists := c.targets[name]; exists {
-		return DuplicateTargetError{Name: name, Source: span}
+		return &DuplicateTargetError{Name: name, Source: span}
 	}
 	c.targets[name] = inst
 	return nil
@@ -48,7 +48,7 @@ func (c *Collector) AddTarget(name string, inst spec.TargetInstance, span spec.S
 // is already taken.
 func (c *Collector) AddDeploy(name string, block spec.DeployBlock, span spec.SourceSpan) error {
 	if _, exists := c.deploy[name]; exists {
-		return DuplicateDeployError{Name: name, Source: span}
+		return &DuplicateDeployError{Name: name, Source: span}
 	}
 	c.deploy[name] = block
 	return nil

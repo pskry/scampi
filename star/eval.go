@@ -4,7 +4,6 @@ package star
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"sync"
 
@@ -26,7 +25,7 @@ func Eval(
 ) (spec.Config, error) {
 	data, err := src.ReadFile(ctx, cfgPath)
 	if err != nil {
-		return spec.Config{}, fmt.Errorf("reading %s: %w", cfgPath, err)
+		return spec.Config{}, &FileReadError{Path: cfgPath, Cause: err}
 	}
 
 	if store != nil {
@@ -123,7 +122,7 @@ func execModule(
 ) (starlark.StringDict, error) {
 	data, err := src.ReadFile(ctx, absPath)
 	if err != nil {
-		return nil, fmt.Errorf("load: reading %s: %w", absPath, err)
+		return nil, &FileReadError{Path: absPath, Cause: err}
 	}
 
 	if store != nil {

@@ -84,10 +84,11 @@ func extractSteps(
 		v := list.Index(i)
 		step, ok := v.(*StarlarkStep)
 		if !ok {
-			return nil, fmt.Errorf(
-				"%s: steps[%d] must be a step value, got %s",
-				fn, i, v.Type(),
-			)
+			return nil, &TypeError{
+				Context:  fmt.Sprintf("%s: steps[%d]", fn, i),
+				Expected: "step",
+				Got:      v.Type(),
+			}
 		}
 		inst := step.Instance
 		if inst.Desc == "" && inst.Type != nil {
@@ -107,20 +108,27 @@ func builtinEnv(
 	args starlark.Tuple,
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
+	span := callSpan(thread)
+
 	if len(args) < 1 || len(args) > 2 {
-		return nil, fmt.Errorf(
-			"env: accepts 1 or 2 positional arguments, got %d", len(args),
-		)
+		return nil, &EnvError{
+			Detail: fmt.Sprintf("accepts 1 or 2 positional arguments, got %d", len(args)),
+			Source: span,
+		}
 	}
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("env: does not accept keyword arguments")
+		return nil, &EnvError{
+			Detail: "does not accept keyword arguments",
+			Source: span,
+		}
 	}
 
 	key, ok := starlark.AsString(args[0])
 	if !ok {
-		return nil, fmt.Errorf(
-			"env: key must be a string, got %s", args[0].Type(),
-		)
+		return nil, &EnvError{
+			Detail: fmt.Sprintf("key must be a string, got %s", args[0].Type()),
+			Source: span,
+		}
 	}
 
 	c := threadCollector(thread)
@@ -129,9 +137,9 @@ func builtinEnv(
 	// No default → required
 	if len(args) == 1 {
 		if !found {
-			return nil, EnvVarRequiredError{
+			return nil, &EnvVarRequiredError{
 				Key:    key,
-				Source: callSpan(thread),
+				Source: span,
 			}
 		}
 		return starlark.String(envVal), nil
@@ -156,7 +164,9 @@ func coerceEnvValue(
 	case starlark.Int:
 		i, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("env: cannot parse %q as int: %w", raw, err)
+			return nil, &EnvError{
+				Detail: fmt.Sprintf("cannot parse %q as int: %s", raw, err),
+			}
 		}
 		return starlark.MakeInt64(i), nil
 
@@ -167,7 +177,9 @@ func coerceEnvValue(
 		case "false", "0", "no", "":
 			return starlark.False, nil
 		default:
-			return nil, fmt.Errorf("env: cannot parse %q as bool", raw)
+			return nil, &EnvError{
+				Detail: fmt.Sprintf("cannot parse %q as bool", raw),
+			}
 		}
 
 	default:
