@@ -76,8 +76,9 @@ func makeLoad(
 	store *spec.SourceStore,
 ) func(thread *starlark.Thread, module string) (starlark.StringDict, error) {
 	var (
-		mu    sync.Mutex
-		cache = make(map[string]*loadEntry)
+		mu      sync.Mutex
+		cache   = make(map[string]*loadEntry)
+		loading = make(map[string]bool)
 	)
 
 	return func(thread *starlark.Thread, module string) (starlark.StringDict, error) {
@@ -95,26 +96,33 @@ func makeLoad(
 		}
 
 		mu.Lock()
-		entry, ok := cache[absPath]
-		if !ok {
-			entry = &loadEntry{}
-			entry.once.Do(func() {
-				entry.globals, entry.err = execModule(ctx, thread, absPath, src, store)
-			})
-			cache[absPath] = entry
+		if loading[absPath] {
+			mu.Unlock()
+			return nil, &CircularLoadError{
+				Path:   absPath,
+				Source: callSpan(thread),
+			}
 		}
+		entry, ok := cache[absPath]
+		if ok {
+			mu.Unlock()
+			return entry.globals, entry.err
+		}
+		loading[absPath] = true
 		mu.Unlock()
 
-		entry.once.Do(func() {
-			entry.globals, entry.err = execModule(ctx, thread, absPath, src, store)
-		})
+		globals, err := execModule(ctx, thread, absPath, src, store)
 
-		return entry.globals, entry.err
+		mu.Lock()
+		delete(loading, absPath)
+		cache[absPath] = &loadEntry{globals: globals, err: err}
+		mu.Unlock()
+
+		return globals, err
 	}
 }
 
 type loadEntry struct {
-	once    sync.Once
 	globals starlark.StringDict
 	err     error
 }
@@ -149,15 +157,17 @@ func execModule(
 		Recursion: true,
 	}
 
+	collector := threadCollector(parentThread)
+
 	f, prog, err := starlark.SourceProgramOptions(fOpts, absPath, data, predeclared().Has)
 	if err != nil {
-		return nil, err
+		return nil, wrapStarlarkError(err, collector)
 	}
-	threadCollector(parentThread).AddAST(absPath, f)
+	collector.AddAST(absPath, f)
 
 	globals, err := prog.Init(childThread, predeclared())
 	if err != nil {
-		return nil, err
+		return nil, wrapStarlarkError(err, collector)
 	}
 
 	return globals, nil

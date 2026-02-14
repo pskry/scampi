@@ -51,6 +51,10 @@ func builtinTargetSSH(
 	}
 
 	span := callSpan(thread)
+
+	if name == "" {
+		return nil, &EmptyNameError{Func: "target.ssh", Source: span}
+	}
 	fields := kwargsFieldSpans(thread,
 		"host", "user", "port", "key", "insecure", "timeout")
 
@@ -87,6 +91,10 @@ func builtinTargetLocal(
 	}
 
 	span := callSpan(thread)
+
+	if name == "" {
+		return nil, &EmptyNameError{Func: "target.local", Source: span}
+	}
 	inst := spec.TargetInstance{
 		Type:   local.Local{},
 		Config: &local.Config{},

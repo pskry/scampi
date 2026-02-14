@@ -4,6 +4,7 @@ package star_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"godoit.dev/doit/source"
@@ -253,8 +254,8 @@ func TestEvalDuplicateDeploy(t *testing.T) {
 	src := source.NewMemSource()
 	src.Files["/config.star"] = []byte(`
 target.local(name="host")
-deploy(name="main", targets=["host"], steps=[])
-deploy(name="main", targets=["host"], steps=[])
+deploy(name="main", targets=["host"], steps=[dir(path="/tmp/a")])
+deploy(name="main", targets=["host"], steps=[dir(path="/tmp/b")])
 `)
 
 	store := spec.NewSourceStore()
@@ -438,6 +439,96 @@ deploy(name="main", targets=["host"], steps=[
 	}
 	if sc.Desc != "vim link" {
 		t.Errorf("desc = %q", sc.Desc)
+	}
+}
+
+func TestEvalEmptyTargetName(t *testing.T) {
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(`target.local(name="")`)
+
+	store := spec.NewSourceStore()
+	_, err := star.Eval(context.Background(), "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for empty target name")
+	}
+	var nameErr *star.EmptyNameError
+	if !errors.As(err, &nameErr) {
+		t.Fatalf("expected EmptyNameError, got %T: %v", err, err)
+	}
+}
+
+func TestEvalEmptyDeployName(t *testing.T) {
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(`
+target.local(name="host")
+deploy(name="", targets=["host"], steps=[dir(path="/tmp/a")])
+`)
+
+	store := spec.NewSourceStore()
+	_, err := star.Eval(context.Background(), "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for empty deploy name")
+	}
+	var nameErr *star.EmptyNameError
+	if !errors.As(err, &nameErr) {
+		t.Fatalf("expected EmptyNameError, got %T: %v", err, err)
+	}
+}
+
+func TestEvalEmptyDeployTargets(t *testing.T) {
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(`
+target.local(name="host")
+deploy(name="main", targets=[], steps=[dir(path="/tmp/a")])
+`)
+
+	store := spec.NewSourceStore()
+	_, err := star.Eval(context.Background(), "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for empty targets")
+	}
+	var listErr *star.EmptyListError
+	if !errors.As(err, &listErr) {
+		t.Fatalf("expected EmptyListError, got %T: %v", err, err)
+	}
+}
+
+func TestEvalEmptyDeploySteps(t *testing.T) {
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(`
+target.local(name="host")
+deploy(name="main", targets=["host"], steps=[])
+`)
+
+	store := spec.NewSourceStore()
+	_, err := star.Eval(context.Background(), "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for empty steps")
+	}
+	var listErr *star.EmptyListError
+	if !errors.As(err, &listErr) {
+		t.Fatalf("expected EmptyListError, got %T: %v", err, err)
+	}
+}
+
+func TestEvalCircularLoad(t *testing.T) {
+	src := source.NewMemSource()
+	src.Files["/a.star"] = []byte(`load("/b.star", "bval")
+aval = 1
+`)
+	src.Files["/b.star"] = []byte(`load("/a.star", "aval")
+bval = 2
+`)
+	src.Files["/config.star"] = []byte(`load("/a.star", "aval")`)
+
+	store := spec.NewSourceStore()
+	_, err := star.Eval(context.Background(), "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for circular load")
+	}
+	var circErr *star.CircularLoadError
+	if !errors.As(err, &circErr) {
+		t.Fatalf("expected CircularLoadError, got %T: %v", err, err)
 	}
 }
 

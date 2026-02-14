@@ -6,6 +6,7 @@ import (
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 
+	"godoit.dev/doit/errs"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 )
@@ -34,7 +35,12 @@ func newCollector(path string, sources *spec.SourceStore, src source.Source) *Co
 }
 
 func threadCollector(thread *starlark.Thread) *Collector {
-	return thread.Local(collectorKey).(*Collector)
+	v := thread.Local(collectorKey)
+	c, ok := v.(*Collector)
+	if !ok {
+		panic(errs.BUG("thread %q: expected *Collector in thread-local %q, got %T", thread.Name, collectorKey, v))
+	}
+	return c
 }
 
 func (c *Collector) AddAST(name string, f *syntax.File) {

@@ -47,17 +47,27 @@ func builtinDeploy(
 		return nil, err
 	}
 
+	span := callSpan(thread)
+
+	if name == "" {
+		return nil, &EmptyNameError{Func: "deploy", Source: span}
+	}
+
 	targetNames, err := stringList(targets, "deploy", "targets")
 	if err != nil {
 		return nil, err
+	}
+	if len(targetNames) == 0 {
+		return nil, &EmptyListError{Func: "deploy", Field: "targets", Source: span}
 	}
 
 	stepInstances, err := extractSteps(steps, "deploy")
 	if err != nil {
 		return nil, err
 	}
-
-	span := callSpan(thread)
+	if len(stepInstances) == 0 {
+		return nil, &EmptyListError{Func: "deploy", Field: "steps", Source: span}
+	}
 	block := spec.DeployBlock{
 		Name:    name,
 		Targets: targetNames,
@@ -151,11 +161,11 @@ func builtinEnv(
 		return dflt, nil
 	}
 
-	return coerceEnvValue(envVal, dflt)
+	return coerceEnvValue(envVal, dflt, span)
 }
 
 func coerceEnvValue(
-	raw string, dflt starlark.Value,
+	raw string, dflt starlark.Value, span spec.SourceSpan,
 ) (starlark.Value, error) {
 	switch dflt.(type) {
 	case starlark.String:
@@ -166,6 +176,7 @@ func coerceEnvValue(
 		if err != nil {
 			return nil, &EnvError{
 				Detail: fmt.Sprintf("cannot parse %q as int: %s", raw, err),
+				Source: span,
 			}
 		}
 		return starlark.MakeInt64(i), nil
@@ -179,6 +190,7 @@ func coerceEnvValue(
 		default:
 			return nil, &EnvError{
 				Detail: fmt.Sprintf("cannot parse %q as bool", raw),
+				Source: span,
 			}
 		}
 

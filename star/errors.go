@@ -488,3 +488,71 @@ func (e *UnknownKeyError) setSource(s spec.SourceSpan) {
 		e.Source = s
 	}
 }
+
+// CircularLoadError is raised when load() forms a cycle.
+type CircularLoadError struct {
+	Path   string
+	Source spec.SourceSpan
+}
+
+func (e CircularLoadError) Error() string {
+	return fmt.Sprintf("circular load: %s", e.Path)
+}
+
+func (e CircularLoadError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.CircularLoad",
+		Text:   "circular load: {{.Path}}",
+		Hint:   "break the cycle by removing one of the load() calls",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (CircularLoadError) Severity() signal.Severity { return signal.Error }
+func (CircularLoadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+// EmptyNameError is raised when a required name argument is empty.
+type EmptyNameError struct {
+	Func   string
+	Source spec.SourceSpan
+}
+
+func (e EmptyNameError) Error() string {
+	return fmt.Sprintf("%s: name must not be empty", e.Func)
+}
+
+func (e EmptyNameError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.EmptyName",
+		Text:   "{{.Func}}: name must not be empty",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (EmptyNameError) Severity() signal.Severity { return signal.Error }
+func (EmptyNameError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+// EmptyListError is raised when a required list argument is empty.
+type EmptyListError struct {
+	Func   string
+	Field  string
+	Source spec.SourceSpan
+}
+
+func (e EmptyListError) Error() string {
+	return fmt.Sprintf("%s: %s must not be empty", e.Func, e.Field)
+}
+
+func (e EmptyListError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.EmptyList",
+		Text:   "{{.Func}}: {{.Field}} must not be empty",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (EmptyListError) Severity() signal.Severity { return signal.Error }
+func (EmptyListError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

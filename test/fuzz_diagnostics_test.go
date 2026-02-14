@@ -21,7 +21,9 @@ func FuzzDiagnostics(f *testing.F) {
 	seeds := []string{
 		// minimal valid config
 		`target.local(name="local")
-deploy(name="test", targets=["local"], steps=[])`,
+deploy(name="test", targets=["local"], steps=[
+    dir(path="/tmp/fuzz"),
+])`,
 
 		// valid config with a copy step
 		`target.local(name="local")
