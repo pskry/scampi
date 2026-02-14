@@ -1,0 +1,13 @@
+{
+  "target": {
+    "files": {},
+    "services": {
+      "nginx": false
+    },
+    "enabledServices": {
+      "nginx": false
+    }
+  },
+  "changed": 2,
+  "memOnly": true
+}

@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+package service
+
+import (
+	"context"
+
+	"godoit.dev/doit/capability"
+	"godoit.dev/doit/source"
+	"godoit.dev/doit/spec"
+	"godoit.dev/doit/step/sharedops"
+	"godoit.dev/doit/target"
+)
+
+const ensureActiveID = "builtin.ensure-service-active"
+
+type ensureActiveOp struct {
+	sharedops.BaseOp
+	name  string
+	state string
+}
+
+func (op *ensureActiveOp) Check(
+	ctx context.Context, _ source.Source, tgt target.Target,
+) (spec.CheckResult, []spec.DriftDetail, error) {
+	sm := target.Must[target.ServiceManager](ensureActiveID, tgt)
+
+	active, err := sm.IsActive(ctx, op.name)
+	if err != nil {
+		return spec.CheckUnsatisfied, nil, err
+	}
+
+	wantRunning := op.state == StateRunning
+	if active == wantRunning {
+		return spec.CheckSatisfied, nil, nil
+	}
+
+	current := "stopped"
+	if active {
+		current = "running"
+	}
+	return spec.CheckUnsatisfied, []spec.DriftDetail{{
+		Field:   "state",
+		Current: current,
+		Desired: op.state,
+	}}, nil
+}
+
+func (op *ensureActiveOp) Execute(
+	ctx context.Context, _ source.Source, tgt target.Target,
+) (spec.Result, error) {
+	sm := target.Must[target.ServiceManager](ensureActiveID, tgt)
+
+	active, err := sm.IsActive(ctx, op.name)
+	if err != nil {
+		return spec.Result{}, err
+	}
+
+	wantRunning := op.state == StateRunning
+	if active == wantRunning {
+		return spec.Result{Changed: false}, nil
+	}
+
+	if wantRunning {
+		if err := sm.DaemonReload(ctx); err != nil {
+			return spec.Result{}, DaemonReloadError{
+				Name:   op.name,
+				Stderr: err.Error(),
+			}
+		}
+		if err := sm.Start(ctx, op.name); err != nil {
+			return spec.Result{}, ServiceCommandError{
+				Op:     "start",
+				Name:   op.name,
+				Stderr: err.Error(),
+			}
+		}
+	} else {
+		if err := sm.Stop(ctx, op.name); err != nil {
+			return spec.Result{}, ServiceCommandError{
+				Op:     "stop",
+				Name:   op.name,
+				Stderr: err.Error(),
+			}
+		}
+	}
+
+	return spec.Result{Changed: true}, nil
+}
+
+func (ensureActiveOp) RequiredCapabilities() capability.Capability {
+	return capability.Service
+}
+
+type ensureActiveDesc struct {
+	Name  string
+	State string
+}
+
+func (d ensureActiveDesc) PlanTemplate() spec.PlanTemplate {
+	return spec.PlanTemplate{
+		ID:   ensureActiveID,
+		Text: `ensure service {{.Name}} is {{.State}}`,
+		Data: d,
+	}
+}
+
+func (op *ensureActiveOp) OpDescription() spec.OpDescription {
+	return ensureActiveDesc{
+		Name:  op.name,
+		State: op.state,
+	}
+}

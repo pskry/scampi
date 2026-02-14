@@ -11,6 +11,7 @@ import (
 	stepcopy "godoit.dev/doit/step/copy"
 	"godoit.dev/doit/step/dir"
 	"godoit.dev/doit/step/pkg"
+	"godoit.dev/doit/step/service"
 	"godoit.dev/doit/step/symlink"
 	"godoit.dev/doit/step/template"
 )
@@ -152,6 +153,42 @@ func builtinPkg(
 			Config: &pkg.PkgConfig{Desc: desc, Packages: pkgs, State: state},
 			Source: span,
 			Fields: kwargsFieldSpans(thread, "packages", "state"),
+		},
+	}, nil
+}
+
+// Step builtin: service
+// -----------------------------------------------------------------------------
+
+func builtinService(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var (
+		name    string
+		state   = "running"
+		enabled = true
+		desc    string
+	)
+	if err := starlark.UnpackArgs("service", args, kwargs,
+		"name", &name,
+		"state?", &state,
+		"enabled?", &enabled,
+		"desc?", &desc,
+	); err != nil {
+		return nil, err
+	}
+
+	span := callSpan(thread)
+	return &StarlarkStep{
+		Instance: spec.StepInstance{
+			Desc:   desc,
+			Type:   service.Service{},
+			Config: &service.ServiceConfig{Desc: desc, Name: name, State: state, Enabled: enabled},
+			Source: span,
+			Fields: kwargsFieldSpans(thread, "name", "state", "enabled"),
 		},
 	}, nil
 }

@@ -20,10 +20,12 @@ import (
 	"godoit.dev/doit/errs"
 	"godoit.dev/doit/target"
 	"godoit.dev/doit/target/pkgmgr"
+	"godoit.dev/doit/target/svcmgr"
 )
 
 type POSIXTarget struct {
 	pkgBackend *pkgmgr.Backend
+	svcBackend *svcmgr.Backend
 	escalate   string // "sudo", "doas", or "" (none)
 	isRoot     bool
 }
@@ -231,6 +233,9 @@ func (t POSIXTarget) Capabilities() capability.Capability {
 	caps := capability.POSIX
 	if t.pkgBackend != nil {
 		caps |= capability.Pkg
+	}
+	if t.svcBackend != nil {
+		caps |= capability.Service
 	}
 	return caps
 }

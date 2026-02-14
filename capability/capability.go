@@ -19,6 +19,7 @@ const (
 	Symlink                           // Symlink, Readlink, Lstat
 	Ownership                         // HasUser, HasGroup, GetOwner, Chown
 	Pkg                               // IsInstalled, InstallPkgs, RemovePkgs
+	Service                           // IsActive, IsEnabled, Start, Stop, Enable, Disable
 )
 
 const (
@@ -55,6 +56,9 @@ func (c Capability) String() string {
 	}
 	if c&Pkg != 0 {
 		parts = append(parts, "Pkg")
+	}
+	if c&Service != 0 {
+		parts = append(parts, "Service")
 	}
 
 	// If no known flags matched, show raw value

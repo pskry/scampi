@@ -7,6 +7,7 @@ import (
 	"godoit.dev/doit/step/copy"
 	"godoit.dev/doit/step/dir"
 	"godoit.dev/doit/step/pkg"
+	"godoit.dev/doit/step/service"
 	"godoit.dev/doit/step/symlink"
 	"godoit.dev/doit/step/template"
 	"godoit.dev/doit/target/local"
@@ -23,6 +24,7 @@ func NewRegistry() *Registry {
 		copy.Copy{},
 		dir.Dir{},
 		pkg.Pkg{},
+		service.Service{},
 		symlink.Symlink{},
 		template.Template{},
 	}

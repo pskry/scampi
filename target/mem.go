@@ -28,20 +28,25 @@ type MemTarget struct {
 	Pkgs       map[string]bool
 	Upgradable map[string]bool
 
+	Services        map[string]bool // service name -> active (running)
+	EnabledServices map[string]bool // service name -> enabled at boot
+
 	Commands    []CommandCall
 	CommandFunc func(cmd string) (CommandResult, error)
 }
 
 func NewMemTarget() *MemTarget {
 	return &MemTarget{
-		Files:      make(map[string][]byte),
-		Dirs:       make(map[string]fs.FileMode),
-		Modes:      make(map[string]fs.FileMode),
-		Owners:     make(map[string]Owner),
-		ModTimes:   make(map[string]time.Time),
-		Symlinks:   make(map[string]string),
-		Pkgs:       make(map[string]bool),
-		Upgradable: make(map[string]bool),
+		Files:           make(map[string][]byte),
+		Dirs:            make(map[string]fs.FileMode),
+		Modes:           make(map[string]fs.FileMode),
+		Owners:          make(map[string]Owner),
+		ModTimes:        make(map[string]time.Time),
+		Symlinks:        make(map[string]string),
+		Pkgs:            make(map[string]bool),
+		Upgradable:      make(map[string]bool),
+		Services:        make(map[string]bool),
+		EnabledServices: make(map[string]bool),
 	}
 }
 
@@ -283,7 +288,7 @@ func (m *MemTarget) Remove(_ context.Context, path string) error {
 }
 
 func (m *MemTarget) Capabilities() capability.Capability {
-	return capability.POSIX | capability.Pkg
+	return capability.POSIX | capability.Pkg | capability.Service
 }
 
 func (m *MemTarget) IsInstalled(_ context.Context, pkg string) (bool, error) {
@@ -318,6 +323,50 @@ func (m *MemTarget) IsUpgradable(_ context.Context, pkg string) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.Upgradable[pkg], nil
+}
+
+func (m *MemTarget) IsActive(_ context.Context, name string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.Services[name], nil
+}
+
+func (m *MemTarget) IsEnabled(_ context.Context, name string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.EnabledServices[name], nil
+}
+
+func (m *MemTarget) Start(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Services[name] = true
+	return nil
+}
+
+func (m *MemTarget) Stop(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Services[name] = false
+	return nil
+}
+
+func (m *MemTarget) Enable(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.EnabledServices[name] = true
+	return nil
+}
+
+func (m *MemTarget) Disable(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.EnabledServices[name] = false
+	return nil
+}
+
+func (m *MemTarget) DaemonReload(_ context.Context) error {
+	return nil
 }
 
 func (m *MemTarget) RunCommand(_ context.Context, cmd string) (CommandResult, error) {

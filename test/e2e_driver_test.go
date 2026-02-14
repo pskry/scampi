@@ -92,6 +92,12 @@ func (d *MemDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 	for pkg, upgradable := range initial.Upgradable {
 		d.tgt.Upgradable[pkg] = upgradable
 	}
+	for svc, active := range initial.Services {
+		d.tgt.Services[svc] = active
+	}
+	for svc, enabled := range initial.EnabledServices {
+		d.tgt.EnabledServices[svc] = enabled
+	}
 
 	ti := mockTargetInstance(d.tgt)
 
@@ -150,6 +156,20 @@ func (d *MemDriver) Verify(t *testing.T, expect E2EFiles) {
 		gotInstalled := d.tgt.Pkgs[pkg]
 		if gotInstalled != wantInstalled {
 			t.Errorf("package %q: got installed=%v, want installed=%v", pkg, gotInstalled, wantInstalled)
+		}
+	}
+
+	// Verify services
+	for svc, wantActive := range expect.Services {
+		gotActive := d.tgt.Services[svc]
+		if gotActive != wantActive {
+			t.Errorf("service %q: got active=%v, want active=%v", svc, gotActive, wantActive)
+		}
+	}
+	for svc, wantEnabled := range expect.EnabledServices {
+		gotEnabled := d.tgt.EnabledServices[svc]
+		if gotEnabled != wantEnabled {
+			t.Errorf("service %q: got enabled=%v, want enabled=%v", svc, gotEnabled, wantEnabled)
 		}
 	}
 }

@@ -17,6 +17,7 @@ func predeclared() starlark.StringDict {
 		"copy":     starlark.NewBuiltin("copy", builtinCopy),
 		"dir":      starlark.NewBuiltin("dir", builtinDir),
 		"pkg":      starlark.NewBuiltin("pkg", builtinPkg),
+		"service":  starlark.NewBuiltin("service", builtinService),
 		"symlink":  starlark.NewBuiltin("symlink", builtinSymlink),
 		"template": starlark.NewBuiltin("template", builtinTemplate),
 		"target":   targetModule(),

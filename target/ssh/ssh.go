@@ -22,6 +22,7 @@ import (
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
 	"godoit.dev/doit/target/pkgmgr"
+	"godoit.dev/doit/target/svcmgr"
 )
 
 const knownHostsFile = "~/.ssh/known_hosts"
@@ -147,6 +148,15 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	}
 
 	sshTgt.pkgBackend = pkgmgr.Detect(sshTgt.osInfo)
+
+	// Init system detection for service management.
+	sshTgt.svcBackend = svcmgr.Detect(func(cmd string) (int, error) {
+		result, err := sshTgt.RunCommand(ctx, cmd)
+		if err != nil {
+			return -1, err
+		}
+		return result.ExitCode, nil
+	})
 
 	// Privilege escalation detection.
 	if result, err := sshTgt.RunCommand(ctx, "id -u"); err == nil {

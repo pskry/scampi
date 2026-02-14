@@ -11,6 +11,7 @@ import (
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
 	"godoit.dev/doit/target/pkgmgr"
+	"godoit.dev/doit/target/svcmgr"
 )
 
 type Local struct{}
@@ -36,6 +37,15 @@ func (Local) Create(ctx context.Context, _ source.Source, _ spec.TargetInstance)
 	}
 
 	tgt.pkgBackend = pkgmgr.Detect(osInfo)
+
+	// Init system detection for service management.
+	tgt.svcBackend = svcmgr.Detect(func(cmd string) (int, error) {
+		result, err := tgt.RunCommand(ctx, cmd)
+		if err != nil {
+			return -1, err
+		}
+		return result.ExitCode, nil
+	})
 
 	// Privilege escalation detection.
 	tgt.isRoot = os.Getuid() == 0

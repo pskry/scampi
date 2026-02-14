@@ -29,13 +29,15 @@ type E2EScenario struct {
 
 // E2EFiles represents a virtual filesystem as a map of path -> content.
 type E2EFiles struct {
-	Files      map[string]string   `json:"files"`
-	Dirs       map[string]bool     `json:"dirs,omitempty"`       // path -> exists
-	Perms      map[string]string   `json:"perms,omitempty"`      // path -> "0644"
-	Owners     map[string]E2EOwner `json:"owners,omitempty"`     // path -> owner info
-	Symlinks   map[string]string   `json:"symlinks,omitempty"`   // link -> target
-	Pkgs       map[string]bool     `json:"pkgs,omitempty"`       // pkg name -> installed
-	Upgradable map[string]bool     `json:"upgradable,omitempty"` // pkg name -> has upgrade
+	Files           map[string]string   `json:"files"`
+	Dirs            map[string]bool     `json:"dirs,omitempty"`            // path -> exists
+	Perms           map[string]string   `json:"perms,omitempty"`           // path -> "0644"
+	Owners          map[string]E2EOwner `json:"owners,omitempty"`          // path -> owner info
+	Symlinks        map[string]string   `json:"symlinks,omitempty"`        // link -> target
+	Pkgs            map[string]bool     `json:"pkgs,omitempty"`            // pkg name -> installed
+	Upgradable      map[string]bool     `json:"upgradable,omitempty"`      // pkg name -> has upgrade
+	Services        map[string]bool     `json:"services,omitempty"`        // service name -> active (running)
+	EnabledServices map[string]bool     `json:"enabledServices,omitempty"` // service name -> enabled at boot
 }
 
 // E2EOwner represents file ownership.

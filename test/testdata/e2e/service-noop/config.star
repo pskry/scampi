@@ -1,0 +1,12 @@
+target.local(name="local")
+
+deploy(
+    name="test",
+    targets=["local"],
+    steps=[
+        service(
+            desc="nginx already running",
+            name="nginx",
+        ),
+    ],
+)

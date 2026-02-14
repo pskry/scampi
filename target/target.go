@@ -65,6 +65,15 @@ type (
 		UpdateCache(ctx context.Context) error
 		IsUpgradable(ctx context.Context, pkg string) (bool, error)
 	}
+	ServiceManager interface {
+		IsActive(ctx context.Context, name string) (bool, error)
+		IsEnabled(ctx context.Context, name string) (bool, error)
+		Start(ctx context.Context, name string) error
+		Stop(ctx context.Context, name string) error
+		Enable(ctx context.Context, name string) error
+		Disable(ctx context.Context, name string) error
+		DaemonReload(ctx context.Context) error
+	}
 	CommandResult struct {
 		Stdout   string
 		Stderr   string

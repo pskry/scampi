@@ -1,0 +1,9 @@
+{
+  "files": {},
+  "services": {
+    "nginx": false
+  },
+  "enabledServices": {
+    "nginx": false
+  }
+}
