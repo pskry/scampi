@@ -25,7 +25,7 @@ import (
 
 type POSIXTarget struct {
 	pkgBackend *pkgmgr.Backend
-	svcBackend *svcmgr.Backend
+	svcBackend svcmgr.Backend
 	escalate   string // "sudo", "doas", or "" (none)
 	isRoot     bool
 }

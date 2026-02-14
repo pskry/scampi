@@ -10,7 +10,7 @@ import (
 )
 
 func (t *SSHTarget) IsActive(ctx context.Context, name string) (bool, error) {
-	cmd := fmt.Sprintf(t.svcBackend.IsActive, shellQuote(name))
+	cmd := t.svcBackend.CmdIsActive(name)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return false, err
@@ -19,7 +19,7 @@ func (t *SSHTarget) IsActive(ctx context.Context, name string) (bool, error) {
 }
 
 func (t *SSHTarget) IsEnabled(ctx context.Context, name string) (bool, error) {
-	cmd := fmt.Sprintf(t.svcBackend.IsEnabled, shellQuote(name))
+	cmd := t.svcBackend.CmdIsEnabled(name)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return false, err
@@ -28,30 +28,30 @@ func (t *SSHTarget) IsEnabled(ctx context.Context, name string) (bool, error) {
 }
 
 func (t *SSHTarget) Start(ctx context.Context, name string) error {
-	return t.runSvcCommand(ctx, t.svcBackend.Start, name, "start")
+	return t.runSvcCommand(ctx, t.svcBackend.CmdStart(name), "start")
 }
 
 func (t *SSHTarget) Stop(ctx context.Context, name string) error {
-	return t.runSvcCommand(ctx, t.svcBackend.Stop, name, "stop")
+	return t.runSvcCommand(ctx, t.svcBackend.CmdStop(name), "stop")
 }
 
 func (t *SSHTarget) Enable(ctx context.Context, name string) error {
-	return t.runSvcCommand(ctx, t.svcBackend.Enable, name, "enable")
+	return t.runSvcCommand(ctx, t.svcBackend.CmdEnable(name), "enable")
 }
 
 func (t *SSHTarget) Disable(ctx context.Context, name string) error {
-	return t.runSvcCommand(ctx, t.svcBackend.Disable, name, "disable")
+	return t.runSvcCommand(ctx, t.svcBackend.CmdDisable(name), "disable")
 }
 
 func (t *SSHTarget) DaemonReload(ctx context.Context) error {
-	if t.svcBackend.DaemonReload == "" {
+	cmd := t.svcBackend.CmdDaemonReload()
+	if cmd == "" {
 		return nil
 	}
-	if t.svcBackend.NeedsRoot && !t.isRoot && t.escalate == "" {
-		return target.NoEscalationError{Op: t.svcBackend.Name + " daemon-reload"}
+	if t.svcBackend.NeedsRoot() && !t.isRoot && t.escalate == "" {
+		return target.NoEscalationError{Op: t.svcBackend.Name() + " daemon-reload"}
 	}
-	cmd := t.svcBackend.DaemonReload
-	if t.svcBackend.NeedsRoot && t.escalate != "" {
+	if t.svcBackend.NeedsRoot() && t.escalate != "" {
 		cmd = t.escalate + " " + cmd
 	}
 	result, err := t.RunCommand(ctx, cmd)
@@ -68,12 +68,11 @@ func (t *SSHTarget) DaemonReload(ctx context.Context) error {
 	return nil
 }
 
-func (t *SSHTarget) runSvcCommand(ctx context.Context, tmpl, name, op string) error {
-	if t.svcBackend.NeedsRoot && !t.isRoot && t.escalate == "" {
-		return target.NoEscalationError{Op: t.svcBackend.Name + " " + op}
+func (t *SSHTarget) runSvcCommand(ctx context.Context, cmd, op string) error {
+	if t.svcBackend.NeedsRoot() && !t.isRoot && t.escalate == "" {
+		return target.NoEscalationError{Op: t.svcBackend.Name() + " " + op}
 	}
-	cmd := fmt.Sprintf(tmpl, shellQuote(name))
-	if t.svcBackend.NeedsRoot && t.escalate != "" {
+	if t.svcBackend.NeedsRoot() && t.escalate != "" {
 		cmd = t.escalate + " " + cmd
 	}
 	result, err := t.RunCommand(ctx, cmd)
@@ -83,7 +82,7 @@ func (t *SSHTarget) runSvcCommand(ctx context.Context, tmpl, name, op string) er
 	if result.ExitCode != 0 {
 		return ServiceCommandError{
 			Op:       op,
-			Name:     name,
+			Name:     cmd,
 			Stderr:   result.Stderr,
 			ExitCode: result.ExitCode,
 		}

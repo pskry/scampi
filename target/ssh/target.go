@@ -31,7 +31,7 @@ type SSHTarget struct {
 	closeAgent func() error
 	osInfo     pkgmgr.OSInfo
 	pkgBackend *pkgmgr.Backend
-	svcBackend *svcmgr.Backend
+	svcBackend svcmgr.Backend
 	escalate   string // "sudo", "doas", or "" (none)
 	isRoot     bool
 }

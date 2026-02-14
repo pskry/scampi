@@ -1,42 +1,98 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package svcmgr provides init system detection and command templates.
+// Package svcmgr provides init system detection and command building.
 package svcmgr
 
-// Backend holds command templates for a service manager.
-// Each template contains a single %s verb for the service name.
-type Backend struct {
-	Name         string
-	IsActive     string // exit 0 = running
-	IsEnabled    string // exit 0 = enabled at boot
-	Start        string
-	Stop         string
-	Enable       string
-	Disable      string
-	DaemonReload string // "" if not applicable
-	NeedsRoot    bool
+import (
+	"fmt"
+	"strings"
+)
+
+// Backend builds shell commands for a service manager.
+type Backend interface {
+	Name() string
+	NeedsRoot() bool
+	CmdIsActive(name string) string
+	CmdIsEnabled(name string) string
+	CmdStart(name string) string
+	CmdStop(name string) string
+	CmdEnable(name string) string
+	CmdDisable(name string) string
+	CmdDaemonReload() string // "" = not applicable
 }
 
-var backends = map[string]Backend{
+// ShellQuote wraps s in single quotes, escaping embedded single quotes.
+func ShellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// templateBackend
+// -----------------------------------------------------------------------------
+
+type templateBackend struct {
+	name         string
+	isActive     string
+	isEnabled    string
+	start        string
+	stop         string
+	enable       string
+	disable      string
+	daemonReload string
+	needsRoot    bool
+}
+
+func (b *templateBackend) Name() string    { return b.name }
+func (b *templateBackend) NeedsRoot() bool { return b.needsRoot }
+
+func (b *templateBackend) CmdIsActive(name string) string {
+	return fmt.Sprintf(b.isActive, ShellQuote(name))
+}
+
+func (b *templateBackend) CmdIsEnabled(name string) string {
+	return fmt.Sprintf(b.isEnabled, ShellQuote(name))
+}
+
+func (b *templateBackend) CmdStart(name string) string {
+	return fmt.Sprintf(b.start, ShellQuote(name))
+}
+
+func (b *templateBackend) CmdStop(name string) string {
+	return fmt.Sprintf(b.stop, ShellQuote(name))
+}
+
+func (b *templateBackend) CmdEnable(name string) string {
+	return fmt.Sprintf(b.enable, ShellQuote(name))
+}
+
+func (b *templateBackend) CmdDisable(name string) string {
+	return fmt.Sprintf(b.disable, ShellQuote(name))
+}
+
+func (b *templateBackend) CmdDaemonReload() string { return b.daemonReload }
+
+// Built-in template backends
+// -----------------------------------------------------------------------------
+
+var backends = map[string]*templateBackend{
 	"systemd": {
-		Name:         "systemd",
-		IsActive:     "systemctl is-active %s",
-		IsEnabled:    "systemctl is-enabled %s",
-		Start:        "systemctl start %s",
-		Stop:         "systemctl stop %s",
-		Enable:       "systemctl enable %s",
-		Disable:      "systemctl disable %s",
-		DaemonReload: "systemctl daemon-reload",
-		NeedsRoot:    true,
+		name:         "systemd",
+		isActive:     "systemctl is-active %s",
+		isEnabled:    "systemctl is-enabled %s",
+		start:        "systemctl start %s",
+		stop:         "systemctl stop %s",
+		enable:       "systemctl enable %s",
+		disable:      "systemctl disable %s",
+		daemonReload: "systemctl daemon-reload",
+		needsRoot:    true,
 	},
 	"openrc": {
-		Name:      "openrc",
-		IsActive:  "rc-service %s status",
-		IsEnabled: "rc-update show default | grep -q %s",
-		Start:     "rc-service %s start",
-		Stop:      "rc-service %s stop",
-		Enable:    "rc-update add %s default",
-		Disable:   "rc-update del %s default",
-		NeedsRoot: true,
+		name:      "openrc",
+		isActive:  "rc-service %s status",
+		isEnabled: "rc-update show default | grep -q %s",
+		start:     "rc-service %s start",
+		stop:      "rc-service %s stop",
+		enable:    "rc-update add %s default",
+		disable:   "rc-update del %s default",
+		needsRoot: true,
 	},
 }
