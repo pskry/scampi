@@ -50,14 +50,17 @@ test-all:
 race:
   go test -race ./...
 
-[doc("Run fuzz tests across all packages")]
-fuzz time='30s':
+[doc("Run fuzz tests (optional package filter, e.g. just fuzz 10m test)")]
+fuzz time='30s' pkg='':
   #!/usr/bin/env bash
   set -euo pipefail
-  # Find every package that contains a Fuzz function.
-  pkgs=$(grep -rl '^func Fuzz' --include='*_test.go' . \
-    | xargs -n1 dirname | sort -u \
-    | sed 's|^\./||')
+  if [[ -n "{{pkg}}" ]]; then
+    pkgs="{{pkg}}"
+  else
+    pkgs=$(grep -rl '^func Fuzz' --include='*_test.go' . \
+      | xargs -n1 dirname | sort -u \
+      | sed 's|^\./||')
+  fi
   for pkg in $pkgs; do
     echo "fuzzing ./$pkg ({{time}})..."
     go test "./$pkg" -fuzz=. -fuzztime={{time}}
