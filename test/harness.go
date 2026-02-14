@@ -641,11 +641,11 @@ func (m *minimalTarget) HasUser(_ context.Context, _ string) bool {
 }
 
 func (m *minimalTarget) HasGroup(_ context.Context, _ string) bool {
-	panic("MinimalTarget.HasUser called - capability check failed")
+	panic("MinimalTarget.HasGroup called - capability check failed")
 }
 
 func (m *minimalTarget) GetOwner(_ context.Context, _ string) (target.Owner, error) {
-	panic("MinimalTarget.HasUser called - capability check failed")
+	panic("MinimalTarget.GetOwner called - capability check failed")
 }
 
 type allCapNoImplTarget struct{}

@@ -33,7 +33,7 @@ func FuzzCLI(f *testing.F) {
 		"inspect --step",
 		"apply --only",
 		"apply --targets",
-		"apply --env",
+		"apply --only=foo --targets=bar",
 		"check --only",
 
 		// unknown flags

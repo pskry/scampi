@@ -123,9 +123,11 @@ func (a *templateAction) Ops() []spec.Op {
 		BaseOp: sharedops.BaseOp{
 			DestSpan: a.step.Fields["dest"].Value,
 		},
-		Path:  a.dest,
-		Owner: a.owner,
-		Group: a.group,
+		Path:      a.dest,
+		Owner:     a.owner,
+		Group:     a.group,
+		OwnerSpan: a.step.Fields["owner"].Value,
+		GroupSpan: a.step.Fields["group"].Value,
 	}
 	chmod := &fileops.EnsureModeOp{
 		BaseOp: sharedops.BaseOp{
