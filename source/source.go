@@ -15,8 +15,8 @@ type FileMeta struct {
 }
 
 // Source provides access to the host filesystem and environment where
-// CUE configs, templates, and secrets reside. Distinct from target.Target
-// which represents the system being converged.
+// Starlark configs, templates, and secrets reside. Distinct from
+// target.Target which represents the system being converged.
 type Source interface {
 	ReadFile(ctx context.Context, path string) ([]byte, error)
 	WriteFile(ctx context.Context, path string, data []byte) error

@@ -4,7 +4,7 @@ This document defines the **authoritative naming conventions** used throughout t
 
 Its purpose is to:
 - Make the conceptual model explicit
-- Keep CUE and Go terminology aligned without conflation
+- Keep Starlark and Go terminology aligned without conflation
 - Prevent naming drift and "Impl-suffix creep"
 - Provide a stable vocabulary for future extensions
 
@@ -16,12 +16,12 @@ If a naming question arises, this document is the source of truth.
 
 `doit` is a **declarative system convergence engine**.
 
-Users describe *what should exist* in CUE. The engine translates this into *how to make it so* in Go.
+Users describe *what should exist* in Starlark. The engine translates this into *how to make it so* in Go.
 
 The core flow:
 
 ```
-CUE step (kind + fields)
+Starlark step (kind + fields)
         |
         v
 Go StepType
@@ -40,22 +40,22 @@ Every name in the codebase exists to make this flow obvious.
 
 ---
 
-## CUE-Side Terminology
+## Starlark-Side Terminology
 
-CUE is the user-facing, declarative language. Go adapts to CUE concepts — not the other way around.
+Starlark is the user-facing, declarative language. Go adapts to Starlark concepts — not the other way around.
 
 ### Step
 
 A **step** is a single declarative unit of work defined by the user.
 
-```cue
-steps: [
-  builtin.copy & {
-    src:   "./src.yml"
-    dest:  "/etc/app/config.yml"
-    owner: "root"
-    mode:  "0640"
-  },
+```python
+steps = [
+    copy(
+        src="./src.yml",
+        dest="/etc/app/config.yml",
+        owner="root",
+        perm="0640",
+    ),
 ]
 ```
 
@@ -63,8 +63,8 @@ steps: [
 
 A **kind** identifies what type of step this is.
 
-- Stored as `meta.kind`
-- Examples: `"copy"`, `"service"`, `"package"`
+- Returned by `StepType.Kind()`
+- Examples: `"copy"`, `"dir"`, `"pkg"`, `"symlink"`, `"template"`
 
 Kinds are semantic categories, not implementations.
 
@@ -72,11 +72,11 @@ Kinds are semantic categories, not implementations.
 
 ## Go-Side Core Concepts
 
-Go code mirrors the CUE model, but separates **definition**, **instance**, and **execution**.
+Go code mirrors the Starlark model, but separates **definition**, **instance**, and **execution**.
 
 ### StepType
 
-A **StepType** represents a CUE kind in Go. It defines how to decode configuration and how to plan execution.
+A **StepType** represents a step kind in Go. It defines how to decode configuration and how to plan execution.
 
 ```go
 type StepType interface {
@@ -87,7 +87,7 @@ type StepType interface {
 ```
 
 Key points:
-- There is exactly one StepType per CUE kind
+- There is exactly one StepType per step kind
 - `Plan` receives a `StepInstance` (not a raw config value)
 - StepType is not an implementation detail
 - Avoid `Impl`, `Handler`, or `Spec` suffixes
@@ -108,11 +108,11 @@ type StepInstance struct {
 }
 ```
 
-- Created by decoding user CUE
+- Created by evaluating user Starlark
 - Couples user data with its StepType
 - Exists only during planning
 - `Desc` is the human-readable description
-- `Source` and `Fields` carry CUE source locations for diagnostics
+- `Source` and `Fields` carry Starlark source locations for diagnostics
 
 ### TargetType
 
@@ -141,7 +141,7 @@ type TargetInstance struct {
 
 ### Registry
 
-The **Registry** maps CUE kinds to Go StepTypes and TargetTypes.
+The **Registry** maps step kinds to Go StepTypes and TargetTypes.
 
 ```go
 type Registry struct {
@@ -163,7 +163,7 @@ The registry is intentionally explicit and centralized.
 
 ### Config
 
-A **Config** is the fully decoded CUE configuration.
+A **Config** is the fully evaluated Starlark configuration.
 
 ```go
 type Config struct {
@@ -400,6 +400,7 @@ Both are abstract interfaces. The local POSIX implementations are development de
 cmd/           # CLI entry point
 engine/        # Planning and execution engine
 spec/          # Core domain interfaces and types
+star/          # Starlark evaluator and builtins
 step/          # StepType implementations (one per kind)
 source/        # Read-only system state inspection
 target/        # Execution environments (write-side mutations)
@@ -408,7 +409,6 @@ diagnostic/    # Event emission (observational only, no control flow)
 render/        # CLI output formatting (purely presentational)
 model/         # Execution reports and op outcomes
 signal/        # Severity, verbosity, and color mode
-cue/           # Embedded CUE schema
 ```
 
 Example:
@@ -427,8 +427,8 @@ The following patterns are intentionally avoided:
 
 - `Impl` suffixes (Java-style indirection)
 - Interface/implementation name pairs
-- Go names leaking into CUE
-- CUE schema shaped around Go constraints
+- Go names leaking into Starlark
+- Starlark builtins shaped around Go constraints
 - Over-generalization "for future extensions"
 
 Extensibility is achieved by **clear boundaries**, not abstractions.
@@ -437,18 +437,18 @@ Extensibility is achieved by **clear boundaries**, not abstractions.
 
 ## Summary
 
-| Concept | CUE | Go |
-|---------|-----|-----|
-| Declarative work | step | StepInstance |
+| Concept | Starlark | Go |
+|---------|----------|-----|
+| Declarative work | step builtin (copy, dir, …) | StepInstance |
 | Semantic category | kind | StepType |
-| Target definition | target | TargetInstance |
+| Target definition | target.ssh / target.local | TargetInstance |
 | Target category | target type | TargetType |
 | Planned execution | — | Action |
 | Executable unit | — | Op |
 | Execution graph | — | Plan / Unit |
 | Data origin | — | Source |
 | Change destination | — | Target (capability-based) |
-| Configuration | deploy block | Config / DeployBlock / ResolvedConfig |
+| Configuration | deploy() | Config / DeployBlock / ResolvedConfig |
 | Check outcome | — | CheckResult |
 | Op self-description | — | OpDescriber / PlanTemplate |
 | Dependency inference | — | Pather |

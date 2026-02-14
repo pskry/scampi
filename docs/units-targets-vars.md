@@ -1,22 +1,24 @@
-# Units, Targets, and Vars Design
+# Configuration Model
 
-This document captures the design for `doit`'s configuration model: how reusable units are packaged, how targets (machines/environments) are organized, and how environment-specific variables flow through the system.
+This document describes `doit`'s configuration model: how targets are defined,
+how deploy blocks organize work, how environment-specific values flow through
+the system, and how project layout scales.
 
 ---
 
 ## Design Principles
 
 1. **Explicit over implicit** — No magic precedence, no hidden conventions
-2. **Complexity is opt-in** — Single file works; full layout available when needed
+2. **Complexity is opt-in** — Single file works; split when it hurts
 3. **Target is truth** — Stateless execution, always inspect live state
-4. **Developer experience is paramount** — LSP support, autocomplete, clear errors
+4. **Batteries included** — Steps are built-in, not plugins
 5. **Not everything executable deserves identity** — Steps are anonymous; units are named
 
 ---
 
 ## The Core Abstraction
 
-There are two fundamentally different concepts:
+Two fundamentally different concepts:
 
 | Concept | Has identity? | Needs ordering? | Example |
 |---------|---------------|-----------------|---------|
@@ -29,132 +31,9 @@ There are two fundamentally different concepts:
 - Identity belongs only at convergence boundaries
 - Ordering belongs only to procedural sequences
 
----
-
-## The Three Layers
-
-```
-┌─────────────────────────────────────────┐
-│  UNITS (what)                           │
-│  Reusable convergence modules           │
-│  Pure CUE, explicit params schema       │
-└─────────────────────────────────────────┘
-              ↓ run on
-┌─────────────────────────────────────────┐
-│  TARGETS (where)                        │
-│  Pure identity — how to reach machines  │
-│  No tags, no metadata, no quirks        │
-└─────────────────────────────────────────┘
-              ↓ parameterized by
-┌─────────────────────────────────────────┐
-│  VARS (context)                         │
-│  Environment-specific values            │
-│  Explicit CUE imports, no precedence    │
-└─────────────────────────────────────────┘
-```
-
----
-
-## Units
-
-> **Status: Design — not yet implemented**
-
-### What a Unit Is
-
-A **unit** is a reusable convergence module. It defines a sequence of steps that bring a system to a desired state.
-
-Examples: `nginx`, `postgres`, `docker`, `base-packages`
-
-### Unit Structure
-
-```cue
-// units/nginx/unit.cue
-package nginx
-
-import "godoit.dev/doit/builtin"
-
-#Params: {
-  port:      int | *80
-  workers:   int | *4
-  ssl_cert?: string  // optional
-  ssl_key?:  string
-}
-
-#Unit: {
-  params: #Params
-
-  steps: [
-    builtin.package & {name: "nginx"},
-    builtin.template & {
-      src:  "templates/nginx.conf.tmpl"
-      dest: "/etc/nginx/nginx.conf"
-      data: params
-    },
-    builtin.service & {name: "nginx", state: "running"},
-  ]
-}
-```
-
-### Key Properties
-
-| Property | Decision |
-|----------|----------|
-| Content | Pure CUE + files (templates, etc.) |
-| Parameters | Explicit `#Params` schema (not implicit unification) |
-| Template resolution | Relative paths resolved from vendored source at runtime |
-| Versioning | Go-style: `@v1.2.3`, lockfile for reproducibility |
-
-### Packaging
-
-Units are CUE modules, managed via `doit mod`:
-
-```bash
-doit mod init                    # create cue.mod
-doit mod tidy                    # resolve dependencies
-doit mod vendor                  # vendor for offline/reproducibility
-```
-
-```cue
-// Importing a third-party unit
-import "github.com/acme/doit-units/nginx"
-
-// Using it
-nginx.#Unit & {params: {port: 443}}
-```
-
-### Why Explicit `#Params`
-
-- LSP can autocomplete fields and show types
-- Clear contract between unit author and consumer
-- Validation happens at CUE evaluation time, not runtime
-
----
-
-## Steps
-
-### Batteries Included
-
-Steps are the executable primitives. They are **built into `doit`**, not plugins.
-
-Current steps: `copy`, `symlink`, `template`
-
-Planned steps: `package`, `service`, `command`, `directory`, `absent`, `user`, `group`
-
-### Why No Plugins
-
-- Security boundary is clear (import capability rules)
-- No version matrix hell
-- Consistent quality and documentation
-- If something's missing, contribute to `doit`, don't fork
-
-### Steps vs Units
-
-| Concept | Identity | Reusable | Implemented in |
-|---------|----------|----------|----------------|
-| Step | Anonymous | No (inline) | Go (built-in) |
-| Unit | Named | Yes (imported) | CUE (pure config) |
-
-Units are composed of steps. Steps are the atoms.
+> **Units are not yet implemented.** The current system works entirely with
+> inline steps. The unit concept is preserved here because it will inform the
+> reusable-module design.
 
 ---
 
@@ -164,13 +43,14 @@ Units are composed of steps. Steps are the atoms.
 
 A **target** describes how to reach a machine. Nothing more.
 
-```cue
-targets: {
-  web1: {type: "ssh", host: "10.0.0.1", user: "deploy"}
-  web2: {type: "ssh", host: "10.0.0.2", user: "deploy"}
-  local: {type: "local"}
-  api: {type: "rest", endpoint: "https://config.internal/v1"}
-}
+```python
+target.local(name="laptop")
+
+target.ssh(
+    name="web1",
+    host="10.0.0.1",
+    user="deploy",
+)
 ```
 
 ### What a Target Is NOT
@@ -182,295 +62,238 @@ targets: {
 
 ### Target Types
 
-| Type | Use case |
-|------|----------|
-| `local` | Local machine execution |
-| `ssh` | Remote execution via SSH |
-| `rest` | Configuration via REST API (planned) |
+| Type | Builtin | Use case |
+|------|---------|----------|
+| `local` | `target.local(name)` | Local machine execution |
+| `ssh` | `target.ssh(name, host, user, ...)` | Remote execution via SSH |
 
-The `type` field determines the target interface. SSH is not the default assumption.
+SSH targets accept additional keyword arguments:
 
-### Inventory Files
-
-One file per environment:
-
-```
-inventory/
-├── test.cue
-├── stage.cue
-├── prod.cue
-└── prod-west.cue
-```
-
-```cue
-// inventory/prod.cue
-package inventory
-
-targets: {
-  web1: {type: "ssh", host: "10.0.0.1", user: "deploy"}
-  web2: {type: "ssh", host: "10.0.0.2", user: "deploy"}
-  db1:  {type: "ssh", host: "10.0.0.10", user: "deploy"}
-}
+```python
+target.ssh(
+    name="web1",
+    host="10.0.0.1",
+    user="deploy",
+    port=2222,              # optional
+    key="~/.ssh/id_rsa",    # optional
+    insecure=True,          # optional: skip host key verification
+    timeout="10s",          # optional: connection timeout
+)
 ```
 
 ---
 
-## Groups
+## Steps
 
-> **Status: Design — not yet implemented**
+### Batteries Included
 
-### What Groups Are
+Steps are the executable primitives. They are **built into `doit`**, not plugins.
 
-Groups are **explicit lists** of target names. They live separately from targets.
+Current steps: `copy`, `dir`, `symlink`, `template`, `pkg`
 
-```cue
-// groups/groups.cue
-package groups
+Planned steps: `service`, `command`, `absent`, `user`, `group`
 
-web: ["web1", "web2"]
-db:  ["db1"]
-all: ["web1", "web2", "db1"]
+### Why No Plugins
+
+- Security boundary is clear
+- No version matrix hell
+- Consistent quality and documentation
+- If something's missing, contribute to `doit`, don't fork
+
+### Step Builtins
+
+```python
+copy(src="./app.conf", dest="/etc/app.conf", perm="0644", owner="root", group="root")
+
+dir(path="/var/app", perm="0755", owner="app", group="app")
+
+symlink(target="/etc/app.conf", link="/opt/app/config")
+
+template(
+    src="./nginx.conf.tmpl",       # or content="inline {{ .template }}"
+    dest="/etc/nginx/nginx.conf",
+    perm="0644",
+    owner="root",
+    group="root",
+    data={"values": {"workers": 4, "port": 80}},
+)
+
+pkg(packages=["nginx", "curl"], state="present")  # present | latest | absent
 ```
 
-### Why Not Tags
-
-Ansible's tags are OR-based and become a dumping ground for metadata. You cannot express "web AND prod" cleanly.
-
-Groups are explicit. Composition is CUE:
-
-```cue
-// AND: intersection
-prod_web: [for t in web if list.Contains(prod, t) {t}]
-
-// OR: concatenation
-web_or_db: web + db
-```
-
-### Computed Groups (Optional)
-
-If explicit lists are too verbose:
-
-```cue
-// Computed from target properties (if you add them)
-web_computed: [for name, t in targets if strings.HasPrefix(name, "web") {name}]
-```
-
-But prefer explicit lists for clarity.
+Every step accepts an optional `desc` keyword for human-readable descriptions.
 
 ---
 
-## Variables
+## Deploy Blocks
 
-> **Status: Design — not yet implemented**
+A **deploy block** binds targets to an ordered sequence of steps.
+
+```python
+deploy(
+    name="web",
+    targets=["web1", "web2"],
+    steps=[
+        copy(src="./motd.txt", dest="/etc/motd", perm="0644", owner="root", group="root"),
+        pkg(packages=["nginx"]),
+        template(
+            src="./nginx.conf.tmpl",
+            dest="/etc/nginx/nginx.conf",
+            perm="0644",
+            owner="root",
+            group="root",
+            data={"values": {"workers": 4}},
+        ),
+    ],
+)
+```
+
+Reading order matches execution: "On web1 and web2, run: copy, pkg, template."
+
+---
+
+## Environment Variables
 
 ### The Ansible Trap
 
-Ansible has 22 levels of variable precedence. "Where did this value come from?" is often unanswerable.
+Ansible has 22 levels of variable precedence. "Where did this value come from?"
+is often unanswerable.
 
-### doit Approach: Explicit Imports
+### doit Approach: `env()`
 
-Variables are layered via explicit CUE imports:
+The `env()` builtin reads environment variables with optional defaults and type
+coercion:
 
-```cue
-// vars/base.cue
-package vars
+```python
+# Required — errors if not set
+db_host = env("DB_HOST")
 
-#Base: {
-  nginx_workers: 4
-  log_level:     "info"
-}
+# With default — returns default if not set
+port = env("SSH_PORT", 2222)         # coerces to int
+debug = env("DEBUG", False)          # coerces to bool
+level = env("LOG_LEVEL", "info")     # string
 ```
 
-```cue
-// vars/prod.cue
-package vars
+Type coercion follows the default value's type:
+- **int**: parses the env var as an integer
+- **bool**: `"true"`, `"1"`, `"yes"` → True; `"false"`, `"0"`, `"no"`, `""` → False
+- **string**: no coercion
 
-import "vars/base"
+### Provenance is Obvious
 
-#Prod: base.#Base & {
-  log_level:  "warn"                    // override
-  ssl_cert:   "/etc/ssl/prod.crt"
-  db_host:    "prod-db.internal"
-}
-```
-
-```cue
-// vars/prod-west.cue
-package vars
-
-import "vars/prod"
-
-#ProdWest: prod.#Prod & {
-  db_host: "prod-west-db.internal"      // regional override
-}
-```
-
-### Key Properties
-
-| Property | How |
-|----------|-----|
-| No magic precedence | Layering is explicit CUE imports |
-| Obvious provenance | Follow the imports to see where values come from |
-| Editor support | LSP can jump-to-definition through the chain |
-| Type-safe | Unit's `#Params` validates what you pass |
-
-### Vars vs Unit Params
-
-- **Vars are freeform** — they're just CUE structs
-- **Units have schemas** — `#Params` is the contract
-- CUE errors at evaluation time if vars don't satisfy unit params
+Every value is either a literal in your `.star` file or an explicit `env()` call.
+There's no layering, no precedence, no hidden override mechanism. You can always
+answer "where did this value come from?" by reading the code.
 
 ### Secrets (Future)
 
-Secrets are referenced symbolically, resolved at runtime:
-
-```cue
-#Prod: #Base & {
-  ssl_cert: "/etc/ssl/prod.crt"                      // literal
-  db_pass:  {secret: "vault:prod/db/password"}       // runtime resolution
-}
-```
-
-Resolution strategies (planned):
-- SSH agent
-- OS keychain
-- Vault / secret manager
-- Environment variables
+Runtime secret resolution (vault, keychain, etc.) is planned but not yet
+implemented.
 
 ---
 
-## Site Definition
+## Multi-File Configs
 
-### Host-Centric Model
+### `load()` for Splitting
 
-> **Note:** Unit references (e.g. `nginx.#Unit`) in examples below are aspirational. Only inline steps work today.
+Standard Starlark `load()` splits configs across files:
 
-The site file defines "on these targets, run these steps":
+```python
+# config.star
+load("./targets.star", "web_targets", "db_targets")
+load("./steps/web.star", "web_steps")
 
-```cue
-// site.cue
-package site
-
-import (
-  "groups"
-  "units/nginx"
-  "units/app"
-  "vars/prod"
-)
-
-deploy: {
-  web_servers: {
-    targets: groups.web
-
-    steps: [
-      // Inline step
-      {copy: {src: "motd.txt", dest: "/etc/motd"}},
-
-      // Unit (expands to its steps)
-      nginx.#Unit & {params: prod.#Vars},
-
-      // More inline steps
-      {template: {src: "app.conf.tmpl", dest: "/etc/app/config.yml"}},
-
-      // Another unit
-      app.#Unit & {params: prod.#Vars},
-    ]
-  }
-
-  db_servers: {
-    targets: groups.db
-
-    steps: [
-      postgres.#Unit & {params: prod.#Vars},
-    ]
-  }
-}
+deploy(name="web", targets=web_targets, steps=web_steps)
 ```
 
-### Why Host-Centric
+```python
+# targets.star
+target.ssh(name="web1", host="10.0.0.1", user="deploy")
+target.ssh(name="web2", host="10.0.0.2", user="deploy")
 
-Reading order matches execution: "On web_servers, run: copy, nginx, template, app."
+web_targets = ["web1", "web2"]
+db_targets = ["db1"]
+```
 
-Units interleave naturally with inline steps. No separate "binding" layer to reason about.
+Loaded files share the same target/deploy collector — `target.*()` and
+`deploy()` calls in loaded files register globally.
+
+### Target Grouping
+
+Groups are plain Starlark lists. Composition is just list operations:
+
+```python
+web = ["web1", "web2"]
+db = ["db1"]
+all = web + db
+```
+
+No special group abstraction needed — Starlark is a real language.
 
 ---
 
 ## Project Layout
 
-### Principle: Complexity is Opt-In
+### Complexity is Opt-In
 
 Start with one file. Split when it hurts.
 
 ### Minimal (Single File)
 
-```cue
-// dotfiles.cue
-target: {type: "local"}
+```python
+# dotfiles.star
+target.local(name="laptop")
 
-steps: [
-  {symlink: {src: "bashrc", dest: "~/.bashrc"}},
-  {symlink: {src: "vimrc", dest: "~/.vimrc"}},
-]
+deploy(
+    name="dotfiles",
+    targets=["laptop"],
+    steps=[
+        symlink(target="bashrc", link="~/.bashrc"),
+        symlink(target="vimrc", link="~/.vimrc"),
+    ],
+)
 ```
 
 ```bash
-doit apply dotfiles.cue
+doit apply dotfiles.star
 ```
 
 ### Small (One File, Multiple Targets)
 
-```cue
-// site.cue
-targets: {
-  laptop: {type: "local"}
-  server: {type: "ssh", host: "myserver.com", user: "me"}
-}
+```python
+# config.star
+target.local(name="laptop")
+target.ssh(name="server", host="myserver.com", user="me")
 
-deploy: {
-  dotfiles: {
-    targets: ["laptop", "server"]
-    steps: [
-      {symlink: {src: "bashrc", dest: "~/.bashrc"}},
-    ]
-  }
-}
+deploy(
+    name="dotfiles",
+    targets=["laptop", "server"],
+    steps=[
+        symlink(target="bashrc", link="~/.bashrc"),
+    ],
+)
 ```
 
 ### Medium (Split Files)
 
 ```
-├── inventory/
-│   └── prod.cue
-├── vars/
-│   └── prod.cue
-└── site.cue
+myproject/
+├── targets.star
+└── config.star
 ```
 
 ### Large (Full Layout)
 
 ```
 myproject/
-├── cue.mod/
-│   └── module.cue
-├── inventory/
-│   ├── test.cue
-│   ├── stage.cue
-│   └── prod.cue
-├── groups/
-│   └── groups.cue
-├── vars/
-│   ├── base.cue
-│   ├── test.cue
-│   ├── stage.cue
-│   └── prod.cue
-├── units/
-│   ├── nginx/
-│   │   ├── unit.cue
-│   │   └── templates/
-│   └── app/
-│       ├── unit.cue
-│       └── templates/
-└── site.cue
+├── targets/
+│   ├── test.star
+│   ├── stage.star
+│   └── prod.star
+├── steps/
+│   ├── web.star
+│   └── db.star
+└── config.star
 ```
 
 ---
@@ -479,29 +302,32 @@ myproject/
 
 | Flag | Meaning |
 |------|---------|
-| (none) | Target must be inline, or defaults to local |
-| `-i <file>` | Explicit inventory file |
-| `--env <name>` | Convention: loads `inventory/<name>.cue` (and `vars/<name>.cue`) |
-| `--targets <names>` | Filter to specific target names |
-| `--only <blocks>` | Filter to specific deploy blocks |
+| `--targets <names>` | Filter to specific target names (comma-separated) |
+| `--only <blocks>` | Filter to specific deploy blocks (comma-separated) |
+| `-v` / `-vv` / `-vvv` | Increase verbosity |
+| `--color <mode>` | Colorize output: auto, always, never |
+| `--ascii` | Force ASCII output (no Unicode glyphs) |
 
 ### Examples
 
 ```bash
-# Minimal: single file, local target
-doit apply dotfiles.cue
+# Minimal: single file
+doit apply dotfiles.star
 
-# Explicit inventory
-doit apply -i inventory/prod.cue site.cue
+# Check without applying
+doit check config.star
 
-# Environment convention
-doit apply --env prod site.cue
+# Show execution plan
+doit plan config.star
 
 # Filter to specific targets
-doit apply --env prod --targets web1,web2 site.cue
+doit apply --targets web1,web2 config.star
 
 # Filter to specific deploy block
-doit apply --env prod --only web_servers site.cue
+doit apply --only web config.star
+
+# Inspect file diffs
+doit inspect config.star
 ```
 
 ---
@@ -531,19 +357,21 @@ Check() → "is the file already correct?"
 - No drift blindness (manual changes are visible immediately)
 - Idempotent by design — run 100 times, same result
 
-The target IS the truth. You cannot avoid inspecting it. Caching that inspection is a liability, not an optimization.
+The target IS the truth. You cannot avoid inspecting it. Caching that
+inspection is a liability, not an optimization.
 
 ---
 
 ## Summary
 
-| Concept | Where | Key property |
-|---------|-------|--------------|
-| Units | `units/*/unit.cue` | Pure CUE, explicit `#Params` |
-| Steps | Built-in | Batteries included |
-| Targets | `inventory/*.cue` | Pure identity, one file per env |
-| Groups | `groups/*.cue` | Explicit lists |
-| Vars | `vars/*.cue` | Explicit imports, no precedence |
-| Site | `site.cue` | Host-centric: "on X run Y" |
+| Concept | How | Key property |
+|---------|-----|--------------|
+| Steps | Built-in functions (`copy`, `dir`, ...) | Batteries included |
+| Targets | `target.local()`, `target.ssh()` | Pure identity |
+| Deploy blocks | `deploy(name, targets, steps)` | Host-centric: "on X run Y" |
+| Environment | `env(key, default?)` | Explicit, no precedence |
+| Multi-file | `load()` | Standard Starlark |
+| Groups | Plain lists | Just Starlark |
 
-Complexity scales from one file to full layout. Explicit over implicit. Target is truth.
+Complexity scales from one file to full layout. Explicit over implicit.
+Target is truth.
