@@ -74,11 +74,19 @@ bench save_as='' count='10' benchtime='100ms':
     } else {
       f'''
       mkdir -p "{{bench_dir}}"
+      latest=$(ls {{bench_dir}}/*.txt 2>/dev/null | sort | tail -1)
+      ts=$(date '+%Y-%m-%dT%H%M')
+      if [ -n "$latest" ]; then
+        prev_ts=$(basename "$latest" | sed 's/-[^-]*\.txt$//')
+        if [ ! -f "{{bench_dir}}/$prev_ts-{{save_as}}.txt" ]; then
+          ts=$prev_ts
+        fi
+      fi
       echo 'Warmup run...'
       go test ./test -bench=. -benchmem -count=2 -benchtime={{benchtime}}
       echo 'Recorded run...'
       go test ./test -bench=. -benchmem -count={{count}} -benchtime={{benchtime}} \
-        | tee "{{bench_dir}}/$(date '+%Y-%m-%dT%H%M')-{{save_as}}.txt"
+        | tee "{{bench_dir}}/$ts-{{save_as}}.txt"
       '''
     }
   }}
@@ -92,13 +100,9 @@ benchcomp suffix:
   echo "  $curr"; \
   benchstat -table .config -row .fullname -col .file "$prev" "$curr"
 
-[doc("Plot available ns/op (geometric mean) benchmarks with suffix")]
+[doc("Plot benchmark history as HTML dashboard for given suffix")]
 benchplot suffix:
-  pushd bin/benchplot/ \
-    && rm -f *.csv \
-    && rm -f *.svg \
-    && go run benchplot.go ../../{{bench_dir}}/*{{suffix}}.txt > bench.csv \
-    && gnuplot bench.gnuplot
+  go run ./bin/benchplot -o bin/benchplot/{{suffix}}.html {{bench_dir}}/*-{{suffix}}.txt
 
 [doc("Format all code")]
 fmt:
