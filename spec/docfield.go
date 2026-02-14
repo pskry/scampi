@@ -23,7 +23,7 @@ import (
 //	step:"Description text"        — field description (required tag)
 //	optional:"true"                — marks field as optional (default: required)
 //	default:"present"              — display default (implies optional)
-//	example:"/etc/app/config.yaml" — example value
+//	example:"/etc/app/config.yaml"         — example value (pipe-delimited for multiple)
 func DocFromConfig(kind string, cfg any) StepDoc {
 	rt := reflectStruct(cfg)
 	return StepDoc{
@@ -92,7 +92,7 @@ func extractFields(rt reflect.Type) []FieldDoc {
 			fd.Default = `"` + v + `"`
 		}
 		if v := sf.Tag.Get("example"); v != "" {
-			fd.Example = v
+			fd.Examples = strings.Split(v, "|")
 		}
 
 		fields = append(fields, fd)

@@ -20,8 +20,8 @@ type FieldDoc struct {
 	Type     string // "string", "int", "bool", "list", "struct"
 	Required bool
 	Desc     string
-	Default  string // display string, empty if none
-	Example  string // example value, empty if none
+	Default  string   // display string, empty if none
+	Examples []string // example values (from pipe-delimited example tag)
 }
 
 // Examples returns Starlark code snippets showing how to call this step.
@@ -41,7 +41,10 @@ func (d StepDoc) Examples() []string {
 }
 
 func exampleValue(f FieldDoc) (string, bool) {
-	raw := f.Example
+	var raw string
+	if len(f.Examples) > 0 {
+		raw = f.Examples[0]
+	}
 	if raw == "" {
 		raw = strings.Trim(f.Default, `"`)
 	}

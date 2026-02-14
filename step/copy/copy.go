@@ -20,7 +20,7 @@ type (
 		Desc  string `step:"Human-readable description" optional:"true"`
 		Src   string `step:"Source file path" example:"./config.yaml"`
 		Dest  string `step:"Destination file path" example:"/etc/app/config.yaml"`
-		Perm  string `step:"File permissions (octal, POSIX, or ls-style)" example:"0644"`
+		Perm  string `step:"File permissions" example:"0644|u=rw,g=r,o=r|rw-r--r--"`
 		Owner string `step:"Owner user name or UID" example:"root"`
 		Group string `step:"Group name or GID" example:"root"`
 	}

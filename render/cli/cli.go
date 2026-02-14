@@ -258,36 +258,55 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 			if f.Required {
 				reqStr = "required"
 			}
-			line := fmt.Sprintf("  %-*s   %-*s   %-*s   %s",
-				nameW, f.Name, typeW, f.Type, reqW, reqStr, f.Desc)
+			line := "  " +
+				c.formatter.fmtMsg(ansi.Cyan(), fmt.Sprintf("%-*s", nameW, f.Name)) +
+				"   " +
+				c.formatter.fmtMsg(ansi.BrightBlack(), fmt.Sprintf("%-*s", typeW, f.Type)) +
+				"   " +
+				c.formatter.fmtMsg(ansi.BrightBlack(), fmt.Sprintf("%-*s", reqW, reqStr)) +
+				"   " +
+				c.formatter.fmtMsg(ansi.White(), f.Desc)
 			events = append(events, renderEvent{
-				line:   c.formatter.fmtMsg(ansi.White(), line),
+				line:   line,
 				stream: streamOut,
 			})
 		}
 	}
 
-	examples := doc.Examples()
-	if len(examples) > 0 {
-		v := c.opts.Verbosity
-		switch {
-		case v >= signal.VV:
-			events = append(events, c.renderExamples(examples)...)
-		case v >= signal.V:
-			events = append(events, c.renderExamples(examples[:1])...)
-			if len(examples) > 1 {
-				events = append(events, renderEvent{line: "", stream: streamOut})
-				events = append(events, renderEvent{
-					line: c.formatter.fmtMsg(ansi.BrightBlack(),
-						fmt.Sprintf("For all examples, run 'doit index %s -vv'.", doc.Kind)),
-					stream: streamOut,
-				})
-			}
-		default:
+	// Per-field examples and snippet, gated by verbosity.
+	hasFieldExamples := false
+	for _, f := range doc.Fields {
+		if len(f.Examples) > 0 {
+			hasFieldExamples = true
+			break
+		}
+	}
+
+	snippets := doc.Examples()
+	v := c.opts.Verbosity
+
+	switch {
+	case v >= signal.VV:
+		if hasFieldExamples {
+			events = append(events, c.renderFieldExamples(doc.Fields)...)
+		}
+		events = append(events, c.renderSnippets(snippets)...)
+	case v >= signal.V:
+		if hasFieldExamples {
+			events = append(events, c.renderFieldExamples(doc.Fields)...)
+		}
+		events = append(events, renderEvent{line: "", stream: streamOut})
+		events = append(events, renderEvent{
+			line: c.formatter.fmtMsg(ansi.BrightBlack(),
+				fmt.Sprintf("For a copy-pasteable snippet, run 'doit index %s -vv'.", doc.Kind)),
+			stream: streamOut,
+		})
+	default:
+		if hasFieldExamples || len(snippets) > 0 {
 			events = append(events, renderEvent{line: "", stream: streamOut})
 			events = append(events, renderEvent{
 				line: c.formatter.fmtMsg(ansi.BrightBlack(),
-					fmt.Sprintf("For usage examples, run 'doit index %s -v'.", doc.Kind)),
+					fmt.Sprintf("For examples, run 'doit index %s -v'.", doc.Kind)),
 				stream: streamOut,
 			})
 		}
@@ -296,23 +315,51 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 	c.commitRenderEvents(events)
 }
 
-func (c *cli) renderExamples(examples []string) []renderEvent {
+func (c *cli) renderFieldExamples(fields []spec.FieldDoc) []renderEvent {
 	var events []renderEvent
-	header := "EXAMPLE"
-	if len(examples) > 1 {
-		header = "EXAMPLES"
-	}
 	events = append(events, renderEvent{line: "", stream: streamOut})
 	events = append(events, renderEvent{
-		line:   c.formatter.fmtMsg(ansi.BrightBlack(), header),
+		line:   c.formatter.fmtMsg(ansi.BrightBlack(), "EXAMPLES"),
 		stream: streamOut,
 	})
-	for i, ex := range examples {
+	events = append(events, renderEvent{line: "", stream: streamOut})
+
+	nameW := 0
+	for _, f := range fields {
+		if len(f.Examples) > 0 && len(f.Name) > nameW {
+			nameW = len(f.Name)
+		}
+	}
+
+	for _, f := range fields {
+		if len(f.Examples) == 0 {
+			continue
+		}
+		line := "  " +
+			c.formatter.fmtMsg(ansi.Cyan(), fmt.Sprintf("%-*s", nameW, f.Name)) +
+			"   " +
+			c.formatter.fmtMsg(ansi.BrightBlack(), strings.Join(f.Examples, "   "))
+		events = append(events, renderEvent{
+			line:   line,
+			stream: streamOut,
+		})
+	}
+	return events
+}
+
+func (c *cli) renderSnippets(snippets []string) []renderEvent {
+	var events []renderEvent
+	events = append(events, renderEvent{line: "", stream: streamOut})
+	events = append(events, renderEvent{
+		line:   c.formatter.fmtMsg(ansi.BrightBlack(), "EXAMPLE SNIPPET"),
+		stream: streamOut,
+	})
+	for i, s := range snippets {
 		if i > 0 {
 			events = append(events, renderEvent{line: "", stream: streamOut})
 		}
 		events = append(events, renderEvent{line: "", stream: streamOut})
-		for _, l := range strings.Split(ex, "\n") {
+		for _, l := range strings.Split(s, "\n") {
 			events = append(events, renderEvent{
 				line:   c.formatter.fmtMsg(ansi.BrightBlack().Dim(), "  "+l),
 				stream: streamOut,
