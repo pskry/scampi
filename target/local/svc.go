@@ -4,7 +4,6 @@ package local
 
 import (
 	"context"
-	"fmt"
 
 	"godoit.dev/doit/target"
 )
@@ -59,7 +58,7 @@ func (t POSIXTarget) DaemonReload(ctx context.Context) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return ServiceCommandError{
+		return target.SvcCommandError{
 			Op:       "daemon-reload",
 			Stderr:   result.Stderr,
 			ExitCode: result.ExitCode,
@@ -80,7 +79,7 @@ func (t POSIXTarget) runSvcCommand(ctx context.Context, cmd, op string) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return ServiceCommandError{
+		return target.SvcCommandError{
 			Op:       op,
 			Name:     cmd,
 			Stderr:   result.Stderr,
@@ -88,16 +87,4 @@ func (t POSIXTarget) runSvcCommand(ctx context.Context, cmd, op string) error {
 		}
 	}
 	return nil
-}
-
-// ServiceCommandError is returned when a service command fails.
-type ServiceCommandError struct {
-	Op       string
-	Name     string
-	Stderr   string
-	ExitCode int
-}
-
-func (e ServiceCommandError) Error() string {
-	return fmt.Sprintf("service %s %s failed (exit %d): %s", e.Op, e.Name, e.ExitCode, e.Stderr)
 }

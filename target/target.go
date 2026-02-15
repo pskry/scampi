@@ -98,6 +98,18 @@ func Must[T any](reqID string, tgt Target) T {
 	return res
 }
 
+// SvcCommandError is returned when a service management command fails.
+type SvcCommandError struct {
+	Op       string
+	Name     string
+	Stderr   string
+	ExitCode int
+}
+
+func (e SvcCommandError) Error() string {
+	return fmt.Sprintf("service %s %s failed (exit %d): %s", e.Op, e.Name, e.ExitCode, e.Stderr)
+}
+
 // EscalationError is returned when a privilege-escalated command fails
 // (password required, not in sudoers, command denied, etc).
 type EscalationError struct {
