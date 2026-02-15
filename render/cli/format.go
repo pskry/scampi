@@ -107,7 +107,7 @@ func (f *formatter) fmtTemplate(
 }
 
 func (f *formatter) renderSnippet(src *spec.SourceSpan) (string, bool) {
-	if src == nil || f.store == nil {
+	if src == nil || f.store == nil || *src == (spec.SourceSpan{}) {
 		return "", false
 	}
 	v := f.loadSourceLine(src)

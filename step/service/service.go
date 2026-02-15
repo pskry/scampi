@@ -75,14 +75,16 @@ func (a *serviceAction) Kind() string { return "service" }
 
 func (a *serviceAction) Ops() []spec.Op {
 	activeOp := &ensureActiveOp{
-		name:  a.name,
-		state: a.state,
+		name:       a.name,
+		state:      a.state,
+		nameSource: a.step.Fields["name"].Value,
 	}
 	activeOp.SetAction(a)
 
 	enabledOp := &ensureEnabledOp{
-		name:    a.name,
-		enabled: a.enabled,
+		name:       a.name,
+		enabled:    a.enabled,
+		nameSource: a.step.Fields["name"].Value,
 	}
 	enabledOp.SetAction(a)
 

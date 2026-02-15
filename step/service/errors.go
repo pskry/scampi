@@ -74,10 +74,11 @@ func (e DaemonReloadError) Error() string {
 
 func (e DaemonReloadError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "builtin.service.DaemonReloadFailed",
-		Text: `daemon-reload failed before starting service {{.Name}}: {{.Stderr}}`,
-		Hint: "check systemd configuration and permissions",
-		Data: e,
+		ID:     "builtin.service.DaemonReloadFailed",
+		Text:   `daemon-reload failed before starting service {{.Name}}: {{.Stderr}}`,
+		Hint:   "check systemd configuration and permissions",
+		Data:   e,
+		Source: &e.Source,
 	}
 }
 

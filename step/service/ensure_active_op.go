@@ -16,8 +16,9 @@ const ensureActiveID = "builtin.ensure-service-active"
 
 type ensureActiveOp struct {
 	sharedops.BaseOp
-	name  string
-	state string
+	name       string
+	state      string
+	nameSource spec.SourceSpan
 }
 
 func (op *ensureActiveOp) Check(
@@ -66,6 +67,7 @@ func (op *ensureActiveOp) Execute(
 			return spec.Result{}, DaemonReloadError{
 				Name:   op.name,
 				Stderr: err.Error(),
+				Source: op.nameSource,
 			}
 		}
 		if err := sm.Start(ctx, op.name); err != nil {
@@ -73,6 +75,7 @@ func (op *ensureActiveOp) Execute(
 				Op:     "start",
 				Name:   op.name,
 				Stderr: err.Error(),
+				Source: op.nameSource,
 			}
 		}
 	} else {
@@ -81,6 +84,7 @@ func (op *ensureActiveOp) Execute(
 				Op:     "stop",
 				Name:   op.name,
 				Stderr: err.Error(),
+				Source: op.nameSource,
 			}
 		}
 	}

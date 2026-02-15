@@ -17,8 +17,9 @@ const ensureEnabledID = "builtin.ensure-service-enabled"
 
 type ensureEnabledOp struct {
 	sharedops.BaseOp
-	name    string
-	enabled bool
+	name       string
+	enabled    bool
+	nameSource spec.SourceSpan
 }
 
 func (op *ensureEnabledOp) Check(
@@ -70,6 +71,7 @@ func (op *ensureEnabledOp) Execute(
 				Op:     "enable",
 				Name:   op.name,
 				Stderr: err.Error(),
+				Source: op.nameSource,
 			}
 		}
 	} else {
@@ -78,6 +80,7 @@ func (op *ensureEnabledOp) Execute(
 				Op:     "disable",
 				Name:   op.name,
 				Stderr: err.Error(),
+				Source: op.nameSource,
 			}
 		}
 	}
