@@ -11,6 +11,29 @@ project, and be able to migrate an existing one incrementally?**
 
 ---
 
+## Progress
+
+**Phase 1: Foundation**
+- [x] Secrets (v1: `secret()` builtin, `unencrypted_file` backend)
+- [ ] User-controlled backend selection (`secrets()` builtin)
+- [ ] Encrypted file backend (age/sops)
+- [ ] Deploy block dependencies (`after=`)
+
+**Phase 2: Targets**
+- [ ] REST target + auth
+- [ ] REST escape hatch steps
+
+**Phase 3: Step Types**
+- [ ] Docker container
+- [ ] User/group
+- [ ] Repository
+
+**Phase 4: Orchestration**
+- [ ] Handlers / post-change triggers
+- [ ] Domain targets (NPM, Grafana, etc.)
+
+---
+
 ## Where We Are
 
 doit can converge files, directories, symlinks, templates, packages, and
@@ -489,7 +512,7 @@ No half-hour no-op runs. Check is fast, execute is minimal, re-runs are cheap.
 Not a promise of timeline — a dependency-ordered list of what to build and why.
 
 **Phase 1: Foundation**
-1. Secrets — unblocks real-world configs
+1. ~~Secrets~~ (done) — unblocks real-world configs
 2. Deploy block dependencies (`after=`) — unblocks multi-phase workflows
 
 **Phase 2: Targets**
