@@ -24,6 +24,7 @@ func predeclared() starlark.StringDict {
 		"target":   targetModule(),
 		"deploy":   starlark.NewBuiltin("deploy", builtinDeploy),
 		"env":      starlark.NewBuiltin("env", builtinEnv),
+		"secret":   starlark.NewBuiltin("secret", builtinSecret),
 	}
 }
 
@@ -164,6 +165,57 @@ func builtinEnv(
 	}
 
 	return coerceEnvValue(envVal, dflt, span)
+}
+
+// secret(key)
+// -----------------------------------------------------------------------------
+
+func builtinSecret(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	span := callSpan(thread)
+
+	if len(args) != 1 {
+		return nil, &SecretError{
+			Detail: fmt.Sprintf("accepts exactly 1 positional argument, got %d", len(args)),
+			Source: span,
+		}
+	}
+	if len(kwargs) > 0 {
+		return nil, &SecretError{
+			Detail: "does not accept keyword arguments",
+			Source: span,
+		}
+	}
+
+	key, ok := starlark.AsString(args[0])
+	if !ok {
+		return nil, &SecretError{
+			Detail: fmt.Sprintf("key must be a string, got %s", args[0].Type()),
+			Source: span,
+		}
+	}
+
+	c := threadCollector(thread)
+	val, found, err := c.src.LookupSecret(key)
+	if err != nil {
+		return nil, &SecretBackendError{
+			Key:    key,
+			Cause:  err,
+			Source: span,
+		}
+	}
+	if !found {
+		return nil, &SecretNotFoundError{
+			Key:    key,
+			Source: span,
+		}
+	}
+
+	return starlark.String(val), nil
 }
 
 func coerceEnvValue(

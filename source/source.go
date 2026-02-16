@@ -23,4 +23,5 @@ type Source interface {
 	EnsureDir(ctx context.Context, path string) error
 	Stat(ctx context.Context, path string) (FileMeta, error)
 	LookupEnv(key string) (string, bool)
+	LookupSecret(key string) (string, bool, error)
 }

@@ -36,3 +36,7 @@ func (r *Recorder) Stat(ctx context.Context, path string) (FileMeta, error) {
 func (r *Recorder) LookupEnv(key string) (string, bool) {
 	return r.Inner.LookupEnv(key)
 }
+
+func (r *Recorder) LookupSecret(key string) (string, bool, error) {
+	return r.Inner.LookupSecret(key)
+}

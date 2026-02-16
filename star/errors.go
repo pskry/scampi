@@ -556,3 +556,92 @@ func (e EmptyListError) EventTemplate() event.Template {
 
 func (EmptyListError) Severity() signal.Severity { return signal.Error }
 func (EmptyListError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+// SecretError is raised for invalid secret() builtin usage.
+type SecretError struct {
+	Detail string
+	Source spec.SourceSpan
+}
+
+func (e SecretError) Error() string {
+	return fmt.Sprintf("secret: %s", e.Detail)
+}
+
+func (e SecretError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.SecretError",
+		Text:   "secret: {{.Detail}}",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (SecretError) Severity() signal.Severity { return signal.Error }
+func (SecretError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+func (e *SecretError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
+// SecretNotFoundError is raised when a secret key is not in the backend.
+type SecretNotFoundError struct {
+	Key    string
+	Source spec.SourceSpan
+}
+
+func (e SecretNotFoundError) Error() string {
+	return fmt.Sprintf("secret %q not found", e.Key)
+}
+
+func (e SecretNotFoundError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.SecretNotFound",
+		Text:   `secret "{{.Key}}" not found`,
+		Hint:   "add the key to your secrets file or check the backend configuration",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (SecretNotFoundError) Severity() signal.Severity { return signal.Error }
+func (SecretNotFoundError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+func (e *SecretNotFoundError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
+// SecretBackendError is raised when the secret backend returns an error.
+type SecretBackendError struct {
+	Key    string
+	Cause  error
+	Source spec.SourceSpan
+}
+
+func (e SecretBackendError) Error() string {
+	return fmt.Sprintf("secret backend error for %q: %s", e.Key, e.Cause)
+}
+
+func (e SecretBackendError) Unwrap() error { return e.Cause }
+
+func (e SecretBackendError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.SecretBackendError",
+		Text:   `secret backend error for "{{.Key}}": {{.Cause}}`,
+		Hint:   "check your secrets backend configuration",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (SecretBackendError) Severity() signal.Severity { return signal.Error }
+func (SecretBackendError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+func (e *SecretBackendError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
