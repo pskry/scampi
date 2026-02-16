@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"filippo.io/age"
 	"go.starlark.net/starlark"
 
 	"godoit.dev/doit/secret"
@@ -205,7 +206,8 @@ func builtinSecret(
 	c := threadCollector(thread)
 	if !c.secretsConfigured {
 		return nil, &SecretsConfigError{
-			Detail: "secret() requires a secrets() backend to be configured first",
+			Detail: `secret() requires a secrets() backend; add e.g.` +
+				` secrets(backend="age", path="secrets.age.json") before any secret() call`,
 			Source: span,
 		}
 	}
@@ -220,14 +222,14 @@ func builtinSecret(
 	if !found {
 		return nil, &SecretNotFoundError{
 			Key:    key,
-			Source: span,
+			Source: firstArgSpan(thread),
 		}
 	}
 
 	return starlark.String(val), nil
 }
 
-// secrets(backend, path?)
+// secrets(backend, path, recipients?)
 // -----------------------------------------------------------------------------
 
 func builtinSecrets(
@@ -246,19 +248,30 @@ func builtinSecrets(
 	}
 
 	var backend, path string
+	var recipientsVal starlark.Value
 	if err := starlark.UnpackArgs("secrets", args, kwargs,
 		"backend", &backend,
-		"path?", &path,
+		"path", &path,
+		"recipients?", &recipientsVal,
 	); err != nil {
+		if backend == "" {
+			backend = "age"
+		}
+		if path == "" {
+			path = "secrets." + backend + ".json"
+		}
 		return nil, &SecretsConfigError{
-			Detail: err.Error(),
+			Detail: fmt.Sprintf(
+				`%s; e.g. secrets(backend=%q, path=%q)`,
+				err.Error(), backend, path,
+			),
 			Source: span,
 		}
 	}
 
 	c := threadCollector(thread)
 
-	b, err := buildSecretBackend(c, backend, path, span)
+	b, err := buildSecretBackend(c, backend, path, recipientsVal, span)
 	if err != nil {
 		return nil, err
 	}
@@ -274,13 +287,10 @@ func builtinSecrets(
 }
 
 func buildSecretBackend(
-	c *Collector, backend, path string, span spec.SourceSpan,
+	c *Collector, backend, path string, recipientsVal starlark.Value, span spec.SourceSpan,
 ) (secret.Backend, error) {
 	switch backend {
 	case "file":
-		if path == "" {
-			path = "secrets.json"
-		}
 		data, err := c.src.ReadFile(context.Background(), path)
 		if err != nil {
 			return nil, &SecretsConfigError{
@@ -297,12 +307,84 @@ func buildSecretBackend(
 		}
 		return b, nil
 
+	case "age":
+		_, err := parseRecipientStrings(recipientsVal, span)
+		if err != nil {
+			return nil, err
+		}
+
+		readFile := func(path string) ([]byte, error) {
+			return c.src.ReadFile(context.Background(), path)
+		}
+		identities, err := secret.ResolveIdentities(
+			c.src.LookupEnv,
+			readFile,
+		)
+		if err != nil {
+			return nil, &SecretsConfigError{
+				Detail: err.Error(),
+				Source: span,
+			}
+		}
+
+		data, err := c.src.ReadFile(context.Background(), path)
+		if err != nil {
+			return nil, &SecretsConfigError{
+				Detail: fmt.Sprintf("reading secrets file %q: %s", path, err),
+				Source: span,
+			}
+		}
+
+		b, err := secret.NewAgeBackend(data, identities)
+		if err != nil {
+			return nil, &SecretsConfigError{
+				Detail: fmt.Sprintf("decrypting secrets file %q: %s", path, err),
+				Source: span,
+			}
+		}
+		return b, nil
+
 	default:
 		return nil, &SecretsConfigError{
-			Detail: fmt.Sprintf("unknown backend %q (available: file)", backend),
+			Detail: fmt.Sprintf("unknown backend %q (available: file, age)", backend),
 			Source: span,
 		}
 	}
+}
+
+// parseRecipientStrings extracts age recipient public keys from a Starlark list value.
+func parseRecipientStrings(val starlark.Value, span spec.SourceSpan) ([]age.Recipient, error) {
+	if val == nil || val == starlark.None {
+		return nil, nil
+	}
+
+	list, ok := val.(*starlark.List)
+	if !ok {
+		return nil, &SecretsConfigError{
+			Detail: fmt.Sprintf("recipients must be a list, got %s", val.Type()),
+			Source: span,
+		}
+	}
+
+	recipients := make([]age.Recipient, 0, list.Len())
+	for i := 0; i < list.Len(); i++ {
+		s, ok := starlark.AsString(list.Index(i))
+		if !ok {
+			return nil, &SecretsConfigError{
+				Detail: fmt.Sprintf("recipients[%d] must be a string, got %s", i, list.Index(i).Type()),
+				Source: span,
+			}
+		}
+		r, err := age.ParseX25519Recipient(s)
+		if err != nil {
+			return nil, &SecretsConfigError{
+				Detail: fmt.Sprintf("recipients[%d]: invalid age recipient %q: %s", i, s, err),
+				Source: span,
+			}
+		}
+		recipients = append(recipients, r)
+	}
+	return recipients, nil
 }
 
 func coerceEnvValue(

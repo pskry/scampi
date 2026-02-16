@@ -99,6 +99,29 @@ func findCallExpr(file *syntax.File, pos syntax.Position) *syntax.CallExpr {
 	return found
 }
 
+// firstArgSpan extracts the source span of the first positional argument
+// from the current builtin's call site. Falls back to the call-site span.
+func firstArgSpan(thread *starlark.Thread) spec.SourceSpan {
+	pos := callerPosition(thread)
+	call := findCallFromThread(thread, pos)
+	if call != nil {
+		for _, arg := range call.Args {
+			if _, ok := arg.(*syntax.BinaryExpr); ok {
+				continue // skip kwargs
+			}
+			start, end := arg.Span()
+			return spec.SourceSpan{
+				Filename:  start.Filename(),
+				StartLine: int(start.Line),
+				StartCol:  int(start.Col),
+				EndLine:   int(end.Line),
+				EndCol:    int(end.Col),
+			}
+		}
+	}
+	return posToSpan(pos)
+}
+
 // kwargKeySpan extracts the source span for a named kwarg's key identifier
 // from a CallExpr. Used for diagnostics about the kwarg name itself (e.g.
 // unknown keyword argument).

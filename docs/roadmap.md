@@ -16,7 +16,7 @@ project, and be able to migrate an existing one incrementally?**
 **Phase 1: Foundation**
 - [x] Secrets (v1: `secret()` builtin, `unencrypted_file` backend)
 - [x] User-controlled backend selection (`secrets()` builtin)
-- [ ] Encrypted file backend (age/sops)
+- [x] Encrypted file backend (age/sops)
 - [ ] Deploy block dependencies (`after=`)
 
 **Phase 2: Targets**
@@ -559,3 +559,31 @@ Things this roadmap explicitly does not pursue:
 
 The escape hatch is the adoption ramp. The roadmap is about paving that ramp
 into a proper road.
+
+---
+
+## Odds and Ends
+
+Things that aren't blocking anything but would be nice to get to.
+
+- **Evaluate CLI parsers.** urfave/cli works fine but has rough edges — the help
+  formatter for repeatable flags pushes description columns way right, and error
+  output needs manual workarounds. Worth doing a comparison with cobra, kong, or
+  ff at some point.
+- **Broken symlink in sandbox.** `cat /tmp/.link1.yml` in the sshd container —
+  the link created by `sandbox/config.star` is broken.
+- **Templates render `<no value>` for missing keys.** Should error instead of
+  silently producing wrong output. Fix: `template.Option("missingkey=error")`.
+- **`doit inspect` doesn't show template steps.** Templates should be
+  inspectable like other step types.
+- **Error message consistency pass.** Go through all error messages codebase-wide
+  and make them self-documenting: say what's wrong, show correct syntax using
+  values the user already provided.
+- **`secrets()` validation ordering.** `secrets(backend="nope")` complains about
+  missing `path` before rejecting the unknown backend. Should validate backend
+  first.
+- **`secrets()` usable as a value expression.** `secrets()` returns
+  `starlark.None`, so it silently works as a value (e.g. inside a `data` dict)
+  when it should only be a top-level declaration. Fix: return a sentinel/poison
+  pill value that produces a clear error when used as a template value or
+  similar.

@@ -4,11 +4,15 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
+	"filippo.io/age"
+
 	"godoit.dev/doit/diagnostic"
 	"godoit.dev/doit/engine"
+	"godoit.dev/doit/secret"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/star"
@@ -341,59 +345,47 @@ deploy(
 	}
 }
 
-// TestSecrets_DefaultPath verifies secrets(backend="file") defaults to secrets.json.
-// Note: with MemSource (no rootedSource), the default "secrets.json" path is
-// resolved as a relative path which won't match MemSource's absolute keys.
-// In production, rootedSource resolves it relative to the config directory.
-// This test verifies the real-world path by using an explicit absolute path.
-func TestSecrets_DefaultPath(t *testing.T) {
+// TestSecrets_MissingPath verifies secrets() rejects a missing path argument.
+func TestSecrets_MissingPath(t *testing.T) {
 	cfgStr := `
-secrets(backend="file", path="/secrets.json")
+secrets(backend="file")
 
 target.local(name="local")
-
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        template(
-            desc="default-path",
-            content="pass={{.pw}}",
-            dest="/out.txt",
-            data={
-                "values": {
-                    "pw": secret("pw"),
-                },
-            },
-            perm="0644",
-            owner="user",
-            group="group",
-        ),
-    ],
-)
+deploy(name="test", targets=["local"], steps=[])
 `
 	src := source.NewMemSource()
-	tgt := target.NewMemTarget()
-
-	src.Files["/secrets.json"] = []byte(`{"pw": "default-path-works"}`)
+	src.Files["/config.star"] = []byte(cfgStr)
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := spec.NewSourceStore()
 
-	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
-	if err != nil {
-		t.Fatalf("setup failed: %v", err)
+	ctx := context.Background()
+	_, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for missing path, got nil")
 	}
-	defer e.Close()
+}
 
-	err = e.Apply(context.Background())
-	if err != nil {
-		t.Fatalf("Apply failed: %v\n%s", err, rec)
-	}
+// TestSecrets_AgeMissingPath verifies secrets(backend="age") rejects a missing path.
+func TestSecrets_AgeMissingPath(t *testing.T) {
+	cfgStr := `
+secrets(backend="age")
 
-	if string(tgt.Files["/out.txt"]) != "pass=default-path-works" {
-		t.Errorf("unexpected content: got %q", tgt.Files["/out.txt"])
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[])
+`
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(cfgStr)
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	ctx := context.Background()
+	_, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for missing path, got nil")
 	}
 }
 
@@ -453,6 +445,228 @@ deploy(name="test", targets=["local"], steps=[])
 `
 	src := source.NewMemSource()
 	src.Files["/config.star"] = []byte(cfgStr)
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	ctx := context.Background()
+	_, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for missing secrets file, got nil")
+	}
+}
+
+// Age backend integration tests
+// -----------------------------------------------------------------------------
+
+func ageTestKeypair(t *testing.T) *age.X25519Identity {
+	t.Helper()
+	id, err := age.GenerateX25519Identity()
+	if err != nil {
+		t.Fatalf("generating keypair: %v", err)
+	}
+	return id
+}
+
+func ageEncryptedJSON(t *testing.T, id *age.X25519Identity, kv map[string]string) []byte {
+	t.Helper()
+	encrypted := make(map[string]string, len(kv))
+	for k, v := range kv {
+		enc, err := secret.EncryptValue(v, []age.Recipient{id.Recipient()})
+		if err != nil {
+			t.Fatalf("encrypting %q: %v", k, err)
+		}
+		encrypted[k] = enc
+	}
+	data, err := json.Marshal(encrypted)
+	if err != nil {
+		t.Fatalf("marshaling JSON: %v", err)
+	}
+	return data
+}
+
+// TestSecret_AgeBackend verifies age-encrypted secrets flow through to templates.
+func TestSecret_AgeBackend(t *testing.T) {
+	id := ageTestKeypair(t)
+
+	cfgStr := `
+secrets(backend="age", path="/secrets.age.json")
+
+target.local(name="local")
+
+deploy(
+    name="test",
+    targets=["local"],
+    steps=[
+        template(
+            desc="age-secret",
+            content="pass={{.db_pass}}",
+            dest="/out.txt",
+            data={
+                "values": {
+                    "db_pass": secret("db_pass"),
+                },
+            },
+            perm="0644",
+            owner="user",
+            group="group",
+        ),
+    ],
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/secrets.age.json"] = ageEncryptedJSON(t, id, map[string]string{
+		"db_pass": "hunter2",
+	})
+	src.Env["DOIT_AGE_KEY"] = id.String()
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	err = e.Apply(context.Background())
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	data, ok := tgt.Files["/out.txt"]
+	if !ok {
+		t.Fatal("destination file not created")
+	}
+	if string(data) != "pass=hunter2" {
+		t.Errorf("unexpected content: got %q, want %q", data, "pass=hunter2")
+	}
+}
+
+// TestSecret_AgeNotFound verifies a missing key in age backend produces an abort.
+func TestSecret_AgeNotFound(t *testing.T) {
+	id := ageTestKeypair(t)
+
+	cfgStr := `
+secrets(backend="age", path="/secrets.age.json")
+
+target.local(name="local")
+
+deploy(
+    name="test",
+    targets=["local"],
+    steps=[
+        template(
+            desc="missing-age-secret",
+            content="{{.token}}",
+            dest="/out.txt",
+            data={
+                "values": {
+                    "token": secret("missing_key"),
+                },
+            },
+            perm="0644",
+            owner="user",
+            group="group",
+        ),
+    ],
+)
+`
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(cfgStr)
+	src.Files["/secrets.age.json"] = ageEncryptedJSON(t, id, map[string]string{})
+	src.Env["DOIT_AGE_KEY"] = id.String()
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	ctx := context.Background()
+	_, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for missing secret, got nil")
+	}
+
+	var abort engine.AbortError
+	if !errors.As(err, &abort) {
+		t.Fatalf("expected AbortError, got %T: %v", err, err)
+	}
+
+	var notFound *star.SecretNotFoundError
+	found := false
+	for _, cause := range abort.Causes {
+		if errors.As(cause, &notFound) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected SecretNotFoundError in causes, got: %v", abort.Causes)
+	}
+}
+
+// TestSecret_AgeMissingIdentity verifies a clear error when no age identity is available.
+func TestSecret_AgeMissingIdentity(t *testing.T) {
+	id := ageTestKeypair(t)
+
+	cfgStr := `
+secrets(backend="age", path="/secrets.age.json")
+
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[])
+`
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(cfgStr)
+	src.Files["/secrets.age.json"] = ageEncryptedJSON(t, id, map[string]string{})
+	// Point DOIT_AGE_KEY_FILE at a nonexistent path to block the default-file
+	// fallback (which would succeed if ~/.config/doit/age.key happens to exist).
+	src.Env["DOIT_AGE_KEY_FILE"] = "/nonexistent/doit-test/age.key"
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	ctx := context.Background()
+	_, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err == nil {
+		t.Fatal("expected error for missing identity, got nil")
+	}
+
+	var abort engine.AbortError
+	if !errors.As(err, &abort) {
+		t.Fatalf("expected AbortError, got %T: %v", err, err)
+	}
+
+	var cfgErr *star.SecretsConfigError
+	found := false
+	for _, cause := range abort.Causes {
+		if errors.As(cause, &cfgErr) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected SecretsConfigError in causes, got: %v", abort.Causes)
+	}
+}
+
+// TestSecret_AgeMissingFile verifies an error when the age secrets file doesn't exist.
+func TestSecret_AgeMissingFile(t *testing.T) {
+	cfgStr := `
+secrets(backend="age", path="nonexistent.age.json")
+
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[])
+`
+	src := source.NewMemSource()
+	src.Files["/config.star"] = []byte(cfgStr)
+	// No secrets file, but set identity so we get past identity resolution
+	id := ageTestKeypair(t)
+	src.Env["DOIT_AGE_KEY"] = id.String()
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)

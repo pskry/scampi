@@ -88,6 +88,7 @@ func main() {
 			planCmd(),
 			indexCmd(),
 			legendCmd(),
+			secretsCmd(),
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			ascii := cmd.Bool(flagASCII)
