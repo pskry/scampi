@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/secret"
 	"godoit.dev/doit/source"
 	"godoit.dev/doit/spec"
 	"godoit.dev/doit/target"
@@ -70,7 +69,6 @@ func runForEachResolved(
 	run func(ctx context.Context, e *Engine) error,
 ) error {
 	src := source.WithRoot(cfgPath, source.LocalPosixSource{})
-	src = loadSecretsBackend(ctx, src)
 	cfg, err := LoadConfig(ctx, em, cfgPath, store, src)
 	if err != nil {
 		return err
@@ -100,18 +98,4 @@ func runForEachResolved(
 	}
 
 	return nil
-}
-
-func loadSecretsBackend(ctx context.Context, src source.Source) source.Source {
-	data, err := src.ReadFile(ctx, "secrets.json")
-	if err != nil {
-		return src
-	}
-
-	backend, err := secret.NewFileBackend(data)
-	if err != nil {
-		return src
-	}
-
-	return source.WithSecrets(src, backend)
 }

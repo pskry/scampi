@@ -3,11 +3,13 @@
 package star
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
 	"go.starlark.net/starlark"
 
+	"godoit.dev/doit/secret"
 	"godoit.dev/doit/spec"
 )
 
@@ -25,6 +27,7 @@ func predeclared() starlark.StringDict {
 		"deploy":   starlark.NewBuiltin("deploy", builtinDeploy),
 		"env":      starlark.NewBuiltin("env", builtinEnv),
 		"secret":   starlark.NewBuiltin("secret", builtinSecret),
+		"secrets":  starlark.NewBuiltin("secrets", builtinSecrets),
 	}
 }
 
@@ -200,6 +203,12 @@ func builtinSecret(
 	}
 
 	c := threadCollector(thread)
+	if !c.secretsConfigured {
+		return nil, &SecretsConfigError{
+			Detail: "secret() requires a secrets() backend to be configured first",
+			Source: span,
+		}
+	}
 	val, found, err := c.src.LookupSecret(key)
 	if err != nil {
 		return nil, &SecretBackendError{
@@ -216,6 +225,84 @@ func builtinSecret(
 	}
 
 	return starlark.String(val), nil
+}
+
+// secrets(backend, path?)
+// -----------------------------------------------------------------------------
+
+func builtinSecrets(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	span := callSpan(thread)
+
+	if len(args) > 0 {
+		return nil, &SecretsConfigError{
+			Detail: "accepts only keyword arguments",
+			Source: span,
+		}
+	}
+
+	var backend, path string
+	if err := starlark.UnpackArgs("secrets", args, kwargs,
+		"backend", &backend,
+		"path?", &path,
+	); err != nil {
+		return nil, &SecretsConfigError{
+			Detail: err.Error(),
+			Source: span,
+		}
+	}
+
+	c := threadCollector(thread)
+
+	b, err := buildSecretBackend(c, backend, path, span)
+	if err != nil {
+		return nil, err
+	}
+
+	if !c.SetSecretBackend(b) {
+		return nil, &SecretsConfigError{
+			Detail: "secrets() can only be called once per config",
+			Source: span,
+		}
+	}
+
+	return starlark.None, nil
+}
+
+func buildSecretBackend(
+	c *Collector, backend, path string, span spec.SourceSpan,
+) (secret.Backend, error) {
+	switch backend {
+	case "file":
+		if path == "" {
+			path = "secrets.json"
+		}
+		data, err := c.src.ReadFile(context.Background(), path)
+		if err != nil {
+			return nil, &SecretsConfigError{
+				Detail: fmt.Sprintf("reading secrets file %q: %s", path, err),
+				Source: span,
+			}
+		}
+		b, err := secret.NewFileBackend(data)
+		if err != nil {
+			return nil, &SecretsConfigError{
+				Detail: fmt.Sprintf("parsing secrets file %q: %s", path, err),
+				Source: span,
+			}
+		}
+		return b, nil
+
+	default:
+		return nil, &SecretsConfigError{
+			Detail: fmt.Sprintf("unknown backend %q (available: file)", backend),
+			Source: span,
+		}
+	}
 }
 
 func coerceEnvValue(

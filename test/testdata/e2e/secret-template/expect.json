@@ -1,0 +1,11 @@
+{
+  "target": {
+    "files": {
+      "/tmp/dsn.txt": "dsn=postgres://app:hunter2@db:5432/myapp"
+    },
+    "perms": {
+      "/tmp/dsn.txt": "0600"
+    }
+  },
+  "changed": 2
+}

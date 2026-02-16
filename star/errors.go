@@ -645,3 +645,31 @@ func (e *SecretBackendError) setSource(s spec.SourceSpan) {
 		e.Source = s
 	}
 }
+
+// SecretsConfigError is raised for invalid secrets() builtin usage.
+type SecretsConfigError struct {
+	Detail string
+	Source spec.SourceSpan
+}
+
+func (e SecretsConfigError) Error() string {
+	return fmt.Sprintf("secrets: %s", e.Detail)
+}
+
+func (e SecretsConfigError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.SecretsConfigError",
+		Text:   "secrets: {{.Detail}}",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (SecretsConfigError) Severity() signal.Severity { return signal.Error }
+func (SecretsConfigError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+func (e *SecretsConfigError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}

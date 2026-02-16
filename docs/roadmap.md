@@ -15,7 +15,7 @@ project, and be able to migrate an existing one incrementally?**
 
 **Phase 1: Foundation**
 - [x] Secrets (v1: `secret()` builtin, `unencrypted_file` backend)
-- [ ] User-controlled backend selection (`secrets()` builtin)
+- [x] User-controlled backend selection (`secrets()` builtin)
 - [ ] Encrypted file backend (age/sops)
 - [ ] Deploy block dependencies (`after=`)
 
