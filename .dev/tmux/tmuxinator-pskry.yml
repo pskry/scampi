@@ -2,6 +2,9 @@
 name: doit
 root: ./
 
+on_project_start:
+  - tmux set-window-option -g main-pane-width 67%
+
 windows:
   - "nvim  ":
       layout: main-vertical
@@ -9,5 +12,7 @@ windows:
         - nvim:
             - nvim
         - shell:
+            - bash
             - clear
+            - claude
   - "git  ": lazygit
