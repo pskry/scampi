@@ -254,7 +254,8 @@ func TestDrift_EnsureMode_Differs(t *testing.T) {
 	op := &fileops.EnsureModeOp{Path: "/etc/app.conf", Mode: 0o644}
 	details := mustCheckDrift(t, op, src, tgt)
 	assertDrift(
-		t, details,
+		t,
+		details,
 		"perm",
 		fs.FileMode(0o755).String(),
 		fs.FileMode(0o644).String(),

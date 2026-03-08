@@ -63,8 +63,7 @@ func builtinTargetSSH(
 		}
 		return nil, &EmptyNameError{Func: "target.ssh", Source: s}
 	}
-	fields := kwargsFieldSpans(thread,
-		"host", "user", "port", "key", "insecure", "timeout")
+	fields := kwargsFieldSpans(thread, "host", "user", "port", "key", "insecure", "timeout")
 
 	inst := spec.TargetInstance{
 		Type: ssh.SSH{},

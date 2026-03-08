@@ -326,6 +326,8 @@ func TestFuncSignatureStyle(t *testing.T) {
 			case *ast.FuncLit:
 				checkFieldList(t, fset, rel, "(func literal)", "params", n.Type.Params)
 				checkFieldList(t, fset, rel, "(func literal)", "results", n.Type.Results)
+			case *ast.CallExpr:
+				checkCallArgs(t, fset, rel, n)
 			}
 			return true
 		})
@@ -334,6 +336,87 @@ func TestFuncSignatureStyle(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func callName(expr ast.Expr) string {
+	switch fn := expr.(type) {
+	case *ast.Ident:
+		return fn.Name
+	case *ast.SelectorExpr:
+		return callName(fn.X) + "." + fn.Sel.Name
+	}
+	return "(call)"
+}
+
+func argSpansOneLine(fset *token.FileSet, arg ast.Expr) bool {
+	return fset.Position(arg.Pos()).Line == fset.Position(arg.End()).Line
+}
+
+var formatFuncSuffixes = []string{
+	"Sprintf", "Errorf", "Fatalf", "Logf", "Skipf",
+	"fmtfMsg", "fmtfMsgTo", "BUG",
+}
+
+func isFormatCall(name string) bool {
+	for _, suffix := range formatFuncSuffixes {
+		if name == suffix || strings.HasSuffix(name, "."+suffix) {
+			return true
+		}
+	}
+	return name == "fmt.Sprintf" || name == "fmt.Errorf"
+}
+
+func isExcludedCall(name string) bool {
+	if isFormatCall(name) {
+		return true
+	}
+	return strings.HasSuffix(name, ".UnpackArgs") || name == "UnpackArgs"
+}
+
+func checkCallArgs(
+	t *testing.T,
+	fset *token.FileSet,
+	file string,
+	call *ast.CallExpr,
+) {
+	t.Helper()
+	if len(call.Args) <= 1 {
+		return
+	}
+
+	name := callName(call.Fun)
+	if isExcludedCall(name) {
+		return
+	}
+
+	openLine := fset.Position(call.Lparen).Line
+	closeLine := fset.Position(call.Rparen).Line
+
+	if openLine == closeLine {
+		return
+	}
+
+	// Skip if any argument spans multiple lines (nested calls, func
+	// literals, composite literals, etc). These naturally make the
+	// outer call multi-line without it being a formatting issue.
+	for _, arg := range call.Args {
+		if !argSpansOneLine(fset, arg) {
+			return
+		}
+	}
+
+	seen := map[int]bool{}
+	for _, arg := range call.Args {
+		line := fset.Position(arg.Pos()).Line
+		if seen[line] {
+			t.Errorf(
+				"%s:%d: %s: multi-line call must have one argument per line",
+				file, line, name,
+			)
+			break
+		}
+		seen[line] = true
 	}
 }
 

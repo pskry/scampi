@@ -75,9 +75,7 @@ func TestDetectEscalation(t *testing.T) {
 
 func TestEscalatedReadFile_Command(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	_, err := tgt.escalatedReadFile(
-		context.Background(), "/etc/shadow",
-	)
+	_, err := tgt.escalatedReadFile(context.Background(), "/etc/shadow")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,9 +86,7 @@ func TestEscalatedReadFile_Command(t *testing.T) {
 
 func TestEscalatedWriteFile_Command(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	err := tgt.escalatedWriteFile(
-		context.Background(), "/etc/config", []byte("data"),
-	)
+	err := tgt.escalatedWriteFile(context.Background(), "/etc/config", []byte("data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,9 +101,7 @@ func TestEscalatedWriteFile_Command(t *testing.T) {
 
 func TestEscalatedRemove_Command(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	err := tgt.escalatedRemove(
-		context.Background(), "/etc/config",
-	)
+	err := tgt.escalatedRemove(context.Background(), "/etc/config")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,9 +112,7 @@ func TestEscalatedRemove_Command(t *testing.T) {
 
 func TestEscalatedChmod_Command(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	err := tgt.escalatedChmod(
-		context.Background(), "/etc/config", 0o755,
-	)
+	err := tgt.escalatedChmod(context.Background(), "/etc/config", 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,10 +123,7 @@ func TestEscalatedChmod_Command(t *testing.T) {
 
 func TestEscalatedChown_Command(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	err := tgt.escalatedChown(
-		context.Background(), "/etc/config",
-		target.Owner{User: "root", Group: "wheel"},
-	)
+	err := tgt.escalatedChown(context.Background(), "/etc/config", target.Owner{User: "root", Group: "wheel"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,9 +135,7 @@ func TestEscalatedChown_Command(t *testing.T) {
 
 func TestEscalatedSymlink_Command(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	err := tgt.escalatedSymlink(
-		context.Background(), "/usr/bin/vim", "/usr/local/bin/vi",
-	)
+	err := tgt.escalatedSymlink(context.Background(), "/usr/bin/vim", "/usr/local/bin/vi")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,9 +150,7 @@ func TestEscalatedSymlink_Command(t *testing.T) {
 
 func TestEscalatedRemove_ReturnsEscalationError(t *testing.T) {
 	tgt := newFailTarget(t)
-	err := tgt.escalatedRemove(
-		context.Background(), "/etc/config",
-	)
+	err := tgt.escalatedRemove(context.Background(), "/etc/config")
 
 	var escErr target.EscalationError
 	if !errors.As(err, &escErr) {
@@ -187,9 +172,7 @@ func TestEscalatedRemove_ReturnsEscalationError(t *testing.T) {
 
 func TestEscalatedReadFile_ReturnsEscalationError(t *testing.T) {
 	tgt := newFailTarget(t)
-	_, err := tgt.escalatedReadFile(
-		context.Background(), "/etc/shadow",
-	)
+	_, err := tgt.escalatedReadFile(context.Background(), "/etc/shadow")
 
 	var escErr target.EscalationError
 	if !errors.As(err, &escErr) {

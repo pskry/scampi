@@ -84,14 +84,22 @@ func (s *scheduler) schedule(n *opNode) {
 		displayID := diagnostic.OpDisplayID(n.op)
 
 		s.em.EmitOpLifecycle(diagnostic.OpExecuteStarted(
-			s.actIdx, s.actKind, s.actDesc, displayID,
+			s.actIdx,
+			s.actKind,
+			s.actDesc,
+			displayID,
 		))
 
 		res, err := n.op.Execute(s.ctx, s.src, s.tgt)
 
 		s.em.EmitOpLifecycle(diagnostic.OpExecuted(
-			s.actIdx, s.actKind, s.actDesc, displayID,
-			res.Changed, time.Since(start), err,
+			s.actIdx,
+			s.actKind,
+			s.actDesc,
+			displayID,
+			res.Changed,
+			time.Since(start),
+			err,
 		))
 
 		s.mu.Lock()
@@ -133,7 +141,10 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 		g.Go(func() error {
 			displayID := diagnostic.OpDisplayID(n.op)
 			s.em.EmitOpLifecycle(diagnostic.OpCheckStarted(
-				s.actIdx, s.actKind, s.actDesc, displayID,
+				s.actIdx,
+				s.actKind,
+				s.actDesc,
+				displayID,
 			))
 
 			res, drift, err := n.op.Check(ctx, s.src, s.tgt)
@@ -141,8 +152,14 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 				impact, consumed := emitOpDiagnostic(s.em, s.actIdx, s.actKind, s.actDesc, displayID, err)
 
 				s.em.EmitOpLifecycle(diagnostic.OpChecked(
-					s.actIdx, s.actKind, s.actDesc, displayID,
-					res, err, s.checkOnly, nil,
+					s.actIdx,
+					s.actKind,
+					s.actDesc,
+					displayID,
+					res,
+					err,
+					s.checkOnly,
+					nil,
 				))
 				if impact.ShouldAbort() {
 					s.mu.Lock()
@@ -164,8 +181,14 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 			}
 
 			s.em.EmitOpLifecycle(diagnostic.OpChecked(
-				s.actIdx, s.actKind, s.actDesc, displayID,
-				res, nil, s.checkOnly, drift,
+				s.actIdx,
+				s.actKind,
+				s.actDesc,
+				displayID,
+				res,
+				nil,
+				s.checkOnly,
+				drift,
 			))
 
 			s.mu.Lock()

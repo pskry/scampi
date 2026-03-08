@@ -311,8 +311,7 @@ func builtinTemplate(
 				Data: dataCfg, Perm: perm, Owner: owner, Group: group,
 			},
 			Source: span,
-			Fields: kwargsFieldSpans(thread,
-				"dest", "perm", "owner", "group", "src", "content"),
+			Fields: kwargsFieldSpans(thread, "dest", "perm", "owner", "group", "src", "content"),
 		},
 	}, nil
 }
