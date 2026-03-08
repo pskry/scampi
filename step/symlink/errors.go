@@ -25,7 +25,7 @@ func (e LinkDirMissingError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.symlink.LinkDirMissing",
 		Text:   `link directory "{{.Path}}" does not exist`,
-		Hint:   "create the parent directory before creating the symlink",
+		Hint:   `add dir(path="{{.Path}}") to your deploy steps before this symlink`,
 		Help:   "the symlink action does not create directories automatically",
 		Data:   e,
 		Source: &e.Source,
@@ -75,7 +75,7 @@ func (e NotASymlinkError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.symlink.NotASymlink",
 		Text:   `path "{{.Path}}" exists but is not a symlink`,
-		Hint:   "remove the existing file or directory before creating the symlink",
+		Hint:   `remove or rename the existing file or directory at "{{.Path}}" first`,
 		Help:   "the symlink action will not overwrite existing files or directories for safety",
 		Data:   e,
 		Source: &e.Source,

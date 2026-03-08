@@ -47,7 +47,7 @@ func (e PartialOwnershipError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.dir.PartialOwnership",
 		Text:   `{{.Set}} is set but {{.Missing}} is empty`,
-		Hint:   "set both owner and group, or omit both",
+		Hint:   `add {{.Missing}}="<value>" or remove {{.Set}}`,
 		Data:   e,
 		Source: &e.Source,
 	}

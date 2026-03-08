@@ -77,8 +77,8 @@ func (e TemplateParseError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.template.Parse",
 		Text:   "template parse error: {{.Err}}",
-		Hint:   "check template syntax",
-		Help:   "templates use Go text/template syntax",
+		Hint:   "check for unclosed braces, missing closing delimiters, or malformed variable names",
+		Help:   "templates use Go text/template syntax: https://pkg.go.dev/text/template",
 		Data:   e,
 		Source: &e.Source,
 	}

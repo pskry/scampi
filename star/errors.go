@@ -506,7 +506,7 @@ func (e CircularLoadError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "star.CircularLoad",
 		Text:   "circular load: {{.Path}}",
-		Hint:   "break the cycle by removing one of the load() calls",
+		Hint:   `check load() calls in "{{.Path}}" - one imports a file that eventually loads this file again`,
 		Data:   e,
 		Source: &e.Source,
 	}

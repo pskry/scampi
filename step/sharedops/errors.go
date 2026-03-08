@@ -31,7 +31,7 @@ func (e UnknownUserError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.UnknownUser",
 		Text:   `unknown user "{{.User}}"`,
-		Hint:   "create user before changing file owner",
+		Hint:   `create user "{{.User}}" with useradd or adduser before setting file owner`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -58,7 +58,7 @@ func (e UnknownGroupError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.UnknownGroup",
 		Text:   `unknown group "{{.Group}}"`,
-		Hint:   "create group before changing file owner",
+		Hint:   `create group "{{.Group}}" with groupadd or addgroup before setting file owner`,
 		Data:   e,
 		Source: &e.Source,
 	}
