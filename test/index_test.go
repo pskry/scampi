@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/engine"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/engine"
 )
 
 func TestIndexAll_EmitsWellFormedEvent(t *testing.T) {

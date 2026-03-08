@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/target"
 )
 
 func (t POSIXTarget) IsInstalled(ctx context.Context, pkg string) (bool, error) {

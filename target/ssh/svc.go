@@ -5,7 +5,7 @@ package ssh
 import (
 	"context"
 
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/target"
 )
 
 func (t *SSHTarget) IsActive(ctx context.Context, name string) (bool, error) {

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/model"
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/model"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/spec"
 )
 
 // OpDisplayID derives a display identifier for an op.

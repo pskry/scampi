@@ -5,7 +5,7 @@ package source
 import (
 	"context"
 
-	"godoit.dev/doit/secret"
+	"scampi.dev/scampi/secret"
 )
 
 type secretSource struct {

@@ -7,12 +7,12 @@ import (
 	"io/fs"
 	"time"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/model"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/model"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 func Plan(

@@ -3,7 +3,7 @@
 //go:generate stringer -type=OpOutcome
 package model
 
-import "godoit.dev/doit/spec"
+import "scampi.dev/scampi/spec"
 
 type OpOutcome uint8
 

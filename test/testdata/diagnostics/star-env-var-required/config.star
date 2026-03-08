@@ -1,1 +1,1 @@
-val = env("DOIT_TEST_NONEXISTENT_VAR_9f8a7b6c")
+val = env("SCAMPI_TEST_NONEXISTENT_VAR_9f8a7b6c")

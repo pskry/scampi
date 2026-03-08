@@ -3,8 +3,8 @@
 package engine
 
 import (
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/spec"
 )
 
 // LoadStepDoc returns documentation for a step type, derived from the

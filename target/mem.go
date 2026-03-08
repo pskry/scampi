@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/errs"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/errs"
 )
 
 type CommandCall struct {

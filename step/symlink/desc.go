@@ -3,7 +3,7 @@
 package symlink
 
 import (
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/spec"
 )
 
 type ensureSymlinkDesc struct {

@@ -3,9 +3,9 @@
 package diagnostic
 
 import (
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/render"
-	"godoit.dev/doit/signal"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/render"
+	"scampi.dev/scampi/signal"
 )
 
 type (

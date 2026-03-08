@@ -132,8 +132,8 @@ func RecreateContainer(t *testing.T) {
 func SetupSSHTestEnv(t *testing.T) (*SSHTestEnv, func()) {
 	t.Helper()
 
-	if os.Getenv("DOIT_TEST_CONTAINERS") == "" {
-		t.Skip("SSH tests disabled (set DOIT_TEST_CONTAINERS=1 to enable)")
+	if os.Getenv("SCAMPI_TEST_CONTAINERS") == "" {
+		t.Skip("SSH tests disabled (set SCAMPI_TEST_CONTAINERS=1 to enable)")
 	}
 
 	if sharedSSHEnv == nil {

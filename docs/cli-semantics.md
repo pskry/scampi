@@ -1,6 +1,6 @@
 # CLI Semantics
 
-`doit`'s CLI output is designed for **parallel, unordered execution**. Colors and verbosity are not decoration — they are a **semantic contract**.
+`scampi`'s CLI output is designed for **parallel, unordered execution**. Colors and verbosity are not decoration — they are a **semantic contract**.
 
 ---
 
@@ -53,12 +53,12 @@ Traditional tools assume:
 - Human-paced output
 - Visual grouping implies execution order
 
-`doit` assumes the opposite:
+`scampi` assumes the opposite:
 - Actions and ops run in parallel
 - Ordering is not stable or meaningful
 - Grouping or indentation would lie about causality
 
-As a result, `doit` intentionally avoids:
+As a result, `scampi` intentionally avoids:
 - Animated or buffered output
 - Progress bars or spinners
 - Tree-style nesting that implies sequencing

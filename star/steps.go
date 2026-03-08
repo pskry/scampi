@@ -7,14 +7,14 @@ import (
 
 	"go.starlark.net/starlark"
 
-	"godoit.dev/doit/spec"
-	stepcopy "godoit.dev/doit/step/copy"
-	"godoit.dev/doit/step/dir"
-	"godoit.dev/doit/step/pkg"
-	"godoit.dev/doit/step/run"
-	"godoit.dev/doit/step/service"
-	"godoit.dev/doit/step/symlink"
-	"godoit.dev/doit/step/template"
+	"scampi.dev/scampi/spec"
+	stepcopy "scampi.dev/scampi/step/copy"
+	"scampi.dev/scampi/step/dir"
+	"scampi.dev/scampi/step/pkg"
+	"scampi.dev/scampi/step/run"
+	"scampi.dev/scampi/step/service"
+	"scampi.dev/scampi/step/symlink"
+	"scampi.dev/scampi/step/template"
 )
 
 // StarlarkStep wraps a spec.StepInstance as an opaque Starlark value.

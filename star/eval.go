@@ -10,8 +10,8 @@ import (
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
 )
 
 const maxExecutionSteps = 100_000_000

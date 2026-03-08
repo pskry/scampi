@@ -5,10 +5,10 @@ package engine
 import (
 	"context"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 type Engine struct {

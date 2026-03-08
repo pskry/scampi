@@ -10,8 +10,8 @@ package event
 import (
 	"time"
 
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/spec"
 )
 
 type StepDetail struct {

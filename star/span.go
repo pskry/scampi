@@ -6,7 +6,7 @@ import (
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/spec"
 )
 
 func posFromSpan(s spec.SourceSpan) syntax.Position {

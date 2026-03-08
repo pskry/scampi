@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/spec"
 )
 
 func TestParsePerm_InvalidPermissions(t *testing.T) {

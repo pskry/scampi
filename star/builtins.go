@@ -10,8 +10,8 @@ import (
 	"filippo.io/age"
 	"go.starlark.net/starlark"
 
-	"godoit.dev/doit/secret"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/secret"
+	"scampi.dev/scampi/spec"
 )
 
 // predeclared returns the global builtins available in every .star file.

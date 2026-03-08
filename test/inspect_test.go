@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 func makeInspectEngine(t *testing.T, actions []spec.Action) *engine.Engine {

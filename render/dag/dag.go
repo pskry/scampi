@@ -6,7 +6,7 @@ package dag
 import (
 	"slices"
 
-	"godoit.dev/doit/diagnostic/event"
+	"scampi.dev/scampi/diagnostic/event"
 )
 
 // PlanDAG is a DAG-ready view of a plan, used by renderers.

@@ -7,12 +7,12 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/step/sharedops"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/step/sharedops"
+	"scampi.dev/scampi/target"
 )
 
 const id = "builtin.symlink"

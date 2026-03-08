@@ -16,12 +16,12 @@ import (
 	"strings"
 
 	"github.com/pkg/sftp"
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/pkgmgr"
-	"godoit.dev/doit/target/svcmgr"
 	"golang.org/x/crypto/ssh"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/pkgmgr"
+	"scampi.dev/scampi/target/svcmgr"
 )
 
 type SSHTarget struct {
@@ -477,7 +477,7 @@ func (t *SSHTarget) writeTempFile(data []byte) (string, error) {
 	if _, err := rand.Read(buf[:]); err != nil {
 		return "", err
 	}
-	tmp := "/tmp/.doit-" + hex.EncodeToString(buf[:])
+	tmp := "/tmp/.scampi-" + hex.EncodeToString(buf[:])
 
 	f, err := t.sftp.Create(tmp)
 	if err != nil {

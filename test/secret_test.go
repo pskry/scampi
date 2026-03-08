@@ -10,13 +10,13 @@ import (
 
 	"filippo.io/age"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/secret"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/star"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/secret"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/star"
+	"scampi.dev/scampi/target"
 )
 
 // TestSecret_ResolvesIntoTemplateData verifies that secret() values flow
@@ -521,7 +521,7 @@ deploy(
 	src.Files["/secrets.age.json"] = ageEncryptedJSON(t, id, map[string]string{
 		"db_pass": "hunter2",
 	})
-	src.Env["DOIT_AGE_KEY"] = id.String()
+	src.Env["SCAMPI_AGE_KEY"] = id.String()
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -579,7 +579,7 @@ deploy(
 	src := source.NewMemSource()
 	src.Files["/config.star"] = []byte(cfgStr)
 	src.Files["/secrets.age.json"] = ageEncryptedJSON(t, id, map[string]string{})
-	src.Env["DOIT_AGE_KEY"] = id.String()
+	src.Env["SCAMPI_AGE_KEY"] = id.String()
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -622,9 +622,9 @@ deploy(name="test", targets=["local"], steps=[])
 	src := source.NewMemSource()
 	src.Files["/config.star"] = []byte(cfgStr)
 	src.Files["/secrets.age.json"] = ageEncryptedJSON(t, id, map[string]string{})
-	// Point DOIT_AGE_KEY_FILE at a nonexistent path to block the default-file
-	// fallback (which would succeed if ~/.config/doit/age.key happens to exist).
-	src.Env["DOIT_AGE_KEY_FILE"] = "/nonexistent/doit-test/age.key"
+	// Point SCAMPI_AGE_KEY_FILE at a nonexistent path to block the default-file
+	// fallback (which would succeed if ~/.config/scampi/age.key happens to exist).
+	src.Env["SCAMPI_AGE_KEY_FILE"] = "/nonexistent/scampi-test/age.key"
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -666,7 +666,7 @@ deploy(name="test", targets=["local"], steps=[])
 	src.Files["/config.star"] = []byte(cfgStr)
 	// No secrets file, but set identity so we get past identity resolution
 	id := ageTestKeypair(t)
-	src.Env["DOIT_AGE_KEY"] = id.String()
+	src.Env["SCAMPI_AGE_KEY"] = id.String()
 
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)

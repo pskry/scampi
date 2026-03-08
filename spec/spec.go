@@ -6,9 +6,9 @@ package spec
 import (
 	"context"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/target"
 )
 
 type (
@@ -117,7 +117,7 @@ type (
 	}
 
 	// Inspectable is an optional interface that ops producing file content
-	// can implement to support `doit inspect`.
+	// can implement to support `scampi inspect`.
 	Inspectable interface {
 		DesiredContent(ctx context.Context, src source.Source) ([]byte, error)
 		CurrentContent(ctx context.Context, src source.Source, tgt target.Target) ([]byte, error)

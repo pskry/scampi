@@ -6,11 +6,11 @@ import (
 	"context"
 	"path/filepath"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/star"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/star"
 )
 
 // LoadConfig decodes and validates user configuration.

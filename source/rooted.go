@@ -6,7 +6,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"godoit.dev/doit/errs"
+	"scampi.dev/scampi/errs"
 )
 
 // rootedSource wraps a Source and resolves relative paths against a base directory.

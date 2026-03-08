@@ -3,7 +3,7 @@ BENCHSTAT_VERSION     := `go list -m -f '{{.Version}}' golang.org/x/perf`
 
 build_dir := "./build"
 bin_dir   := f"{{build_dir}}/bin"
-bin_path  := f"{{bin_dir}}/doit"
+bin_path  := f"{{bin_dir}}/scampi"
 bench_dir := "./benchmarks"
 
 
@@ -22,13 +22,13 @@ install-prereqs:
 generate:
   go generate ./...
 
-[doc("Build the doit CLI binary")]
+[doc("Build the scampi CLI binary")]
 build:
   mkdir -p {{bin_dir}}
   go build -o {{bin_path}} ./cmd
 
-[doc("Build and run doit locally")]
-doit *args:
+[doc("Build and run scampi locally")]
+scampi *args:
   go run ./cmd {{args}}
 
 # Testing
@@ -40,11 +40,11 @@ test:
 
 [doc("Run tests against containers")]
 test-containers:
-  DOIT_TEST_CONTAINERS=1 go test -v ./test/...
+  SCAMPI_TEST_CONTAINERS=1 go test -v ./test/...
 
 [doc("Run all tests with race-detector and containers")]
 test-all:
-  DOIT_TEST_CONTAINERS=1 go test -race -v ./...
+  SCAMPI_TEST_CONTAINERS=1 go test -race -v ./...
 
 [doc("Run tests with race-detector")]
 race:

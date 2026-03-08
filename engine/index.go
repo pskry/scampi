@@ -5,8 +5,8 @@ package engine
 import (
 	"context"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/spec"
 )
 
 func IndexAll(_ context.Context, em diagnostic.Emitter) error {

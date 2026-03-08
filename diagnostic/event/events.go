@@ -5,8 +5,8 @@ package event
 import (
 	"time"
 
-	"godoit.dev/doit/model"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/model"
+	"scampi.dev/scampi/spec"
 )
 
 type EngineFinishedDetail struct {

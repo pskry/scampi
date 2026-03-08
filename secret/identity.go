@@ -11,14 +11,14 @@ import (
 )
 
 const (
-	envAgeKey     = "DOIT_AGE_KEY"
-	envAgeKeyFile = "DOIT_AGE_KEY_FILE"
+	envAgeKey     = "SCAMPI_AGE_KEY"
+	envAgeKeyFile = "SCAMPI_AGE_KEY_FILE"
 )
 
 // ResolveIdentities finds age identities using a three-step chain:
-//  1. $DOIT_AGE_KEY — raw private key string
-//  2. $DOIT_AGE_KEY_FILE — path to a key file
-//  3. ~/.config/doit/age.key — default location
+//  1. $SCAMPI_AGE_KEY — raw private key string
+//  2. $SCAMPI_AGE_KEY_FILE — path to a key file
+//  3. ~/.config/scampi/age.key — default location
 //
 // lookupEnv and readFile are injected so the caller decides where
 // "the environment" and "the filesystem" come from (source abstraction
@@ -61,7 +61,7 @@ func ResolveIdentities(
 // DefaultAgeKeyPath returns the conventional path to the age identity file
 // under the given config directory.
 func DefaultAgeKeyPath(configDir string) string {
-	return filepath.Join(configDir, "doit", "age.key")
+	return filepath.Join(configDir, "scampi", "age.key")
 }
 
 // configDir resolves the user config directory from the environment,

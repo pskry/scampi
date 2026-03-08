@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/signal"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/signal"
 )
 
 type stubDiagnostic struct {

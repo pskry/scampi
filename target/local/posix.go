@@ -16,11 +16,11 @@ import (
 	"strconv"
 	"syscall"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/pkgmgr"
-	"godoit.dev/doit/target/svcmgr"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/pkgmgr"
+	"scampi.dev/scampi/target/svcmgr"
 )
 
 type POSIXTarget struct {
@@ -262,7 +262,7 @@ func (t POSIXTarget) escalatedWriteFile(ctx context.Context, path string, data [
 	if _, err := rand.Read(buf[:]); err != nil {
 		return target.StagingError{Path: path, Err: err}
 	}
-	tmp := "/tmp/.doit-" + hex.EncodeToString(buf[:])
+	tmp := "/tmp/.scampi-" + hex.EncodeToString(buf[:])
 
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return target.StagingError{Path: path, Err: err}

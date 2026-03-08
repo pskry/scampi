@@ -18,7 +18,7 @@ import (
 //
 // diff(1) exit code 1 (files differ) is not treated as an error.
 func RunDiffTool(ctx context.Context, tool, destPath string, current, desired []byte) error {
-	dir, err := os.MkdirTemp("", "doit-inspect-")
+	dir, err := os.MkdirTemp("", "scampi-inspect-")
 	if err != nil {
 		return fmt.Errorf("creating temp dir: %w", err)
 	}
@@ -65,9 +65,9 @@ func RunDiffTool(ctx context.Context, tool, destPath string, current, desired []
 }
 
 // ResolveDiffTool picks a diff tool from environment variables.
-// Lookup order: DOIT_DIFFTOOL → DIFFTOOL → EDITOR → "diff".
+// Lookup order: SCAMPI_DIFFTOOL → DIFFTOOL → EDITOR → "diff".
 func ResolveDiffTool() string {
-	for _, env := range []string{"DOIT_DIFFTOOL", "DIFFTOOL", "EDITOR"} {
+	for _, env := range []string{"SCAMPI_DIFFTOOL", "DIFFTOOL", "EDITOR"} {
 		if v := os.Getenv(env); v != "" {
 			return v
 		}

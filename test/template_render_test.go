@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	template "godoit.dev/doit/render/template"
+	template "scampi.dev/scampi/render/template"
 )
 
 // TestAllTemplatesRender is a contract test that auto-discovers every
@@ -31,7 +31,7 @@ func TestAllTemplatesRender(t *testing.T) {
 			packages.NeedFiles,
 	}
 
-	pkgs, err := packages.Load(cfg, "godoit.dev/...")
+	pkgs, err := packages.Load(cfg, "scampi.dev/...")
 	if err != nil {
 		t.Fatalf("failed to load packages: %v", err)
 	}

@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/spec"
 )
 
 func Apply(

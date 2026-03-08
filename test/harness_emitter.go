@@ -8,7 +8,7 @@ import (
 	"io"
 	"sync"
 
-	"godoit.dev/doit/diagnostic/event"
+	"scampi.dev/scampi/diagnostic/event"
 )
 
 type (

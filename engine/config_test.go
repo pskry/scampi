@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/spec"
 )
 
 func testConfig(deploys map[string]spec.DeployBlock, targets map[string]spec.TargetInstance) spec.Config {

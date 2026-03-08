@@ -10,10 +10,10 @@ import (
 
 	"go.starlark.net/starlark"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/spec"
 )
 
 // StarlarkError wraps a Starlark evaluation error with source position.

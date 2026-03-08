@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/target"
 )
 
 func TestDiagnoseTargetError_EscalationFailed(t *testing.T) {

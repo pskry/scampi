@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/render/dag"
-	"godoit.dev/doit/render/layout"
-	"godoit.dev/doit/render/template"
-	"godoit.dev/doit/signal"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/render/dag"
+	"scampi.dev/scampi/render/layout"
+	"scampi.dev/scampi/render/template"
+	"scampi.dev/scampi/signal"
 )
 
 const minWidePlanCols = 70

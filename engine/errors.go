@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"runtime"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/spec"
 )
 
 type AbortError struct {
@@ -146,7 +146,7 @@ func (e UnknownIndexKindError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "index.UnknownKind",
 		Text: `unknown step kind "{{.Kind}}"`,
-		Hint: "use 'doit index' to list available step types",
+		Hint: "use 'scampi index' to list available step types",
 		Data: e,
 	}
 }

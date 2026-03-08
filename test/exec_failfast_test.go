@@ -6,13 +6,13 @@ import (
 	"context"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/model"
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target/local"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/model"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target/local"
 )
 
 // Dependency graph:

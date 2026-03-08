@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/pkgmgr"
-	"godoit.dev/doit/target/svcmgr"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/pkgmgr"
+	"scampi.dev/scampi/target/svcmgr"
 )
 
 type Local struct{}

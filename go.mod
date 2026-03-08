@@ -1,4 +1,4 @@
-module godoit.dev/doit
+module scampi.dev/scampi
 
 go 1.25.0
 

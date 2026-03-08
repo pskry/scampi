@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/render/template"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/render/template"
+	"scampi.dev/scampi/spec"
 )
 
 func TestPlan_CyclicDependencies(t *testing.T) {

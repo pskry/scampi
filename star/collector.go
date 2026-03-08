@@ -6,10 +6,10 @@ import (
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/secret"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/secret"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
 )
 
 const collectorKey = "collector"

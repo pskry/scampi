@@ -10,14 +10,14 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/x/term"
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/model"
-	"godoit.dev/doit/render"
-	"godoit.dev/doit/render/ansi"
-	"godoit.dev/doit/render/layout"
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/model"
+	"scampi.dev/scampi/render"
+	"scampi.dev/scampi/render/ansi"
+	"scampi.dev/scampi/render/layout"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/spec"
 )
 
 // Options configures the CLI renderer.
@@ -207,7 +207,7 @@ func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
 
 	events = append(events, renderEvent{line: "", stream: streamOut})
 	events = append(events, renderEvent{
-		line:   c.formatter.fmtMsg(ansi.BrightBlack(), "Use 'doit index <step>' for details."),
+		line:   c.formatter.fmtMsg(ansi.BrightBlack(), "Use 'scampi index <step>' for details."),
 		stream: streamOut,
 	})
 
@@ -298,7 +298,7 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 		events = append(events, renderEvent{line: "", stream: streamOut})
 		events = append(events, renderEvent{
 			line: c.formatter.fmtMsg(ansi.BrightBlack(),
-				fmt.Sprintf("For a copy-pasteable snippet, run 'doit index %s -vv'.", doc.Kind)),
+				fmt.Sprintf("For a copy-pasteable snippet, run 'scampi index %s -vv'.", doc.Kind)),
 			stream: streamOut,
 		})
 	default:
@@ -306,7 +306,7 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 			events = append(events, renderEvent{line: "", stream: streamOut})
 			events = append(events, renderEvent{
 				line: c.formatter.fmtMsg(ansi.BrightBlack(),
-					fmt.Sprintf("For examples, run 'doit index %s -v'.", doc.Kind)),
+					fmt.Sprintf("For examples, run 'scampi index %s -v'.", doc.Kind)),
 				stream: streamOut,
 			})
 		}

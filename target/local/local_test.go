@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"testing"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/spec"
 )
 
 func TestCreate_DetectsPkgBackend(t *testing.T) {

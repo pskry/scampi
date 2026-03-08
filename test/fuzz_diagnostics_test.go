@@ -7,12 +7,12 @@ import (
 	"errors"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 func FuzzDiagnostics(f *testing.F) {

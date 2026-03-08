@@ -1,6 +1,6 @@
 # Naming Conventions
 
-This document defines the **authoritative naming conventions** used throughout the `doit` codebase.
+This document defines the **authoritative naming conventions** used throughout the `scampi` codebase.
 
 Its purpose is to:
 - Make the conceptual model explicit
@@ -14,7 +14,7 @@ If a naming question arises, this document is the source of truth.
 
 ## Mental Model
 
-`doit` is a **declarative system convergence engine**.
+`scampi` is a **declarative system convergence engine**.
 
 Users describe *what should exist* in Starlark. The engine translates this into *how to make it so* in Go.
 

@@ -6,7 +6,7 @@ against a 25-host, 35-role Ansible project with databases, Docker apps, reverse
 proxies, directory services, logging, and monitoring.
 
 The goal isn't feature parity with Ansible. It's answering the question: **what
-does doit need so that a practitioner would choose it over Ansible for a new
+does scampi need so that a practitioner would choose it over Ansible for a new
 project, and be able to migrate an existing one incrementally?**
 
 ---
@@ -36,7 +36,7 @@ project, and be able to migrate an existing one incrementally?**
 
 ## Where We Are
 
-doit can converge files, directories, symlinks, templates, packages, and
+scampi can converge files, directories, symlinks, templates, packages, and
 services on local and SSH targets. The `run()` escape hatch covers everything
 else with degraded guarantees. The diagnostic system, the check/execute model,
 the DAG scheduler, and the CLI output are solid.
@@ -90,7 +90,7 @@ secrets(backend="vault", addr=env("VAULT_ADDR"))
 secrets(backend=env("DOIT_SECRET_BACKEND", "file"))
 ```
 
-This matters for the deferred-config use case: a build-time doit run can
+This matters for the deferred-config use case: a build-time scampi run can
 resolve secrets from an enterprise vault, re-encrypt them for the deploy-time
 backend, and package two artifacts — the config bundle (with encrypted secrets
 store) and the decryption key (delivered out-of-band). Build-time and
@@ -108,7 +108,7 @@ deploy-time are independent runs with independent backends. The config says
 - Secrets are resolved at eval time, before planning
 - Secret values never appear in diagnostic output, plan display, or logs
 - The secret store is explicit — no 22-level precedence chain
-- Backend selection is the user's choice, not doit's opinion
+- Backend selection is the user's choice, not scampi's opinion
 
 ---
 
@@ -163,7 +163,7 @@ same machinery with wider scope.
 **The problem:** Half of real infrastructure management is API-driven. Reverse
 proxies, monitoring systems, databases, container orchestrators, DNS services —
 they all expose REST APIs for configuration. Ansible uses the `uri` module as a
-generic escape hatch and builds modules on top of it. doit needs the same
+generic escape hatch and builds modules on top of it. scampi needs the same
 layered approach, but with the check/execute model baked in.
 
 **Design — two layers:**
@@ -276,7 +276,7 @@ homelab/small-server setups. The pattern is dead consistent:
 3. Deploy container (image, ports, volumes, env, restart policy, healthcheck)
 4. Wait for healthy
 
-Ansible's `community.docker.docker_container` module handles step 3. doit
+Ansible's `community.docker.docker_container` module handles step 3. scampi
 needs a native step for this because:
 - It's the single highest-frequency operation in Docker-based setups
 - The check/execute contract maps naturally (inspect container state vs desired)
@@ -360,7 +360,7 @@ user management commands on SSH/local targets.
 
 **Open questions:**
 - Password handling: accept a pre-hashed value (like Ansible's
-  `password_hash()` filter)? Or hash in doit with a configurable algorithm?
+  `password_hash()` filter)? Or hash in scampi with a configurable algorithm?
 - SSH key management: append to `authorized_keys` or own the whole file?
 - Home directory creation: implicit with `useradd -m` or explicit?
 
@@ -389,7 +389,7 @@ Already designed in `docs/pkg-design.md`. Needs implementation.
 
 **The problem:** The classic pattern: template a config file, restart the
 service if (and only if) the config actually changed. In Ansible, handlers
-accumulate notifications during a play and fire at the end. In doit, steps
+accumulate notifications during a play and fire at the end. In scampi, steps
 execute sequentially but there's no way to conditionally run a step based on
 whether a previous step made changes.
 
@@ -545,7 +545,7 @@ Things this roadmap explicitly does not pursue:
 - **Dynamic inventory** — host lists are Starlark code. External data comes in
   via `env()`, `secret()`, or `load()`.  Starlark is a real language — you can
   read JSON files, build lists, compute values.
-- **Agent mode** — doit pushes from a control machine. No pull-based daemon.
+- **Agent mode** — scampi pushes from a control machine. No pull-based daemon.
 - **Windows targets** — POSIX-first. Windows is a different world with
   different primitives. Maybe someday, but not on this roadmap.
 
@@ -570,7 +570,7 @@ Things that aren't blocking anything but would be nice to get to.
   formatter for repeatable flags pushes description columns way right, and error
   output needs manual workarounds. Worth doing a comparison with cobra, kong, or
   ff at some point.
-- **`doit inspect` doesn't show template steps.** Templates should be
+- **`scampi inspect` doesn't show template steps.** Templates should be
   inspectable like other step types.
 - **Error message consistency pass.** Go through all error messages codebase-wide
   and make them self-documenting: say what's wrong, show correct syntax using

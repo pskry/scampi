@@ -1,1 +1,1 @@
-load("/nonexistent_doit_test_module_9f8a7b6c.star", "x")
+load("/nonexistent_scampi_test_module_9f8a7b6c.star", "x")

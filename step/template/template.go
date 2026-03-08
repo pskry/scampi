@@ -6,10 +6,10 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/step/sharedops"
-	"godoit.dev/doit/step/sharedops/fileops"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/step/sharedops"
+	"scampi.dev/scampi/step/sharedops/fileops"
 )
 
 type (

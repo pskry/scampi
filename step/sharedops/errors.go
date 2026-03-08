@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 type UnknownUserError struct {

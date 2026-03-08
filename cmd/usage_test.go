@@ -13,13 +13,13 @@ import (
 var binary string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "doit-cli-test-")
+	dir, err := os.MkdirTemp("", "scampi-cli-test-")
 	if err != nil {
 		panic(err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 
-	binary = filepath.Join(dir, "doit")
+	binary = filepath.Join(dir, "scampi")
 	out, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput()
 	if err != nil {
 		panic("go build failed: " + string(out))
@@ -76,8 +76,8 @@ func TestUsageError_SubcommandFlagMissingValue(t *testing.T) {
 		t.Errorf("expected subcommand help (OPTIONS) in output, got:\n%s", out)
 	}
 	// Should mention the subcommand name.
-	if !strings.Contains(out, "doit inspect") {
-		t.Errorf("expected 'doit inspect' in output, got:\n%s", out)
+	if !strings.Contains(out, "scampi inspect") {
+		t.Errorf("expected 'scampi inspect' in output, got:\n%s", out)
 	}
 }
 

@@ -6,9 +6,9 @@ import (
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target/local"
-	"godoit.dev/doit/target/ssh"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target/local"
+	"scampi.dev/scampi/target/ssh"
 )
 
 // targetModule builds the `target` namespace (target.ssh, target.local).

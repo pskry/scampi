@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/ssh"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/ssh"
 )
 
 // E2EDriver abstracts over different target backends for e2e testing.
@@ -65,7 +65,7 @@ func (d *MemDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 	d.tgt = target.NewMemTarget()
 
 	// Create placeholder to make /tmp exist as a directory
-	d.tgt.Files["/tmp/.doit-placeholder"] = []byte{}
+	d.tgt.Files["/tmp/.scampi-placeholder"] = []byte{}
 
 	// Populate initial state
 	for path, content := range initial.Files {
@@ -236,7 +236,7 @@ func (d *SSHDriver) Name() string {
 }
 
 func (d *SSHDriver) Available() bool {
-	return os.Getenv("DOIT_TEST_CONTAINERS") != ""
+	return os.Getenv("SCAMPI_TEST_CONTAINERS") != ""
 }
 
 func (d *SSHDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.TargetInstance, func()) {

@@ -3,7 +3,7 @@
 package dir
 
 import (
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/spec"
 )
 
 type ensureDirDesc struct {

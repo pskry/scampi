@@ -9,11 +9,11 @@ import (
 	"os"
 	"testing"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/ssh"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/ssh"
 )
 
 // Connection Tests

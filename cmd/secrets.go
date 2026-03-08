@@ -14,11 +14,11 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/urfave/cli/v3"
 
-	"godoit.dev/doit/osutil"
-	"godoit.dev/doit/secret"
+	"scampi.dev/scampi/osutil"
+	"scampi.dev/scampi/secret"
 )
 
-const envSecretsFile = "DOIT_SECRETS_FILE"
+const envSecretsFile = "SCAMPI_SECRETS_FILE"
 
 func usageError(cmd *cli.Command, msg string) error {
 	_, _ = fmt.Fprintf(os.Stderr, "Incorrect Usage: %s\n\n", msg)
@@ -47,7 +47,7 @@ func secretsCmd() *cli.Command {
 	}
 }
 
-// doit secrets init
+// scampi secrets init
 // -----------------------------------------------------------------------------
 
 func secretsInitCmd() *cli.Command {
@@ -98,7 +98,7 @@ func secretsInitCmd() *cli.Command {
 	}
 }
 
-// doit secrets pubkey
+// scampi secrets pubkey
 // -----------------------------------------------------------------------------
 
 func secretsPubkeyCmd() *cli.Command {
@@ -122,7 +122,7 @@ func secretsPubkeyCmd() *cli.Command {
 	}
 }
 
-// doit secrets set
+// scampi secrets set
 // -----------------------------------------------------------------------------
 
 func secretsSetCmd() *cli.Command {
@@ -134,7 +134,7 @@ func secretsSetCmd() *cli.Command {
 			&cli.StringFlag{
 				Name:    "file",
 				Aliases: []string{"f"},
-				Usage:   "path to the secrets JSON file (default: $DOIT_SECRETS_FILE)",
+				Usage:   "path to the secrets JSON file (default: $SCAMPI_SECRETS_FILE)",
 			},
 			&cli.StringSliceFlag{
 				Name:    "recipient",
@@ -151,7 +151,7 @@ func secretsSetCmd() *cli.Command {
 			key := cmd.Args().First()
 			filePath := resolveSecretsFile(cmd)
 			if filePath == "" {
-				return usageError(cmd, "no secrets file: use --file or set $DOIT_SECRETS_FILE")
+				return usageError(cmd, "no secrets file: use --file or set $SCAMPI_SECRETS_FILE")
 			}
 
 			// Derive own public key from identity as default recipient
@@ -217,7 +217,7 @@ func secretsSetCmd() *cli.Command {
 	}
 }
 
-// doit secrets del
+// scampi secrets del
 // -----------------------------------------------------------------------------
 
 func secretsDelCmd() *cli.Command {
@@ -229,7 +229,7 @@ func secretsDelCmd() *cli.Command {
 			&cli.StringFlag{
 				Name:    "file",
 				Aliases: []string{"f"},
-				Usage:   "path to the secrets JSON file (default: $DOIT_SECRETS_FILE)",
+				Usage:   "path to the secrets JSON file (default: $SCAMPI_SECRETS_FILE)",
 			},
 		},
 		Before: requireArgs(1),
@@ -237,7 +237,7 @@ func secretsDelCmd() *cli.Command {
 			key := cmd.Args().First()
 			filePath := resolveSecretsFile(cmd)
 			if filePath == "" {
-				return usageError(cmd, "no secrets file: use --file or set $DOIT_SECRETS_FILE")
+				return usageError(cmd, "no secrets file: use --file or set $SCAMPI_SECRETS_FILE")
 			}
 
 			data, err := os.ReadFile(filePath)
@@ -271,7 +271,7 @@ func secretsDelCmd() *cli.Command {
 	}
 }
 
-// doit secrets get
+// scampi secrets get
 // -----------------------------------------------------------------------------
 
 func secretsGetCmd() *cli.Command {
@@ -283,7 +283,7 @@ func secretsGetCmd() *cli.Command {
 			&cli.StringFlag{
 				Name:    "file",
 				Aliases: []string{"f"},
-				Usage:   "path to the secrets JSON file (default: $DOIT_SECRETS_FILE)",
+				Usage:   "path to the secrets JSON file (default: $SCAMPI_SECRETS_FILE)",
 			},
 		},
 		Before: requireArgs(1),
@@ -291,7 +291,7 @@ func secretsGetCmd() *cli.Command {
 			key := cmd.Args().First()
 			filePath := resolveSecretsFile(cmd)
 			if filePath == "" {
-				return usageError(cmd, "no secrets file: use --file or set $DOIT_SECRETS_FILE")
+				return usageError(cmd, "no secrets file: use --file or set $SCAMPI_SECRETS_FILE")
 			}
 
 			identities, err := secret.ResolveIdentities(os.LookupEnv, os.ReadFile)

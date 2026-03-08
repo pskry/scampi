@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/model"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
 	"golang.org/x/sync/errgroup"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/model"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 const actionTimeout = 5 * time.Second

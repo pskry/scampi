@@ -7,16 +7,16 @@ import (
 	"errors"
 	"testing"
 
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/star"
-	stepcopy "godoit.dev/doit/step/copy"
-	"godoit.dev/doit/step/dir"
-	"godoit.dev/doit/step/pkg"
-	"godoit.dev/doit/step/symlink"
-	"godoit.dev/doit/step/template"
-	"godoit.dev/doit/target/local"
-	"godoit.dev/doit/target/ssh"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/star"
+	stepcopy "scampi.dev/scampi/step/copy"
+	"scampi.dev/scampi/step/dir"
+	"scampi.dev/scampi/step/pkg"
+	"scampi.dev/scampi/step/symlink"
+	"scampi.dev/scampi/step/template"
+	"scampi.dev/scampi/target/local"
+	"scampi.dev/scampi/target/ssh"
 )
 
 func TestEvalMinimalConfig(t *testing.T) {

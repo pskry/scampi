@@ -7,10 +7,10 @@ import (
 	"errors"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
 )
 
 func TestPlan_CapabilityMismatch(t *testing.T) {

@@ -204,7 +204,7 @@ func TestResolveIdentities_EnvKeyFile(t *testing.T) {
 
 func TestResolveIdentities_DefaultFile(t *testing.T) {
 	id := generateTestKeypair(t)
-	expectedPath := "/fake/home/.config/doit/age.key"
+	expectedPath := "/fake/home/.config/scampi/age.key"
 
 	lookup := func(key string) (string, bool) {
 		if key == "HOME" {

@@ -5,11 +5,11 @@ package service
 import (
 	"context"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/step/sharedops"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/step/sharedops"
+	"scampi.dev/scampi/target"
 )
 
 const ensureActiveID = "builtin.ensure-service-active"

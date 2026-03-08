@@ -5,7 +5,7 @@ package local
 import (
 	"context"
 
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/target"
 )
 
 func (t POSIXTarget) IsActive(ctx context.Context, name string) (bool, error) {

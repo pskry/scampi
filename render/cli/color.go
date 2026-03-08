@@ -2,7 +2,7 @@
 
 package cli
 
-import "godoit.dev/doit/render/ansi"
+import "scampi.dev/scampi/render/ansi"
 
 // Semantic colors for CLI output.
 var (

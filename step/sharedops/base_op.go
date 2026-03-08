@@ -2,7 +2,7 @@
 
 package sharedops
 
-import "godoit.dev/doit/spec"
+import "scampi.dev/scampi/spec"
 
 type BaseOp struct {
 	SrcSpan  spec.SourceSpan

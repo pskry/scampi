@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package main defines the CLI surface of doit.
+// Package main defines the CLI surface of scampi.
 //
 // It wires user-facing commands to engine execution, diagnostics, and rendering.
 // This package contains no execution semantics; it is responsible only for
@@ -17,14 +17,14 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v3"
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/osutil"
-	"godoit.dev/doit/render"
-	clir "godoit.dev/doit/render/cli"
-	"godoit.dev/doit/signal"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/osutil"
+	"scampi.dev/scampi/render"
+	clir "scampi.dev/scampi/render/cli"
+	"scampi.dev/scampi/signal"
+	"scampi.dev/scampi/spec"
 )
 
 const (
@@ -55,8 +55,8 @@ const (
 )
 
 func main() {
-	doit := &cli.Command{
-		Name:  "doit",
+	scampi := &cli.Command{
+		Name:  "scampi",
 		Usage: "Declarative task execution for local and remote systems",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -114,7 +114,7 @@ func main() {
 	)
 	defer stop()
 
-	if err := doit.Run(ctx, os.Args); err != nil {
+	if err := scampi.Run(ctx, os.Args); err != nil {
 		// Flag-parsing errors (missing value, unknown flag) are reported
 		// to stderr by urfave/cli before returning. Exit cleanly so the
 		// user sees only the library's message, not a scary "unhandled
@@ -272,7 +272,7 @@ func inspectCmd() *cli.Command {
 from inspectable ops (e.g. copy), and opens a diff tool to compare
 the desired state against what currently exists on the target.
 
-Set DOIT_DIFFTOOL, DIFFTOOL, or EDITOR to choose your diff tool.
+Set SCAMPI_DIFFTOOL, DIFFTOOL, or EDITOR to choose your diff tool.
 Falls back to plain diff(1).`,
 		Before: requireArgs(1),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -430,7 +430,7 @@ func legendCmd() *cli.Command {
 		Name:  "legend",
 		Usage: "Show the CLI visual language reference",
 		Description: `Prints a reference card for glyphs, plan structure,
-and color semantics used in doit CLI output.`,
+and color semantics used in scampi CLI output.`,
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 			displ := newDisplayer(opts, nil)
@@ -563,12 +563,12 @@ func recoverAndReport(r any) {
 	}
 
 	_println()
-	_println("[doit] fatal internal error")
+	_println("[scampi] fatal internal error")
 	_println()
-	_println("This is a BUG in doit, not in your configuration.")
+	_println("This is a BUG in scampi, not in your configuration.")
 	_println()
 	_println("Please report this issue and include the information below:")
-	_println("  https://godoit.dev/issues/new")
+	_println("  https://github.com/anthropics/scampi/issues")
 	_println()
 	_println()
 	_println("======  internal error  ======")

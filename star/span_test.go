@@ -6,9 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/star"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/star"
 )
 
 func TestKwargFieldSpans(t *testing.T) {

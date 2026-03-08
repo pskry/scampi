@@ -1,11 +1,11 @@
--- Project-local DAP setup for doit
+-- Project-local DAP setup for scampi
 local dap = require("dap")
 dap.configurations.go = dap.configurations.go or {}
 
 -- Run Config - APPLY
 local apply_config = {
 	type = "go",
-	name = "doit: apply sandbox",
+	name = "scampi: apply sandbox",
 	request = "launch",
 	program = "${workspaceFolder}/cmd",
 	args = {
@@ -26,11 +26,11 @@ local function dap_run(cfg)
 end
 
 vim.keymap.set("n", "<leader>dd", function() end, {
-	desc = "doit debug",
+	desc = "scampi debug",
 })
 
 vim.keymap.set("n", "<leader>dda", dap_run(apply_config), {
-	desc = "doit: debug apply",
+	desc = "scampi: debug apply",
 })
 
 return {}

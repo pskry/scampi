@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"godoit.dev/doit/errs"
+	"scampi.dev/scampi/errs"
 )
 
 // Renderable is the contract for anything the template renderer can render.

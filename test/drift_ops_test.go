@@ -7,14 +7,14 @@ import (
 	"io/fs"
 	"testing"
 
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/step/copy"
-	"godoit.dev/doit/step/pkg"
-	"godoit.dev/doit/step/sharedops/fileops"
-	stepsymlink "godoit.dev/doit/step/symlink"
-	"godoit.dev/doit/step/template"
-	"godoit.dev/doit/target"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/step/copy"
+	"scampi.dev/scampi/step/pkg"
+	"scampi.dev/scampi/step/sharedops/fileops"
+	stepsymlink "scampi.dev/scampi/step/symlink"
+	"scampi.dev/scampi/step/template"
+	"scampi.dev/scampi/target"
 )
 
 func planOps(

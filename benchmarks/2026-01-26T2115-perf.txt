@@ -1,6 +1,6 @@
 goos: darwin
 goarch: arm64
-pkg: godoit.dev/doit/test
+pkg: scampi.dev/scampi/test
 cpu: Apple M3 Max
 BenchmarkLoadConfig/Size-1-14     	     981	   1204980 ns/op	 1032985 B/op	    8271 allocs/op
 BenchmarkLoadConfig/Size-1-14     	     970	   1204539 ns/op	 1033523 B/op	    8271 allocs/op
@@ -263,4 +263,4 @@ BenchmarkValidateCueInput/Size-10000-14      	       8	 125161495 ns/op	 7609133
 BenchmarkValidateCueInput/Size-10000-14      	       9	 124331954 ns/op	 7503140 B/op	    2247 allocs/op
 BenchmarkValidateCueInput/Size-10000-14      	       9	 124423032 ns/op	 7501764 B/op	    2244 allocs/op
 PASS
-ok  	godoit.dev/doit/test	315.203s
+ok  	scampi.dev/scampi/test	315.203s

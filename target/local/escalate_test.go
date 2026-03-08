@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/pkgmgr"
+	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/pkgmgr"
 )
 
 // newCaptureTarget creates a POSIXTarget whose escalation tool is a
@@ -95,7 +95,7 @@ func TestEscalatedWriteFile_Command(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := readLog()
-	if !strings.HasPrefix(got, "cp /tmp/.doit-") {
+	if !strings.HasPrefix(got, "cp /tmp/.scampi-") {
 		t.Fatalf("expected cp from staging path, got %q", got)
 	}
 	if !strings.HasSuffix(got, " /etc/config") {

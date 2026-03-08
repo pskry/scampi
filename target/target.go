@@ -9,8 +9,8 @@ import (
 	"io/fs"
 	"strings"
 
-	"godoit.dev/doit/capability"
-	"godoit.dev/doit/errs"
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/errs"
 )
 
 var (

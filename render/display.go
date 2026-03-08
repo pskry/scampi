@@ -2,7 +2,7 @@
 
 package render
 
-import "godoit.dev/doit/diagnostic/event"
+import "scampi.dev/scampi/diagnostic/event"
 
 // Displayer defines the interface for rendering engine events.
 type Displayer interface {

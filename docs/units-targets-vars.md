@@ -1,6 +1,6 @@
 # Configuration Model
 
-This document describes `doit`'s configuration model: how targets are defined,
+This document describes `scampi`'s configuration model: how targets are defined,
 how deploy blocks organize work, how environment-specific values flow through
 the system, and how project layout scales.
 
@@ -88,7 +88,7 @@ target.ssh(
 
 ### Batteries Included
 
-Steps are the executable primitives. They are **built into `doit`**, not plugins.
+Steps are the executable primitives. They are **built into `scampi`**, not plugins.
 
 Current steps: `copy`, `dir`, `symlink`, `template`, `pkg`, `service`, `run`
 
@@ -99,7 +99,7 @@ Planned steps: see `docs/roadmap.md`
 - Security boundary is clear
 - No version matrix hell
 - Consistent quality and documentation
-- If something's missing, contribute to `doit`, don't fork
+- If something's missing, contribute to `scampi`, don't fork
 
 ### Step Builtins
 
@@ -160,7 +160,7 @@ Reading order matches execution: "On web1 and web2, run: copy, pkg, template."
 Ansible has 22 levels of variable precedence. "Where did this value come from?"
 is often unanswerable.
 
-### doit Approach: `env()`
+### scampi Approach: `env()`
 
 The `env()` builtin reads environment variables with optional defaults and type
 coercion:
@@ -198,7 +198,7 @@ api_token = secret("npm.api_token")
 
 V1 ships with an `unencrypted_file` backend that reads a flat JSON
 `secrets.json` next to the config file. Additional backends (age, Bitwarden,
-Vault, etc.) are planned — the backend is selected by the user, not by doit.
+Vault, etc.) are planned — the backend is selected by the user, not by scampi.
 See `docs/roadmap.md` for the full design direction.
 
 Secret values never appear in diagnostic output — only key names.
@@ -268,7 +268,7 @@ deploy(
 ```
 
 ```bash
-doit apply dotfiles.star
+scampi apply dotfiles.star
 ```
 
 ### Small (One File, Multiple Targets)
@@ -325,22 +325,22 @@ myproject/
 
 ```bash
 # Minimal: single file
-doit apply dotfiles.star
+scampi apply dotfiles.star
 
 # Check without applying
-doit check config.star
+scampi check config.star
 
 # Show execution plan
-doit plan config.star
+scampi plan config.star
 
 # Filter to specific targets
-doit apply --targets web1,web2 config.star
+scampi apply --targets web1,web2 config.star
 
 # Filter to specific deploy block
-doit apply --only web config.star
+scampi apply --only web config.star
 
 # Inspect file diffs
-doit inspect config.star
+scampi inspect config.star
 ```
 
 ---

@@ -3,8 +3,8 @@
 package service
 
 import (
-	"godoit.dev/doit/errs"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/spec"
 )
 
 // Desired service state values.

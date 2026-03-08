@@ -2,7 +2,7 @@
 
 package engine
 
-import "godoit.dev/doit/spec"
+import "scampi.dev/scampi/spec"
 
 // actionNode represents an action in the dependency graph.
 type actionNode struct {

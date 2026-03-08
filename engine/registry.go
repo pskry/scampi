@@ -3,16 +3,16 @@
 package engine
 
 import (
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/step/copy"
-	"godoit.dev/doit/step/dir"
-	"godoit.dev/doit/step/pkg"
-	"godoit.dev/doit/step/run"
-	"godoit.dev/doit/step/service"
-	"godoit.dev/doit/step/symlink"
-	"godoit.dev/doit/step/template"
-	"godoit.dev/doit/target/local"
-	"godoit.dev/doit/target/ssh"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/step/copy"
+	"scampi.dev/scampi/step/dir"
+	"scampi.dev/scampi/step/pkg"
+	"scampi.dev/scampi/step/run"
+	"scampi.dev/scampi/step/service"
+	"scampi.dev/scampi/step/symlink"
+	"scampi.dev/scampi/step/template"
+	"scampi.dev/scampi/target/local"
+	"scampi.dev/scampi/target/ssh"
 )
 
 type Registry struct {

@@ -40,7 +40,7 @@ func Test_StepType_NewConfig_ReturnsPointer(t *testing.T) {
 			packages.NeedFiles,
 	}
 
-	pkgs, err := packages.Load(cfg, "godoit.dev/...")
+	pkgs, err := packages.Load(cfg, "scampi.dev/...")
 	if err != nil {
 		t.Fatalf("failed to load packages: %v", err)
 	}

@@ -5,7 +5,7 @@
 The declarative model works when a step type exists for the thing you need. But
 there's always stuff that doesn't fit: a one-off sysctl tweak, a custom build
 script, a config transformation that no step type covers yet. Without an escape
-hatch, users either can't use doit for their full setup, or they wrap it in a
+hatch, users either can't use scampi for their full setup, or they wrap it in a
 shell script — which defeats the purpose.
 
 Every config management tool that tried to be purely declarative eventually
@@ -85,7 +85,7 @@ a proper step type.
 ## Migration on-ramp
 
 The escape hatch isn't just an emergency exit — it's the adoption path. Asking
-users to rewrite their entire setup before they can use doit is a non-starter.
+users to rewrite their entire setup before they can use scampi is a non-starter.
 The `run` step lets people start with what they have:
 
 ```python
@@ -117,12 +117,12 @@ of the escape hatch design for free when the time comes.
 
 ## Shell and environment
 
-**Shell**: POSIX `sh` — same as every other command doit runs today
+**Shell**: POSIX `sh` — same as every other command scampi runs today
 (`exec.CommandContext(ctx, "sh", "-c", cmd)` locally, bare string over SSH).
 If someone needs bash features, they write `bash -c '...'` in their command.
 No `shell` parameter in v1.
 
-**Environment**: inherited from the target. Local = doit's process env.
+**Environment**: inherited from the target. Local = scampi's process env.
 SSH = remote session env. Users set vars inline (`FOO=bar do-thing`).
 No `env` dict in v1 — inline works fine and keeps the step type minimal.
 

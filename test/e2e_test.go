@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"godoit.dev/doit/diagnostic"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
 )
 
 // E2EScenario defines a data-driven E2E test case.

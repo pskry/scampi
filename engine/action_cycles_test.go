@@ -5,7 +5,7 @@ package engine
 import (
 	"testing"
 
-	"godoit.dev/doit/spec"
+	"scampi.dev/scampi/spec"
 )
 
 func TestDetectActionCycles_NoCycle(t *testing.T) {

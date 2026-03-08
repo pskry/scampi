@@ -6,12 +6,12 @@ import (
 	"context"
 	"testing"
 
-	"godoit.dev/doit/diagnostic/event"
-	"godoit.dev/doit/engine"
-	"godoit.dev/doit/source"
-	"godoit.dev/doit/spec"
-	"godoit.dev/doit/target"
-	"godoit.dev/doit/target/local"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/local"
 )
 
 func driftCheckFn(drift []spec.DriftDetail) checkFn {
