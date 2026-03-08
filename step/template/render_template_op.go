@@ -30,7 +30,9 @@ type renderTemplateOp struct {
 }
 
 func (op *renderTemplateOp) Check(
-	ctx context.Context, src source.Source, tgt target.Target,
+	ctx context.Context,
+	src source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	fsTgt := target.Must[target.Filesystem](renderTemplateID, tgt)
 

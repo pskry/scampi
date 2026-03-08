@@ -27,7 +27,9 @@ type copyFileOp struct {
 }
 
 func (op *copyFileOp) Check(
-	ctx context.Context, src source.Source, tgt target.Target,
+	ctx context.Context,
+	src source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	fsTgt := target.Must[target.Filesystem](copyFileID, tgt)
 

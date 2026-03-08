@@ -109,9 +109,7 @@ func builtinDeploy(
 	return poisonValue{funcName: "deploy"}, nil
 }
 
-func extractSteps(
-	list *starlark.List, fn string,
-) ([]spec.StepInstance, error) {
+func extractSteps(list *starlark.List, fn string) ([]spec.StepInstance, error) {
 	if list == nil {
 		return nil, nil
 	}
@@ -326,7 +324,10 @@ func builtinSecrets(
 }
 
 func buildSecretBackend(
-	c *Collector, backend, path string, recipientsVal starlark.Value, span spec.SourceSpan,
+	c *Collector,
+	backend, path string,
+	recipientsVal starlark.Value,
+	span spec.SourceSpan,
 ) (secret.Backend, error) {
 	switch backend {
 	case "file":
@@ -424,7 +425,9 @@ func parseRecipientStrings(val starlark.Value, span spec.SourceSpan) ([]age.Reci
 }
 
 func coerceEnvValue(
-	raw string, dflt starlark.Value, span spec.SourceSpan,
+	raw string,
+	dflt starlark.Value,
+	span spec.SourceSpan,
 ) (starlark.Value, error) {
 	switch dflt.(type) {
 	case starlark.String:

@@ -24,7 +24,9 @@ type ensurePkgOp struct {
 }
 
 func (op *ensurePkgOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	pm := target.Must[target.PkgManager](ensurePkgID, tgt)
 

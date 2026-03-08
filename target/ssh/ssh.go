@@ -181,7 +181,10 @@ func detectEscalation(ctx context.Context, tgt *SSHTarget) string {
 }
 
 func buildSSHConfig(
-	ctx context.Context, src source.Source, c *Config, timeout time.Duration,
+	ctx context.Context,
+	src source.Source,
+	c *Config,
+	timeout time.Duration,
 ) (*ssh.ClientConfig, func() error, error) {
 	var authMethods []ssh.AuthMethod
 	closeAgent := func() error { return nil }

@@ -23,7 +23,9 @@ type ensureEnabledOp struct {
 }
 
 func (op *ensureEnabledOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	sm := target.Must[target.ServiceManager](ensureEnabledID, tgt)
 
@@ -52,7 +54,9 @@ func (op *ensureEnabledOp) Check(
 }
 
 func (op *ensureEnabledOp) Execute(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.Result, error) {
 	sm := target.Must[target.ServiceManager](ensureEnabledID, tgt)
 

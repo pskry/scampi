@@ -22,7 +22,9 @@ type ensureActiveOp struct {
 }
 
 func (op *ensureActiveOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	sm := target.Must[target.ServiceManager](ensureActiveID, tgt)
 
@@ -48,7 +50,9 @@ func (op *ensureActiveOp) Check(
 }
 
 func (op *ensureActiveOp) Execute(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.Result, error) {
 	sm := target.Must[target.ServiceManager](ensureActiveID, tgt)
 

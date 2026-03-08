@@ -23,7 +23,9 @@ type runOp struct {
 }
 
 func (op *runOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	if op.always {
 		return spec.CheckUnsatisfied, nil, nil
@@ -51,7 +53,9 @@ func (op *runOp) Check(
 }
 
 func (op *runOp) Execute(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.Result, error) {
 	cmdr := target.Must[target.Commander](runOpID, tgt)
 

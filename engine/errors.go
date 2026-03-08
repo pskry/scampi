@@ -108,7 +108,10 @@ func emitEngineDiagnostic(em diagnostic.Emitter, cfgPath string, err error) (dia
 }
 
 func emitPlanDiagnostic(
-	em diagnostic.Emitter, stepIndex int, stepKind, stepDesc string, err error,
+	em diagnostic.Emitter,
+	stepIndex int,
+	stepKind, stepDesc string,
+	err error,
 ) (diagnostic.Impact, bool) {
 	return emitScopedDiagnostic(err, func(d diagnostic.Diagnostic) {
 		em.EmitPlanDiagnostic(diagnostic.RaisePlanDiagnostic(stepIndex, stepKind, stepDesc, d))
@@ -116,7 +119,10 @@ func emitPlanDiagnostic(
 }
 
 func emitActionDiagnostic(
-	em diagnostic.Emitter, stepIndex int, stepKind, stepDesc string, err error,
+	em diagnostic.Emitter,
+	stepIndex int,
+	stepKind, stepDesc string,
+	err error,
 ) (diagnostic.Impact, bool) {
 	return emitScopedDiagnostic(err, func(d diagnostic.Diagnostic) {
 		em.EmitActionDiagnostic(diagnostic.RaiseActionDiagnostic(stepIndex, stepKind, stepDesc, d))
@@ -124,7 +130,10 @@ func emitActionDiagnostic(
 }
 
 func emitOpDiagnostic(
-	em diagnostic.Emitter, stepIndex int, stepKind, stepDesc, displayID string, err error,
+	em diagnostic.Emitter,
+	stepIndex int,
+	stepKind, stepDesc, displayID string,
+	err error,
 ) (diagnostic.Impact, bool) {
 	return emitScopedDiagnostic(err, func(d diagnostic.Diagnostic) {
 		em.EmitOpDiagnostic(diagnostic.RaiseOpDiagnostic(stepIndex, stepKind, stepDesc, displayID, d))

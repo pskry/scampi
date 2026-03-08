@@ -90,7 +90,9 @@ func (o fakeOp) Action() spec.Action  { return o.action }
 func (o fakeOp) DependsOn() []spec.Op { return o.deps }
 
 func (o *fakeOp) Check(
-	ctx context.Context, src source.Source, tgt target.Target,
+	ctx context.Context,
+	src source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	o.checkCalls++
 	return o.checkFn(ctx, src, tgt)

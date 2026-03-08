@@ -3,6 +3,7 @@
 package test
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -288,5 +289,83 @@ func TestImportCapabilities(t *testing.T) {
 				)
 			}
 		}
+	}
+}
+
+// Function signature formatting
+// -----------------------------------------------------------------------------
+
+func TestFuncSignatureStyle(t *testing.T) {
+	root := ".."
+
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, p, nil, parser.ParseComments)
+		if err != nil {
+			return err
+		}
+
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.FuncDecl:
+				checkFieldList(t, fset, rel, n.Name.Name, "params", n.Type.Params)
+				checkFieldList(t, fset, rel, n.Name.Name, "results", n.Type.Results)
+			case *ast.FuncLit:
+				checkFieldList(t, fset, rel, "(func literal)", "params", n.Type.Params)
+				checkFieldList(t, fset, rel, "(func literal)", "results", n.Type.Results)
+			}
+			return true
+		})
+
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func checkFieldList(
+	t *testing.T,
+	fset *token.FileSet,
+	file, funcName, label string,
+	fl *ast.FieldList,
+) {
+	t.Helper()
+	if fl == nil || len(fl.List) <= 1 {
+		return
+	}
+
+	openLine := fset.Position(fl.Opening).Line
+	closeLine := fset.Position(fl.Closing).Line
+
+	if openLine == closeLine {
+		return // all on one line — fine
+	}
+
+	// Multi-line: each field must be on its own line.
+	seen := map[int]bool{}
+	for _, field := range fl.List {
+		line := fset.Position(field.Pos()).Line
+		if seen[line] {
+			t.Errorf(
+				"%s:%d: %s %s: multi-line signature must have one parameter per line",
+				file, line, funcName, label,
+			)
+			break
+		}
+		seen[line] = true
 	}
 }

@@ -27,7 +27,9 @@ type EnsureModeOp struct {
 }
 
 func (op *EnsureModeOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	fsTgt := target.Must[target.Filesystem](ensureModeID, tgt)
 

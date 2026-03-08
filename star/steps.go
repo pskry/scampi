@@ -320,9 +320,7 @@ func builtinTemplate(
 // Helpers
 // -----------------------------------------------------------------------------
 
-func stringList(
-	list *starlark.List, fn, arg string,
-) ([]string, error) {
+func stringList(list *starlark.List, fn, arg string) ([]string, error) {
 	if list == nil {
 		return nil, nil
 	}
@@ -418,9 +416,7 @@ func starlarkDictToMap(dict *starlark.Dict, ctx string) (map[string]any, error) 
 	return result, nil
 }
 
-func starlarkDictToStringMap(
-	dict *starlark.Dict, ctx string,
-) (map[string]string, error) {
+func starlarkDictToStringMap(dict *starlark.Dict, ctx string) (map[string]string, error) {
 	result := make(map[string]string, dict.Len())
 	for _, item := range dict.Items() {
 		key, ok := starlark.AsString(item[0])

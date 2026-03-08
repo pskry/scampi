@@ -141,7 +141,9 @@ type ensureDirOp struct {
 }
 
 func (op *ensureDirOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	fsTgt := target.Must[target.Filesystem](id, tgt)
 
@@ -167,7 +169,9 @@ func (op *ensureDirOp) Check(
 }
 
 func (op *ensureDirOp) Execute(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.Result, error) {
 	fsTgt := target.Must[target.Filesystem](id, tgt)
 

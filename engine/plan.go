@@ -49,7 +49,9 @@ func (e *Engine) Plan(ctx context.Context) error {
 }
 
 func plan(
-	cfg spec.ResolvedConfig, em diagnostic.Emitter, tgtCaps capability.Capability,
+	cfg spec.ResolvedConfig,
+	em diagnostic.Emitter,
+	tgtCaps capability.Capability,
 ) (spec.Plan, diagnostic.ActionDeps, error) {
 	start := time.Now()
 	unitID := spec.UnitID(cfg.DeployName)

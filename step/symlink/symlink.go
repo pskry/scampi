@@ -119,7 +119,9 @@ func resolveTarget(target, link string) (string, error) {
 }
 
 func (op *ensureSymlinkOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	fsTgt := target.Must[target.Filesystem](id, tgt)
 	slTgt := target.Must[target.Symlink](id, tgt)

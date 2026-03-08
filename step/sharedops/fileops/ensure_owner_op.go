@@ -29,7 +29,9 @@ type EnsureOwnerOp struct {
 }
 
 func (op *EnsureOwnerOp) Check(
-	ctx context.Context, _ source.Source, tgt target.Target,
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	owTgt := target.Must[target.Ownership](ensureOwnerID, tgt)
 	desired := op.Owner + ":" + op.Group

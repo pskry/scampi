@@ -66,7 +66,9 @@ func (f *formatter) fmtfMsgTo(w io.Writer, color ansi.ANSI, format string, args 
 }
 
 func (f *formatter) fmtTemplate(
-	tmpl event.Template, prefix, msg, glyph string, txtCol, helpCol ansi.ANSI,
+	tmpl event.Template,
+	prefix, msg, glyph string,
+	txtCol, helpCol ansi.ANSI,
 ) []string {
 	var buf strings.Builder
 
