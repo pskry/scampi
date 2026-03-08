@@ -98,7 +98,7 @@ func (e UnknownKeyError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "ssh.UnknownKey",
 		Text: "unknown host SSH-key",
-		Hint: "make sure the host SSH-key is known",
+		Hint: "connect manually once with ssh to add the host key, or use insecure: true to skip verification",
 	}
 }
 
@@ -157,7 +157,7 @@ func (e KeyMismatchError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "ssh.KeyMismatch",
 		Text: "host SSH-key mismatch",
-		Hint: "make sure the host SSH-key is correct",
+		Hint: "if the host was reinstalled, remove the old entry from known_hosts and reconnect",
 		Help: `known host keys:
 {{- range .Known}}
   - {{.Filename}}:{{.Line}}: {{.Type}} {{.Fingerprint}}
@@ -184,7 +184,7 @@ func (e KeyRevokedError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "ssh.KeyRevoked",
 		Text: "host SSH-key revoked",
-		Hint: "make sure the host SSH-key is up-to-date",
+		Hint: "this host key was explicitly revoked in known_hosts — do not connect unless you trust the host",
 		Help: `revoked host key:
   {{.Revoked.Filename}}:{{.Revoked.Line}}: {{.Revoked.Type}} {{.Revoked.Fingerprint}}`,
 		Data: e,
@@ -206,7 +206,8 @@ func (e KeyReadError) Error() string {
 func (e KeyReadError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "ssh.KeyRead",
-		Text: "failed to read SSH-key file {{.Path}}",
+		Text: `failed to read SSH-key file "{{.Path}}"`,
+		Hint: "check that the file exists and is readable",
 		Data: e,
 	}
 }
@@ -270,6 +271,7 @@ func (e AuthError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "ssh.Auth",
 		Text: "authentication failed: {{.Err}}",
+		Hint: "check that the SSH key is authorized on the remote host",
 		Data: e,
 	}
 }
@@ -316,6 +318,7 @@ func (e SFTPSessionError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "ssh.SFTPSession",
 		Text: "failed to start SFTP session: {{.Err}}",
+		Hint: "check that the SFTP subsystem is enabled on the remote host",
 		Data: e,
 	}
 }
