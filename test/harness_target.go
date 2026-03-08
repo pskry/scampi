@@ -218,6 +218,56 @@ func (p *pkgOnlyTarget) IsUpgradable(_ context.Context, _ string) (bool, error) 
 	panic("pkgOnlyTarget.IsUpgradable called — capability check failed")
 }
 
+// symlinkOnlyTarget advertises Symlink but not Filesystem.
+type symlinkOnlyTarget struct {
+	*target.MemTarget
+}
+
+func newSymlinkOnlyTarget() *symlinkOnlyTarget {
+	return &symlinkOnlyTarget{MemTarget: target.NewMemTarget()}
+}
+
+func (s *symlinkOnlyTarget) Capabilities() capability.Capability {
+	return capability.Symlink
+}
+
+func (s *symlinkOnlyTarget) Stat(_ context.Context, _ string) (fs.FileInfo, error) {
+	panic("symlinkOnlyTarget.Stat called — capability check failed")
+}
+
+func (s *symlinkOnlyTarget) ReadFile(_ context.Context, _ string) ([]byte, error) {
+	panic("symlinkOnlyTarget.ReadFile called — capability check failed")
+}
+
+func (s *symlinkOnlyTarget) WriteFile(_ context.Context, _ string, _ []byte) error {
+	panic("symlinkOnlyTarget.WriteFile called — capability check failed")
+}
+
+func (s *symlinkOnlyTarget) Remove(_ context.Context, _ string) error {
+	panic("symlinkOnlyTarget.Remove called — capability check failed")
+}
+
+func (s *symlinkOnlyTarget) Mkdir(_ context.Context, _ string, _ fs.FileMode) error {
+	panic("symlinkOnlyTarget.Mkdir called — capability check failed")
+}
+
+// noCommanderTarget advertises Filesystem but not Commander.
+type noCommanderTarget struct {
+	*target.MemTarget
+}
+
+func newNoCommanderTarget() *noCommanderTarget {
+	return &noCommanderTarget{MemTarget: target.NewMemTarget()}
+}
+
+func (n *noCommanderTarget) Capabilities() capability.Capability {
+	return capability.Filesystem
+}
+
+func (n *noCommanderTarget) RunCommand(_ context.Context, _ string) (target.CommandResult, error) {
+	panic("noCommanderTarget.RunCommand called — capability check failed")
+}
+
 type allCapNoImplTarget struct{}
 
 func (allCapNoImplTarget) Capabilities() capability.Capability {

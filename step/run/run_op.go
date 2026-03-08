@@ -104,7 +104,7 @@ func (op *runOp) Execute(
 }
 
 func (runOp) RequiredCapabilities() capability.Capability {
-	return capability.None
+	return capability.Commander
 }
 
 // OpDescription

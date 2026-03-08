@@ -240,5 +240,5 @@ func (op *ensureSymlinkOp) Execute(ctx context.Context, _ source.Source, tgt tar
 }
 
 func (ensureSymlinkOp) RequiredCapabilities() capability.Capability {
-	return capability.Symlink
+	return capability.Filesystem | capability.Symlink
 }
