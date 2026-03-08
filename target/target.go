@@ -93,7 +93,7 @@ func IsCommandNotFound(err error) bool { return errors.Is(err, ErrCommandNotFoun
 func Must[T any](reqID string, tgt Target) T {
 	res, ok := tgt.(T)
 	if !ok {
-		panic(errs.BUG("%s requires Filesystem capable target, got %T", reqID, tgt))
+		panic(errs.BUG("%s requires %T capable target, got %T", reqID, (*T)(nil), tgt))
 	}
 	return res
 }
