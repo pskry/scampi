@@ -12,7 +12,7 @@ import (
 	"scampi.dev/scampi/errs"
 )
 
-type CommandCall struct {
+type commandCall struct {
 	Cmd string
 }
 
@@ -31,7 +31,7 @@ type MemTarget struct {
 	Services        map[string]bool // service name -> active (running)
 	EnabledServices map[string]bool // service name -> enabled at boot
 
-	Commands    []CommandCall
+	Commands    []commandCall
 	CommandFunc func(cmd string) (CommandResult, error)
 }
 
@@ -371,7 +371,7 @@ func (m *MemTarget) DaemonReload(_ context.Context) error {
 
 func (m *MemTarget) RunCommand(_ context.Context, cmd string) (CommandResult, error) {
 	m.mu.Lock()
-	m.Commands = append(m.Commands, CommandCall{Cmd: cmd})
+	m.Commands = append(m.Commands, commandCall{Cmd: cmd})
 	fn := m.CommandFunc
 	m.mu.Unlock()
 
