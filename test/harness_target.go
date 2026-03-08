@@ -251,21 +251,21 @@ func (s *symlinkOnlyTarget) Mkdir(_ context.Context, _ string, _ fs.FileMode) er
 	panic("symlinkOnlyTarget.Mkdir called — capability check failed")
 }
 
-// noCommanderTarget advertises Filesystem but not Commander.
-type noCommanderTarget struct {
+// noCommandTarget advertises Filesystem but not Command.
+type noCommandTarget struct {
 	*target.MemTarget
 }
 
-func newNoCommanderTarget() *noCommanderTarget {
-	return &noCommanderTarget{MemTarget: target.NewMemTarget()}
+func newNoCommandTarget() *noCommandTarget {
+	return &noCommandTarget{MemTarget: target.NewMemTarget()}
 }
 
-func (n *noCommanderTarget) Capabilities() capability.Capability {
+func (n *noCommandTarget) Capabilities() capability.Capability {
 	return capability.Filesystem
 }
 
-func (n *noCommanderTarget) RunCommand(_ context.Context, _ string) (target.CommandResult, error) {
-	panic("noCommanderTarget.RunCommand called — capability check failed")
+func (n *noCommandTarget) RunCommand(_ context.Context, _ string) (target.CommandResult, error) {
+	panic("noCommandTarget.RunCommand called — capability check failed")
 }
 
 type allCapNoImplTarget struct{}

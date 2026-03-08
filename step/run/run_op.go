@@ -31,7 +31,7 @@ func (op *runOp) Check(
 		return spec.CheckUnsatisfied, nil, nil
 	}
 
-	cmdr := target.Must[target.Commander](runOpID, tgt)
+	cmdr := target.Must[target.Command](runOpID, tgt)
 	result, err := cmdr.RunCommand(ctx, op.check)
 	if err != nil {
 		return spec.CheckUnsatisfied, nil, err
@@ -57,7 +57,7 @@ func (op *runOp) Execute(
 	_ source.Source,
 	tgt target.Target,
 ) (spec.Result, error) {
-	cmdr := target.Must[target.Commander](runOpID, tgt)
+	cmdr := target.Must[target.Command](runOpID, tgt)
 
 	result, err := cmdr.RunCommand(ctx, op.apply)
 	if err != nil {
@@ -104,7 +104,7 @@ func (op *runOp) Execute(
 }
 
 func (runOp) RequiredCapabilities() capability.Capability {
-	return capability.Commander
+	return capability.Command
 }
 
 // OpDescription

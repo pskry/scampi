@@ -22,12 +22,11 @@ const (
 	Pkg                                 // IsInstalled, InstallPkgs, RemovePkgs
 	PkgUpdate                           // UpdateCache, IsUpgradable
 	Service                             // IsActive, IsEnabled, Start, Stop, Enable, Disable
-	Commander                           // RunCommand
+	Command                             // RunCommand
 )
 
 const (
-	// Full POSIX filesystem
-	POSIX Capability = Filesystem | Ownership | FileMode | Symlink | Commander
+	POSIX Capability = Filesystem | Ownership | FileMode | Symlink | Command
 )
 
 func (c Capability) HasAll(other Capability) bool {
@@ -70,8 +69,8 @@ func (c Capability) String() string {
 	if c&Service != 0 {
 		parts = append(parts, "Service")
 	}
-	if c&Commander != 0 {
-		parts = append(parts, "Commander")
+	if c&Command != 0 {
+		parts = append(parts, "Command")
 	}
 
 	// If no known flags matched, show raw value

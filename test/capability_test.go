@@ -83,7 +83,7 @@ deploy(
 `, newSymlinkOnlyTarget())
 }
 
-func TestPlan_Run_RequiresCommander(t *testing.T) {
+func TestPlan_Run_RequiresCommand(t *testing.T) {
 	assertCapabilityMismatch(t, `
 target.local(name="local")
 deploy(
@@ -91,7 +91,7 @@ deploy(
     targets=["local"],
     steps=[run(apply="echo hello", check="true")],
 )
-`, newNoCommanderTarget())
+`, newNoCommandTarget())
 }
 
 func TestPlan_Copy_RequiresOwnership(t *testing.T) {

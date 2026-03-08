@@ -79,7 +79,7 @@ type (
 		Stderr   string
 		ExitCode int
 	}
-	Commander interface {
+	Command interface {
 		RunCommand(ctx context.Context, cmd string) (CommandResult, error)
 	}
 )
