@@ -87,7 +87,7 @@ convention as a fallback default:
 secrets(backend="file", path="secrets.json")
 secrets(backend="bitwarden", vault="my-vault")
 secrets(backend="vault", addr=env("VAULT_ADDR"))
-secrets(backend=env("DOIT_SECRET_BACKEND", "file"))
+secrets(backend=env("SCAMPI_SECRET_BACKEND", "file"))
 ```
 
 This matters for the deferred-config use case: a build-time scampi run can
