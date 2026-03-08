@@ -16,7 +16,7 @@ func TestCreate_DetectsPkgBackend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if !tgt.Capabilities().Has(capability.Pkg) {
+	if !tgt.Capabilities().HasAll(capability.Pkg) {
 		t.Fatalf(
 			"expected local target on %s/%s to provide Pkg capability, but it didn't",
 			runtime.GOOS,

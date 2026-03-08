@@ -30,7 +30,11 @@ const (
 	POSIX Capability = Filesystem | Ownership | FileMode | Symlink | Commander
 )
 
-func (c Capability) Has(other Capability) bool {
+func (c Capability) HasAll(other Capability) bool {
+	return c&other == other
+}
+
+func (c Capability) HasAny(other Capability) bool {
 	return c&other != 0
 }
 
