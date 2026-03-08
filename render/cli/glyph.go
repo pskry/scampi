@@ -27,6 +27,8 @@ type glyphSet struct {
 	opBranch             string
 	opLast               string
 
+	depsArrow string
+
 	parallelTop   string
 	parallelMid   string
 	parallelBot   string
@@ -59,6 +61,8 @@ var (
 		opBranch:             "├─",
 		opLast:               "└─",
 
+		depsArrow: "←",
+
 		parallelTop:   "╮",
 		parallelMid:   "│",
 		parallelBot:   "╯",
@@ -89,6 +93,8 @@ var (
 		actionEnd:            "#",
 		opBranch:             "|-",
 		opLast:               "`-",
+
+		depsArrow: "<-",
 
 		parallelTop:   ")",
 		parallelMid:   ")",

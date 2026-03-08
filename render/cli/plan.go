@@ -178,7 +178,7 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 		for i, d := range deps {
 			parts[i] = strconv.Itoa(d)
 		}
-		return "← [" + strings.Join(parts, ", ") + "]"
+		return p.glyphs.depsArrow + " [" + strings.Join(parts, ", ") + "]"
 	}
 
 	depsStrs := make([]string, len(actions))

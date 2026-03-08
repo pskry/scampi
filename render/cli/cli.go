@@ -456,7 +456,7 @@ func (c *cli) EmitLegend() {
 		{"", ansi.ANSI{}, "", ""},
 		{collapsed, colActionKind, "", "collapsed action (default verbosity)"},
 		{"", ansi.ANSI{}, "", ""},
-		{"← [N, ...]", colPlanDeps, "", "depends on action N (must complete first)"},
+		{c.glyphs.depsArrow + " [N, ...]", colPlanDeps, "", "depends on action N (must complete first)"},
 		{c.glyphs.parallelTop, colPlanBracket, "", "parallel execution group"},
 		{c.glyphs.parallelMid, colPlanBracket, "", ""},
 		{c.glyphs.parallelBot, colPlanBracket, "", ""},
