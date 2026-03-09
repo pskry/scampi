@@ -572,6 +572,12 @@ Things that aren't blocking anything but would be nice to get to.
   ff at some point.
 - **`scampi inspect` doesn't show template steps.** Templates should be
   inspectable like other step types.
+- **`secrets reencrypt` command.** Decrypt all secrets with your key and
+  re-encrypt them to an updated recipient list. Needed for key rotation and
+  revoking access (e.g. team member leaves). Recipients file resolution:
+  `--recipients` (inline CSV) or `--recipients-file` override, otherwise
+  look for `<project_root>/.scampi/recipients` then
+  `<project_root>/.recipients`. Each line is an age public key.
 - **Error message consistency pass.** Go through all error messages codebase-wide
   and make them self-documenting: say what's wrong, show correct syntax using
   values the user already provided.
