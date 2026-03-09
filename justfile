@@ -1,6 +1,3 @@
-GOLANGCI_LINT_VERSION := `go list -m -f '{{.Version}}' github.com/golangci/golangci-lint/v2`
-BENCHSTAT_VERSION     := `go list -m -f '{{.Version}}' golang.org/x/perf`
-
 build_dir := "./build"
 bin_dir   := f"{{build_dir}}/bin"
 bin_path  := f"{{bin_dir}}/scampi"
@@ -32,7 +29,8 @@ fmt:
 
 [doc("Lint project")]
 lint:
-  golangci-lint run
+  go tool golangci-lint run
+  go tool gomarklint
   just license-check
 
 [doc("Site build/dev (just site --list for subcommands)")]
@@ -44,12 +42,6 @@ mod site
 [doc("Run code generation")]
 generate:
   go generate ./...
-
-[doc("Install prerequisites")]
-install-prereqs:
-  go mod tidy
-  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{GOLANGCI_LINT_VERSION}}
-  go install golang.org/x/perf/cmd/benchstat@{{BENCHSTAT_VERSION}}
 
 [doc("Check SPDX license headers")]
 license-check:

@@ -81,7 +81,6 @@ a proper step type.
 | always + apply        | No         | No      | Always "changed"   |
 | Built-in step types   | Yes (engine)| Yes    | Yes                |
 
-
 ## Migration on-ramp
 
 The escape hatch isn't just an emergency exit — it's the adoption path. Asking

@@ -102,7 +102,7 @@ benchcomp suffix:
   echo "Comparing:"; \
   echo "  $prev"; \
   echo "  $curr"; \
-  benchstat -table .config -row .fullname -col .file "$prev" "$curr"
+  go tool benchstat -table .config -row .fullname -col .file "$prev" "$curr"
 
 [doc("Plot benchmark history as HTML dashboard for given suffix")]
 benchplot suffix:
