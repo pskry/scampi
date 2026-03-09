@@ -35,6 +35,9 @@ lint:
   golangci-lint run
   just license-check
 
+[doc("Site build/dev (just site --list for subcommands)")]
+mod site
+
 # Housekeeping
 # ##############################################################################
 

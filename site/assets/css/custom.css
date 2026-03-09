@@ -1,0 +1,17 @@
+nav a[href*="docs"],
+nav a[href*="docs"] * {
+  font-weight: 600 !important;
+}
+
+/* External link indicator for content area */
+article a[href^="http"]::after,
+.hextra-content a[href^="http"]::after {
+  content: "\2197";
+  font-size: 0.65em;
+  position: relative;
+  top: -0.25em;
+  margin-left: 0.1em;
+  opacity: 0.6;
+  text-decoration: none;
+  display: inline-block;
+}

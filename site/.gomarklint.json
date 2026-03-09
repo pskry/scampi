@@ -1,0 +1,8 @@
+{
+  "minHeadingLevel": 2,
+  "enableDuplicateHeadingCheck": false,
+  "enableHeadingLevelCheck": true,
+  "enableNoMultipleBlankLinesCheck": true,
+  "enableNoSetextHeadingsCheck": true,
+  "enableFinalBlankLineCheck": true
+}

@@ -2,6 +2,7 @@
 .*
 !.gitignore
 !.golangci.yml
+!.gomarklint.json
 
 # Github workflows
 !/.github/
