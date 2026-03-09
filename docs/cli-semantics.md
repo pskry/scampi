@@ -11,10 +11,10 @@
 | Yellow | Change / Mutation | Something modified system state |
 | Green | Correctness / Stability | System was already correct; no change needed |
 | Red | Failure | An error occurred; execution could not proceed |
-| Blue | Narration / Context | Engine, plan, action boundaries (structural) |
+| Blue | Deploy block boundaries | Plan start/finish, deploy block lifecycle |
+| Cyan | Action boundaries | Action headers, kind labels, op counts |
+| Magenta | Plan structure | Plan headers, plan rails |
 | Dim | Detail / Noise | Ops, checks, execution details (higher verbosity) |
-
-Unused colors (cyan, magenta, etc.) are **intentionally reserved** for future semantic meaning.
 
 ---
 

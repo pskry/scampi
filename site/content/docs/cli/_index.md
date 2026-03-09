@@ -43,13 +43,15 @@ decorative, and verbosity controls how much detail you see.
 
 ### Colors
 
-| Color  | Meaning |
-|--------|---------|
-| Yellow | Mutation — something changed |
-| Green  | Already correct — no change needed |
-| Red    | Failure |
-| Blue   | Engine narration — action and deploy block boundaries |
-| Dim    | Detail — shown at higher verbosity levels |
+| Color   | Meaning |
+|---------|---------|
+| Yellow  | Mutation — something changed |
+| Green   | Already correct — no change needed |
+| Red     | Failure |
+| Blue    | Deploy block boundaries — plan start/finish |
+| Cyan    | Action boundaries — step headers and op counts |
+| Magenta | Plan structure — plan headers and rails |
+| Dim     | Detail — shown at higher verbosity levels |
 
 When you see yellow, something changed. When you see green, it was already right.
 When you see red, something broke. You never need to read the text to understand

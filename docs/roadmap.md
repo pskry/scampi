@@ -14,9 +14,9 @@ project, and be able to migrate an existing one incrementally?**
 ## Progress
 
 **Phase 1: Foundation**
-- [x] Secrets (v1: `secret()` builtin, `unencrypted_file` backend)
+- [x] Secrets (v1: `secret()` builtin, `file` backend)
 - [x] User-controlled backend selection (`secrets()` builtin)
-- [x] Encrypted file backend (age/sops)
+- [x] Encrypted file backend (`age`)
 - [ ] Deploy block dependencies (`after=`)
 
 **Phase 2: Targets**
@@ -58,7 +58,7 @@ Each gap is ordered by what it unblocks. Later items depend on earlier ones.
 
 - `secret("key")` builtin — resolves at eval time, returns a plain string
 - `secret.Backend` interface — `Name() string`, `Lookup(key) (string, bool, error)`
-- `unencrypted_file` backend — reads a flat JSON `secrets.json` next to the config
+- `file` backend — reads a flat JSON `secrets.json` next to the config
 - `source.Source.LookupSecret()` — wired through all Source implementations
 - `source.WithSecrets()` decorator — attaches a backend to any Source
 - Diagnostic errors: `SecretError`, `SecretNotFoundError`, `SecretBackendError`
@@ -101,7 +101,7 @@ deploy-time are independent runs with independent backends. The config says
 |---------|---------|------|
 | Local dev | `file` (secrets.json) | None, plaintext |
 | CI runner / web UI | `bitwarden`, `1password` | API token via env var |
-| Airgapped deploy | `encrypted_file` (age/gpg) | Key delivered out-of-band |
+| Airgapped deploy | `age` | Key delivered out-of-band |
 | Enterprise | `vault` | Token from env or instance metadata |
 
 **Design principles (unchanged):**

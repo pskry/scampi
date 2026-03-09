@@ -153,16 +153,18 @@ services, or anything else. This means:
   "this is independent, safe to parallelize with everything else."
 - A `run` command could touch anything. The only safe behavior is to treat it
   as a **barrier**: drain all preceding steps, execute the `run` step alone,
-  then continue with subsequent steps.
+  then continue with subsequent steps. Same idea as a memory fence in assembly
+  — the compiler can't see through the clobber, so it must not reorder across
+  it.
 
-This is an explicit property of the `run` step type, not an inference from
-missing metadata. The step type declares "I conflict with everything" and the
-engine respects that.
+Today the engine executes actions sequentially, so the barrier falls out for
+free. But this is a design constraint, not an implementation detail — if the
+engine ever parallelizes independent actions (via `Pather` dependency
+inference), `run` must remain a full serialization point.
 
 This is also another reason to convert `run` steps to native step types over
 time — native steps declare their dependencies, which lets the engine
-parallelize them. Each `run` step is a serialization point that slows down the
-whole plan.
+parallelize them. Each `run` step is a barrier that serializes the whole plan.
 
 ## Open questions
 

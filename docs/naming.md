@@ -170,7 +170,6 @@ type Config struct {
     Path    string
     Targets map[string]TargetInstance
     Deploy  map[string]DeployBlock
-    Sources SourceStore
 }
 ```
 
@@ -198,7 +197,6 @@ type ResolvedConfig struct {
     TargetName string
     Target     TargetInstance
     Steps      []StepInstance
-    Sources    SourceStore
 }
 ```
 
@@ -325,11 +323,13 @@ type Source interface {
     EnsureDir(ctx context.Context, path string) error
     Stat(ctx context.Context, path string) (FileMeta, error)
     LookupEnv(key string) (string, bool)
+    LookupSecret(key string) (string, bool, error)
 }
 ```
 
 - Supports both read and write (write is for caching, not mutation)
 - `LookupEnv` provides environment variable access
+- `LookupSecret` resolves secrets from the configured backend
 - Examples: local filesystem, git repository, S3 bucket
 - Used to fetch files that will be distributed to targets
 
@@ -349,9 +349,13 @@ Available capability interfaces:
 
 ```go
 type Filesystem interface { ... }  // ReadFile, WriteFile, Stat, Remove
-type FileMode interface { ... }    // Chmod
+type FileMode interface { ... }    // Chmod, mode in Stat
 type Symlink interface { ... }     // Symlink, Readlink, Lstat
 type Ownership interface { ... }   // HasUser, HasGroup, GetOwner, Chown
+type Pkg interface { ... }         // IsInstalled, InstallPkgs, RemovePkgs
+type PkgUpdate interface { ... }   // UpdateCache, IsUpgradable
+type Service interface { ... }     // IsActive, IsEnabled, Start, Stop, Enable, Disable
+type Command interface { ... }     // RunCommand
 ```
 
 The capability bitmask:
@@ -362,6 +366,10 @@ const (
     FileMode
     Symlink
     Ownership
+    Pkg
+    PkgUpdate
+    Service
+    Command
 )
 ```
 
