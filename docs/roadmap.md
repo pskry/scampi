@@ -578,6 +578,15 @@ Things that aren't blocking anything but would be nice to get to.
   `--recipients` (inline CSV) or `--recipients-file` override, otherwise
   look for `<project_root>/.scampi/recipients` then
   `<project_root>/.recipients`. Each line is an age public key.
+- **`check` across barriers.** When a `run` step's check reports "would change",
+  downstream steps that depend on it will fail because the side effect hasn't
+  happened. Instead of hard errors, the engine should report these as "skipped —
+  depends on uncommitted changes." Requires the check phase to propagate
+  "uncommitted" state through barrier edges.
+- **Action-started feedback.** The CLI shows nothing between "plan finished" and
+  the first action completing. Every action should announce itself when it starts
+  executing, not just when it finishes — otherwise slow steps (apt installs,
+  large file transfers) look like hangs.
 - **Error message consistency pass.** Go through all error messages codebase-wide
   and make them self-documenting: say what's wrong, show correct syntax using
   values the user already provided.
