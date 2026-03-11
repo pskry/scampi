@@ -132,6 +132,39 @@ func (renderTemplateOp) RequiredCapabilities() capability.Capability {
 	return capability.Filesystem
 }
 
+func (op *renderTemplateOp) DesiredContent(ctx context.Context, src source.Source) ([]byte, error) {
+	data, err := mergeData(op.data, src)
+	if err != nil {
+		return nil, err
+	}
+
+	tmplContent, err := op.getTemplateContent(ctx, src)
+	if err != nil {
+		return nil, err
+	}
+
+	tmpl, err := gotmpl.New("template").Option("missingkey=error").Parse(string(tmplContent))
+	if err != nil {
+		return nil, TemplateParseError{Err: err, Source: op.SrcSpan}
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, op.execError(err, string(tmplContent))
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (op *renderTemplateOp) CurrentContent(ctx context.Context, _ source.Source, tgt target.Target) ([]byte, error) {
+	fsTgt := target.Must[target.Filesystem](renderTemplateID, tgt)
+	return fsTgt.ReadFile(ctx, op.dest)
+}
+
+func (op *renderTemplateOp) DestPath() string {
+	return op.dest
+}
+
 func (op *renderTemplateOp) getTemplateContent(ctx context.Context, src source.Source) ([]byte, error) {
 	if op.content != "" {
 		return []byte(op.content), nil

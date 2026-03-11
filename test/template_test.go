@@ -15,6 +15,146 @@ import (
 	"scampi.dev/scampi/target"
 )
 
+// TestTemplate_Inspect_SrcFile verifies template steps are inspectable with src files.
+func TestTemplate_Inspect_SrcFile(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+    name="test",
+    targets=["local"],
+    steps=[
+        template(
+            desc="inspect-src",
+            src="/tmpl.txt",
+            dest="/out.txt",
+            data={
+                "values": {
+                    "name": "world",
+                },
+            },
+            perm="0644",
+            owner="user",
+            group="group",
+        ),
+    ],
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/tmpl.txt"] = []byte("Hello, {{.name}}!")
+	src.Files["/config.star"] = []byte(cfgStr)
+	tgt.Files["/out.txt"] = []byte("old content")
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	ctx := context.Background()
+	cfg, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	result, err := e.Inspect(ctx, "")
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+
+	if result.DestPath != "/out.txt" {
+		t.Errorf("DestPath = %q, want %q", result.DestPath, "/out.txt")
+	}
+	if got := string(result.Desired); got != "Hello, world!" {
+		t.Errorf("Desired = %q, want %q", got, "Hello, world!")
+	}
+	if got := string(result.Current); got != "old content" {
+		t.Errorf("Current = %q, want %q", got, "old content")
+	}
+}
+
+// TestTemplate_Inspect_Inline verifies template steps are inspectable with inline content.
+func TestTemplate_Inspect_Inline(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+    name="test",
+    targets=["local"],
+    steps=[
+        template(
+            desc="inspect-inline",
+            content="Port: {{.port}}",
+            dest="/app.conf",
+            data={
+                "values": {
+                    "port": "8080",
+                },
+            },
+            perm="0644",
+            owner="user",
+            group="group",
+        ),
+    ],
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/config.star"] = []byte(cfgStr)
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	ctx := context.Background()
+	cfg, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	resolved, err := engine.Resolve(cfg, "", "")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	resolved.Target = mockTargetInstance(tgt)
+
+	e, err := engine.New(ctx, src, resolved, em)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	result, err := e.Inspect(ctx, "")
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+
+	if result.DestPath != "/app.conf" {
+		t.Errorf("DestPath = %q, want %q", result.DestPath, "/app.conf")
+	}
+	if got := string(result.Desired); got != "Port: 8080" {
+		t.Errorf("Desired = %q, want %q", got, "Port: 8080")
+	}
+	if result.Current != nil {
+		t.Errorf("Current = %q, want nil (file doesn't exist)", result.Current)
+	}
+}
+
 // TestTemplate_BasicRender verifies basic template rendering with values.
 func TestTemplate_BasicRender(t *testing.T) {
 	cfgStr := `
