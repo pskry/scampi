@@ -36,6 +36,9 @@ lint:
 [doc("Site build/dev (just site --list for subcommands)")]
 mod site
 
+[doc("Codeberg repo management")]
+mod codeberg
+
 # Housekeeping
 # ##############################################################################
 
