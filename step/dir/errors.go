@@ -24,7 +24,7 @@ func (e NotADirectoryError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.dir.NotADirectory",
 		Text:   `path "{{.Path}}" exists but is not a directory`,
-		Hint:   "the path exists but is not a directory",
+		Hint:   `remove or rename the file at "{{.Path}}", then rerun to create it as a directory`,
 		Data:   e,
 		Source: &e.Source,
 	}

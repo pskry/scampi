@@ -85,7 +85,7 @@ func (e PermissionDeniedError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.PermissionDenied",
 		Text:   `permission denied for operation "{{.Operation}}"`,
-		Hint:   "make sure you have the necessary permissions for this operation",
+		Hint:   "run as root, or configure passwordless sudo/doas for the target user",
 		Data:   e,
 		Source: &e.Source,
 	}
