@@ -4,11 +4,13 @@ mdlint := "go tool github.com/shinagawa-web/gomarklint"
 [default]
 [doc("Build the Hugo site")]
 build:
+  cp scampi.png site/static/scampi.png
   cd site && {{hugo}} --minify
 
 [doc("Local dev server")]
-dev:
-  cd site && {{hugo}} server -D -e production
+dev *args:
+  cp scampi.png site/static/scampi.png
+  cd site && {{hugo}} server -D -e production {{args}}
 
 [doc("Package site for deployment")]
 dist outdir="build/site-dist": build

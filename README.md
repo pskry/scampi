@@ -1,4 +1,6 @@
-# 🍤 scampi
+![scampi](scampi.png)
+
+# scampi
 
 [![CI](https://codeberg.org/pskry/scampi/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/pskry/scampi/actions?workflow=ci.yml)
 
@@ -103,4 +105,4 @@ See [LICENSE](LICENSE)
 
 ---
 
-*🍤 Made with garlic butter and good intentions*
+*🍤 Made with garlic butter and strong opinions*

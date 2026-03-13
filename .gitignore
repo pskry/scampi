@@ -12,6 +12,7 @@
 
 # Build and debug artifacts
 /build/
+site/static/scampi.png
 __debug*
 *.zip
 *.out

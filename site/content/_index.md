@@ -8,21 +8,36 @@ layout: hextra-home
   {{< icon name="arrow-circle-right" attributes="height=14" >}}
 {{< /hextra/hero-badge >}}
 
-<div class="hx-mt-6 hx-mb-6">
+<style>
+.hero-row { display: flex; align-items: center; justify-content: center; gap: 2rem; }
+.hero-mascot { height: 160px; flex-shrink: 0; }
+@media (max-width: 640px) { .hero-mascot { display: none; } }
+.home-code pre { overflow-x: auto; max-width: 100%; }
+.home-code { overflow: hidden; max-width: 100%; }
+</style>
+
+<div class="hero-row hx-mt-6 hx-mb-6">
+<div>
+
 {{< hextra/hero-headline >}}
   Declare the what.&nbsp;<br class="sm:hx-block hx-hidden" />scampi handles the how.
 {{< /hextra/hero-headline >}}
+
+<div class="hx-mt-4">
+{{< hextra/hero-subtitle >}}
+  IaC convergence, garlic buttery smooth
+{{< /hextra/hero-subtitle >}}
 </div>
 
-<div class="hx-mb-6">
-{{< hextra/hero-subtitle >}}
-  IaC convergence, garlic buttery smooth 🍤
-{{< /hextra/hero-subtitle >}}
+</div>
+<img src="/scampi.png" alt="scampi mascot" class="hero-mascot">
 </div>
 
 <div class="hx-mt-8 hx-mb-16" style="padding-top: 1.5rem; padding-bottom: 1.5rem;">
 {{< hextra/hero-button text="Get Started" link="docs/getting-started" >}}
 </div>
+
+<div class="home-code">
 
 ```python
 target.local(name="my-machine")
@@ -40,6 +55,8 @@ deploy(
     ],
 )
 ```
+
+</div>
 
 {{< hextra/feature-grid >}}
   {{< hextra/feature-card
