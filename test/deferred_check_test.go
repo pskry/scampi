@@ -81,7 +81,7 @@ func TestCheck_DeferredPath_UpstreamPromisesDirectory(t *testing.T) {
 	}
 	defer e.Close()
 
-	rep, err := e.CheckPlan(context.Background(), plan)
+	rep, _, err := e.CheckPlan(context.Background(), plan)
 	if err != nil {
 		t.Fatalf("CheckPlan must not return error when path is deferred, got: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestCheck_DeferredPath_NoPromise_StillAborts(t *testing.T) {
 	}
 	defer e.Close()
 
-	_, err = e.CheckPlan(context.Background(), plan)
+	_, _, err = e.CheckPlan(context.Background(), plan)
 	if err == nil {
 		t.Fatalf("CheckPlan must abort when no upstream action promises the path")
 	}
@@ -181,7 +181,7 @@ func TestCheck_DeferredPath_UpstreamSatisfied_NoPromise(t *testing.T) {
 	}
 	defer e.Close()
 
-	_, err = e.CheckPlan(context.Background(), plan)
+	_, _, err = e.CheckPlan(context.Background(), plan)
 	if err == nil {
 		t.Fatalf("CheckPlan must abort: upstream is satisfied so path is not promised")
 	}
@@ -223,7 +223,7 @@ func TestCheck_DeferredPath_NonDeferrableError_StillAborts(t *testing.T) {
 	}
 	defer e.Close()
 
-	_, err = e.CheckPlan(context.Background(), plan)
+	_, _, err = e.CheckPlan(context.Background(), plan)
 	if err == nil {
 		t.Fatalf("CheckPlan must abort for non-deferrable errors")
 	}
@@ -270,7 +270,7 @@ func TestCheck_DeferredPath_AncestorPromise(t *testing.T) {
 	}
 	defer e.Close()
 
-	rep, err := e.CheckPlan(context.Background(), plan)
+	rep, _, err := e.CheckPlan(context.Background(), plan)
 	if err != nil {
 		t.Fatalf("CheckPlan must not abort when ancestor path is promised, got: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestCheck_DeferredPath_OpOutcomeIsWouldChange(t *testing.T) {
 	}
 	defer e.Close()
 
-	rep, err := e.CheckPlan(context.Background(), plan)
+	rep, _, err := e.CheckPlan(context.Background(), plan)
 	if err != nil {
 		t.Fatalf("CheckPlan: %v", err)
 	}

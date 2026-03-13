@@ -45,7 +45,7 @@ func Inspect(
 }
 
 func (e *Engine) Inspect(ctx context.Context, stepFilter string) (*InspectResult, error) {
-	p, _, err := plan(e.cfg, e.em, e.tgt.Capabilities())
+	p, _, _, err := plan(e.cfg, e.em, e.tgt.Capabilities())
 	if err != nil {
 		return nil, err
 	}

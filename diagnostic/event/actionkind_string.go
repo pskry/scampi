@@ -12,11 +12,13 @@ func _() {
 	var x [1]struct{}
 	_ = x[ActionStarted-0]
 	_ = x[ActionFinished-1]
+	_ = x[HookTriggered-2]
+	_ = x[HookSkipped-3]
 }
 
-const _ActionKind_name = "ActionStartedActionFinished"
+const _ActionKind_name = "ActionStartedActionFinishedHookTriggeredHookSkipped"
 
-var _ActionKind_index = [...]uint8{0, 13, 27}
+var _ActionKind_index = [...]uint8{0, 13, 27, 40, 51}
 
 func (i ActionKind) String() string {
 	if i >= ActionKind(len(_ActionKind_index)-1) {

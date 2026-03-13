@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/model"
 	"scampi.dev/scampi/source"
@@ -68,7 +69,8 @@ type scheduler struct {
 	actIdx    int
 	actKind   string
 	actDesc   string
-	checkOnly bool // true for check command (affects op event chattiness)
+	hookID    string // non-empty when running ops for a hook
+	checkOnly bool   // true for check command (affects op event chattiness)
 
 	// promisedPaths holds paths that upstream actions have promised to create.
 	// Used during check mode to defer abort errors for missing directories
@@ -81,6 +83,11 @@ type scheduler struct {
 	ctx     context.Context
 }
 
+func (s *scheduler) emitOp(e event.OpEvent) {
+	e.Step.HookID = s.hookID
+	s.em.EmitOpLifecycle(e)
+}
+
 func (s *scheduler) schedule(n *opNode) {
 	if n.satisfied {
 		return
@@ -90,7 +97,7 @@ func (s *scheduler) schedule(n *opNode) {
 		start := time.Now()
 		displayID := diagnostic.OpDisplayID(n.op)
 
-		s.em.EmitOpLifecycle(diagnostic.OpExecuteStarted(
+		s.emitOp(diagnostic.OpExecuteStarted(
 			s.actIdx,
 			s.actKind,
 			s.actDesc,
@@ -99,7 +106,7 @@ func (s *scheduler) schedule(n *opNode) {
 
 		res, err := n.op.Execute(s.ctx, s.src, s.tgt)
 
-		s.em.EmitOpLifecycle(diagnostic.OpExecuted(
+		s.emitOp(diagnostic.OpExecuted(
 			s.actIdx,
 			s.actKind,
 			s.actDesc,
@@ -147,7 +154,7 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 		n := n
 		g.Go(func() error {
 			displayID := diagnostic.OpDisplayID(n.op)
-			s.em.EmitOpLifecycle(diagnostic.OpCheckStarted(
+			s.emitOp(diagnostic.OpCheckStarted(
 				s.actIdx,
 				s.actKind,
 				s.actDesc,
@@ -160,7 +167,7 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 					s.mu.Lock()
 					n.outcome = model.OpWouldChange
 					s.mu.Unlock()
-					s.em.EmitOpLifecycle(diagnostic.OpChecked(
+					s.emitOp(diagnostic.OpChecked(
 						s.actIdx,
 						s.actKind,
 						s.actDesc,
@@ -175,7 +182,7 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 
 				impact, consumed := emitOpDiagnostic(s.em, s.actIdx, s.actKind, s.actDesc, displayID, err)
 
-				s.em.EmitOpLifecycle(diagnostic.OpChecked(
+				s.emitOp(diagnostic.OpChecked(
 					s.actIdx,
 					s.actKind,
 					s.actDesc,
@@ -204,7 +211,7 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 				drift = nil
 			}
 
-			s.em.EmitOpLifecycle(diagnostic.OpChecked(
+			s.emitOp(diagnostic.OpChecked(
 				s.actIdx,
 				s.actKind,
 				s.actDesc,
@@ -280,15 +287,15 @@ func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) (model.Executi
 	return res, nil
 }
 
-func (e *Engine) CheckPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, error) {
-	res, err := e.checkPlan(ctx, plan)
+func (e *Engine) CheckPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, map[string]bool, error) {
+	res, pp, err := e.checkPlan(ctx, plan)
 	if err != nil {
-		return res, panicIfNotAbortError(err)
+		return res, pp, panicIfNotAbortError(err)
 	}
-	return res, nil
+	return res, pp, nil
 }
 
-func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, error) {
+func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, map[string]bool, error) {
 	nodes := buildActionGraph(plan.Unit.Actions)
 	initActionPending(nodes)
 
@@ -359,7 +366,7 @@ func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.Execution
 		rep.Err = err
 	}
 
-	return rep, err
+	return rep, promisedPaths, err
 }
 
 func (e *Engine) checkAction(
@@ -376,7 +383,7 @@ func (e *Engine) checkAction(
 	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
-	res, err := e.runCheckAction(actCtx, idx, act, promisedPaths)
+	res, err := e.runCheckAction(actCtx, idx, act, promisedPaths, "")
 
 	e.em.EmitActionLifecycle(
 		diagnostic.ActionFinished(
@@ -401,6 +408,7 @@ func (e *Engine) runCheckAction(
 	idx int,
 	act spec.Action,
 	promisedPaths map[string]bool,
+	hookID string,
 ) (model.ActionReport, error) {
 	nodes, planErr := buildPlan(act.Ops())
 	if planErr != nil {
@@ -414,6 +422,7 @@ func (e *Engine) runCheckAction(
 		actIdx:        idx,
 		actKind:       act.Kind(),
 		actDesc:       act.Desc(),
+		hookID:        hookID,
 		checkOnly:     true,
 		promisedPaths: promisedPaths,
 	}
@@ -552,7 +561,7 @@ func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (m
 	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
-	res, err := e.runAction(actCtx, idx, act)
+	res, err := e.runAction(actCtx, idx, act, "")
 
 	e.em.EmitActionLifecycle(
 		diagnostic.ActionFinished(
@@ -572,7 +581,7 @@ func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (m
 	return res, nil
 }
 
-func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model.ActionReport, error) {
+func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action, hookID string) (model.ActionReport, error) {
 	nodes, planErr := buildPlan(act.Ops())
 	if planErr != nil {
 		return model.ActionReport{}, planErr
@@ -585,6 +594,7 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action) (model
 		actIdx:  idx,
 		actKind: act.Kind(),
 		actDesc: act.Desc(),
+		hookID:  hookID,
 	}
 	s.grp, s.ctx = errgroup.WithContext(ctx)
 

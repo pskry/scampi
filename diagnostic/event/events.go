@@ -15,6 +15,7 @@ type EngineFinishedDetail struct {
 	WouldChangeCount int
 	FailedCount      int
 	TotalCount       int
+	HooksFired       int
 	Duration         time.Duration
 	Err              error
 }
@@ -57,6 +58,13 @@ type ActionDetail struct {
 	Summary  model.ActionSummary
 	Duration time.Duration
 	Err      error
+}
+
+type HookDetail struct {
+	HookID    string
+	TriggerBy string // desc of the step/hook that triggered this hook (empty for skipped)
+	Summary   model.ActionSummary
+	Duration  time.Duration
 }
 
 type OpCheckDetail struct {

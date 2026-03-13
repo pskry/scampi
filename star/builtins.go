@@ -41,14 +41,16 @@ func builtinDeploy(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		name    string
-		targets *starlark.List
-		steps   *starlark.List
+		name     string
+		targets  *starlark.List
+		steps    *starlark.List
+		hooksVal *starlark.Dict
 	)
 	if err := starlark.UnpackArgs("deploy", args, kwargs,
 		"name", &name,
 		"targets", &targets,
 		"steps", &steps,
+		"hooks?", &hooksVal,
 	); err != nil {
 		return nil, err
 	}
@@ -94,10 +96,17 @@ func builtinDeploy(
 		}
 		return nil, &EmptyListError{Func: "deploy", Field: "steps", Source: s}
 	}
+
+	hooks, err := extractHooks(hooksVal, span)
+	if err != nil {
+		return nil, err
+	}
+
 	block := spec.DeployBlock{
 		Name:    name,
 		Targets: targetNames,
 		Steps:   stepInstances,
+		Hooks:   hooks,
 		Source:  span,
 	}
 
@@ -107,6 +116,82 @@ func builtinDeploy(
 	}
 
 	return poisonValue{funcName: "deploy"}, nil
+}
+
+func extractHooks(dict *starlark.Dict, span spec.SourceSpan) (map[string][]spec.StepInstance, error) {
+	if dict == nil {
+		return nil, nil
+	}
+
+	hooks := make(map[string][]spec.StepInstance, dict.Len())
+	for _, item := range dict.Items() {
+		key, ok := starlark.AsString(item[0])
+		if !ok {
+			return nil, &TypeError{
+				Context:  "deploy: hooks key",
+				Expected: "string",
+				Got:      item[0].Type(),
+				Source:   span,
+			}
+		}
+		if key == "" {
+			return nil, &EmptyNameError{Func: "deploy hooks", Source: span}
+		}
+
+		steps, err := extractHookSteps(key, item[1], span)
+		if err != nil {
+			return nil, err
+		}
+		hooks[key] = steps
+	}
+
+	return hooks, nil
+}
+
+func extractHookSteps(hookID string, val starlark.Value, span spec.SourceSpan) ([]spec.StepInstance, error) {
+	switch v := val.(type) {
+	case *StarlarkStep:
+		inst := v.Instance
+		if inst.Desc == "" && inst.Type != nil {
+			inst.Desc = fmt.Sprintf("hook:%s", hookID)
+		}
+		return []spec.StepInstance{inst}, nil
+
+	case *starlark.List:
+		if v.Len() == 0 {
+			return nil, &EmptyListError{
+				Func:   "deploy hooks",
+				Field:  fmt.Sprintf("hooks[%q]", hookID),
+				Source: span,
+			}
+		}
+		out := make([]spec.StepInstance, 0, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			step, ok := v.Index(i).(*StarlarkStep)
+			if !ok {
+				return nil, &TypeError{
+					Context:  fmt.Sprintf("deploy: hooks[%q][%d]", hookID, i),
+					Expected: "step",
+					Got:      v.Index(i).Type(),
+					Source:   span,
+				}
+			}
+			inst := step.Instance
+			if inst.Desc == "" && inst.Type != nil {
+				inst.Desc = fmt.Sprintf("hook:%s[%d]", hookID, i)
+			}
+			out = append(out, inst)
+		}
+		return out, nil
+
+	default:
+		return nil, &TypeError{
+			Context:  fmt.Sprintf("deploy: hooks[%q]", hookID),
+			Expected: "step or list of steps",
+			Got:      val.Type(),
+			Source:   span,
+		}
+	}
 }
 
 func extractSteps(list *starlark.List, fn string) ([]spec.StepInstance, error) {

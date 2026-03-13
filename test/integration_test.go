@@ -663,6 +663,681 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
+// Hook tests
+// -----------------------------------------------------------------------------
+
+// TestHook_Triggered verifies that a hook fires when its notifying step changes.
+func TestHook_Triggered(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["restart-nginx"],
+		),
+	],
+	hooks={
+		"restart-nginx": service(
+			name="nginx",
+			state="restarted",
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("new config")
+	tgt.Services["nginx"] = true
+	tgt.EnabledServices["nginx"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	if tgt.Restarts["nginx"] != 1 {
+		t.Errorf("expected 1 restart, got %d", tgt.Restarts["nginx"])
+	}
+}
+
+// TestHook_OnChangeSingleString verifies that on_change accepts a bare string.
+func TestHook_OnChangeSingleString(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change="restart-nginx",
+		),
+	],
+	hooks={
+		"restart-nginx": service(
+			name="nginx",
+			state="restarted",
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("new config")
+	tgt.Services["nginx"] = true
+	tgt.EnabledServices["nginx"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	if tgt.Restarts["nginx"] != 1 {
+		t.Errorf("expected 1 restart, got %d", tgt.Restarts["nginx"])
+	}
+}
+
+// TestHook_NotTriggered verifies that a hook does not fire when nothing changed.
+func TestHook_NotTriggered(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["restart-nginx"],
+		),
+	],
+	hooks={
+		"restart-nginx": service(
+			name="nginx",
+			state="restarted",
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("content")
+	// Pre-populate with matching state
+	tgt.Files["/dest.txt"] = []byte("content")
+	tgt.Modes["/dest.txt"] = fs.FileMode(0o644)
+	tgt.Owners["/dest.txt"] = target.Owner{User: "user", Group: "group"}
+	tgt.Services["nginx"] = true
+	tgt.EnabledServices["nginx"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	if tgt.Restarts["nginx"] != 0 {
+		t.Errorf("expected 0 restarts, got %d", tgt.Restarts["nginx"])
+	}
+}
+
+// TestHook_MultipleNotifiers verifies a hook fires once even if notified
+// by multiple steps.
+func TestHook_MultipleNotifiers(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-a",
+			src="/src-a.txt",
+			dest="/dest-a.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["restart-nginx"],
+		),
+		copy(
+			desc="config-b",
+			src="/src-b.txt",
+			dest="/dest-b.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["restart-nginx"],
+		),
+	],
+	hooks={
+		"restart-nginx": service(
+			name="nginx",
+			state="restarted",
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src-a.txt"] = []byte("config A")
+	src.Files["/src-b.txt"] = []byte("config B")
+	tgt.Services["nginx"] = true
+	tgt.EnabledServices["nginx"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	if tgt.Restarts["nginx"] != 1 {
+		t.Errorf("expected exactly 1 restart, got %d", tgt.Restarts["nginx"])
+	}
+}
+
+// TestHook_Chaining verifies that hooks can trigger other hooks.
+func TestHook_Chaining(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["restart-app"],
+		),
+	],
+	hooks={
+		"restart-app": service(
+			name="app",
+			state="restarted",
+			on_change=["restart-proxy"],
+		),
+		"restart-proxy": service(
+			name="proxy",
+			state="restarted",
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("new config")
+	tgt.Services["app"] = true
+	tgt.EnabledServices["app"] = true
+	tgt.Services["proxy"] = true
+	tgt.EnabledServices["proxy"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	if tgt.Restarts["app"] != 1 {
+		t.Errorf("expected 1 app restart, got %d", tgt.Restarts["app"])
+	}
+	if tgt.Restarts["proxy"] != 1 {
+		t.Errorf("expected 1 proxy restart, got %d", tgt.Restarts["proxy"])
+	}
+}
+
+// TestHook_CheckMode verifies that hooks report WouldChange when the
+// upstream step would change.
+func TestHook_CheckMode(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["restart-nginx"],
+		),
+	],
+	hooks={
+		"restart-nginx": service(
+			name="nginx",
+			state="restarted",
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("new config")
+	tgt.Services["nginx"] = true
+	tgt.EnabledServices["nginx"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Check(context.Background()); err != nil {
+		t.Fatalf("Check failed: %v\n%s", err, rec)
+	}
+
+	// In check mode, nothing should actually restart
+	if tgt.Restarts["nginx"] != 0 {
+		t.Errorf("check mode should not restart, got %d", tgt.Restarts["nginx"])
+	}
+
+	// But the hook action should report WouldChange
+	hookTriggered := false
+	for _, ev := range rec.actionEvents {
+		if ev.Kind == event.HookTriggered {
+			hookTriggered = true
+			break
+		}
+	}
+	if !hookTriggered {
+		t.Error("expected HookTriggered event in check mode")
+	}
+}
+
+// TestHook_UnknownRef verifies that referencing a nonexistent hook ID
+// produces a plan error.
+func TestHook_UnknownRef(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["nonexistent-hook"],
+		),
+	],
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	src.Files["/src.txt"] = []byte("content")
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	err = e.Apply(context.Background())
+	if err == nil {
+		t.Fatal("expected error for unknown hook reference")
+	}
+
+	var abortErr engine.AbortError
+	if !errors.As(err, &abortErr) {
+		t.Errorf("expected AbortError, got %T: %v", err, err)
+	}
+}
+
+// TestHook_CycleDetection verifies that a hook chain forming a cycle
+// produces a plan error.
+func TestHook_CycleDetection(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["hook-a"],
+		),
+	],
+	hooks={
+		"hook-a": service(
+			name="svc-a",
+			state="restarted",
+			on_change=["hook-b"],
+		),
+		"hook-b": service(
+			name="svc-b",
+			state="restarted",
+			on_change=["hook-a"],
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	src.Files["/src.txt"] = []byte("content")
+	tgt.Services["svc-a"] = true
+	tgt.EnabledServices["svc-a"] = true
+	tgt.Services["svc-b"] = true
+	tgt.EnabledServices["svc-b"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	err = e.Apply(context.Background())
+	if err == nil {
+		t.Fatal("expected error for hook cycle")
+	}
+
+	var abortErr engine.AbortError
+	if !errors.As(err, &abortErr) {
+		t.Errorf("expected AbortError, got %T: %v", err, err)
+	}
+}
+
+// TestHook_RunStepAsHook verifies that non-service steps can be hooks.
+func TestHook_RunStepAsHook(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["run-reload"],
+		),
+	],
+	hooks={
+		"run-reload": run(
+			apply="nginx -s reload",
+			always=True,
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("new config")
+	tgt.CommandFunc = func(_ string) (target.CommandResult, error) {
+		return target.CommandResult{ExitCode: 0}, nil
+	}
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	// Verify the run hook command was executed
+	found := false
+	for _, c := range tgt.Commands {
+		if c.Cmd == "nginx -s reload" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected run hook command to be executed")
+	}
+}
+
+// TestHook_MultiStep verifies that a hook with multiple steps executes all
+// steps sequentially.
+func TestHook_MultiStep(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["deploy-app"],
+		),
+	],
+	hooks={
+		"deploy-app": [
+			copy(
+				desc="app-conf",
+				src="/app.conf",
+				dest="/app.conf.deployed",
+				perm="0644",
+				owner="user",
+				group="group",
+			),
+			service(
+				name="app",
+				state="restarted",
+			),
+		],
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("new config")
+	src.Files["/app.conf"] = []byte("app config")
+	tgt.Services["app"] = true
+	tgt.EnabledServices["app"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	if string(tgt.Files["/app.conf.deployed"]) != "app config" {
+		t.Errorf("app.conf not copied: got %q", tgt.Files["/app.conf.deployed"])
+	}
+	if tgt.Restarts["app"] != 1 {
+		t.Errorf("expected 1 app restart, got %d", tgt.Restarts["app"])
+	}
+}
+
+// TestHook_MultiStepChaining verifies that on_change in a multi-step hook
+// fires downstream hooks when any step changes.
+func TestHook_MultiStepChaining(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+
+deploy(
+	name="test",
+	targets=["local"],
+	steps=[
+		copy(
+			desc="config-file",
+			src="/src.txt",
+			dest="/dest.txt",
+			perm="0644",
+			owner="user",
+			group="group",
+			on_change=["deploy-app"],
+		),
+	],
+	hooks={
+		"deploy-app": [
+			copy(
+				desc="app-conf",
+				src="/app.conf",
+				dest="/app.conf.deployed",
+				perm="0644",
+				owner="user",
+				group="group",
+			),
+			service(
+				name="app",
+				state="restarted",
+				on_change=["reload-proxy"],
+			),
+		],
+		"reload-proxy": service(
+			name="proxy",
+			state="restarted",
+		),
+	},
+)
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+
+	src.Files["/src.txt"] = []byte("new config")
+	src.Files["/app.conf"] = []byte("app config")
+	tgt.Services["app"] = true
+	tgt.EnabledServices["app"] = true
+	tgt.Services["proxy"] = true
+	tgt.EnabledServices["proxy"] = true
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := spec.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+
+	if tgt.Restarts["app"] != 1 {
+		t.Errorf("expected 1 app restart, got %d", tgt.Restarts["app"])
+	}
+	if tgt.Restarts["proxy"] != 1 {
+		t.Errorf("expected 1 proxy restart, got %d", tgt.Restarts["proxy"])
+	}
+}
+
 // TestIntegration_ReloadFallbackToRestart verifies that state="reloaded"
 // falls back to restart when the backend does not support reload.
 func TestIntegration_ReloadFallbackToRestart(t *testing.T) {

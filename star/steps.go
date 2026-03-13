@@ -51,12 +51,13 @@ func builtinCopy(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		src   string
-		dest  string
-		perm  string
-		owner string
-		group string
-		desc  string
+		src         string
+		dest        string
+		perm        string
+		owner       string
+		group       string
+		desc        string
+		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("copy", args, kwargs,
 		"src", &src,
@@ -65,18 +66,25 @@ func builtinCopy(
 		"owner", &owner,
 		"group", &group,
 		"desc?", &desc,
+		"on_change?", &onChangeVal,
 	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "copy")
+	if err != nil {
 		return nil, err
 	}
 
 	span := callSpan(thread)
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
-			Desc:   desc,
-			Type:   stepcopy.Copy{},
-			Config: &stepcopy.CopyConfig{Desc: desc, Src: src, Dest: dest, Perm: perm, Owner: owner, Group: group},
-			Source: span,
-			Fields: kwargsFieldSpans(thread, "src", "dest", "perm", "owner", "group"),
+			Desc:     desc,
+			Type:     stepcopy.Copy{},
+			Config:   &stepcopy.CopyConfig{Desc: desc, Src: src, Dest: dest, Perm: perm, Owner: owner, Group: group},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "src", "dest", "perm", "owner", "group", "on_change"),
 		},
 	}, nil
 }
@@ -91,11 +99,12 @@ func builtinDir(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		path  string
-		perm  string
-		owner string
-		group string
-		desc  string
+		path        string
+		perm        string
+		owner       string
+		group       string
+		desc        string
+		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("dir", args, kwargs,
 		"path", &path,
@@ -103,18 +112,25 @@ func builtinDir(
 		"owner?", &owner,
 		"group?", &group,
 		"desc?", &desc,
+		"on_change?", &onChangeVal,
 	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "dir")
+	if err != nil {
 		return nil, err
 	}
 
 	span := callSpan(thread)
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
-			Desc:   desc,
-			Type:   dir.Dir{},
-			Config: &dir.DirConfig{Desc: desc, Path: path, Perm: perm, Owner: owner, Group: group},
-			Source: span,
-			Fields: kwargsFieldSpans(thread, "path", "perm", "owner", "group"),
+			Desc:     desc,
+			Type:     dir.Dir{},
+			Config:   &dir.DirConfig{Desc: desc, Path: path, Perm: perm, Owner: owner, Group: group},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "path", "perm", "owner", "group", "on_change"),
 		},
 	}, nil
 }
@@ -129,14 +145,16 @@ func builtinPkg(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		packages *starlark.List
-		state    = "present"
-		desc     string
+		packages    *starlark.List
+		state       = "present"
+		desc        string
+		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("pkg", args, kwargs,
 		"packages", &packages,
 		"state?", &state,
 		"desc?", &desc,
+		"on_change?", &onChangeVal,
 	); err != nil {
 		return nil, err
 	}
@@ -146,14 +164,20 @@ func builtinPkg(
 		return nil, err
 	}
 
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "pkg")
+	if err != nil {
+		return nil, err
+	}
+
 	span := callSpan(thread)
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
-			Desc:   desc,
-			Type:   pkg.Pkg{},
-			Config: &pkg.PkgConfig{Desc: desc, Packages: pkgs, State: state},
-			Source: span,
-			Fields: kwargsFieldSpans(thread, "packages", "state"),
+			Desc:     desc,
+			Type:     pkg.Pkg{},
+			Config:   &pkg.PkgConfig{Desc: desc, Packages: pkgs, State: state},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "packages", "state", "on_change"),
 		},
 	}, nil
 }
@@ -168,28 +192,36 @@ func builtinRun(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		apply  string
-		check  string
-		always bool
-		desc   string
+		apply       string
+		check       string
+		always      bool
+		desc        string
+		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("run", args, kwargs,
 		"apply", &apply,
 		"check?", &check,
 		"always?", &always,
 		"desc?", &desc,
+		"on_change?", &onChangeVal,
 	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "run")
+	if err != nil {
 		return nil, err
 	}
 
 	span := callSpan(thread)
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
-			Desc:   desc,
-			Type:   run.Run{},
-			Config: &run.RunConfig{Desc: desc, Apply: apply, Check: check, Always: always},
-			Source: span,
-			Fields: kwargsFieldSpans(thread, "apply", "check", "always"),
+			Desc:     desc,
+			Type:     run.Run{},
+			Config:   &run.RunConfig{Desc: desc, Apply: apply, Check: check, Always: always},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "apply", "check", "always", "on_change"),
 		},
 	}, nil
 }
@@ -204,28 +236,36 @@ func builtinService(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		name    string
-		state   = "running"
-		enabled = true
-		desc    string
+		name        string
+		state       = "running"
+		enabled     = true
+		desc        string
+		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("service", args, kwargs,
 		"name", &name,
 		"state?", &state,
 		"enabled?", &enabled,
 		"desc?", &desc,
+		"on_change?", &onChangeVal,
 	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "service")
+	if err != nil {
 		return nil, err
 	}
 
 	span := callSpan(thread)
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
-			Desc:   desc,
-			Type:   service.Service{},
-			Config: &service.ServiceConfig{Desc: desc, Name: name, State: state, Enabled: enabled},
-			Source: span,
-			Fields: kwargsFieldSpans(thread, "name", "state", "enabled"),
+			Desc:     desc,
+			Type:     service.Service{},
+			Config:   &service.ServiceConfig{Desc: desc, Name: name, State: state, Enabled: enabled},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "name", "state", "enabled", "on_change"),
 		},
 	}, nil
 }
@@ -240,26 +280,34 @@ func builtinSymlink(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		target string
-		link   string
-		desc   string
+		target      string
+		link        string
+		desc        string
+		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("symlink", args, kwargs,
 		"target", &target,
 		"link", &link,
 		"desc?", &desc,
+		"on_change?", &onChangeVal,
 	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "symlink")
+	if err != nil {
 		return nil, err
 	}
 
 	span := callSpan(thread)
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
-			Desc:   desc,
-			Type:   symlink.Symlink{},
-			Config: &symlink.SymlinkConfig{Desc: desc, Target: target, Link: link},
-			Source: span,
-			Fields: kwargsFieldSpans(thread, "target", "link"),
+			Desc:     desc,
+			Type:     symlink.Symlink{},
+			Config:   &symlink.SymlinkConfig{Desc: desc, Target: target, Link: link},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "target", "link", "on_change"),
 		},
 	}, nil
 }
@@ -274,14 +322,15 @@ func builtinTemplate(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		dest    string
-		perm    string
-		owner   string
-		group   string
-		src     string
-		content string
-		data    *starlark.Dict
-		desc    string
+		dest        string
+		perm        string
+		owner       string
+		group       string
+		src         string
+		content     string
+		data        *starlark.Dict
+		desc        string
+		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("template", args, kwargs,
 		"dest", &dest,
@@ -292,11 +341,17 @@ func builtinTemplate(
 		"content?", &content,
 		"data?", &data,
 		"desc?", &desc,
+		"on_change?", &onChangeVal,
 	); err != nil {
 		return nil, err
 	}
 
 	dataCfg, err := convertDataConfig(data)
+	if err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "template")
 	if err != nil {
 		return nil, err
 	}
@@ -310,14 +365,41 @@ func builtinTemplate(
 				Desc: desc, Src: src, Content: content, Dest: dest,
 				Data: dataCfg, Perm: perm, Owner: owner, Group: group,
 			},
-			Source: span,
-			Fields: kwargsFieldSpans(thread, "dest", "perm", "owner", "group", "src", "content"),
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "dest", "perm", "owner", "group", "src", "content", "on_change"),
 		},
 	}, nil
 }
 
 // Helpers
 // -----------------------------------------------------------------------------
+
+func unpackOnChange(thread *starlark.Thread, val starlark.Value, fn string) ([]string, error) {
+	if val == nil || val == starlark.None {
+		return nil, nil
+	}
+	if s, ok := starlark.AsString(val); ok {
+		return []string{s}, nil
+	}
+	list, ok := val.(*starlark.List)
+	if !ok {
+		source := callSpan(thread)
+		pos := callerPosition(thread)
+		if call := findCallFromThread(thread, pos); call != nil {
+			if vs, ok := kwargValueSpan(call, "on_change"); ok {
+				source = vs
+			}
+		}
+		return nil, &TypeError{
+			Context:  fmt.Sprintf("%s: on_change", fn),
+			Expected: "string or list of strings",
+			Got:      val.Type(),
+			Source:   source,
+		}
+	}
+	return stringList(list, fn, "on_change")
+}
 
 func stringList(list *starlark.List, fn, arg string) ([]string, error) {
 	if list == nil {

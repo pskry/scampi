@@ -102,22 +102,39 @@ func EngineStarted() event.EngineEvent {
 	}
 }
 
-func EngineFinished(rep model.ExecutionReport, dur time.Duration, err error, checkOnly bool) event.EngineEvent {
+func EngineFinished(
+	rep model.ExecutionReport,
+	hooksFired int,
+	dur time.Duration,
+	err error,
+	checkOnly bool,
+) event.EngineEvent {
 	e := event.EngineEvent{
 		Time: time.Now(),
 		Kind: event.EngineFinished,
 		Detail: &event.EngineFinishedDetail{
-			CheckOnly: checkOnly,
-			Duration:  dur,
-			Err:       err,
+			CheckOnly:  checkOnly,
+			HooksFired: hooksFired,
+			Duration:   dur,
+			Err:        err,
 		},
 	}
 
-	for _, ar := range rep.Actions {
-		e.Detail.TotalCount += ar.Summary.Total
-		e.Detail.ChangedCount += ar.Summary.Changed
-		e.Detail.WouldChangeCount += ar.Summary.WouldChange
-		e.Detail.FailedCount += ar.Summary.Failed
+	stepCount := len(rep.Actions) - hooksFired
+	for i, ar := range rep.Actions {
+		if i >= stepCount {
+			break
+		}
+		e.Detail.TotalCount++
+		s := ar.Summary
+		switch {
+		case s.Failed > 0 || s.Aborted > 0:
+			e.Detail.FailedCount++
+		case s.Changed > 0:
+			e.Detail.ChangedCount++
+		case s.WouldChange > 0:
+			e.Detail.WouldChangeCount++
+		}
 	}
 
 	switch {
@@ -329,6 +346,36 @@ func ActionFinished(
 	}
 
 	return e
+}
+
+// Hook lifecycle
+// -----------------------------------------------------------------------------
+
+func HookTriggered(hookID, triggerBy string, summary model.ActionSummary, dur time.Duration) event.ActionEvent {
+	return event.ActionEvent{
+		Time: time.Now(),
+		Kind: event.HookTriggered,
+		HookDetail: &event.HookDetail{
+			HookID:    hookID,
+			TriggerBy: triggerBy,
+			Summary:   summary,
+			Duration:  dur,
+		},
+		Severity:   signal.Notice,
+		Chattiness: event.Subtle,
+	}
+}
+
+func HookSkipped(hookID string) event.ActionEvent {
+	return event.ActionEvent{
+		Time: time.Now(),
+		Kind: event.HookSkipped,
+		HookDetail: &event.HookDetail{
+			HookID: hookID,
+		},
+		Severity:   signal.Info,
+		Chattiness: event.Normal,
+	}
 }
 
 // Op lifecycle

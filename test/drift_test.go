@@ -52,7 +52,7 @@ func TestCheckPlan_DriftEmitted(t *testing.T) {
 	}
 	defer e.Close()
 
-	_, err = e.CheckPlan(ctx, plan)
+	_, _, err = e.CheckPlan(ctx, plan)
 	if err != nil {
 		t.Fatalf("CheckPlan: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestCheckPlan_SatisfiedNoDrift(t *testing.T) {
 	}
 	defer e.Close()
 
-	_, err = e.CheckPlan(ctx, plan)
+	_, _, err = e.CheckPlan(ctx, plan)
 	if err != nil {
 		t.Fatalf("CheckPlan: %v", err)
 	}

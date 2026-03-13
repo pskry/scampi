@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/diagnostic"
@@ -264,3 +265,52 @@ func (e TargetNotInDeployError) EventTemplate() event.Template {
 
 func (TargetNotInDeployError) Severity() signal.Severity { return signal.Error }
 func (TargetNotInDeployError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+// Hook errors
+// -----------------------------------------------------------------------------
+
+type UnknownHookError struct {
+	HookID   string
+	StepKind string
+	StepDesc string
+	Source   spec.SourceSpan
+}
+
+func (e UnknownHookError) Error() string {
+	return fmt.Sprintf("on_change references unknown hook %q", e.HookID)
+}
+
+func (e UnknownHookError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "engine.UnknownHook",
+		Text:   `on_change references unknown hook "{{.HookID}}"`,
+		Hint:   `add hooks = {"{{.HookID}}": service(name="...", state="restarted")} to the deploy block`,
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (UnknownHookError) Severity() signal.Severity { return signal.Error }
+func (UnknownHookError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
+type HookCycleError struct {
+	Chain  []string
+	Source spec.SourceSpan
+}
+
+func (e HookCycleError) Error() string {
+	return fmt.Sprintf("hook cycle detected: %s", strings.Join(e.Chain, " -> "))
+}
+
+func (e HookCycleError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "engine.HookCycle",
+		Text:   "hook cycle detected",
+		Hint:   `{{join " -> " .Chain}}`,
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (HookCycleError) Severity() signal.Severity { return signal.Error }
+func (HookCycleError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

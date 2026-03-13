@@ -168,6 +168,15 @@ func (c *cli) EmitActionLifecycle(e event.ActionEvent) {
 			return
 		}
 		c.commitRenderEvents(c.renderActionFinished(e))
+	case event.HookTriggered:
+		if !c.shouldRender(e.Chattiness) {
+			return
+		}
+		c.commitRenderEvents(c.renderHookTriggered(e))
+	case event.HookSkipped:
+		if !c.shouldRender(e.Chattiness) {
+			return
+		}
 	default:
 		panic(errs.BUG("unknown action event kind %q (0x%02x)", e.Kind, uint8(e.Kind)))
 	}
@@ -529,9 +538,10 @@ func (c *cli) renderEngineFinished(e event.EngineEvent) []renderEvent {
 	if d.CheckOnly {
 		parts = append(parts, fmt.Sprintf("%d would change", d.WouldChangeCount))
 	} else {
-		parts = append(parts, fmt.Sprintf("%d change%s", d.ChangedCount, layout.Plural(d.ChangedCount)))
+		parts = append(parts, fmt.Sprintf("%d changed", d.ChangedCount))
 	}
-	parts = append(parts, fmt.Sprintf("%d failure%s", d.FailedCount, layout.Plural(d.FailedCount)))
+	parts = append(parts, fmt.Sprintf("%d failed", d.FailedCount))
+	parts = append(parts, fmt.Sprintf("%d hook%s fired", d.HooksFired, layout.Plural(d.HooksFired)))
 	parts = append(parts, fmt.Sprintf("%d step%s", d.TotalCount, layout.Plural(d.TotalCount)))
 	parts = append(parts, d.Duration.String())
 
@@ -580,6 +590,43 @@ func (c *cli) renderActionFinished(e event.ActionEvent) []renderEvent {
 		line += c.formatter.fmtfMsg(color, " %s —", e.Step.StepDesc)
 	}
 	line += c.formatter.fmtfMsg(color, " %s (%s)", fmtActionSummary(smry), d.Duration)
+
+	return []renderEvent{{stream: streamOut, line: line}}
+}
+
+func (c *cli) renderHookTriggered(e event.ActionEvent) []renderEvent {
+	h := e.HookDetail
+	smry := h.Summary
+
+	fmtSummary := func() string {
+		switch {
+		case smry.Failed > 0 || smry.Aborted > 0:
+			return fmt.Sprintf("failed (%d failed, %d aborted)", smry.Failed, smry.Aborted)
+		case smry.Changed > 0:
+			return fmt.Sprintf("%d/%d ops changed", smry.Changed, smry.Total)
+		case smry.WouldChange > 0:
+			return fmt.Sprintf("%d/%d ops would change", smry.WouldChange, smry.Total)
+		default:
+			return "up-to-date"
+		}
+	}
+
+	var color ansi.ANSI
+	var glyph string
+	switch {
+	case smry.Failed > 0 || smry.Aborted > 0:
+		color = colActionFinishedFailed
+		glyph = c.glyphs.fatal
+	case smry.Changed > 0 || smry.WouldChange > 0:
+		color = colActionFinishedChanged
+		glyph = c.glyphs.change
+	default:
+		color = colActionFinishedUnchanged
+		glyph = c.glyphs.ok
+	}
+
+	line := c.formatter.fmtfMsg(color, "[hook:%s]%s %s — %s (%s)",
+		h.HookID, glyphR(glyph), h.TriggerBy, fmtSummary(), h.Duration)
 
 	return []renderEvent{{stream: streamOut, line: line}}
 }
@@ -682,6 +729,12 @@ func (c *cli) EmitOpDiagnostic(e event.OpDiagnostic) {
 }
 
 func stepScope(s event.StepDetail) string {
+	if s.StepIndex < 0 {
+		if s.StepDesc != "" {
+			return fmt.Sprintf(` in %s '%s'`, s.StepKind, s.StepDesc)
+		}
+		return ""
+	}
 	tag := fmt.Sprintf("%d", s.StepIndex)
 	if s.StepKind != "" {
 		tag += "|" + s.StepKind
@@ -701,7 +754,12 @@ func (c *cli) renderDiagnostic(prefix, msg string, tmpl event.Template) {
 }
 
 func (c *cli) ensureActionFromStep(step event.StepDetail) *actionState {
-	key := fmt.Sprintf("%s:%d", step.StepKind, step.StepIndex)
+	var key string
+	if step.HookID != "" {
+		key = fmt.Sprintf("hook:%s][%s", step.HookID, step.StepKind)
+	} else {
+		key = fmt.Sprintf("%s:%d", step.StepKind, step.StepIndex)
+	}
 	st, _ := c.actions.LoadOrStore(key, &actionState{id: key})
 	return st.(*actionState)
 }

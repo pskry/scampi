@@ -18,6 +18,7 @@ type StepDetail struct {
 	StepIndex int
 	StepKind  string
 	StepDesc  string
+	HookID    string // non-empty when this op belongs to a hook
 }
 
 type EngineEvent struct {
@@ -44,6 +45,7 @@ type ActionEvent struct {
 	Kind       ActionKind
 	Step       StepDetail
 	Detail     *ActionDetail
+	HookDetail *HookDetail
 	Severity   signal.Severity
 	Chattiness Chattiness
 }
@@ -127,6 +129,8 @@ type ActionKind uint8
 const (
 	ActionStarted ActionKind = iota
 	ActionFinished
+	HookTriggered
+	HookSkipped
 )
 
 type OpKind uint8

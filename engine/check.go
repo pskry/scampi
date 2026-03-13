@@ -26,18 +26,25 @@ func (e *Engine) Check(ctx context.Context) error {
 	start := time.Now()
 	e.em.EmitEngineLifecycle(diagnostic.EngineStarted())
 
-	plan, _, err := plan(e.cfg, e.em, e.tgt.Capabilities())
+	p, _, hp, err := plan(e.cfg, e.em, e.tgt.Capabilities())
 	if err != nil {
 		return err
 	}
-	e.storeInputPaths(ctx, plan)
+	e.storeInputPaths(ctx, p)
 
-	rep, err := e.CheckPlan(ctx, plan)
+	rep, promisedPaths, err := e.CheckPlan(ctx, p)
 	if err != nil {
 		return err
 	}
 
-	e.em.EmitEngineLifecycle(diagnostic.EngineFinished(rep, time.Since(start), err, true))
+	hookRep, err := e.executeHooks(ctx, rep, hp, true, promisedPaths)
+	if err != nil {
+		return err
+	}
+	hooksFired := len(hookRep.Actions)
+	rep.Actions = append(rep.Actions, hookRep.Actions...)
+
+	e.em.EmitEngineLifecycle(diagnostic.EngineFinished(rep, hooksFired, time.Since(start), err, true))
 
 	return nil
 }

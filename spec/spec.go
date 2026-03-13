@@ -19,18 +19,20 @@ type (
 	}
 
 	DeployBlock struct {
-		Name    string         // block name (key from deploy map)
-		Targets []string       // references target names
-		Steps   []StepInstance // ordered steps
-		Source  SourceSpan     // source location
+		Name    string                    // block name (key from deploy map)
+		Targets []string                  // references target names
+		Steps   []StepInstance            // ordered steps
+		Hooks   map[string][]StepInstance // hook ID → steps (execute only when notified)
+		Source  SourceSpan                // source location
 	}
 
 	ResolvedConfig struct {
 		Path       string
-		DeployName string         // which deploy block
-		TargetName string         // which target
-		Target     TargetInstance // resolved target
-		Steps      []StepInstance // steps from the deploy block
+		DeployName string                    // which deploy block
+		TargetName string                    // which target
+		Target     TargetInstance            // resolved target
+		Steps      []StepInstance            // steps from the deploy block
+		Hooks      map[string][]StepInstance // hook ID → steps (execute only when notified)
 	}
 
 	// TargetType is the Go handler for a target kind (one per kind).
@@ -51,11 +53,12 @@ type (
 		Desc string
 	}
 	StepInstance struct {
-		Desc   string // optional human description
-		Type   StepType
-		Config any
-		Source SourceSpan
-		Fields map[string]FieldSpan
+		Desc     string // optional human description
+		Type     StepType
+		Config   any
+		OnChange []string // hook IDs to notify when this step changes
+		Source   SourceSpan
+		Fields   map[string]FieldSpan
 	}
 	// StepType is the Go handler for a step kind (one per kind).
 	StepType interface {
