@@ -32,6 +32,7 @@ fmt:
 lint:
   go tool golangci-lint run
   go tool gomarklint
+  shellcheck scripts/*.sh
   just license-check
 
 [doc("Site build/dev (just site --list for subcommands)")]
@@ -39,6 +40,32 @@ mod site
 
 [doc("Codeberg repo management")]
 mod codeberg
+
+[doc("Install external build/lint dependencies")]
+setup:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  missing=()
+  for cmd in shellcheck; do
+    command -v "$cmd" &>/dev/null || missing+=("$cmd")
+  done
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    echo "All dependencies installed."
+    exit 0
+  fi
+  echo "Missing: ${missing[*]}"
+  if command -v brew &>/dev/null; then
+    brew install "${missing[@]}"
+  elif command -v pacman &>/dev/null; then
+    sudo pacman -S "${missing[@]}"
+  elif command -v dnf &>/dev/null; then
+    sudo dnf install -y "${missing[@]}"
+  elif command -v apt-get &>/dev/null; then
+    sudo apt-get install -y "${missing[@]}"
+  else
+    echo "Install manually: ${missing[*]}"
+    exit 1
+  fi
 
 # Housekeeping
 # ##############################################################################
@@ -65,46 +92,15 @@ _patch-license-headers:
 
 [doc("Check SPDX license headers")]
 license-check:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  header="{{spdx_header}}"
-  missing=()
-  wrong=()
-  stray=()
-  while IFS= read -r f; do
-    first=$(head -1 "$f")
-    if [[ "$first" != "$header" ]]; then
-      if grep -q 'SPDX-License-Identifier' "$f"; then
-        wrong+=("$f  (line 1: $first)")
-      else
-        missing+=("$f")
-      fi
-    fi
-    count=$(grep -c 'SPDX-License-Identifier' "$f")
-    if [[ "$count" -gt 1 ]]; then
-      stray+=("$f  (${count} occurrences)")
-    fi
-  done < <(find . -name '*.go' -not -path './vendor/*')
-  ok=true
-  if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "✗ Missing SPDX header (not present anywhere in file):"
-    printf '  %s\n' "${missing[@]}"
-    ok=false
-  fi
-  if [[ ${#wrong[@]} -gt 0 ]]; then
-    echo "✗ SPDX header present but not on line 1:"
-    printf '  %s\n' "${wrong[@]}"
-    ok=false
-  fi
-  if [[ ${#stray[@]} -gt 0 ]]; then
-    echo "✗ Duplicate SPDX headers:"
-    printf '  %s\n' "${stray[@]}"
-    ok=false
-  fi
-  if [[ "$ok" == true ]]; then
-    echo "✓ All $(find . -name '*.go' -not -path './vendor/*' | wc -l | tr -d ' ') files have correct SPDX headers"
-  fi
-  [[ "$ok" == true ]]
+  ./scripts/license-check.sh "{{spdx_header}}"
+
+[doc("Check for outdated direct dependencies")]
+outdated:
+  @./scripts/go-outdated.sh
+
+[doc("Upgrade all direct dependencies to latest")]
+upgrade:
+  @./scripts/go-upgrade.sh
 
 [doc("Clean project")]
 clean:
