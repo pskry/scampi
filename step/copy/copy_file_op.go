@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/diagnostic"
@@ -22,8 +23,26 @@ const copyFileID = "builtin.copy-file"
 
 type copyFileOp struct {
 	sharedops.BaseOp
-	src  string
-	dest string
+	src     string
+	content string
+	dest    string
+}
+
+func (op *copyFileOp) getContent(ctx context.Context, src source.Source) ([]byte, error) {
+	if op.content != "" {
+		return []byte(op.content), nil
+	}
+
+	data, err := src.ReadFile(ctx, op.src)
+	if err != nil {
+		return nil, CopySourceMissingError{
+			Path:   op.src,
+			Err:    err,
+			Source: op.SrcSpan,
+		}
+	}
+
+	return data, nil
 }
 
 func (op *copyFileOp) Check(
@@ -33,13 +52,9 @@ func (op *copyFileOp) Check(
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	fsTgt := target.Must[target.Filesystem](copyFileID, tgt)
 
-	srcData, err := src.ReadFile(ctx, op.src)
+	srcData, err := op.getContent(ctx, src)
 	if err != nil {
-		return spec.CheckUnsatisfied, nil, CopySourceMissingError{
-			Path:   op.src,
-			Err:    err,
-			Source: op.SrcSpan,
-		}
+		return spec.CheckUnsatisfied, nil, err
 	}
 
 	if _, err := fsTgt.Stat(ctx, filepath.Dir(op.dest)); err != nil {
@@ -72,7 +87,7 @@ func (op *copyFileOp) Check(
 func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target.Target) (spec.Result, error) {
 	fsTgt := target.Must[target.Filesystem](copyFileID, tgt)
 
-	srcData, err := src.ReadFile(ctx, op.src)
+	srcData, err := op.getContent(ctx, src)
 	if err != nil {
 		return spec.Result{}, err
 	}
@@ -94,7 +109,7 @@ func (copyFileOp) RequiredCapabilities() capability.Capability {
 }
 
 func (op *copyFileOp) DesiredContent(ctx context.Context, src source.Source) ([]byte, error) {
-	return src.ReadFile(ctx, op.src)
+	return op.getContent(ctx, src)
 }
 
 func (op *copyFileOp) CurrentContent(ctx context.Context, _ source.Source, tgt target.Target) ([]byte, error) {
@@ -120,11 +135,50 @@ func (d copyFileDesc) PlanTemplate() spec.PlanTemplate {
 }
 
 func (op *copyFileOp) OpDescription() spec.OpDescription {
+	src := op.src
+	if src == "" {
+		src = "(inline)"
+	}
 	return copyFileDesc{
-		Src:  op.src,
+		Src:  src,
 		Dest: op.dest,
 	}
 }
+
+// Errors
+// -----------------------------------------------------------------------------
+
+type MutuallyExclusiveError struct {
+	Fields []string
+	Got    []string
+	Source spec.SourceSpan
+}
+
+func (e MutuallyExclusiveError) Error() string {
+	return fmt.Sprintf("requires exactly one of %s", strings.Join(e.Fields, ", "))
+}
+
+func (e MutuallyExclusiveError) EventTemplate() event.Template {
+	if len(e.Got) > 1 {
+		return event.Template{
+			ID:     "builtin.copy.MutuallyExclusive",
+			Text:   `requires exactly one of {{join ", " .Fields}}`,
+			Hint:   "both were provided",
+			Data:   e,
+			Source: &e.Source,
+		}
+	}
+	return event.Template{
+		ID:     "builtin.copy.MutuallyExclusive",
+		Text:   `requires exactly one of {{join ", " .Fields}}`,
+		Hint:   "neither was provided",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (MutuallyExclusiveError) Severity() signal.Severity { return signal.Error }
+func (MutuallyExclusiveError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 type CopySourceMissingError struct {
 	Path   string

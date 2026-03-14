@@ -55,6 +55,7 @@ func builtinCopy(
 ) (starlark.Value, error) {
 	var (
 		src         string
+		content     string
 		dest        string
 		perm        string
 		owner       string
@@ -63,11 +64,12 @@ func builtinCopy(
 		onChangeVal starlark.Value
 	)
 	if err := starlark.UnpackArgs("copy", args, kwargs,
-		"src", &src,
 		"dest", &dest,
 		"perm", &perm,
 		"owner", &owner,
 		"group", &group,
+		"src?", &src,
+		"content?", &content,
 		"desc?", &desc,
 		"on_change?", &onChangeVal,
 	); err != nil {
@@ -82,12 +84,15 @@ func builtinCopy(
 	span := callSpan(thread)
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
-			Desc:     desc,
-			Type:     stepcopy.Copy{},
-			Config:   &stepcopy.CopyConfig{Desc: desc, Src: src, Dest: dest, Perm: perm, Owner: owner, Group: group},
+			Desc: desc,
+			Type: stepcopy.Copy{},
+			Config: &stepcopy.CopyConfig{
+				Desc: desc, Src: src, Content: content,
+				Dest: dest, Perm: perm, Owner: owner, Group: group,
+			},
 			OnChange: hookIDs,
 			Source:   span,
-			Fields:   kwargsFieldSpans(thread, "src", "dest", "perm", "owner", "group", "on_change"),
+			Fields:   kwargsFieldSpans(thread, "src", "content", "dest", "perm", "owner", "group", "on_change"),
 		},
 	}, nil
 }

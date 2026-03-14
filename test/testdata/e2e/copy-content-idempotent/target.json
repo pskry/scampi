@@ -1,0 +1,11 @@
+{
+  "files": {
+    "/etc/sudoers.d/hal9000": "hal9000 ALL=(ALL) NOPASSWD:ALL\n"
+  },
+  "perms": {
+    "/etc/sudoers.d/hal9000": "0440"
+  },
+  "owners": {
+    "/etc/sudoers.d/hal9000": {"user": "testuser", "group": "testgroup"}
+  }
+}

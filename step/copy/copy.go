@@ -17,33 +17,58 @@ type (
 	CopyConfig struct {
 		_ struct{} `summary:"Copy files with owner and permission management"`
 
-		Desc  string `step:"Human-readable description" optional:"true"`
-		Src   string `step:"Source file path" example:"./config.yaml"`
-		Dest  string `step:"Destination file path" example:"/etc/app/config.yaml"`
-		Perm  string `step:"File permissions" example:"0644|u=rw,g=r,o=r|rw-r--r--"`
-		Owner string `step:"Owner user name or UID" example:"root"`
-		Group string `step:"Group name or GID" example:"root"`
+		Desc    string `step:"Human-readable description" optional:"true"`
+		Src     string `step:"Source file path" optional:"true" exclusive:"source" example:"./config.yaml"`
+		Content string `step:"Inline file content" optional:"true" exclusive:"source"`
+		Dest    string `step:"Destination file path" example:"/etc/app/config.yaml"`
+		Perm    string `step:"File permissions" example:"0644|u=rw,g=r,o=r|rw-r--r--"`
+		Owner   string `step:"Owner user name or UID" example:"root"`
+		Group   string `step:"Group name or GID" example:"root"`
 	}
 	copyAction struct {
-		idx   int
-		desc  string
-		kind  string
-		src   string
-		dest  string
-		mode  fs.FileMode
-		owner string
-		group string
-		step  spec.StepInstance
+		idx     int
+		desc    string
+		kind    string
+		src     string
+		content string
+		dest    string
+		mode    fs.FileMode
+		owner   string
+		group   string
+		step    spec.StepInstance
 	}
 )
 
 func (Copy) Kind() string   { return "copy" }
 func (Copy) NewConfig() any { return &CopyConfig{} }
 
+func (c *CopyConfig) Validate(step spec.StepInstance) error {
+	hasSrc := c.Src != ""
+	hasContent := c.Content != ""
+	if hasSrc == hasContent {
+		var got []string
+		source := step.Source
+		if hasSrc {
+			got = []string{"src", "content"}
+			source = step.Fields["content"].Value
+		}
+		return MutuallyExclusiveError{
+			Fields: []string{"src", "content"},
+			Got:    got,
+			Source: source,
+		}
+	}
+	return nil
+}
+
 func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*CopyConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &CopyConfig{}, step.Config)
+	}
+
+	if err := cfg.Validate(step); err != nil {
+		return nil, err
 	}
 
 	if !filepath.IsAbs(cfg.Dest) {
@@ -60,22 +85,28 @@ func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &copyAction{
-		idx:   idx,
-		desc:  cfg.Desc,
-		kind:  c.Kind(),
-		src:   cfg.Src,
-		dest:  cfg.Dest,
-		mode:  mode,
-		owner: cfg.Owner,
-		group: cfg.Group,
+		idx:     idx,
+		desc:    cfg.Desc,
+		kind:    c.Kind(),
+		src:     cfg.Src,
+		content: cfg.Content,
+		dest:    cfg.Dest,
+		mode:    mode,
+		owner:   cfg.Owner,
+		group:   cfg.Group,
 
 		step: step,
 	}, nil
 }
 
-func (c *copyAction) Desc() string          { return c.desc }
-func (c *copyAction) Kind() string          { return c.kind }
-func (c *copyAction) InputPaths() []string  { return []string{c.src} }
+func (c *copyAction) Desc() string { return c.desc }
+func (c *copyAction) Kind() string { return c.kind }
+func (c *copyAction) InputPaths() []string {
+	if c.src != "" {
+		return []string{c.src}
+	}
+	return nil
+}
 func (c *copyAction) OutputPaths() []string { return []string{c.dest} }
 
 func (c *copyAction) Ops() []spec.Op {
@@ -84,8 +115,9 @@ func (c *copyAction) Ops() []spec.Op {
 			SrcSpan:  c.step.Fields["src"].Value,
 			DestSpan: c.step.Fields["dest"].Value,
 		},
-		src:  c.src,
-		dest: c.dest,
+		src:     c.src,
+		content: c.content,
+		dest:    c.dest,
 	}
 	chown := &fileops.EnsureOwnerOp{
 		BaseOp: sharedops.BaseOp{
