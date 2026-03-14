@@ -10,11 +10,12 @@ import (
 
 // actionNode represents an action in the dependency graph.
 type actionNode struct {
-	action     spec.Action
-	idx        int
-	requires   []*actionNode // actions that must complete before this one
-	requiredBy []*actionNode // actions that wait for this one
-	pending    int           // runtime counter for scheduling
+	action      spec.Action
+	idx         int
+	requires    []*actionNode            // actions that must complete before this one
+	requiresSet map[*actionNode]struct{} // O(1) dedup for addEdge
+	requiredBy  []*actionNode            // actions that wait for this one
+	pending     int                      // runtime counter for scheduling
 }
 
 // buildActionGraph constructs a dependency graph from actions based on their
@@ -79,11 +80,13 @@ func buildActionGraph(actions []spec.Action) []*actionNode {
 
 // addEdge adds a dependency edge from -> to, skipping duplicates.
 func addEdge(from, to *actionNode) {
-	for _, r := range to.requires {
-		if r == from {
-			return
-		}
+	if to.requiresSet == nil {
+		to.requiresSet = map[*actionNode]struct{}{}
 	}
+	if _, dup := to.requiresSet[from]; dup {
+		return
+	}
+	to.requiresSet[from] = struct{}{}
 	to.requires = append(to.requires, from)
 	from.requiredBy = append(from.requiredBy, to)
 }
