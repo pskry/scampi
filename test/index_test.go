@@ -164,6 +164,49 @@ func TestIndexStep_FieldsHaveDocumentation(t *testing.T) {
 	}
 }
 
+func TestIndexStep_DefaultsPopulated(t *testing.T) {
+	tests := []struct {
+		kind    string
+		field   string
+		wantDef string
+	}{
+		{"pkg", "state", `"present"`},
+		{"service", "state", `"running"`},
+		{"service", "enabled", `"true"`},
+		{"user", "state", `"present"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.kind+"/"+tt.field, func(t *testing.T) {
+			rec := &recordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+			err := engine.IndexStep(context.Background(), tt.kind, em)
+			if err != nil {
+				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
+			}
+
+			if len(rec.indexStepEvents) != 1 {
+				t.Fatalf("expected 1 IndexStepEvent, got %d", len(rec.indexStepEvents))
+			}
+
+			var found bool
+			for _, f := range rec.indexStepEvents[0].Doc.Fields {
+				if f.Name == tt.field {
+					found = true
+					if f.Default != tt.wantDef {
+						t.Errorf("field %q default = %q, want %q", tt.field, f.Default, tt.wantDef)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("field %q not found in %q step", tt.field, tt.kind)
+			}
+		})
+	}
+}
+
 func TestIndexStep_RequiredFieldsMarkedCorrectly(t *testing.T) {
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -192,5 +235,48 @@ func TestIndexStep_RequiredFieldsMarkedCorrectly(t *testing.T) {
 	}
 	if fields["desc"] {
 		t.Error("desc should be optional")
+	}
+}
+
+func TestIndexStep_ExclusiveFieldsPopulated(t *testing.T) {
+	tests := []struct {
+		kind  string
+		group string
+		want  []string
+	}{
+		{"template", "source", []string{"src", "content"}},
+		{"run", "trigger", []string{"check", "always"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.kind+"/"+tt.group, func(t *testing.T) {
+			rec := &recordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+			err := engine.IndexStep(context.Background(), tt.kind, em)
+			if err != nil {
+				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
+			}
+
+			if len(rec.indexStepEvents) != 1 {
+				t.Fatalf("expected 1 IndexStepEvent, got %d", len(rec.indexStepEvents))
+			}
+
+			var got []string
+			for _, f := range rec.indexStepEvents[0].Doc.Fields {
+				if f.Exclusive == tt.group {
+					got = append(got, f.Name)
+				}
+			}
+
+			if len(got) != len(tt.want) {
+				t.Fatalf("exclusive group %q: got %v, want %v", tt.group, got, tt.want)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Errorf("exclusive group %q[%d] = %q, want %q", tt.group, i, got[i], tt.want[i])
+				}
+			}
+		})
 	}
 }

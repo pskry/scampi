@@ -267,35 +267,37 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 			line:   c.formatter.fmtMsg(ansi.BrightBlack(), "FIELDS"),
 			stream: streamOut,
 		})
-		events = append(events, renderEvent{line: "", stream: streamOut})
 
-		nameW, typeW, reqW := 0, 0, 8
-		for _, f := range doc.Fields {
-			if len(f.Name) > nameW {
-				nameW = len(f.Name)
-			}
-			if len(f.Type) > typeW {
-				typeW = len(f.Type)
-			}
-		}
+		exclusiveGroups, required, optional := partitionFields(doc.Fields)
 
-		for _, f := range doc.Fields {
-			reqStr := "optional"
-			if f.Required {
-				reqStr = "required"
-			}
-			line := "  " +
-				c.formatter.fmtMsg(ansi.Cyan(), fmt.Sprintf("%-*s", nameW, f.Name)) +
-				"   " +
-				c.formatter.fmtMsg(ansi.BrightBlack(), fmt.Sprintf("%-*s", typeW, f.Type)) +
-				"   " +
-				c.formatter.fmtMsg(ansi.BrightBlack(), fmt.Sprintf("%-*s", reqW, reqStr)) +
-				"   " +
-				c.formatter.fmtMsg(ansi.White(), f.Desc)
+		for _, g := range exclusiveGroups {
+			events = append(events, renderEvent{line: "", stream: streamOut})
 			events = append(events, renderEvent{
-				line:   line,
+				line:   "  " + c.formatter.fmtMsg(ansi.BrightBlack(), "Provide exactly one of:"),
 				stream: streamOut,
 			})
+			events = append(events, renderEvent{line: "", stream: streamOut})
+			events = append(events, c.renderFieldRows(g)...)
+		}
+
+		if len(required) > 0 {
+			events = append(events, renderEvent{line: "", stream: streamOut})
+			events = append(events, renderEvent{
+				line:   "  " + c.formatter.fmtMsg(ansi.BrightBlack(), "Required:"),
+				stream: streamOut,
+			})
+			events = append(events, renderEvent{line: "", stream: streamOut})
+			events = append(events, c.renderFieldRows(required)...)
+		}
+
+		if len(optional) > 0 {
+			events = append(events, renderEvent{line: "", stream: streamOut})
+			events = append(events, renderEvent{
+				line:   "  " + c.formatter.fmtMsg(ansi.BrightBlack(), "Optional:"),
+				stream: streamOut,
+			})
+			events = append(events, renderEvent{line: "", stream: streamOut})
+			events = append(events, c.renderFieldRows(optional)...)
 		}
 	}
 
@@ -339,6 +341,60 @@ func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
 	}
 
 	c.commitRenderEvents(events)
+}
+
+func fieldDescWithDefault(f spec.FieldDoc) string {
+	if f.Default == "" {
+		return f.Desc
+	}
+	return fmt.Sprintf("%s (default: %s)", f.Desc, f.Default)
+}
+
+// partitionFields splits fields into exclusive groups (in encounter order),
+// required fields, and optional fields.
+func partitionFields(fields []spec.FieldDoc) (groups [][]spec.FieldDoc, required, optional []spec.FieldDoc) {
+	seen := make(map[string]int) // group name → index into groups
+	for _, f := range fields {
+		switch {
+		case f.Exclusive != "":
+			idx, ok := seen[f.Exclusive]
+			if !ok {
+				idx = len(groups)
+				seen[f.Exclusive] = idx
+				groups = append(groups, nil)
+			}
+			groups[idx] = append(groups[idx], f)
+		case f.Required:
+			required = append(required, f)
+		default:
+			optional = append(optional, f)
+		}
+	}
+	return groups, required, optional
+}
+
+func (c *cli) renderFieldRows(fields []spec.FieldDoc) []renderEvent {
+	nameW, typeW := 0, 0
+	for _, f := range fields {
+		if len(f.Name) > nameW {
+			nameW = len(f.Name)
+		}
+		if len(f.Type) > typeW {
+			typeW = len(f.Type)
+		}
+	}
+
+	var events []renderEvent
+	for _, f := range fields {
+		line := "  " +
+			c.formatter.fmtMsg(ansi.Cyan(), fmt.Sprintf("%-*s", nameW, f.Name)) +
+			"   " +
+			c.formatter.fmtMsg(ansi.BrightBlack(), fmt.Sprintf("%-*s", typeW, f.Type)) +
+			"   " +
+			c.formatter.fmtMsg(ansi.White(), fieldDescWithDefault(f))
+		events = append(events, renderEvent{line: line, stream: streamOut})
+	}
+	return events
 }
 
 func (c *cli) renderFieldExamples(fields []spec.FieldDoc) []renderEvent {

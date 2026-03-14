@@ -14,8 +14,8 @@ type (
 
 		Desc   string `step:"Human-readable description" optional:"true"`
 		Apply  string `step:"Shell command to execute" example:"sysctl -w net.ipv4.ip_forward=1"`
-		Check  string `step:"Exit 0 = already satisfied" optional:"true" example:"grep -q ok /tmp/status"`
-		Always bool   `step:"Always run apply, skip check" optional:"true" default:"false"`
+		Check  string `step:"Exit 0 = already satisfied" optional:"true" exclusive:"trigger"`
+		Always bool   `step:"Always run apply, skip check" optional:"true" exclusive:"trigger" default:"false"`
 	}
 	runAction struct {
 		idx    int

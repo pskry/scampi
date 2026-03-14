@@ -18,8 +18,8 @@ type (
 		_ struct{} `summary:"Render templates with data substitution and owner/permission management"`
 
 		Desc    string     `step:"Human-readable description" optional:"true"`
-		Src     string     `step:"Source template file (exclusive with content)" optional:"true" example:"./tmpl"`
-		Content string     `step:"Inline template string (exclusive with src)" optional:"true"`
+		Src     string     `step:"Source template file" optional:"true" exclusive:"source" example:"./tmpl"`
+		Content string     `step:"Inline template string" optional:"true" exclusive:"source"`
 		Dest    string     `step:"Output file path" example:"/etc/nginx/nginx.conf"`
 		Data    DataConfig `step:"Data sources for template rendering" optional:"true"`
 		Perm    string     `step:"File permissions" example:"0644|u=rw,g=r,o=r|rw-r--r--"`

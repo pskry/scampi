@@ -16,12 +16,13 @@ type StepDoc struct {
 
 // FieldDoc contains documentation for a single field in a step.
 type FieldDoc struct {
-	Name     string
-	Type     string // "string", "int", "bool", "list", "struct"
-	Required bool
-	Desc     string
-	Default  string   // display string, empty if none
-	Examples []string // example values (from pipe-delimited example tag)
+	Name      string
+	Type      string // "string", "int", "bool", "list", "struct"
+	Required  bool
+	Desc      string
+	Default   string   // display string, empty if none
+	Examples  []string // example values (from pipe-delimited example tag)
+	Exclusive string   // mutual exclusion group name, empty if none
 }
 
 // Examples builds code snippets from field metadata (example/default tags).
