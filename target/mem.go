@@ -34,6 +34,9 @@ type MemTarget struct {
 	Reloads           map[string]int  // service name -> reload call count
 	ReloadUnsupported bool            // when true, SupportsReload returns false
 
+	Users  map[string]UserInfo  // name -> info
+	Groups map[string]GroupInfo // name -> info
+
 	Commands    []commandCall
 	CommandFunc func(cmd string) (CommandResult, error)
 }
@@ -52,6 +55,8 @@ func NewMemTarget() *MemTarget {
 		EnabledServices: make(map[string]bool),
 		Restarts:        make(map[string]int),
 		Reloads:         make(map[string]int),
+		Users:           make(map[string]UserInfo),
+		Groups:          make(map[string]GroupInfo),
 	}
 }
 
@@ -293,7 +298,10 @@ func (m *MemTarget) Remove(_ context.Context, path string) error {
 }
 
 func (m *MemTarget) Capabilities() capability.Capability {
-	return capability.POSIX | capability.Pkg | capability.PkgUpdate | capability.Service
+	return capability.POSIX |
+		capability.Pkg | capability.PkgUpdate |
+		capability.Service |
+		capability.User | capability.Group
 }
 
 func (m *MemTarget) IsInstalled(_ context.Context, pkg string) (bool, error) {
@@ -402,6 +410,84 @@ func (m *MemTarget) RunCommand(_ context.Context, cmd string) (CommandResult, er
 		return fn(cmd)
 	}
 	return CommandResult{ExitCode: 127, Stderr: "command not found"}, nil
+}
+
+// UserManager
+// -----------------------------------------------------------------------------
+
+func (m *MemTarget) UserExists(_ context.Context, name string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, ok := m.Users[name]
+	return ok, nil
+}
+
+func (m *MemTarget) GetUser(_ context.Context, name string) (UserInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	u, ok := m.Users[name]
+	if !ok {
+		return UserInfo{}, errs.WrapErrf(ErrUnknownUser, "%q", name)
+	}
+	return u, nil
+}
+
+func (m *MemTarget) CreateUser(_ context.Context, info UserInfo) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Users[info.Name] = info
+	return nil
+}
+
+func (m *MemTarget) ModifyUser(_ context.Context, info UserInfo) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.Users[info.Name]; !ok {
+		return errs.WrapErrf(ErrUnknownUser, "%q", info.Name)
+	}
+	m.Users[info.Name] = info
+	return nil
+}
+
+func (m *MemTarget) DeleteUser(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.Users, name)
+	return nil
+}
+
+// GroupManager
+// -----------------------------------------------------------------------------
+
+func (m *MemTarget) GroupExists(_ context.Context, name string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, ok := m.Groups[name]
+	return ok, nil
+}
+
+func (m *MemTarget) GetGroup(_ context.Context, name string) (GroupInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	g, ok := m.Groups[name]
+	if !ok {
+		return GroupInfo{}, errs.WrapErrf(ErrUnknownGroup, "%q", name)
+	}
+	return g, nil
+}
+
+func (m *MemTarget) CreateGroup(_ context.Context, info GroupInfo) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Groups[info.Name] = info
+	return nil
+}
+
+func (m *MemTarget) DeleteGroup(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.Groups, name)
+	return nil
 }
 
 type memFileInfo struct {

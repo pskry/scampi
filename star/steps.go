@@ -10,11 +10,13 @@ import (
 	"scampi.dev/scampi/spec"
 	stepcopy "scampi.dev/scampi/step/copy"
 	"scampi.dev/scampi/step/dir"
+	"scampi.dev/scampi/step/group"
 	"scampi.dev/scampi/step/pkg"
 	"scampi.dev/scampi/step/run"
 	"scampi.dev/scampi/step/service"
 	"scampi.dev/scampi/step/symlink"
 	"scampi.dev/scampi/step/template"
+	stepuser "scampi.dev/scampi/step/user"
 )
 
 // StarlarkStep wraps a spec.StepInstance as an opaque Starlark value.
@@ -368,6 +370,126 @@ func builtinTemplate(
 			OnChange: hookIDs,
 			Source:   span,
 			Fields:   kwargsFieldSpans(thread, "dest", "perm", "owner", "group", "src", "content", "on_change"),
+		},
+	}, nil
+}
+
+// Step builtin: user
+// -----------------------------------------------------------------------------
+
+func builtinUser(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var (
+		name        string
+		state       = "present"
+		shell       string
+		home        string
+		system      bool
+		password    string
+		groups      *starlark.List
+		desc        string
+		onChangeVal starlark.Value
+	)
+	if err := starlark.UnpackArgs("user", args, kwargs,
+		"name", &name,
+		"state?", &state,
+		"shell?", &shell,
+		"home?", &home,
+		"system?", &system,
+		"password?", &password,
+		"groups?", &groups,
+		"desc?", &desc,
+		"on_change?", &onChangeVal,
+	); err != nil {
+		return nil, err
+	}
+
+	groupList, err := stringList(groups, "user", "groups")
+	if err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "user")
+	if err != nil {
+		return nil, err
+	}
+
+	span := callSpan(thread)
+	return &StarlarkStep{
+		Instance: spec.StepInstance{
+			Desc: desc,
+			Type: stepuser.User{},
+			Config: &stepuser.UserConfig{
+				Desc: desc, Name: name, State: state,
+				Shell: shell, Home: home, System: system,
+				Password: password, Groups: groupList,
+			},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields: kwargsFieldSpans(
+				thread,
+				"name",
+				"state",
+				"shell",
+				"home",
+				"system",
+				"password",
+				"groups",
+				"on_change",
+			),
+		},
+	}, nil
+}
+
+// Step builtin: group
+// -----------------------------------------------------------------------------
+
+func builtinGroup(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var (
+		name        string
+		state       = "present"
+		gid         int
+		system      bool
+		desc        string
+		onChangeVal starlark.Value
+	)
+	if err := starlark.UnpackArgs("group", args, kwargs,
+		"name", &name,
+		"state?", &state,
+		"gid?", &gid,
+		"system?", &system,
+		"desc?", &desc,
+		"on_change?", &onChangeVal,
+	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "group")
+	if err != nil {
+		return nil, err
+	}
+
+	span := callSpan(thread)
+	return &StarlarkStep{
+		Instance: spec.StepInstance{
+			Desc: desc,
+			Type: group.Group{},
+			Config: &group.GroupConfig{
+				Desc: desc, Name: name, State: state,
+				GID: gid, System: system,
+			},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "name", "state", "gid", "system", "on_change"),
 		},
 	}, nil
 }

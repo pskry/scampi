@@ -1,0 +1,13 @@
+{
+  "target": {
+    "files": {},
+    "users": {
+      "appd": {
+        "shell": "/usr/sbin/nologin",
+        "system": true
+      }
+    }
+  },
+  "changed": 1,
+  "memOnly": true
+}

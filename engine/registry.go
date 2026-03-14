@@ -6,11 +6,13 @@ import (
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/copy"
 	"scampi.dev/scampi/step/dir"
+	"scampi.dev/scampi/step/group"
 	"scampi.dev/scampi/step/pkg"
 	"scampi.dev/scampi/step/run"
 	"scampi.dev/scampi/step/service"
 	"scampi.dev/scampi/step/symlink"
 	"scampi.dev/scampi/step/template"
+	stepuser "scampi.dev/scampi/step/user"
 	"scampi.dev/scampi/target/local"
 	"scampi.dev/scampi/target/ssh"
 )
@@ -24,11 +26,13 @@ func NewRegistry() *Registry {
 	stepTypes := []spec.StepType{
 		copy.Copy{},
 		dir.Dir{},
+		group.Group{},
 		pkg.Pkg{},
 		run.Run{},
 		service.Service{},
 		symlink.Symlink{},
 		template.Template{},
+		stepuser.User{},
 	}
 
 	targetTypes := []spec.TargetType{

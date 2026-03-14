@@ -23,10 +23,12 @@ const (
 	PkgUpdate                           // UpdateCache, IsUpgradable
 	Service                             // IsActive, IsEnabled, Start, Stop, Enable, Disable
 	Command                             // RunCommand
+	User                                // UserExists, CreateUser, ModifyUser, DeleteUser, GetUser
+	Group                               // GroupExists, CreateGroup, DeleteGroup, GetGroup
 )
 
 const (
-	POSIX Capability = Filesystem | Ownership | FileMode | Symlink | Command
+	POSIX Capability = Filesystem | Ownership | FileMode | Symlink | Command | User | Group
 )
 
 func (c Capability) HasAll(other Capability) bool {
@@ -71,6 +73,12 @@ func (c Capability) String() string {
 	}
 	if c&Command != 0 {
 		parts = append(parts, "Command")
+	}
+	if c&User != 0 {
+		parts = append(parts, "User")
+	}
+	if c&Group != 0 {
+		parts = append(parts, "Group")
 	}
 
 	// If no known flags matched, show raw value

@@ -230,7 +230,7 @@ func (POSIXTarget) RunCommand(ctx context.Context, cmd string) (target.CommandRe
 }
 
 func (t POSIXTarget) Capabilities() capability.Capability {
-	caps := capability.POSIX
+	caps := capability.POSIX // includes User | Group
 	if t.pkgBackend != nil {
 		caps |= capability.Pkg
 		if t.pkgBackend.SupportsUpgrade() {

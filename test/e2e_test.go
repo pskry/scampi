@@ -41,12 +41,29 @@ type E2EFiles struct {
 	Restarts        map[string]int              `json:"restarts,omitempty"`        // service name -> restart call count
 	Reloads         map[string]int              `json:"reloads,omitempty"`         // service name -> reload call count
 	Commands        map[string]E2ECommandResult `json:"commands,omitempty"`        // cmd string -> result
+	Users           map[string]E2EUserInfo      `json:"users,omitempty"`           // username -> user info
+	Groups          map[string]E2EGroupInfo     `json:"groups,omitempty"`          // group name -> group info
 }
 
 // E2EOwner represents file ownership.
 type E2EOwner struct {
 	User  string `json:"user"`
 	Group string `json:"group"`
+}
+
+// E2EUserInfo represents a user account.
+type E2EUserInfo struct {
+	Shell    string   `json:"shell,omitempty"`
+	Home     string   `json:"home,omitempty"`
+	System   bool     `json:"system,omitempty"`
+	Password string   `json:"password,omitempty"`
+	Groups   []string `json:"groups,omitempty"`
+}
+
+// E2EGroupInfo represents a group.
+type E2EGroupInfo struct {
+	GID    int  `json:"gid,omitempty"`
+	System bool `json:"system,omitempty"`
 }
 
 // E2ECommandResult defines the simulated result of a shell command.

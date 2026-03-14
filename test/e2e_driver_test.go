@@ -6,6 +6,7 @@ import (
 	"context"
 	"io/fs"
 	"os"
+	"sort"
 	"testing"
 
 	"scampi.dev/scampi/spec"
@@ -121,6 +122,24 @@ func (d *MemDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 		}
 	}
 
+	for name, info := range initial.Users {
+		d.tgt.Users[name] = target.UserInfo{
+			Name:     name,
+			Shell:    info.Shell,
+			Home:     info.Home,
+			System:   info.System,
+			Password: info.Password,
+			Groups:   info.Groups,
+		}
+	}
+	for name, info := range initial.Groups {
+		d.tgt.Groups[name] = target.GroupInfo{
+			Name:   name,
+			GID:    info.GID,
+			System: info.System,
+		}
+	}
+
 	ti := mockTargetInstance(d.tgt)
 
 	return d.tgt, ti, func() {} // No cleanup needed for mem target
@@ -208,6 +227,47 @@ func (d *MemDriver) Verify(t *testing.T, expect E2EFiles) {
 		gotCount := d.tgt.Reloads[svc]
 		if gotCount != wantCount {
 			t.Errorf("service %q: got %d reloads, want %d", svc, gotCount, wantCount)
+		}
+	}
+
+	// Verify users
+	for name, wantInfo := range expect.Users {
+		gotInfo, ok := d.tgt.Users[name]
+		if !ok {
+			t.Errorf("expected user %q to exist", name)
+			continue
+		}
+		if wantInfo.Shell != "" && gotInfo.Shell != wantInfo.Shell {
+			t.Errorf("user %q shell: got %q, want %q", name, gotInfo.Shell, wantInfo.Shell)
+		}
+		if wantInfo.Home != "" && gotInfo.Home != wantInfo.Home {
+			t.Errorf("user %q home: got %q, want %q", name, gotInfo.Home, wantInfo.Home)
+		}
+		if wantInfo.System != gotInfo.System {
+			t.Errorf("user %q system: got %v, want %v", name, gotInfo.System, wantInfo.System)
+		}
+		if len(wantInfo.Groups) > 0 {
+			if !stringSlicesEqual(sorted(gotInfo.Groups), sorted(wantInfo.Groups)) {
+				t.Errorf("user %q groups: got %v, want %v", name, gotInfo.Groups, wantInfo.Groups)
+			}
+		}
+	}
+
+	// Verify absent users (users listed in expect but with empty info means "should not exist")
+	// We verify existence via the Users map directly
+
+	// Verify groups
+	for name, wantInfo := range expect.Groups {
+		gotInfo, ok := d.tgt.Groups[name]
+		if !ok {
+			t.Errorf("expected group %q to exist", name)
+			continue
+		}
+		if wantInfo.GID != 0 && gotInfo.GID != wantInfo.GID {
+			t.Errorf("group %q gid: got %d, want %d", name, gotInfo.GID, wantInfo.GID)
+		}
+		if wantInfo.System != gotInfo.System {
+			t.Errorf("group %q system: got %v, want %v", name, gotInfo.System, wantInfo.System)
 		}
 	}
 }
@@ -417,6 +477,13 @@ func (d *SSHDriver) GetMode(ctx context.Context, path string) (fs.FileMode, erro
 
 func (d *SSHDriver) GetSymlink(ctx context.Context, path string) (string, error) {
 	return d.tgt.Readlink(ctx, path)
+}
+
+func sorted(s []string) []string {
+	cp := make([]string, len(s))
+	copy(cp, s)
+	sort.Strings(cp)
+	return cp
 }
 
 // AllDrivers returns all available e2e drivers

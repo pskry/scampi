@@ -85,6 +85,35 @@ type (
 	Command interface {
 		RunCommand(ctx context.Context, cmd string) (CommandResult, error)
 	}
+	UserInfo struct {
+		Name     string
+		UID      int
+		GID      int
+		Home     string
+		Shell    string
+		Groups   []string // supplementary group names
+		System   bool
+		Password string
+	}
+	GroupInfo struct {
+		Name    string
+		GID     int
+		System  bool
+		Members []string
+	}
+	UserManager interface {
+		UserExists(ctx context.Context, name string) (bool, error)
+		GetUser(ctx context.Context, name string) (UserInfo, error)
+		CreateUser(ctx context.Context, info UserInfo) error
+		ModifyUser(ctx context.Context, info UserInfo) error
+		DeleteUser(ctx context.Context, name string) error
+	}
+	GroupManager interface {
+		GroupExists(ctx context.Context, name string) (bool, error)
+		GetGroup(ctx context.Context, name string) (GroupInfo, error)
+		CreateGroup(ctx context.Context, info GroupInfo) error
+		DeleteGroup(ctx context.Context, name string) error
+	}
 )
 
 func IsNotExist(err error) bool        { return errors.Is(err, ErrNotExist) }

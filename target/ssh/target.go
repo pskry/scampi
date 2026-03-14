@@ -37,7 +37,7 @@ type SSHTarget struct {
 }
 
 func (t *SSHTarget) Capabilities() capability.Capability {
-	caps := capability.POSIX
+	caps := capability.POSIX // includes User | Group
 	if t.pkgBackend != nil {
 		caps |= capability.Pkg
 		if t.pkgBackend.SupportsUpgrade() {

@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Package user implements the user step type for managing system user accounts.
+package user
+
+import (
+	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/spec"
+)
+
+const (
+	StatePresent = "present"
+	StateAbsent  = "absent"
+)
+
+type (
+	User       struct{}
+	UserConfig struct {
+		_ struct{} `summary:"Ensure a user account exists or is absent on the target"`
+
+		Desc     string   `step:"Human-readable description" optional:"true"`
+		Name     string   `step:"Username to manage" example:"hal9000"`
+		State    string   `step:"Desired state" default:"present" example:"absent"`
+		Shell    string   `step:"Login shell" optional:"true" example:"/bin/bash"`
+		Home     string   `step:"Home directory" optional:"true" example:"/home/hal9000"`
+		System   bool     `step:"Create as system user" optional:"true"`
+		Password string   `step:"Password hash" optional:"true"`
+		Groups   []string `step:"Supplementary groups" optional:"true" example:"[\"sudo\", \"docker\"]"`
+	}
+	userAction struct {
+		idx    int
+		desc   string
+		name   string
+		state  string
+		shell  string
+		home   string
+		system bool
+		pass   string
+		groups []string
+		step   spec.StepInstance
+	}
+)
+
+func (User) Kind() string   { return "user" }
+func (User) NewConfig() any { return &UserConfig{} }
+
+func (u User) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+	cfg, ok := step.Config.(*UserConfig)
+	if !ok {
+		return nil, errs.BUG("expected %T got %T", &UserConfig{}, step.Config)
+	}
+
+	if err := cfg.Validate(step); err != nil {
+		return nil, err
+	}
+
+	return &userAction{
+		idx:    idx,
+		desc:   cfg.Desc,
+		name:   cfg.Name,
+		state:  cfg.State,
+		shell:  cfg.Shell,
+		home:   cfg.Home,
+		system: cfg.System,
+		pass:   cfg.Password,
+		groups: cfg.Groups,
+		step:   step,
+	}, nil
+}
+
+func (c *UserConfig) Validate(step spec.StepInstance) error {
+	switch c.State {
+	case StatePresent, StateAbsent:
+	default:
+		return InvalidStateError{
+			Got:     c.State,
+			Allowed: []string{StatePresent, StateAbsent},
+			Source:  step.Fields["state"].Value,
+		}
+	}
+	return nil
+}
+
+func (a *userAction) Desc() string { return a.desc }
+func (a *userAction) Kind() string { return "user" }
+
+func (a *userAction) Ops() []spec.Op {
+	nameSource := a.step.Fields["name"].Value
+
+	switch a.state {
+	case StateAbsent:
+		op := &removeUserOp{
+			name:       a.name,
+			nameSource: nameSource,
+		}
+		op.SetAction(a)
+		return []spec.Op{op}
+
+	default:
+		op := &ensureUserOp{
+			name:       a.name,
+			shell:      a.shell,
+			home:       a.home,
+			system:     a.system,
+			password:   a.pass,
+			groups:     a.groups,
+			nameSource: nameSource,
+		}
+		op.SetAction(a)
+		return []spec.Op{op}
+	}
+}

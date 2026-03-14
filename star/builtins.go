@@ -18,11 +18,13 @@ func predeclared() starlark.StringDict {
 	return starlark.StringDict{
 		"copy":     starlark.NewBuiltin("copy", builtinCopy),
 		"dir":      starlark.NewBuiltin("dir", builtinDir),
+		"group":    starlark.NewBuiltin("group", builtinGroup),
 		"pkg":      starlark.NewBuiltin("pkg", builtinPkg),
 		"run":      starlark.NewBuiltin("run", builtinRun),
 		"service":  starlark.NewBuiltin("service", builtinService),
 		"symlink":  starlark.NewBuiltin("symlink", builtinSymlink),
 		"template": starlark.NewBuiltin("template", builtinTemplate),
+		"user":     starlark.NewBuiltin("user", builtinUser),
 		"target":   targetModule(),
 		"deploy":   starlark.NewBuiltin("deploy", builtinDeploy),
 		"env":      starlark.NewBuiltin("env", builtinEnv),

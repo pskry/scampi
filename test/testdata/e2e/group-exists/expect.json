@@ -1,0 +1,12 @@
+{
+  "target": {
+    "files": {},
+    "groups": {
+      "appusers": {
+        "gid": 1100
+      }
+    }
+  },
+  "changed": 0,
+  "memOnly": true
+}
