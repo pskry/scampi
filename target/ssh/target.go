@@ -68,7 +68,7 @@ func (t *SSHTarget) Close() {
 func (t *SSHTarget) ReadFile(ctx context.Context, path string) ([]byte, error) {
 	f, err := t.sftp.Open(path)
 	if err != nil {
-		if os.IsPermission(err) {
+		if isPermission(err) {
 			if t.escalate != "" {
 				return t.escalatedReadFile(ctx, path)
 			}
@@ -87,7 +87,7 @@ func (t *SSHTarget) ReadFile(ctx context.Context, path string) ([]byte, error) {
 func (t *SSHTarget) WriteFile(ctx context.Context, path string, data []byte) error {
 	f, err := t.sftp.Create(path)
 	if err != nil {
-		if os.IsPermission(err) {
+		if isPermission(err) {
 			if t.escalate != "" {
 				return t.escalatedWriteFile(ctx, path, data)
 			}
@@ -113,7 +113,7 @@ func (t *SSHTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
 
 func (t *SSHTarget) Remove(ctx context.Context, path string) error {
 	err := t.sftp.Remove(path)
-	if os.IsPermission(err) {
+	if isPermission(err) {
 		if t.escalate != "" {
 			return t.escalatedRemove(ctx, path)
 		}
@@ -127,7 +127,7 @@ func (t *SSHTarget) Remove(ctx context.Context, path string) error {
 func (t *SSHTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) error {
 	err := t.sftp.MkdirAll(path)
 	if err != nil {
-		if os.IsPermission(err) {
+		if isPermission(err) {
 			if t.escalate != "" {
 				return t.escalatedMkdir(ctx, path, mode)
 			}
@@ -137,7 +137,18 @@ func (t *SSHTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) er
 		}
 		return normalizeError(err)
 	}
-	return normalizeError(t.sftp.Chmod(path, mode))
+	if err := t.sftp.Chmod(path, mode); err != nil {
+		if isPermission(err) {
+			if t.escalate != "" {
+				return t.escalatedMkdir(ctx, path, mode)
+			}
+			if !t.isRoot {
+				return target.NoEscalationError{Op: "chmod", Path: path}
+			}
+		}
+		return normalizeError(err)
+	}
+	return nil
 }
 
 // FileMode
@@ -145,7 +156,7 @@ func (t *SSHTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) er
 
 func (t *SSHTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) error {
 	err := t.sftp.Chmod(path, mode)
-	if os.IsPermission(err) {
+	if isPermission(err) {
 		if t.escalate != "" {
 			return t.escalatedChmod(ctx, path, mode)
 		}
@@ -154,6 +165,25 @@ func (t *SSHTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) er
 		}
 	}
 	return normalizeError(err)
+}
+
+func (t *SSHTarget) ChmodRecursive(ctx context.Context, path string, mode fs.FileMode) error {
+	octal := fmt.Sprintf("%04o", mode.Perm())
+	cmd := "chmod -R " + octal + " " + shellQuote(path)
+	if t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
+	result, err := t.RunCommand(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return target.EscalationError{
+			Tool: t.escalate, Op: "chmod -R", Path: path,
+			Stderr: result.Stderr, ExitCode: result.ExitCode,
+		}
+	}
+	return nil
 }
 
 // Symlinks
@@ -174,7 +204,7 @@ func (t *SSHTarget) Readlink(_ context.Context, path string) (string, error) {
 
 func (t *SSHTarget) Symlink(ctx context.Context, tgt, link string) error {
 	err := t.sftp.Symlink(tgt, link)
-	if os.IsPermission(err) {
+	if isPermission(err) {
 		if t.escalate != "" {
 			return t.escalatedSymlink(ctx, tgt, link)
 		}
@@ -227,7 +257,7 @@ func (t *SSHTarget) Chown(ctx context.Context, path string, owner target.Owner) 
 		return err
 	}
 	err = t.sftp.Chown(path, uid, gid)
-	if os.IsPermission(err) {
+	if isPermission(err) {
 		if t.escalate != "" {
 			return t.escalatedChown(ctx, path, owner)
 		}
@@ -236,6 +266,26 @@ func (t *SSHTarget) Chown(ctx context.Context, path string, owner target.Owner) 
 		}
 	}
 	return normalizeError(err)
+}
+
+func (t *SSHTarget) ChownRecursive(ctx context.Context, path string, owner target.Owner) error {
+	cmd := "chown -R " +
+		shellQuote(owner.User) + ":" + shellQuote(owner.Group) +
+		" " + shellQuote(path)
+	if t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
+	result, err := t.RunCommand(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return target.EscalationError{
+			Tool: t.escalate, Op: "chown -R", Path: path,
+			Stderr: result.Stderr, ExitCode: result.ExitCode,
+		}
+	}
+	return nil
 }
 
 // User and group resolution
@@ -352,6 +402,13 @@ func (t *SSHTarget) RunCommand(_ context.Context, cmd string) (target.CommandRes
 		Stderr:   stderr.String(),
 		ExitCode: 0,
 	}, nil
+}
+
+func (t *SSHTarget) RunPrivileged(ctx context.Context, cmd string) (target.CommandResult, error) {
+	if t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
+	return t.RunCommand(ctx, cmd)
 }
 
 func shellQuote(s string) string {
@@ -495,11 +552,29 @@ func (t *SSHTarget) writeTempFile(data []byte) (string, error) {
 	return tmp, nil
 }
 
+func isPermission(err error) bool {
+	if os.IsPermission(err) {
+		return true
+	}
+	var status *sftp.StatusError
+	return errors.As(err, &status) &&
+		status.FxCode() == sftp.ErrSSHFxPermissionDenied
+}
+
+func isNotExist(err error) bool {
+	if os.IsNotExist(err) {
+		return true
+	}
+	var status *sftp.StatusError
+	return errors.As(err, &status) &&
+		status.FxCode() == sftp.ErrSSHFxNoSuchFile
+}
+
 func normalizeError(err error) error {
 	switch {
-	case os.IsNotExist(err):
+	case isNotExist(err):
 		return target.ErrNotExist
-	case os.IsPermission(err):
+	case isPermission(err):
 		return target.ErrPermission
 	}
 	return err

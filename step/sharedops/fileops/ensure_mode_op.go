@@ -22,8 +22,9 @@ const ensureModeID = "builtin.ensure-mode"
 
 type EnsureModeOp struct {
 	sharedops.BaseOp
-	Path string
-	Mode fs.FileMode
+	Path      string
+	Mode      fs.FileMode
+	Recursive bool
 }
 
 func (op *EnsureModeOp) Check(
@@ -31,6 +32,10 @@ func (op *EnsureModeOp) Check(
 	_ source.Source,
 	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
+	if op.Recursive {
+		return op.checkRecursive(ctx, tgt)
+	}
+
 	fsTgt := target.Must[target.Filesystem](ensureModeID, tgt)
 
 	info, err := fsTgt.Stat(ctx, op.Path)
@@ -60,7 +65,43 @@ func (op *EnsureModeOp) Check(
 	return spec.CheckSatisfied, nil, nil
 }
 
+func (op *EnsureModeOp) checkRecursive(
+	ctx context.Context,
+	tgt target.Target,
+) (spec.CheckResult, []spec.DriftDetail, error) {
+	fsTgt := target.Must[target.Filesystem](ensureModeID, tgt)
+
+	info, err := fsTgt.Stat(ctx, op.Path)
+	if err != nil {
+		if target.IsNotExist(err) {
+			return spec.CheckUnsatisfied, []spec.DriftDetail{{
+				Field:   "perm",
+				Desired: op.Mode.Perm().String(),
+			}}, nil
+		}
+		return spec.CheckUnsatisfied, nil, modeReadError{
+			Path:   op.Path,
+			Err:    err,
+			Source: op.DestSpan,
+		}
+	}
+
+	if info.Mode().Perm() != op.Mode.Perm() {
+		return spec.CheckUnsatisfied, []spec.DriftDetail{{
+			Field:   "perm",
+			Current: info.Mode().Perm().String(),
+			Desired: op.Mode.Perm().String(),
+		}}, nil
+	}
+
+	return spec.CheckSatisfied, nil, nil
+}
+
 func (op *EnsureModeOp) Execute(ctx context.Context, _ source.Source, tgt target.Target) (spec.Result, error) {
+	if op.Recursive {
+		return op.executeRecursive(ctx, tgt)
+	}
+
 	t := target.Must[interface {
 		target.Filesystem
 		target.FileMode
@@ -98,7 +139,24 @@ func (op *EnsureModeOp) Execute(ctx context.Context, _ source.Source, tgt target
 	return spec.Result{Changed: changed}, nil
 }
 
-func (EnsureModeOp) RequiredCapabilities() capability.Capability {
+func (op *EnsureModeOp) executeRecursive(ctx context.Context, tgt target.Target) (spec.Result, error) {
+	t := target.Must[target.FileMode](ensureModeID, tgt)
+
+	if err := t.ChmodRecursive(ctx, op.Path, op.Mode); err != nil {
+		if target.IsPermission(err) {
+			return spec.Result{}, sharedops.PermissionDeniedError{
+				Operation: fmt.Sprintf("chmod -R %s %s", op.Mode, op.Path),
+				Source:    op.DestSpan,
+				Err:       err,
+			}
+		}
+		return spec.Result{}, sharedops.DiagnoseTargetError(err)
+	}
+
+	return spec.Result{Changed: true}, nil
+}
+
+func (op EnsureModeOp) RequiredCapabilities() capability.Capability {
 	return capability.Filesystem | capability.FileMode
 }
 

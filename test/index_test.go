@@ -39,7 +39,7 @@ func TestIndexAll_EmitsWellFormedEvent(t *testing.T) {
 		found[s.Kind] = s.Desc
 	}
 
-	for _, kind := range []string{"copy", "symlink"} {
+	for _, kind := range []string{"copy", "symlink", "unarchive"} {
 		desc, ok := found[kind]
 		if !ok {
 			t.Errorf("missing step %q in index", kind)
@@ -87,6 +87,12 @@ func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
 			wantSummary:    "Manage kernel parameters via sysctl with optional persistence",
 			wantFields:     []string{"key", "value"},
 			wantFieldCount: 4, // includes desc, persist
+		},
+		{
+			kind:           "unarchive",
+			wantSummary:    "Extract an archive to a target directory with optional recursive unpacking",
+			wantFields:     []string{"src", "dest", "depth", "owner", "group", "perm"},
+			wantFieldCount: 7, // includes desc
 		},
 	}
 
@@ -187,6 +193,7 @@ func TestIndexStep_DefaultsPopulated(t *testing.T) {
 		{"service", "enabled", `"true"`},
 		{"firewall", "action", `"allow"`},
 		{"sysctl", "persist", `"true"`},
+		{"unarchive", "depth", `"-1"`},
 		{"user", "state", `"present"`},
 	}
 

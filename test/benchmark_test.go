@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"scampi.dev/scampi/diagnostic"
@@ -839,6 +840,92 @@ deploy(
 				}
 				return target.CommandResult{ExitCode: 127, Stderr: "command not found"}, nil
 			}
+
+			rec := &recordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+			store := spec.NewSourceStore()
+
+			for b.Loop() {
+				ctx := context.Background()
+				cfg, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+				if err != nil {
+					b.Fatalf("engine.LoadConfig() must not return error, got %v", err)
+				}
+
+				resolved, err := engine.Resolve(cfg, "", "")
+				if err != nil {
+					b.Fatalf("engine.Resolve() must not return error, got %v", err)
+				}
+
+				resolved.Target = mockTargetInstance(tgt)
+
+				e, err := engine.New(ctx, src, resolved, noopEmitter{})
+				if err != nil {
+					b.Fatalf("engine.New() must not return error, got %v", err)
+				}
+
+				if err := e.Apply(ctx); err != nil {
+					b.Fatal(err)
+				}
+				e.Close()
+			}
+		})
+	}
+}
+
+// Benchmark: Apply() no-op run for unarchive (idempotent path)
+// -----------------------------------------------------------------------------
+//
+// Size-N is the number of 1KB files in the archive.
+
+func generateFiles(n int) map[string]string {
+	content := strings.Repeat("x", 1024)
+	files := make(map[string]string, n)
+	for i := range n {
+		files[fmt.Sprintf("file-%04d.txt", i)] = content
+	}
+	return files
+}
+
+var benchArchiveSizes = []int{1, 10, 100, 1000}
+
+func BenchmarkApplyNoOp_Unarchive_TarGz(b *testing.B) {
+	benchUnarchiveNoOp(b, makeTarGz, "/data.tar.gz")
+}
+
+func BenchmarkApplyNoOp_Unarchive_TarXz(b *testing.B) {
+	benchUnarchiveNoOp(b, makeTarXz, "/data.tar.xz")
+}
+
+func BenchmarkApplyNoOp_Unarchive_TarZst(b *testing.B) {
+	benchUnarchiveNoOp(b, makeTarZst, "/data.tar.zst")
+}
+
+func BenchmarkApplyNoOp_Unarchive_Tar(b *testing.B) {
+	benchUnarchiveNoOp(b, makeTar, "/data.tar")
+}
+
+func BenchmarkApplyNoOp_Unarchive_Zip(b *testing.B) {
+	benchUnarchiveNoOp(b, makeZip, "/data.zip")
+}
+
+func benchUnarchiveNoOp(b *testing.B, makeFn func(testing.TB, map[string]string) []byte, srcPath string) {
+	for _, n := range benchArchiveSizes {
+		archive := makeFn(b, generateFiles(n))
+		b.Run(fmt.Sprintf("Size-%d", n), func(b *testing.B) {
+			cfgStr := fmt.Sprintf(`target.local(name="local")
+
+deploy(name="bench", targets=["local"], steps=[
+    unarchive(src="%s", dest="/output", depth=0),
+])
+`, srcPath)
+
+			src := source.NewMemSource()
+			src.Files[srcPath] = archive
+			src.Files["/config.star"] = []byte(cfgStr)
+
+			tgt := target.NewMemTarget()
+			tgt.Files[destMarkerPath("/output")] = []byte(archiveHash(archive) + "\n")
 
 			rec := &recordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)

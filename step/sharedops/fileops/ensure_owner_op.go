@@ -24,6 +24,7 @@ type EnsureOwnerOp struct {
 	Path      string
 	Owner     string
 	Group     string
+	Recursive bool
 	OwnerSpan spec.SourceSpan
 	GroupSpan spec.SourceSpan
 }
@@ -49,6 +50,10 @@ func (op *EnsureOwnerOp) Check(
 			Source: op.GroupSpan,
 			Err:    nil,
 		}
+	}
+
+	if op.Recursive {
+		return op.checkRecursive(ctx, tgt, desired)
 	}
 
 	have, err := owTgt.GetOwner(ctx, op.Path)
@@ -78,7 +83,44 @@ func (op *EnsureOwnerOp) Check(
 	return spec.CheckSatisfied, nil, nil
 }
 
+func (op *EnsureOwnerOp) checkRecursive(
+	ctx context.Context,
+	tgt target.Target,
+	desired string,
+) (spec.CheckResult, []spec.DriftDetail, error) {
+	owTgt := target.Must[target.Ownership](ensureOwnerID, tgt)
+
+	have, err := owTgt.GetOwner(ctx, op.Path)
+	if err != nil {
+		if target.IsNotExist(err) {
+			return spec.CheckUnsatisfied, []spec.DriftDetail{{
+				Field:   "owner:group",
+				Desired: desired,
+			}}, nil
+		}
+		return spec.CheckUnsatisfied, nil, ownerReadError{
+			Path:   op.Path,
+			Err:    err,
+			Source: op.DestSpan,
+		}
+	}
+
+	if have.User != op.Owner || have.Group != op.Group {
+		return spec.CheckUnsatisfied, []spec.DriftDetail{{
+			Field:   "owner:group",
+			Current: have.User + ":" + have.Group,
+			Desired: desired,
+		}}, nil
+	}
+
+	return spec.CheckSatisfied, nil, nil
+}
+
 func (op *EnsureOwnerOp) Execute(ctx context.Context, _ source.Source, tgt target.Target) (spec.Result, error) {
+	if op.Recursive {
+		return op.executeRecursive(ctx, tgt)
+	}
+
 	owTgt := target.Must[target.Ownership](ensureOwnerID, tgt)
 
 	have, err := owTgt.GetOwner(ctx, op.Path)
@@ -127,7 +169,38 @@ func (op *EnsureOwnerOp) Execute(ctx context.Context, _ source.Source, tgt targe
 	return spec.Result{Changed: changed}, nil
 }
 
-func (EnsureOwnerOp) RequiredCapabilities() capability.Capability {
+func (op *EnsureOwnerOp) executeRecursive(ctx context.Context, tgt target.Target) (spec.Result, error) {
+	owTgt := target.Must[target.Ownership](ensureOwnerID, tgt)
+
+	if err := owTgt.ChownRecursive(ctx, op.Path, target.Owner{User: op.Owner, Group: op.Group}); err != nil {
+		if target.IsUnknownUser(err) {
+			return spec.Result{}, sharedops.UnknownUserError{
+				User:   op.Owner,
+				Source: op.OwnerSpan,
+				Err:    err,
+			}
+		}
+		if target.IsUnknownGroup(err) {
+			return spec.Result{}, sharedops.UnknownGroupError{
+				Group:  op.Group,
+				Source: op.GroupSpan,
+				Err:    err,
+			}
+		}
+		if target.IsPermission(err) {
+			return spec.Result{}, sharedops.PermissionDeniedError{
+				Operation: fmt.Sprintf("chown -R %s:%s %s", op.Owner, op.Group, op.Path),
+				Source:    op.OwnerSpan,
+				Err:       err,
+			}
+		}
+		return spec.Result{}, sharedops.DiagnoseTargetError(err)
+	}
+
+	return spec.Result{Changed: true}, nil
+}
+
+func (op EnsureOwnerOp) RequiredCapabilities() capability.Capability {
 	return capability.Ownership
 }
 

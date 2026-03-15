@@ -179,6 +179,26 @@ func (m *MemTarget) Chmod(_ context.Context, path string, mode fs.FileMode) erro
 	return nil
 }
 
+func (m *MemTarget) ChmodRecursive(_ context.Context, path string, mode fs.FileMode) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	prefix := path + "/"
+	for p := range m.Files {
+		if p == path || (len(p) > len(prefix) && p[:len(prefix)] == prefix) {
+			m.Modes[p] = mode
+			m.ModTimes[p] = time.Now()
+		}
+	}
+	for p := range m.Dirs {
+		if p == path || (len(p) > len(prefix) && p[:len(prefix)] == prefix) {
+			m.Modes[p] = mode
+			m.Dirs[p] = mode
+		}
+	}
+	return nil
+}
+
 func (m *MemTarget) Chown(_ context.Context, path string, owner Owner) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -190,6 +210,24 @@ func (m *MemTarget) Chown(_ context.Context, path string, owner Owner) error {
 	}
 
 	m.Owners[path] = owner
+	return nil
+}
+
+func (m *MemTarget) ChownRecursive(_ context.Context, path string, owner Owner) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	prefix := path + "/"
+	for p := range m.Files {
+		if p == path || (len(p) > len(prefix) && p[:len(prefix)] == prefix) {
+			m.Owners[p] = owner
+		}
+	}
+	for p := range m.Dirs {
+		if p == path || (len(p) > len(prefix) && p[:len(prefix)] == prefix) {
+			m.Owners[p] = owner
+		}
+	}
 	return nil
 }
 
@@ -410,6 +448,10 @@ func (m *MemTarget) RunCommand(_ context.Context, cmd string) (CommandResult, er
 		return fn(cmd)
 	}
 	return CommandResult{ExitCode: 127, Stderr: "command not found"}, nil
+}
+
+func (m *MemTarget) RunPrivileged(ctx context.Context, cmd string) (CommandResult, error) {
+	return m.RunCommand(ctx, cmd)
 }
 
 // UserManager

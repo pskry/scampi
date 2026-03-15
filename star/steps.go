@@ -18,6 +18,7 @@ import (
 	"scampi.dev/scampi/step/symlink"
 	"scampi.dev/scampi/step/sysctl"
 	"scampi.dev/scampi/step/template"
+	"scampi.dev/scampi/step/unarchive"
 	stepuser "scampi.dev/scampi/step/user"
 )
 
@@ -491,6 +492,69 @@ func builtinTemplate(
 				"src",
 				"content",
 				"verify",
+				"on_change",
+			),
+		},
+	}, nil
+}
+
+// Step builtin: unarchive
+// -----------------------------------------------------------------------------
+
+func builtinUnarchive(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var (
+		src         string
+		dest        string
+		depth       = -1
+		owner       string
+		group       string
+		perm        string
+		desc        string
+		onChangeVal starlark.Value
+	)
+	if err := starlark.UnpackArgs("unarchive", args, kwargs,
+		"src", &src,
+		"dest", &dest,
+		"depth?", &depth,
+		"owner?", &owner,
+		"group?", &group,
+		"perm?", &perm,
+		"desc?", &desc,
+		"on_change?", &onChangeVal,
+	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "unarchive")
+	if err != nil {
+		return nil, err
+	}
+
+	span := callSpan(thread)
+	return &StarlarkStep{
+		Instance: spec.StepInstance{
+			Desc: desc,
+			Type: unarchive.Unarchive{},
+			Config: &unarchive.UnarchiveConfig{
+				Desc: desc, Src: src, Dest: dest,
+				Depth: depth, Owner: owner, Group: group,
+				Perm: perm,
+			},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields: kwargsFieldSpans(
+				thread,
+				"src",
+				"dest",
+				"depth",
+				"owner",
+				"group",
+				"perm",
 				"on_change",
 			),
 		},

@@ -44,6 +44,7 @@ type (
 	}
 	FileMode interface {
 		Chmod(ctx context.Context, path string, mode fs.FileMode) error
+		ChmodRecursive(ctx context.Context, path string, mode fs.FileMode) error
 	}
 	Symlink interface {
 		Lstat(ctx context.Context, path string) (fs.FileInfo, error)
@@ -55,6 +56,7 @@ type (
 		HasGroup(ctx context.Context, group string) bool
 		GetOwner(ctx context.Context, path string) (Owner, error)
 		Chown(ctx context.Context, path string, owner Owner) error
+		ChownRecursive(ctx context.Context, path string, owner Owner) error
 	}
 	PkgManager interface {
 		IsInstalled(ctx context.Context, pkg string) (bool, error)
@@ -84,6 +86,7 @@ type (
 	}
 	Command interface {
 		RunCommand(ctx context.Context, cmd string) (CommandResult, error)
+		RunPrivileged(ctx context.Context, cmd string) (CommandResult, error)
 	}
 	UserInfo struct {
 		Name     string

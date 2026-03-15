@@ -168,6 +168,45 @@ func (t POSIXTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) e
 	return err
 }
 
+func (t POSIXTarget) ChmodRecursive(ctx context.Context, path string, mode fs.FileMode) error {
+	octal := fmt.Sprintf("%04o", mode.Perm())
+	cmd := "chmod -R " + octal + " " + shellQuote(path)
+	if t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
+	result, err := t.RunCommand(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return target.EscalationError{
+			Tool: t.escalate, Op: "chmod -R", Path: path,
+			Stderr: result.Stderr, ExitCode: result.ExitCode,
+		}
+	}
+	return nil
+}
+
+func (t POSIXTarget) ChownRecursive(ctx context.Context, path string, owner target.Owner) error {
+	cmd := "chown -R " +
+		shellQuote(owner.User) + ":" + shellQuote(owner.Group) +
+		" " + shellQuote(path)
+	if t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
+	result, err := t.RunCommand(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
+		return target.EscalationError{
+			Tool: t.escalate, Op: "chown -R", Path: path,
+			Stderr: result.Stderr, ExitCode: result.ExitCode,
+		}
+	}
+	return nil
+}
+
 func (POSIXTarget) HasUser(_ context.Context, user string) bool {
 	_, err := lookupUser(user)
 	return err == nil
@@ -227,6 +266,13 @@ func (POSIXTarget) RunCommand(ctx context.Context, cmd string) (target.CommandRe
 		Stderr:   stderr.String(),
 		ExitCode: 0,
 	}, nil
+}
+
+func (t POSIXTarget) RunPrivileged(ctx context.Context, cmd string) (target.CommandResult, error) {
+	if t.escalate != "" {
+		cmd = t.escalate + " " + cmd
+	}
+	return t.RunCommand(ctx, cmd)
 }
 
 func (t POSIXTarget) Capabilities() capability.Capability {

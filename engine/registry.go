@@ -14,6 +14,7 @@ import (
 	"scampi.dev/scampi/step/symlink"
 	"scampi.dev/scampi/step/sysctl"
 	"scampi.dev/scampi/step/template"
+	"scampi.dev/scampi/step/unarchive"
 	stepuser "scampi.dev/scampi/step/user"
 	"scampi.dev/scampi/target/local"
 	"scampi.dev/scampi/target/ssh"
@@ -36,6 +37,7 @@ func NewRegistry() *Registry {
 		sysctl.Sysctl{},
 		symlink.Symlink{},
 		template.Template{},
+		unarchive.Unarchive{},
 		stepuser.User{},
 	}
 

@@ -11,8 +11,10 @@ tool (
 require (
 	filippo.io/age v1.3.1
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/klauspost/compress v1.18.4
 	github.com/mattn/go-runewidth v0.0.21
 	github.com/pkg/sftp v1.13.10
+	github.com/ulikunitz/xz v0.5.15
 	github.com/urfave/cli/v3 v3.7.0
 	go.starlark.net v0.0.0-20260210143700-b62fd896b91b
 	golang.org/x/crypto v0.49.0

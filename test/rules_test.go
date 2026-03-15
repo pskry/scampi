@@ -162,6 +162,14 @@ func TestImportCapabilities(t *testing.T) {
 			pattern:        "cmd/fuzz_test.go",
 			allowedImports: "os/exec",
 		},
+		{
+			pattern:        "step/unarchive/unarchive_op.go",
+			allowedImports: "crypto/sha256",
+		},
+		{
+			pattern:        "test/unarchive_test.go",
+			allowedImports: "crypto/sha256",
+		},
 	}
 
 	splitList := func(s string) []string {

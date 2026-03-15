@@ -158,6 +158,20 @@ func (f *faultyTarget) Chown(ctx context.Context, path string, owner target.Owne
 	return target.Must[target.Ownership]("faultyTarget", f.Target).Chown(ctx, path, owner)
 }
 
+func (f *faultyTarget) ChownRecursive(ctx context.Context, path string, owner target.Owner) error {
+	if err := f.getFault("ChownRecursive", path); err != nil {
+		return err
+	}
+	return target.Must[target.Ownership]("faultyTarget", f.Target).ChownRecursive(ctx, path, owner)
+}
+
+func (f *faultyTarget) ChmodRecursive(ctx context.Context, path string, mode fs.FileMode) error {
+	if err := f.getFault("ChmodRecursive", path); err != nil {
+		return err
+	}
+	return target.Must[target.FileMode]("faultyTarget", f.Target).ChmodRecursive(ctx, path, mode)
+}
+
 func (f *faultyTarget) GetOwner(ctx context.Context, path string) (target.Owner, error) {
 	if err := f.getFault("GetOwner", path); err != nil {
 		return target.Owner{}, err
