@@ -5,6 +5,7 @@ package copy
 import (
 	"io/fs"
 	"path/filepath"
+	"strings"
 
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/spec"
@@ -24,6 +25,7 @@ type (
 		Perm    string `step:"File permissions" example:"0644|u=rw,g=r,o=r|rw-r--r--"`
 		Owner   string `step:"Owner user name or UID" example:"root"`
 		Group   string `step:"Group name or GID" example:"root"`
+		Verify  string `step:"Validation command (%s = temp file)" optional:"true" example:"visudo -cf %s"`
 	}
 	copyAction struct {
 		idx     int
@@ -35,6 +37,7 @@ type (
 		mode    fs.FileMode
 		owner   string
 		group   string
+		verify  string
 		step    spec.StepInstance
 	}
 )
@@ -84,6 +87,13 @@ func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		return nil, err
 	}
 
+	if cfg.Verify != "" && !strings.Contains(cfg.Verify, "%s") {
+		return nil, sharedops.VerifyMissingPlaceholderError{
+			Cmd:    cfg.Verify,
+			Source: step.Fields["verify"].Value,
+		}
+	}
+
 	return &copyAction{
 		idx:     idx,
 		desc:    cfg.Desc,
@@ -94,6 +104,7 @@ func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		mode:    mode,
 		owner:   cfg.Owner,
 		group:   cfg.Group,
+		verify:  cfg.Verify,
 
 		step: step,
 	}, nil
@@ -118,6 +129,7 @@ func (c *copyAction) Ops() []spec.Op {
 		src:     c.src,
 		content: c.content,
 		dest:    c.dest,
+		verify:  c.verify,
 	}
 	chown := &fileops.EnsureOwnerOp{
 		BaseOp: sharedops.BaseOp{

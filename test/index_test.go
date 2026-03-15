@@ -61,8 +61,8 @@ func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
 		{
 			kind:           "copy",
 			wantSummary:    "Copy files with owner and permission management",
-			wantFields:     []string{"src", "content", "dest", "perm", "owner", "group"},
-			wantFieldCount: 7, // includes desc
+			wantFields:     []string{"src", "content", "dest", "perm", "owner", "group", "verify"},
+			wantFieldCount: 8, // includes desc
 		},
 		{
 			kind:           "symlink",

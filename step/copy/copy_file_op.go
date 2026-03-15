@@ -16,6 +16,7 @@ import (
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/sharedops"
+	"scampi.dev/scampi/step/sharedops/fileops"
 	"scampi.dev/scampi/target"
 )
 
@@ -26,6 +27,7 @@ type copyFileOp struct {
 	src     string
 	content string
 	dest    string
+	verify  string
 }
 
 func (op *copyFileOp) getContent(ctx context.Context, src source.Source) ([]byte, error) {
@@ -97,6 +99,13 @@ func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target
 		return spec.Result{Changed: false}, nil
 	}
 
+	if op.verify != "" {
+		if err := fileops.VerifiedWrite(ctx, tgt, op.dest, srcData, op.verify); err != nil {
+			return spec.Result{}, sharedops.DiagnoseTargetError(err)
+		}
+		return spec.Result{Changed: true}, nil
+	}
+
 	if err := fsTgt.WriteFile(ctx, op.dest, srcData); err != nil {
 		return spec.Result{}, sharedops.DiagnoseTargetError(err)
 	}
@@ -104,7 +113,10 @@ func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target
 	return spec.Result{Changed: true}, nil
 }
 
-func (copyFileOp) RequiredCapabilities() capability.Capability {
+func (op *copyFileOp) RequiredCapabilities() capability.Capability {
+	if op.verify != "" {
+		return capability.Filesystem | capability.Command
+	}
 	return capability.Filesystem
 }
 

@@ -15,6 +15,7 @@ import (
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/sharedops"
+	"scampi.dev/scampi/step/sharedops/fileops"
 	"scampi.dev/scampi/target"
 )
 
@@ -27,6 +28,7 @@ type renderTemplateOp struct {
 	contentSpan spec.SourceSpan
 	dest        string
 	data        DataConfig
+	verify      string
 }
 
 func (op *renderTemplateOp) Check(
@@ -114,6 +116,13 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 		return spec.Result{Changed: false}, nil
 	}
 
+	if op.verify != "" {
+		if err := fileops.VerifiedWrite(ctx, tgt, op.dest, buf.Bytes(), op.verify); err != nil {
+			return spec.Result{}, sharedops.DiagnoseTargetError(err)
+		}
+		return spec.Result{Changed: true}, nil
+	}
+
 	if err := fsTgt.WriteFile(ctx, op.dest, buf.Bytes()); err != nil {
 		if target.IsPermission(err) {
 			return spec.Result{}, sharedops.PermissionDeniedError{
@@ -128,7 +137,10 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 	return spec.Result{Changed: true}, nil
 }
 
-func (renderTemplateOp) RequiredCapabilities() capability.Capability {
+func (op *renderTemplateOp) RequiredCapabilities() capability.Capability {
+	if op.verify != "" {
+		return capability.Filesystem | capability.Command
+	}
 	return capability.Filesystem
 }
 

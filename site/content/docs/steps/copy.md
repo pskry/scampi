@@ -15,13 +15,14 @@ Provide exactly one of:
 
 Always required:
 
-| Field   | Type   | Required | Description                                                |
-|---------|--------|:--------:|------------------------------------------------------------|
-| `dest`  | string |    ✓     | Destination file path (on target)                          |
-| `group` | string |    ✓     | Group name or GID                                          |
-| `owner` | string |    ✓     | Owner user name or UID                                     |
-| `perm`  | string |    ✓     | File permissions (`0644`, `u=rw,g=r,o=r`, or `rw-r--r--`) |
-| `desc`  | string |          | Human-readable description                                 |
+| Field    | Type   | Required | Description                                                        |
+|----------|--------|:--------:|--------------------------------------------------------------------|
+| `dest`   | string |    ✓     | Destination file path (on target)                                  |
+| `group`  | string |    ✓     | Group name or GID                                                  |
+| `owner`  | string |    ✓     | Owner user name or UID                                             |
+| `perm`   | string |    ✓     | File permissions (`0644`, `u=rw,g=r,o=r`, or `rw-r--r--`)         |
+| `desc`   | string |          | Human-readable description                                         |
+| `verify` | string |          | Command to validate content before writing (`%s` = temp file path) |
 
 ## How it works
 
@@ -35,6 +36,17 @@ The `copy` step produces three ops that form a dependency chain:
 The permission and ownership ops only run after the file copy succeeds. If the
 file content already matches and permissions and ownership are correct, nothing
 happens.
+
+### Verify
+
+When `verify` is set, the content is written to a temporary file first. The
+verify command runs with `%s` replaced by the temp file path. If the command
+exits 0, the content is written to the destination. If it exits non-zero, the
+destination is left untouched and the step fails. The temp file is always
+cleaned up.
+
+Verify only runs when the content actually needs to change — idempotent runs
+skip it entirely.
 
 ## Examples
 
@@ -73,6 +85,32 @@ copy(
     perm = "u=rw,g=r,o=",
     owner = "myapp",
     group = "myapp",
+)
+```
+
+### Validated sudoers file
+
+```python {filename="deploy.star"}
+copy(
+    content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n",
+    dest = "/etc/sudoers.d/hal9000",
+    perm = "0440",
+    owner = "root",
+    group = "root",
+    verify = "visudo -cf %s",
+)
+```
+
+### Validated nginx config
+
+```python {filename="deploy.star"}
+copy(
+    src = "./nginx.conf",
+    dest = "/etc/nginx/nginx.conf",
+    perm = "0644",
+    owner = "root",
+    group = "root",
+    verify = "nginx -t -c %s",
 )
 ```
 

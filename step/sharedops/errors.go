@@ -169,6 +169,30 @@ func (e StagingFailedError) EventTemplate() event.Template {
 func (StagingFailedError) Severity() signal.Severity { return signal.Error }
 func (StagingFailedError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
+// VerifyMissingPlaceholderError is raised at plan time when verify is set
+// but does not contain the %s placeholder.
+type VerifyMissingPlaceholderError struct {
+	Cmd    string
+	Source spec.SourceSpan
+}
+
+func (e VerifyMissingPlaceholderError) Error() string {
+	return fmt.Sprintf("verify command %q must contain %%s placeholder", e.Cmd)
+}
+
+func (e VerifyMissingPlaceholderError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.VerifyMissingPlaceholder",
+		Text:   `verify command must contain %%s placeholder`,
+		Hint:   `try: verify = "{{.Cmd}} %s"`,
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (VerifyMissingPlaceholderError) Severity() signal.Severity { return signal.Error }
+func (VerifyMissingPlaceholderError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+
 // DiagnoseTargetError wraps known target-layer errors in diagnostic types.
 // Returns the original error unchanged if not a recognized target error.
 func DiagnoseTargetError(err error) error {

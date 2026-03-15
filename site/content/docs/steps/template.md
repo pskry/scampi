@@ -14,14 +14,15 @@ Provide exactly one of:
 | `src`     | string | Source template file path (local)  |
 | `content` | string | Inline template string            |
 
-| Field   | Type   | Required | Description                         |
-|---------|--------|:--------:|-------------------------------------|
-| `dest`  | string |    ✓     | Output file path (on target)        |
-| `group` | string |    ✓     | Group name or GID                   |
-| `owner` | string |    ✓     | Owner user name or UID              |
-| `perm`  | string |    ✓     | File permissions                    |
-| `data`  | dict   |          | Data sources for template rendering |
-| `desc`  | string |          | Human-readable description          |
+| Field    | Type   | Required | Description                                                        |
+|----------|--------|:--------:|--------------------------------------------------------------------|
+| `dest`   | string |    ✓     | Output file path (on target)                                       |
+| `group`  | string |    ✓     | Group name or GID                                                  |
+| `owner`  | string |    ✓     | Owner user name or UID                                             |
+| `perm`   | string |    ✓     | File permissions                                                   |
+| `data`   | dict   |          | Data sources for template rendering                                |
+| `desc`   | string |          | Human-readable description                                         |
+| `verify` | string |          | Command to validate content before writing (`%s` = temp file path) |
 
 ### Data fields
 
@@ -40,6 +41,17 @@ and writes it only if different.
 
 Like `copy`, it produces a dependency chain: render first, then set permissions
 and ownership in parallel.
+
+### Verify
+
+When `verify` is set, the rendered content is written to a temporary file first.
+The verify command runs with `%s` replaced by the temp file path. If the command
+exits 0, the content is written to the destination. If it exits non-zero, the
+destination is left untouched and the step fails. The temp file is always
+cleaned up.
+
+Verify only runs when the content actually needs to change — idempotent runs
+skip it entirely.
 
 ## Examples
 
@@ -119,4 +131,23 @@ In the template, environment variables are accessible under `.env`:
 ```text {filename="app.env.tmpl"}
 APP_NAME={{ .values.app_name }}
 DB_PASSWORD={{ .env.db_password }}
+```
+
+### With verify
+
+```python
+template(
+    src = "./templates/nginx.conf.tmpl",
+    dest = "/etc/nginx/nginx.conf",
+    perm = "0644",
+    owner = "root",
+    group = "root",
+    data = {
+        "values": {
+            "server_name": "app.example.com",
+            "upstream_port": 8080,
+        },
+    },
+    verify = "nginx -t -c %s",
+)
 ```

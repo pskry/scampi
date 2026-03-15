@@ -61,6 +61,7 @@ func builtinCopy(
 		perm        string
 		owner       string
 		group       string
+		verify      string
 		desc        string
 		onChangeVal starlark.Value
 	)
@@ -71,6 +72,7 @@ func builtinCopy(
 		"group", &group,
 		"src?", &src,
 		"content?", &content,
+		"verify?", &verify,
 		"desc?", &desc,
 		"on_change?", &onChangeVal,
 	); err != nil {
@@ -90,10 +92,21 @@ func builtinCopy(
 			Config: &stepcopy.CopyConfig{
 				Desc: desc, Src: src, Content: content,
 				Dest: dest, Perm: perm, Owner: owner, Group: group,
+				Verify: verify,
 			},
 			OnChange: hookIDs,
 			Source:   span,
-			Fields:   kwargsFieldSpans(thread, "src", "content", "dest", "perm", "owner", "group", "on_change"),
+			Fields: kwargsFieldSpans(
+				thread,
+				"src",
+				"content",
+				"dest",
+				"perm",
+				"owner",
+				"group",
+				"verify",
+				"on_change",
+			),
 		},
 	}, nil
 }
@@ -428,6 +441,7 @@ func builtinTemplate(
 		src         string
 		content     string
 		data        *starlark.Dict
+		verify      string
 		desc        string
 		onChangeVal starlark.Value
 	)
@@ -439,6 +453,7 @@ func builtinTemplate(
 		"src?", &src,
 		"content?", &content,
 		"data?", &data,
+		"verify?", &verify,
 		"desc?", &desc,
 		"on_change?", &onChangeVal,
 	); err != nil {
@@ -463,10 +478,21 @@ func builtinTemplate(
 			Config: &template.TemplateConfig{
 				Desc: desc, Src: src, Content: content, Dest: dest,
 				Data: dataCfg, Perm: perm, Owner: owner, Group: group,
+				Verify: verify,
 			},
 			OnChange: hookIDs,
 			Source:   span,
-			Fields:   kwargsFieldSpans(thread, "dest", "perm", "owner", "group", "src", "content", "on_change"),
+			Fields: kwargsFieldSpans(
+				thread,
+				"dest",
+				"perm",
+				"owner",
+				"group",
+				"src",
+				"content",
+				"verify",
+				"on_change",
+			),
 		},
 	}, nil
 }

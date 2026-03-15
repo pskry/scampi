@@ -5,6 +5,7 @@ package template
 import (
 	"io/fs"
 	"path/filepath"
+	"strings"
 
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/spec"
@@ -25,6 +26,7 @@ type (
 		Perm    string     `step:"File permissions" example:"0644|u=rw,g=r,o=r|rw-r--r--"`
 		Owner   string     `step:"Owner user name or UID" example:"root"`
 		Group   string     `step:"Group name or GID" example:"root"`
+		Verify  string     `step:"Validation command (%s = temp file)" optional:"true" example:"nginx -t -c %s"`
 	}
 	DataConfig struct {
 		Values map[string]any
@@ -41,6 +43,7 @@ type (
 		mode    fs.FileMode
 		owner   string
 		group   string
+		verify  string
 		step    spec.StepInstance
 	}
 )
@@ -90,6 +93,13 @@ func (t Template) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		return nil, err
 	}
 
+	if cfg.Verify != "" && !strings.Contains(cfg.Verify, "%s") {
+		return nil, sharedops.VerifyMissingPlaceholderError{
+			Cmd:    cfg.Verify,
+			Source: step.Fields["verify"].Value,
+		}
+	}
+
 	return &templateAction{
 		idx:     idx,
 		desc:    cfg.Desc,
@@ -101,6 +111,7 @@ func (t Template) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		mode:    mode,
 		owner:   cfg.Owner,
 		group:   cfg.Group,
+		verify:  cfg.Verify,
 		step:    step,
 	}, nil
 }
@@ -128,6 +139,7 @@ func (a *templateAction) Ops() []spec.Op {
 		contentSpan: a.step.Fields["content"].Value,
 		dest:        a.dest,
 		data:        a.data,
+		verify:      a.verify,
 	}
 	chown := &fileops.EnsureOwnerOp{
 		BaseOp: sharedops.BaseOp{
