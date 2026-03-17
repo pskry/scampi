@@ -16,10 +16,8 @@ jobs:
       - name: Build and package site
         run: just site dist
 
-      - uses: actions/checkout@v4
-        with:
-          repository: scampi-dev/scampi-infra
-          path: scampi-infra
+      - name: Checkout scampi-infra
+        run: git clone https://codeberg.org/scampi-dev/scampi-infra.git scampi-infra
 
       - name: Deploy site via scampi
         env:
