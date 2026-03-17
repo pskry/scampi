@@ -5,7 +5,15 @@ on:
     tags: ['v*']
 
 jobs:
+  test:
+    runs-on: scampi
+    steps:
+      - uses: actions/checkout@v4
+      - run: just test everything
+      - run: just lint
+
   release:
+    needs: test
     runs-on: scampi
     steps:
       - uses: actions/checkout@v4

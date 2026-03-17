@@ -1,13 +1,15 @@
 name: CI
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   ci:
     runs-on: scampi
     steps:
       - uses: actions/checkout@v4
-      - run: just build
-      - run: just test race
+      - run: just test everything
       - run: just lint

@@ -17,15 +17,17 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	defer func() { _ = os.RemoveAll(dir) }()
 
 	binary = filepath.Join(dir, "scampi")
 	out, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput()
 	if err != nil {
+		_ = os.RemoveAll(dir)
 		panic("go build failed: " + string(out))
 	}
 
-	os.Exit(m.Run())
+	code := m.Run()
+	_ = os.RemoveAll(dir)
+	os.Exit(code)
 }
 
 // run executes the binary with args and returns combined stderr+stdout and exit code.

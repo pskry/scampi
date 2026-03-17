@@ -45,7 +45,7 @@ var backendsByFamily = map[string]Backend{
 	},
 	"debian": {
 		Name:           "apt",
-		IsInstalled:    "dpkg -s %s",
+		IsInstalled:    "dpkg -s %s 2>/dev/null | grep -q '^Status:.* installed$'",
 		Install:        "DEBIAN_FRONTEND=noninteractive apt-get install -y %s",
 		Remove:         "DEBIAN_FRONTEND=noninteractive apt-get remove -y %s",
 		NeedsRoot:      true,
@@ -55,7 +55,7 @@ var backendsByFamily = map[string]Backend{
 	},
 	"ubuntu": {
 		Name:           "apt",
-		IsInstalled:    "dpkg -s %s",
+		IsInstalled:    "dpkg -s %s 2>/dev/null | grep -q '^Status:.* installed$'",
 		Install:        "DEBIAN_FRONTEND=noninteractive apt-get install -y %s",
 		Remove:         "DEBIAN_FRONTEND=noninteractive apt-get remove -y %s",
 		NeedsRoot:      true,
