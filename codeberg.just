@@ -44,7 +44,17 @@ comment-issue number body:
     "{{codeberg_api}}" "{{codeberg_repo}}" \
     "{{number}}" "{{body}}"
 
-[doc("Show full issue details")]
-show-issue number:
-  ./scripts/codeberg-show-issue.sh \
-    "{{codeberg_api}}" "{{codeberg_repo}}" "{{number}}"
+[doc("Calculate next version tag from issue labels")]
+[positional-arguments]
+next-version *args:
+  #!/usr/bin/env bash
+  exec ./scripts/next-version.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" "$@"
+
+[doc("Show full issue details (--refresh to bypass cache)")]
+[positional-arguments]
+show-issue number *args:
+  #!/usr/bin/env bash
+  shift  # number
+  exec ./scripts/codeberg-show-issue.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" "{{number}}" "$@"
