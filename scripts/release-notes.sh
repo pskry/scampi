@@ -41,7 +41,7 @@ fi
 issues=$(git log "$range" --format='%s%n%b' \
   | grep -ioE '(fixes|closes|fix|close|resolves|resolve) #[0-9]+' \
   | grep -oE '[0-9]+' \
-  | sort -u)
+  | sort -u || true)
 
 # Classify issues by label
 features=""
