@@ -44,6 +44,13 @@ comment-issue number body:
     "{{codeberg_api}}" "{{codeberg_repo}}" \
     "{{number}}" "{{body}}"
 
+[doc("Generate release notes from issues since last tag")]
+[positional-arguments]
+release-notes *args:
+  #!/usr/bin/env bash
+  exec ./scripts/release-notes.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" "$@"
+
 [doc("Calculate next version tag from issue labels")]
 [positional-arguments]
 next-version *args:

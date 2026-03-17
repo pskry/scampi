@@ -45,6 +45,7 @@ jobs:
       - name: Create release and upload assets
         env:
           RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          CODEBERG_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           TAG="${GITHUB_REF_NAME}"
           API="https://codeberg.org/api/v1"
@@ -55,22 +56,8 @@ jobs:
           PRERELEASE=false
           case "$TAG" in *-*) PRERELEASE=true ;; esac
 
-          # Create release
-          BODY=$(cat <<EOF
-          ## scampi ${TAG}
-
-          ### Binaries
-
-          | Platform     | Binary                                     |
-          | ------------ | ------------------------------------------ |
-          | Linux x86_64 | \`scampi-${TAG}-linux-amd64\`              |
-          | Linux ARM64  | \`scampi-${TAG}-linux-arm64\`              |
-          | macOS x86_64 | \`scampi-${TAG}-darwin-amd64\`             |
-          | macOS ARM64  | \`scampi-${TAG}-darwin-arm64\`             |
-
-          Each binary has a corresponding \`.sha256\` checksum file.
-          EOF
-          )
+          # Generate release notes
+          BODY=$(./scripts/release-notes.sh "$API" "$REPO" --refresh)
 
           echo "==> Creating release ${TAG}..."
           PAYLOAD=$(jq -n --arg tag "$TAG" --arg body "$BODY" --argjson pre "$PRERELEASE" \
