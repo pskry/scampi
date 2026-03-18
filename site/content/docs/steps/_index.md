@@ -37,5 +37,6 @@ scampi leaves it alone. If you want scampi to manage it, set it explicitly.
   {{< card link="sysctl" title="sysctl" subtitle="Manage kernel parameters" >}}
   {{< card link="symlink" title="symlink" subtitle="Create and manage symbolic links" >}}
   {{< card link="template" title="template" subtitle="Render templates with data substitution" >}}
+  {{< card link="unarchive" title="unarchive" subtitle="Extract archives with optional recursive unpacking" >}}
   {{< card link="user" title="user" subtitle="Manage system user accounts" >}}
 {{< /cards >}}
