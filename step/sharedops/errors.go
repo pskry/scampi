@@ -39,6 +39,9 @@ func (e UnknownUserError) EventTemplate() event.Template {
 
 func (UnknownUserError) Severity() signal.Severity { return signal.Error }
 func (UnknownUserError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (e UnknownUserError) DeferredResource() spec.Resource {
+	return spec.UserResource(e.User)
+}
 
 type UnknownGroupError struct {
 	Group  string
@@ -66,6 +69,9 @@ func (e UnknownGroupError) EventTemplate() event.Template {
 
 func (UnknownGroupError) Severity() signal.Severity { return signal.Error }
 func (UnknownGroupError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
+func (e UnknownGroupError) DeferredResource() spec.Resource {
+	return spec.GroupResource(e.Group)
+}
 
 type PermissionDeniedError struct {
 	Operation string

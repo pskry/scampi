@@ -220,14 +220,39 @@ type Action interface {
 - `Desc()` returns a human-readable description
 - `Kind()` returns the step kind (e.g. `"copy"`)
 
-Actions may optionally implement `Pather` for automatic dependency inference:
+Actions may optionally implement `Promiser` for automatic dependency inference
+and check-mode deferral:
 
 ```go
-type Pather interface {
-    InputPaths() []string   // paths this action reads from
-    OutputPaths() []string  // paths this action writes to
+type Promiser interface {
+    Inputs()   []Resource    // resources this action consumes
+    Promises() []Resource    // resources this action produces
 }
 ```
+
+**Every step implementation must declare its resources correctly.** This is
+just as important as targets declaring their capabilities — if a step omits
+an input, the engine can't order it after the action that produces that
+resource; if it omits a promise, downstream steps can't defer errors during
+check mode.
+
+Resource types:
+- `PathResource(path)` — filesystem path (supports parent-directory matching)
+- `UserResource(name)` — system user account
+- `GroupResource(name)` — system group
+
+Rules:
+- If a step creates a path, promise `PathResource(path)`
+- If a step creates a user/group, promise the corresponding resource when
+  `state=present` (not when `state=absent`)
+- If a step sets `owner`/`group` fields, declare `UserResource` and
+  `GroupResource` inputs
+- If a step depends on a path existing (e.g. symlink target), declare a
+  `PathResource` input
+- If a step references supplementary groups, declare `GroupResource` inputs
+  for each one
+- Steps without any resources act as **barriers** — they force sequential
+  execution relative to all preceding actions
 
 ### Op
 
@@ -459,7 +484,7 @@ Extensibility is achieved by **clear boundaries**, not abstractions.
 | Configuration        | deploy()                    | Config / DeployBlock / ResolvedConfig |
 | Check outcome        | —                           | CheckResult                           |
 | Op self-description  | —                           | OpDescriber / PlanTemplate            |
-| Dependency inference | —                           | Pather                                |
+| Dependency inference | —                           | Promiser                              |
 
 ---
 

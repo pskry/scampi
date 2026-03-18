@@ -83,6 +83,20 @@ func (c *UserConfig) Validate(step spec.StepInstance) error {
 
 func (a *userAction) Desc() string { return a.desc }
 func (a *userAction) Kind() string { return "user" }
+func (a *userAction) Inputs() []spec.Resource {
+	var r []spec.Resource
+	for _, g := range a.groups {
+		r = append(r, spec.GroupResource(g))
+	}
+	return r
+}
+
+func (a *userAction) Promises() []spec.Resource {
+	if a.state == StatePresent {
+		return []spec.Resource{spec.UserResource(a.name)}
+	}
+	return nil
+}
 
 func (a *userAction) Ops() []spec.Op {
 	nameSource := a.step.Fields["name"].Value

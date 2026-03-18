@@ -11,6 +11,25 @@ import (
 	"scampi.dev/scampi/target"
 )
 
+// ResourceKind identifies the type of a promised or deferred resource.
+type ResourceKind uint8
+
+const (
+	ResourcePath ResourceKind = iota
+	ResourceUser
+	ResourceGroup
+)
+
+// Resource is a typed key for a promised or deferred resource.
+type Resource struct {
+	Kind ResourceKind
+	Name string
+}
+
+func PathResource(name string) Resource  { return Resource{Kind: ResourcePath, Name: name} }
+func UserResource(name string) Resource  { return Resource{Kind: ResourceUser, Name: name} }
+func GroupResource(name string) Resource { return Resource{Kind: ResourceGroup, Name: name} }
+
 type (
 	Config struct {
 		Path    string
@@ -96,13 +115,18 @@ type (
 		Kind() string
 		Ops() []Op
 	}
-	// Pather is an optional interface that actions can implement to declare
-	// their input/output paths for automatic dependency inference.
-	Pather interface {
-		// InputPaths returns paths this action reads from (source or target)
-		InputPaths() []string
-		// OutputPaths returns paths this action writes to (target only)
-		OutputPaths() []string
+	// Promiser is an optional interface that actions can implement to declare
+	// resources they consume and produce. Used for automatic dependency
+	// inference and check-mode deferral.
+	Promiser interface {
+		Inputs() []Resource
+		Promises() []Resource
+	}
+	// SourceReader is an optional interface that actions can implement to
+	// declare source-side files they read. The engine pre-caches these so
+	// the renderer can display source context in error messages.
+	SourceReader interface {
+		SourcePaths() []string
 	}
 	// Op is the smallest idempotent unit of work. Ops receive both
 	// Source (host/config state) and Target (system being converged).

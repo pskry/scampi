@@ -61,19 +61,19 @@ func (e *Engine) Close() {
 	}
 }
 
-// storeInputPaths reads action input files (e.g. template sources) via the
+// storeSourcePaths reads action source files (e.g. template sources) via the
 // source and registers them in the store so the renderer can display source
 // context in error messages.
-func (e *Engine) storeInputPaths(ctx context.Context, p spec.Plan) {
+func (e *Engine) storeSourcePaths(ctx context.Context, p spec.Plan) {
 	if e.store == nil {
 		return
 	}
 	for _, act := range p.Unit.Actions {
-		pather, ok := act.(spec.Pather)
+		sr, ok := act.(spec.SourceReader)
 		if !ok {
 			continue
 		}
-		for _, path := range pather.InputPaths() {
+		for _, path := range sr.SourcePaths() {
 			if data, err := e.src.ReadFile(ctx, path); err == nil {
 				e.store.AddFile(path, data)
 			}

@@ -112,13 +112,24 @@ func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 
 func (c *copyAction) Desc() string { return c.desc }
 func (c *copyAction) Kind() string { return c.kind }
-func (c *copyAction) InputPaths() []string {
+
+func (c *copyAction) Inputs() []spec.Resource {
+	var r []spec.Resource
+	if c.owner != "" {
+		r = append(r, spec.UserResource(c.owner))
+	}
+	if c.group != "" {
+		r = append(r, spec.GroupResource(c.group))
+	}
+	return r
+}
+func (c *copyAction) SourcePaths() []string {
 	if c.src != "" {
 		return []string{c.src}
 	}
 	return nil
 }
-func (c *copyAction) OutputPaths() []string { return []string{c.dest} }
+func (c *copyAction) Promises() []spec.Resource { return []spec.Resource{spec.PathResource(c.dest)} }
 
 func (c *copyAction) Ops() []spec.Op {
 	cp := &copyFileOp{

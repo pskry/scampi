@@ -62,6 +62,17 @@ user(
 )
 ```
 
+### Create a user for later steps
+
+Users created by a `user` step can be referenced as `owner` in later steps.
+During `scampi check`, the engine defers "unknown user" errors when the user
+is promised by an earlier step.
+
+```python
+user(name="appd", system=True, shell="/usr/sbin/nologin")
+dir(path="/opt/app", owner="appd", group="appd")
+```
+
 ### Remove a user
 
 ```python

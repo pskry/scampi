@@ -31,7 +31,7 @@ func (e *Engine) Check(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	e.storeInputPaths(ctx, p)
+	e.storeSourcePaths(ctx, p)
 
 	rep, promisedPaths, err := e.CheckPlan(ctx, p)
 	if err != nil {

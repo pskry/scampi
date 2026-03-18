@@ -39,7 +39,7 @@ func (e *Engine) Plan(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	e.storeInputPaths(ctx, plan)
+	e.storeSourcePaths(ctx, plan)
 
 	e.em.EmitPlanLifecycle(diagnostic.PlanProduced(plan, actionDeps))
 

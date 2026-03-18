@@ -49,7 +49,7 @@ func (e *Engine) Inspect(ctx context.Context, stepFilter string) (*InspectResult
 	if err != nil {
 		return nil, err
 	}
-	e.storeInputPaths(ctx, p)
+	e.storeSourcePaths(ctx, p)
 
 	var found []inspectableOp
 	for _, act := range p.Unit.Actions {

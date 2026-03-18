@@ -102,10 +102,22 @@ func (u Unarchive) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}, nil
 }
 
-func (a *unarchiveAction) Desc() string          { return a.desc }
-func (a *unarchiveAction) Kind() string          { return a.kind }
-func (a *unarchiveAction) InputPaths() []string  { return []string{a.src} }
-func (a *unarchiveAction) OutputPaths() []string { return []string{a.dest} }
+func (a *unarchiveAction) Desc() string { return a.desc }
+func (a *unarchiveAction) Kind() string { return a.kind }
+func (a *unarchiveAction) Inputs() []spec.Resource {
+	var r []spec.Resource
+	if a.owner != "" {
+		r = append(r, spec.UserResource(a.owner))
+	}
+	if a.group != "" {
+		r = append(r, spec.GroupResource(a.group))
+	}
+	return r
+}
+func (a *unarchiveAction) SourcePaths() []string { return []string{a.src} }
+func (a *unarchiveAction) Promises() []spec.Resource {
+	return []spec.Resource{spec.PathResource(a.dest)}
+}
 
 func (a *unarchiveAction) Ops() []spec.Op {
 	extract := &unarchiveOp{

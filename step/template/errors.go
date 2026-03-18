@@ -137,7 +137,9 @@ func (e DestDirMissingError) EventTemplate() event.Template {
 
 func (DestDirMissingError) Severity() signal.Severity { return signal.Error }
 func (DestDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-func (e DestDirMissingError) DeferredPath() string    { return e.Path }
+func (e DestDirMissingError) DeferredResource() spec.Resource {
+	return spec.PathResource(e.Path)
+}
 
 // MutuallyExclusiveError is raised when exactly one of a set of fields is
 // required but zero or more than one were provided.

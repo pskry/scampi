@@ -8,6 +8,7 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/model"
+	"scampi.dev/scampi/spec"
 )
 
 // executeHooks runs notified hooks after all deploy steps complete.
@@ -20,7 +21,7 @@ func (e *Engine) executeHooks(
 	stepReport model.ExecutionReport,
 	hp *hookPlan,
 	checkOnly bool,
-	promisedPaths map[string]bool,
+	promisedPaths map[spec.Resource]bool,
 ) (model.ExecutionReport, error) {
 	if hp == nil || len(hp.actions) == 0 {
 		return model.ExecutionReport{}, nil

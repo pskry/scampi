@@ -82,10 +82,21 @@ func (d Dir) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}, nil
 }
 
-func (a *dirAction) Desc() string          { return a.desc }
-func (a *dirAction) Kind() string          { return a.kind }
-func (a *dirAction) InputPaths() []string  { return nil }
-func (a *dirAction) OutputPaths() []string { return []string{a.path} }
+func (a *dirAction) Desc() string { return a.desc }
+func (a *dirAction) Kind() string { return a.kind }
+
+func (a *dirAction) Inputs() []spec.Resource {
+	cfg := a.step.Config.(*DirConfig)
+	var r []spec.Resource
+	if cfg.Owner != "" {
+		r = append(r, spec.UserResource(cfg.Owner))
+	}
+	if cfg.Group != "" {
+		r = append(r, spec.GroupResource(cfg.Group))
+	}
+	return r
+}
+func (a *dirAction) Promises() []spec.Resource { return []spec.Resource{spec.PathResource(a.path)} }
 
 func (a *dirAction) Ops() []spec.Op {
 	cfg := a.step.Config.(*DirConfig)

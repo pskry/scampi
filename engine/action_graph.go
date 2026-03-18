@@ -18,42 +18,55 @@ type actionNode struct {
 	pending     int                      // runtime counter for scheduling
 }
 
+// hasResources returns true if the action declares any resource inputs or
+// promises. Actions without resources act as barriers in the dependency graph.
+func hasResources(act spec.Action) bool {
+	p, ok := act.(spec.Promiser)
+	if !ok {
+		return false
+	}
+	return len(p.Inputs()) > 0 || len(p.Promises()) > 0
+}
+
 // buildActionGraph constructs a dependency graph from actions based on their
-// declared input/output paths. Independent actions (no path overlap) run in
-// parallel; dependent actions run in order.
+// declared resource inputs and promises. Independent actions (no resource
+// overlap) run in parallel; dependent actions run in order.
 func buildActionGraph(actions []spec.Action) []*actionNode {
 	nodes := make([]*actionNode, len(actions))
 	for i, act := range actions {
 		nodes[i] = &actionNode{action: act, idx: i}
 	}
 
-	// Map output paths to the action that writes them
-	writers := map[string]*actionNode{}
+	// Map promised resources to the action that produces them.
+	producers := map[spec.Resource]*actionNode{}
 	for _, n := range nodes {
-		if p, ok := n.action.(spec.Pather); ok {
-			for _, out := range p.OutputPaths() {
-				writers[out] = n
+		if p, ok := n.action.(spec.Promiser); ok {
+			for _, r := range p.Promises() {
+				producers[r] = n
 			}
 		}
 	}
 
-	// For each action that reads a path, depend on the writer.
-	// For each action that writes to a path, depend on the action that
-	// creates its parent directory (path-prefix matching).
+	// For each action that consumes a resource, depend on the producer.
+	// For path resources, also add parent-directory edges (a promised path
+	// /foo/bar implies /foo exists via MkdirAll semantics).
 	for _, n := range nodes {
-		p, ok := n.action.(spec.Pather)
+		p, ok := n.action.(spec.Promiser)
 		if !ok {
 			continue
 		}
-		for _, in := range p.InputPaths() {
-			if writer := writers[in]; writer != nil && writer != n {
-				addEdge(writer, n)
+		for _, in := range p.Inputs() {
+			if producer := producers[in]; producer != nil && producer != n {
+				addEdge(producer, n)
 			}
 		}
-		for _, out := range p.OutputPaths() {
-			for dir, writer := range writers {
-				if writer != n && strings.HasPrefix(out, dir+"/") {
-					addEdge(writer, n)
+		for _, out := range p.Promises() {
+			if out.Kind == spec.ResourcePath {
+				for r, producer := range producers {
+					if producer != n && r.Kind == spec.ResourcePath &&
+						strings.HasPrefix(out.Name, r.Name+"/") {
+						addEdge(producer, n)
+					}
 				}
 			}
 		}
@@ -61,29 +74,29 @@ func buildActionGraph(actions []spec.Action) []*actionNode {
 
 	// Fence-based barrier edges
 	// -----------------------------------------------------------------------------
-	// Non-Pather actions act as barriers (memory fences): nothing may reorder
-	// across them. Instead of connecting every barrier to every other node
-	// (O(n²) edges), we chain consecutive barriers and fan edges in/out to
-	// neighboring Pather nodes. This produces identical execution order with
-	// O(n) edges.
+	// Actions without resources act as barriers (memory fences): nothing
+	// may reorder across them. Instead of connecting every barrier to every
+	// other node (O(n²) edges), we chain consecutive barriers and fan edges
+	// in/out to neighboring resource-aware nodes. This produces identical
+	// execution order with O(n) edges.
 	var lastBarrier *actionNode
-	var pathersSinceBarrier []*actionNode
+	var resourceActionsSinceBarrier []*actionNode
 
 	for _, n := range nodes {
-		if _, ok := n.action.(spec.Pather); ok {
+		if hasResources(n.action) {
 			if lastBarrier != nil {
 				addEdge(lastBarrier, n)
 			}
-			pathersSinceBarrier = append(pathersSinceBarrier, n)
+			resourceActionsSinceBarrier = append(resourceActionsSinceBarrier, n)
 		} else {
 			// n is a barrier
 			if lastBarrier != nil {
 				addEdge(lastBarrier, n)
 			}
-			for _, p := range pathersSinceBarrier {
+			for _, p := range resourceActionsSinceBarrier {
 				addEdge(p, n)
 			}
-			pathersSinceBarrier = pathersSinceBarrier[:0]
+			resourceActionsSinceBarrier = resourceActionsSinceBarrier[:0]
 			lastBarrier = n
 		}
 	}

@@ -44,11 +44,11 @@ func (i Impact) ShouldAbort() bool {
 	return i == ImpactAbort
 }
 
-// DeferrablePath is implemented by errors that reference a missing path which
+// Deferrable is implemented by errors that reference a missing resource which
 // could be created by an upstream action. The engine uses this to defer aborts
-// during check mode when the path is already promised.
-type DeferrablePath interface {
-	DeferredPath() string
+// during check mode when the resource is already promised.
+type Deferrable interface {
+	DeferredResource() spec.Resource
 }
 
 type (

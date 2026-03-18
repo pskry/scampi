@@ -47,6 +47,17 @@ group(
 )
 ```
 
+### Create a group for later steps
+
+Groups created by a `group` step can be referenced as `group` in later steps.
+During `scampi check`, the engine defers "unknown group" errors when the group
+is promised by an earlier step.
+
+```python
+group(name="appusers")
+dir(path="/opt/app", group="appusers")
+```
+
 ### Remove a group
 
 ```python

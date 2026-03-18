@@ -119,14 +119,26 @@ func (t Template) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 func (a *templateAction) Desc() string { return a.desc }
 func (a *templateAction) Kind() string { return a.kind }
 
-func (a *templateAction) InputPaths() []string {
+func (a *templateAction) Inputs() []spec.Resource {
+	var r []spec.Resource
+	if a.owner != "" {
+		r = append(r, spec.UserResource(a.owner))
+	}
+	if a.group != "" {
+		r = append(r, spec.GroupResource(a.group))
+	}
+	return r
+}
+func (a *templateAction) SourcePaths() []string {
 	if a.src != "" {
 		return []string{a.src}
 	}
 	return nil
 }
 
-func (a *templateAction) OutputPaths() []string { return []string{a.dest} }
+func (a *templateAction) Promises() []spec.Resource {
+	return []spec.Resource{spec.PathResource(a.dest)}
+}
 
 func (a *templateAction) Ops() []spec.Op {
 	render := &renderTemplateOp{

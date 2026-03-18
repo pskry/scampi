@@ -239,4 +239,6 @@ func (e CopyDestDirMissingError) EventTemplate() event.Template {
 
 func (CopyDestDirMissingError) Severity() signal.Severity { return signal.Error }
 func (CopyDestDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-func (e CopyDestDirMissingError) DeferredPath() string    { return e.Path }
+func (e CopyDestDirMissingError) DeferredResource() spec.Resource {
+	return spec.PathResource(e.Path)
+}

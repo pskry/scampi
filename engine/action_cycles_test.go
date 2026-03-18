@@ -29,9 +29,9 @@ func detectActionCyclesForTest(nodes []*actionNode) [][]spec.Action {
 func TestDetectActionCycles_NoCycle(t *testing.T) {
 	// Linear chain: A -> B -> C
 	actions := []spec.Action{
-		&mockPatherAction{desc: "A", outputs: []string{"/a"}},
-		&mockPatherAction{desc: "B", inputs: []string{"/a"}, outputs: []string{"/b"}},
-		&mockPatherAction{desc: "C", inputs: []string{"/b"}},
+		&mockPromiserAction{desc: "A", promises: paths("/a")},
+		&mockPromiserAction{desc: "B", inputs: paths("/a"), promises: paths("/b")},
+		&mockPromiserAction{desc: "C", inputs: paths("/b")},
 	}
 
 	nodes := buildActionGraph(actions)
@@ -47,8 +47,8 @@ func TestDetectActionCycles_SimpleCycle(t *testing.T) {
 	// B writes /b, reads /a
 	// -> cycle: A -> B -> A
 	actions := []spec.Action{
-		&mockPatherAction{desc: "A", inputs: []string{"/b"}, outputs: []string{"/a"}},
-		&mockPatherAction{desc: "B", inputs: []string{"/a"}, outputs: []string{"/b"}},
+		&mockPromiserAction{desc: "A", inputs: paths("/b"), promises: paths("/a")},
+		&mockPromiserAction{desc: "B", inputs: paths("/a"), promises: paths("/b")},
 	}
 
 	nodes := buildActionGraph(actions)
@@ -66,9 +66,9 @@ func TestDetectActionCycles_SimpleCycle(t *testing.T) {
 func TestDetectActionCycles_IndependentActions(t *testing.T) {
 	// No path overlap -> no dependencies -> no cycles
 	actions := []spec.Action{
-		&mockPatherAction{desc: "A", outputs: []string{"/a"}},
-		&mockPatherAction{desc: "B", outputs: []string{"/b"}},
-		&mockPatherAction{desc: "C", outputs: []string{"/c"}},
+		&mockPromiserAction{desc: "A", promises: paths("/a")},
+		&mockPromiserAction{desc: "B", promises: paths("/b")},
+		&mockPromiserAction{desc: "C", promises: paths("/c")},
 	}
 
 	nodes := buildActionGraph(actions)
@@ -80,8 +80,8 @@ func TestDetectActionCycles_IndependentActions(t *testing.T) {
 }
 
 func TestActionCyclicDependency_Error(t *testing.T) {
-	a := &mockPatherAction{desc: "action-A"}
-	b := &mockPatherAction{desc: "action-B"}
+	a := &mockPromiserAction{desc: "action-A"}
+	b := &mockPromiserAction{desc: "action-B"}
 
 	err := ActionCyclicDependencyError{
 		Cycle: []spec.Action{a, b, a},

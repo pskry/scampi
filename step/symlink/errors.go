@@ -34,7 +34,9 @@ func (e LinkDirMissingError) EventTemplate() event.Template {
 
 func (LinkDirMissingError) Severity() signal.Severity { return signal.Error }
 func (LinkDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-func (e LinkDirMissingError) DeferredPath() string    { return e.Path }
+func (e LinkDirMissingError) DeferredResource() spec.Resource {
+	return spec.PathResource(e.Path)
+}
 
 type LinkReadError struct {
 	Path   string

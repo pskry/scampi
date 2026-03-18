@@ -72,10 +72,10 @@ type scheduler struct {
 	hookID    string // non-empty when running ops for a hook
 	checkOnly bool   // true for check command (affects op event chattiness)
 
-	// promisedPaths holds paths that upstream actions have promised to create.
-	// Used during check mode to defer abort errors for missing directories
-	// that would be created by earlier actions.
-	promisedPaths map[string]bool
+	// promised holds resources that upstream actions have promised to create.
+	// Used during check mode to defer abort errors for resources that don't
+	// exist yet.
+	promised map[spec.Resource]bool
 
 	mu      sync.Mutex
 	results []spec.Result
@@ -237,25 +237,27 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 	return g.Wait()
 }
 
-// isDeferred returns true when err references a missing path that an upstream
-// action has already promised to create.
+// isDeferred returns true when err references a missing resource that an
+// upstream action has already promised to create.
 func (s *scheduler) isDeferred(err error) bool {
-	if len(s.promisedPaths) == 0 {
+	if len(s.promised) == 0 {
 		return false
 	}
-	var dp diagnostic.DeferrablePath
-	if !errors.As(err, &dp) {
+	var d diagnostic.Deferrable
+	if !errors.As(err, &d) {
 		return false
 	}
-	path := dp.DeferredPath()
-	if s.promisedPaths[path] {
+	res := d.DeferredResource()
+	if s.promised[res] {
 		return true
 	}
 	// A promised path like /foo/bar implies /foo will also exist
 	// (MkdirAll semantics), so check if any promised path is a descendant.
-	for pp := range s.promisedPaths {
-		if strings.HasPrefix(pp, path+"/") {
-			return true
+	if res.Kind == spec.ResourcePath {
+		for pp := range s.promised {
+			if pp.Kind == spec.ResourcePath && strings.HasPrefix(pp.Name, res.Name+"/") {
+				return true
+			}
 		}
 	}
 	return false
@@ -287,7 +289,7 @@ func (e *Engine) ExecutePlan(ctx context.Context, plan spec.Plan) (model.Executi
 	return res, nil
 }
 
-func (e *Engine) CheckPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, map[string]bool, error) {
+func (e *Engine) CheckPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, map[spec.Resource]bool, error) {
 	res, pp, err := e.checkPlan(ctx, plan)
 	if err != nil {
 		return res, pp, panicIfNotAbortError(err)
@@ -295,7 +297,7 @@ func (e *Engine) CheckPlan(ctx context.Context, plan spec.Plan) (model.Execution
 	return res, pp, nil
 }
 
-func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, map[string]bool, error) {
+func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, map[spec.Resource]bool, error) {
 	nodes := buildActionGraph(plan.Unit.Actions)
 	initActionPending(nodes)
 
@@ -304,23 +306,20 @@ func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.Execution
 	}
 
 	var mu sync.Mutex
-	promisedPaths := map[string]bool{}
+	promised := map[spec.Resource]bool{}
 	grp, gctx := errgroup.WithContext(ctx)
 
 	var scheduleNode func(n *actionNode)
 	scheduleNode = func(n *actionNode) {
-		// Snapshot promised paths for this action under the lock
-		pp := make(map[string]bool, len(promisedPaths))
-		for k := range promisedPaths {
-			pp[k] = true
-		}
+		// Snapshot promised resources for this action under the lock
+		snap := maps.Clone(promised)
 
 		grp.Go(func() error {
 			if err := gctx.Err(); err != nil {
 				return err
 			}
 
-			res, err := e.checkAction(gctx, n.idx, n.action, pp)
+			res, err := e.checkAction(gctx, n.idx, n.action, snap)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -331,12 +330,12 @@ func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.Execution
 				return err
 			}
 
-			// If this action would change something and declares output
-			// paths, add them to the promised set for downstream actions.
+			// If this action would change something, add its promised
+			// resources to the set for downstream actions.
 			if res.Summary.WouldChange > 0 {
-				if p, ok := n.action.(spec.Pather); ok {
-					for _, out := range p.OutputPaths() {
-						promisedPaths[out] = true
+				if p, ok := n.action.(spec.Promiser); ok {
+					for _, key := range p.Promises() {
+						promised[key] = true
 					}
 				}
 			}
@@ -366,14 +365,14 @@ func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.Execution
 		rep.Err = err
 	}
 
-	return rep, promisedPaths, err
+	return rep, promised, err
 }
 
 func (e *Engine) checkAction(
 	ctx context.Context,
 	idx int,
 	act spec.Action,
-	promisedPaths map[string]bool,
+	promised map[spec.Resource]bool,
 ) (model.ActionReport, error) {
 	start := time.Now()
 	kind := act.Kind()
@@ -383,7 +382,7 @@ func (e *Engine) checkAction(
 	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
 	defer cancel()
 
-	res, err := e.runCheckAction(actCtx, idx, act, promisedPaths, "")
+	res, err := e.runCheckAction(actCtx, idx, act, promised, "")
 
 	e.em.EmitActionLifecycle(
 		diagnostic.ActionFinished(
@@ -407,7 +406,7 @@ func (e *Engine) runCheckAction(
 	ctx context.Context,
 	idx int,
 	act spec.Action,
-	promisedPaths map[string]bool,
+	promised map[spec.Resource]bool,
 	hookID string,
 ) (model.ActionReport, error) {
 	nodes, planErr := buildPlan(act.Ops())
@@ -416,15 +415,15 @@ func (e *Engine) runCheckAction(
 	}
 
 	s := &scheduler{
-		src:           e.src,
-		tgt:           e.tgt,
-		em:            e.em,
-		actIdx:        idx,
-		actKind:       act.Kind(),
-		actDesc:       act.Desc(),
-		hookID:        hookID,
-		checkOnly:     true,
-		promisedPaths: promisedPaths,
+		src:       e.src,
+		tgt:       e.tgt,
+		em:        e.em,
+		actIdx:    idx,
+		actKind:   act.Kind(),
+		actDesc:   act.Desc(),
+		hookID:    hookID,
+		checkOnly: true,
+		promised:  promised,
 	}
 	s.grp, s.ctx = errgroup.WithContext(ctx)
 

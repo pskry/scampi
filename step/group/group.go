@@ -72,8 +72,16 @@ func (c *GroupConfig) Validate(step spec.StepInstance) error {
 	return nil
 }
 
-func (a *groupAction) Desc() string { return a.desc }
-func (a *groupAction) Kind() string { return "group" }
+func (a *groupAction) Desc() string            { return a.desc }
+func (a *groupAction) Kind() string            { return "group" }
+func (a *groupAction) Inputs() []spec.Resource { return nil }
+
+func (a *groupAction) Promises() []spec.Resource {
+	if a.state == StatePresent {
+		return []spec.Resource{spec.GroupResource(a.name)}
+	}
+	return nil
+}
 
 func (a *groupAction) Ops() []spec.Op {
 	nameSource := a.step.Fields["name"].Value
