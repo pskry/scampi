@@ -1,7 +1,8 @@
-build_dir    := "./build"
-bin_dir      := f"{{build_dir}}/bin"
-bin_path     := f"{{bin_dir}}/scampi"
-spdx_header  := "// SPDX-License-Identifier: GPL-3.0-only"
+build_dir       := "./build"
+bin_dir         := f"{{build_dir}}/bin"
+bin_path        := f"{{bin_dir}}/scampi"
+spdx_header     := "// SPDX-License-Identifier: GPL-3.0-only"
+required_tools  := "shellcheck jq curl"
 
 
 [default]
@@ -49,7 +50,7 @@ setup:
   #!/usr/bin/env bash
   set -euo pipefail
   missing=()
-  for cmd in shellcheck; do
+  for cmd in {{required_tools}}; do
     command -v "$cmd" &>/dev/null || missing+=("$cmd")
   done
   if [[ ${#missing[@]} -eq 0 ]]; then
