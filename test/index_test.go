@@ -193,7 +193,7 @@ func TestIndexStep_DefaultsPopulated(t *testing.T) {
 		{"service", "enabled", `"true"`},
 		{"firewall", "action", `"allow"`},
 		{"sysctl", "persist", `"true"`},
-		{"unarchive", "depth", `"-1"`},
+		{"unarchive", "depth", `"0"`},
 		{"user", "state", `"present"`},
 	}
 

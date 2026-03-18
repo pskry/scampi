@@ -20,7 +20,7 @@ type (
 		Desc  string         `step:"Human-readable description" optional:"true"`
 		Src   spec.SourceRef `step:"Source archive" example:"local(\"./files/site.tar.gz\")"`
 		Dest  string         `step:"Target directory for extraction" example:"/var/www/mysite"`
-		Depth int            `step:"Nested archive recursion (-1=unlimited, 0=top only)" optional:"true" default:"-1"`
+		Depth int            `step:"Nested archive recursion (-1=unlimited, 0=top only)" optional:"true" default:"0"`
 		Owner string         `step:"Owner applied recursively after extraction" optional:"true" example:"www-data"`
 		Group string         `step:"Group applied recursively after extraction" optional:"true" example:"www-data"`
 		Perm  string         `step:"Permissions applied recursively after extraction" optional:"true" example:"0755"`

@@ -636,10 +636,10 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
-// Unarchive: default depth (-1)
+// Unarchive: default depth (0)
 // -----------------------------------------------------------------------------
 
-func TestUnarchive_DefaultDepthIsUnlimited(t *testing.T) {
+func TestUnarchive_DefaultDepthIsTopLevelOnly(t *testing.T) {
 	archive := makeTarGz(t, map[string]string{
 		"data.txt": "hello",
 	})
@@ -682,9 +682,9 @@ deploy(name="test", targets=["local"], steps=[
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	// Default depth = -1 (unlimited), so find should be called for nested archives
-	if !findCalled {
-		t.Error("expected find to be called for nested archive detection (default depth = -1)")
+	// Default depth = 0 (top-level only), so find should NOT be called
+	if findCalled {
+		t.Error("expected find not to be called for nested archive detection (default depth = 0)")
 	}
 }
 

@@ -514,7 +514,7 @@ func builtinUnarchive(
 	var (
 		srcVal      starlark.Value
 		dest        string
-		depth       = -1
+		depth       = 0
 		owner       string
 		group       string
 		perm        string
