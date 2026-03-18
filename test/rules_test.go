@@ -90,7 +90,15 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "target/local/posix.go",
-			allowedImports: "os,os/exec,os/user,syscall,crypto/rand",
+			allowedImports: "os,os/exec,os/user,crypto/rand",
+		},
+		{
+			pattern:        "target/local/stat_linux.go",
+			allowedImports: "os,os/user,syscall",
+		},
+		{
+			pattern:        "target/local/stat_bsd.go",
+			allowedImports: "os,os/user,syscall",
 		},
 		{
 			pattern:        "target/local/local_test.go",
@@ -99,6 +107,10 @@ func TestImportCapabilities(t *testing.T) {
 		{
 			pattern:        "target/local/escalate_test.go",
 			allowedImports: "os",
+		},
+		{
+			pattern:        "target/escalate/escalate_test.go",
+			allowedImports: "os,os/exec",
 		},
 		{
 			pattern:        "target/ssh/errors.go",

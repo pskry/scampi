@@ -5,7 +5,8 @@ package svcmgr
 
 import (
 	"fmt"
-	"strings"
+
+	"scampi.dev/scampi/target"
 )
 
 // Backend builds shell commands for a service manager.
@@ -21,11 +22,6 @@ type Backend interface {
 	CmdDaemonReload() string // "" = not applicable
 	CmdRestart(name string) string
 	CmdReload(name string) string // "" = not supported
-}
-
-// ShellQuote wraps s in single quotes, escaping embedded single quotes.
-func ShellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 // templateBackend
@@ -49,40 +45,40 @@ func (b *templateBackend) Name() string    { return b.name }
 func (b *templateBackend) NeedsRoot() bool { return b.needsRoot }
 
 func (b *templateBackend) CmdIsActive(name string) string {
-	return fmt.Sprintf(b.isActive, ShellQuote(name))
+	return fmt.Sprintf(b.isActive, target.ShellQuote(name))
 }
 
 func (b *templateBackend) CmdIsEnabled(name string) string {
-	return fmt.Sprintf(b.isEnabled, ShellQuote(name))
+	return fmt.Sprintf(b.isEnabled, target.ShellQuote(name))
 }
 
 func (b *templateBackend) CmdStart(name string) string {
-	return fmt.Sprintf(b.start, ShellQuote(name))
+	return fmt.Sprintf(b.start, target.ShellQuote(name))
 }
 
 func (b *templateBackend) CmdStop(name string) string {
-	return fmt.Sprintf(b.stop, ShellQuote(name))
+	return fmt.Sprintf(b.stop, target.ShellQuote(name))
 }
 
 func (b *templateBackend) CmdEnable(name string) string {
-	return fmt.Sprintf(b.enable, ShellQuote(name))
+	return fmt.Sprintf(b.enable, target.ShellQuote(name))
 }
 
 func (b *templateBackend) CmdDisable(name string) string {
-	return fmt.Sprintf(b.disable, ShellQuote(name))
+	return fmt.Sprintf(b.disable, target.ShellQuote(name))
 }
 
 func (b *templateBackend) CmdDaemonReload() string { return b.daemonReload }
 
 func (b *templateBackend) CmdRestart(name string) string {
-	return fmt.Sprintf(b.restart, ShellQuote(name))
+	return fmt.Sprintf(b.restart, target.ShellQuote(name))
 }
 
 func (b *templateBackend) CmdReload(name string) string {
 	if b.reload == "" {
 		return ""
 	}
-	return fmt.Sprintf(b.reload, ShellQuote(name))
+	return fmt.Sprintf(b.reload, target.ShellQuote(name))
 }
 
 // Built-in template backends

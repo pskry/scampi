@@ -12,7 +12,7 @@ import (
 )
 
 func (t POSIXTarget) IsInstalled(ctx context.Context, pkg string) (bool, error) {
-	cmd := fmt.Sprintf(t.pkgBackend.IsInstalled, shellQuote(pkg))
+	cmd := fmt.Sprintf(t.pkgBackend.IsInstalled, target.ShellQuote(pkg))
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return false, err
@@ -26,7 +26,7 @@ func (t POSIXTarget) InstallPkgs(ctx context.Context, pkgs []string) error {
 	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
-		quoted[i] = shellQuote(p)
+		quoted[i] = target.ShellQuote(p)
 	}
 	cmd := fmt.Sprintf(t.pkgBackend.Install, strings.Join(quoted, " "))
 	if t.pkgBackend.NeedsRoot && t.escalate != "" {
@@ -52,7 +52,7 @@ func (t POSIXTarget) RemovePkgs(ctx context.Context, pkgs []string) error {
 	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
-		quoted[i] = shellQuote(p)
+		quoted[i] = target.ShellQuote(p)
 	}
 	cmd := fmt.Sprintf(t.pkgBackend.Remove, strings.Join(quoted, " "))
 	if t.pkgBackend.NeedsRoot && t.escalate != "" {
@@ -107,16 +107,12 @@ func (t POSIXTarget) IsUpgradable(ctx context.Context, pkg string) (bool, error)
 			t.pkgBackend.Name,
 		)
 	}
-	cmd := fmt.Sprintf(t.pkgBackend.IsUpgradable, shellQuote(pkg))
+	cmd := fmt.Sprintf(t.pkgBackend.IsUpgradable, target.ShellQuote(pkg))
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return false, err
 	}
 	return result.ExitCode == 0, nil
-}
-
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 // PkgInstallError is returned when a package install command fails.

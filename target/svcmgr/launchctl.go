@@ -2,7 +2,11 @@
 
 package svcmgr
 
-import "fmt"
+import (
+	"fmt"
+
+	"scampi.dev/scampi/target"
+)
 
 // launchctl plist search directories, ordered by convention.
 var launchctlDirs = []string{
@@ -34,7 +38,7 @@ func (b *launchctlBackend) Name() string { return "launchctl" }
 func (b *launchctlBackend) NeedsRoot() bool { return b.domain == "system" }
 
 func (b *launchctlBackend) CmdIsActive(name string) string {
-	return fmt.Sprintf("launchctl list %s 2>/dev/null", ShellQuote(name))
+	return fmt.Sprintf("launchctl list %s 2>/dev/null", target.ShellQuote(name))
 }
 
 func (b *launchctlBackend) CmdIsEnabled(name string) string {
@@ -69,7 +73,7 @@ func (b *launchctlBackend) CmdReload(_ string) string { return "" }
 // standard directories and prints its path. Evaluates to empty string (and
 // non-zero exit) if not found.
 func plistFindExpr(name string) string {
-	q := ShellQuote(name + ".plist")
+	q := target.ShellQuote(name + ".plist")
 	expr := "ls"
 	for _, d := range launchctlDirs {
 		expr += " " + d + "/" + q

@@ -70,6 +70,81 @@ func TestDetectEscalation(t *testing.T) {
 	}
 }
 
+// Stat escalation fallback
+// -----------------------------------------------------------------------------
+
+func newStatTarget(t *testing.T, output string) (POSIXTarget, func() string) {
+	t.Helper()
+	dir := t.TempDir()
+	logFile := filepath.Join(dir, "cmd.log")
+	script := filepath.Join(dir, "escalate")
+
+	err := os.WriteFile(script, []byte(
+		"#!/bin/sh\necho \"$*\" >> "+logFile+"\necho '"+output+"'\n",
+	), 0o755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tgt := POSIXTarget{escalate: script}
+	readLog := func() string {
+		data, _ := os.ReadFile(logFile)
+		return strings.TrimSpace(string(data))
+	}
+	return tgt, readLog
+}
+
+func TestStat_FallsBackOnPermission(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("requires non-root")
+	}
+
+	dir := t.TempDir()
+	inner := filepath.Join(dir, "restricted")
+	if err := os.Mkdir(inner, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(inner, 0o755) }()
+
+	path := filepath.Join(inner, "file")
+	tgt, readLog := newStatTarget(t, "81a4 42 1710756000 file")
+	info, err := tgt.Stat(context.Background(), path)
+	if err != nil {
+		t.Fatalf("expected fallback to handle it, got: %v", err)
+	}
+
+	cmd := readLog()
+	if !strings.Contains(cmd, "stat -L") {
+		t.Fatalf("expected escalated stat -L, got: %q", cmd)
+	}
+	if info.Size() != 42 {
+		t.Fatalf("expected size 42, got %d", info.Size())
+	}
+}
+
+func TestGetOwner_FallsBackOnPermission(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("requires non-root")
+	}
+
+	dir := t.TempDir()
+	inner := filepath.Join(dir, "restricted")
+	if err := os.Mkdir(inner, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(inner, 0o755) }()
+
+	path := filepath.Join(inner, "file")
+	tgt, _ := newStatTarget(t, "app app")
+	owner, err := tgt.GetOwner(context.Background(), path)
+	if err != nil {
+		t.Fatalf("expected fallback to handle it, got: %v", err)
+	}
+	if owner.User != "app" || owner.Group != "app" {
+		t.Fatalf("expected app:app, got %s:%s", owner.User, owner.Group)
+	}
+}
+
 // Command construction (capture script records args)
 // -----------------------------------------------------------------------------
 

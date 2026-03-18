@@ -5,6 +5,8 @@ package svcmgr
 import (
 	"strings"
 	"testing"
+
+	"scampi.dev/scampi/target"
 )
 
 func TestDetect(t *testing.T) {
@@ -232,7 +234,7 @@ func TestShellQuote(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := ShellQuote(tt.input)
+			got := target.ShellQuote(tt.input)
 			if got != tt.want {
 				t.Errorf("ShellQuote(%q): got %q, want %q", tt.input, got, tt.want)
 			}

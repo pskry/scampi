@@ -192,3 +192,8 @@ func (e StagingError) Error() string {
 }
 
 func (e StagingError) Unwrap() error { return e.Err }
+
+// ShellQuote single-quotes a string for safe shell interpolation.
+func ShellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}

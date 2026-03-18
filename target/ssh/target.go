@@ -20,6 +20,7 @@ import (
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/escalate"
 	"scampi.dev/scampi/target/pkgmgr"
 	"scampi.dev/scampi/target/svcmgr"
 )
@@ -103,9 +104,12 @@ func (t *SSHTarget) WriteFile(ctx context.Context, path string, data []byte) err
 	return normalizeError(err)
 }
 
-func (t *SSHTarget) Stat(_ context.Context, path string) (fs.FileInfo, error) {
+func (t *SSHTarget) Stat(ctx context.Context, path string) (fs.FileInfo, error) {
 	info, err := t.sftp.Stat(path)
 	if err != nil {
+		if isPermission(err) && t.escalate != "" {
+			return escalate.GNUStat(ctx, t, t.escalate, path, true)
+		}
 		return nil, normalizeError(err)
 	}
 	return info, nil
@@ -169,7 +173,7 @@ func (t *SSHTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) er
 
 func (t *SSHTarget) ChmodRecursive(ctx context.Context, path string, mode fs.FileMode) error {
 	octal := fmt.Sprintf("%04o", mode.Perm())
-	cmd := "chmod -R " + octal + " " + shellQuote(path)
+	cmd := "chmod -R " + octal + " " + target.ShellQuote(path)
 	if t.escalate != "" {
 		cmd = t.escalate + " " + cmd
 	}
@@ -189,9 +193,12 @@ func (t *SSHTarget) ChmodRecursive(ctx context.Context, path string, mode fs.Fil
 // Symlinks
 // -----------------------------------------------------------------------------
 
-func (t *SSHTarget) Lstat(_ context.Context, path string) (fs.FileInfo, error) {
+func (t *SSHTarget) Lstat(ctx context.Context, path string) (fs.FileInfo, error) {
 	info, err := t.sftp.Lstat(path)
 	if err != nil {
+		if isPermission(err) && t.escalate != "" {
+			return escalate.GNUStat(ctx, t, t.escalate, path, false)
+		}
 		return nil, normalizeError(err)
 	}
 	return info, nil
@@ -231,6 +238,9 @@ func (t *SSHTarget) HasGroup(ctx context.Context, group string) bool {
 func (t *SSHTarget) GetOwner(ctx context.Context, path string) (target.Owner, error) {
 	info, err := t.sftp.Stat(path)
 	if err != nil {
+		if isPermission(err) && t.escalate != "" {
+			return escalate.GNUGetOwner(ctx, t, t.escalate, path)
+		}
 		return target.Owner{}, normalizeError(err)
 	}
 
@@ -270,8 +280,8 @@ func (t *SSHTarget) Chown(ctx context.Context, path string, owner target.Owner) 
 
 func (t *SSHTarget) ChownRecursive(ctx context.Context, path string, owner target.Owner) error {
 	cmd := "chown -R " +
-		shellQuote(owner.User) + ":" + shellQuote(owner.Group) +
-		" " + shellQuote(path)
+		target.ShellQuote(owner.User) + ":" + target.ShellQuote(owner.Group) +
+		" " + target.ShellQuote(path)
 	if t.escalate != "" {
 		cmd = t.escalate + " " + cmd
 	}
@@ -298,7 +308,7 @@ func (t *SSHTarget) resolveUser(ctx context.Context, user string) (int, error) {
 	}
 
 	// Use `id` command
-	result, err := t.RunCommand(ctx, fmt.Sprintf("id -u %s", shellQuote(user)))
+	result, err := t.RunCommand(ctx, fmt.Sprintf("id -u %s", target.ShellQuote(user)))
 	if err != nil {
 		return 0, err
 	}
@@ -323,7 +333,7 @@ func (t *SSHTarget) resolveGroup(ctx context.Context, group string) (int, error)
 	}
 
 	// Use `getent` command
-	result, err := t.RunCommand(ctx, fmt.Sprintf("getent group %s", shellQuote(group)))
+	result, err := t.RunCommand(ctx, fmt.Sprintf("getent group %s", target.ShellQuote(group)))
 	if err != nil {
 		return 0, err
 	}
@@ -411,15 +421,11 @@ func (t *SSHTarget) RunPrivileged(ctx context.Context, cmd string) (target.Comma
 	return t.RunCommand(ctx, cmd)
 }
 
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-}
-
 // Escalated fallback methods
 // -----------------------------------------------------------------------------
 
 func (t *SSHTarget) escalatedReadFile(ctx context.Context, path string) ([]byte, error) {
-	result, err := t.RunCommand(ctx, t.escalate+" cat "+shellQuote(path))
+	result, err := t.RunCommand(ctx, t.escalate+" cat "+target.ShellQuote(path))
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +445,7 @@ func (t *SSHTarget) escalatedWriteFile(ctx context.Context, path string, data []
 	}
 	defer func() { _ = t.sftp.Remove(tmp) }()
 
-	result, err := t.RunCommand(ctx, t.escalate+" cp "+shellQuote(tmp)+" "+shellQuote(path))
+	result, err := t.RunCommand(ctx, t.escalate+" cp "+target.ShellQuote(tmp)+" "+target.ShellQuote(path))
 	if err != nil {
 		return err
 	}
@@ -453,7 +459,7 @@ func (t *SSHTarget) escalatedWriteFile(ctx context.Context, path string, data []
 }
 
 func (t *SSHTarget) escalatedRemove(ctx context.Context, path string) error {
-	result, err := t.RunCommand(ctx, t.escalate+" rm "+shellQuote(path))
+	result, err := t.RunCommand(ctx, t.escalate+" rm "+target.ShellQuote(path))
 	if err != nil {
 		return err
 	}
@@ -468,7 +474,7 @@ func (t *SSHTarget) escalatedRemove(ctx context.Context, path string) error {
 
 func (t *SSHTarget) escalatedChmod(ctx context.Context, path string, mode fs.FileMode) error {
 	octal := fmt.Sprintf("%04o", mode.Perm())
-	cmd := t.escalate + " chmod " + octal + " " + shellQuote(path)
+	cmd := t.escalate + " chmod " + octal + " " + target.ShellQuote(path)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
@@ -484,8 +490,8 @@ func (t *SSHTarget) escalatedChmod(ctx context.Context, path string, mode fs.Fil
 
 func (t *SSHTarget) escalatedChown(ctx context.Context, path string, owner target.Owner) error {
 	cmd := t.escalate + " chown " +
-		shellQuote(owner.User) + ":" + shellQuote(owner.Group) +
-		" " + shellQuote(path)
+		target.ShellQuote(owner.User) + ":" + target.ShellQuote(owner.Group) +
+		" " + target.ShellQuote(path)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
@@ -501,7 +507,7 @@ func (t *SSHTarget) escalatedChown(ctx context.Context, path string, owner targe
 
 func (t *SSHTarget) escalatedSymlink(ctx context.Context, tgt, link string) error {
 	cmd := t.escalate + " ln -sfn " +
-		shellQuote(tgt) + " " + shellQuote(link)
+		target.ShellQuote(tgt) + " " + target.ShellQuote(link)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
@@ -517,8 +523,8 @@ func (t *SSHTarget) escalatedSymlink(ctx context.Context, tgt, link string) erro
 
 func (t *SSHTarget) escalatedMkdir(ctx context.Context, path string, mode fs.FileMode) error {
 	octal := fmt.Sprintf("%04o", mode.Perm())
-	cmd := t.escalate + " mkdir -p " + shellQuote(path) +
-		" && " + t.escalate + " chmod " + octal + " " + shellQuote(path)
+	cmd := t.escalate + " mkdir -p " + target.ShellQuote(path) +
+		" && " + t.escalate + " chmod " + octal + " " + target.ShellQuote(path)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err

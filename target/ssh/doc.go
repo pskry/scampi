@@ -6,6 +6,9 @@
 // sessions and SFTP for command execution and data transfer. They represent a
 // concrete execution context used during planning and execution.
 //
+// The implementation currently assumes the remote host runs GNU/Linux
+// (e.g. GNU coreutils for escalated stat).
+//
 // Like all targets, SSH targets are invoked only by the engine and must not
 // contain planning, validation, or diagnostic policy logic.
 package ssh
