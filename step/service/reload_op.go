@@ -28,7 +28,7 @@ func (op *reloadOp) Check(
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	sm := target.Must[target.ServiceManager](reloadID, tgt)
 
-	desired := StateReloaded
+	desired := StateReloaded.String()
 	if !sm.SupportsReload() {
 		op.fallbackToRestart = true
 		desired = "restarted (reload not supported)"

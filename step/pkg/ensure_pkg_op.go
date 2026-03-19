@@ -27,7 +27,7 @@ const cacheStaleThreshold = 1 * time.Second
 type ensurePkgOp struct {
 	sharedops.BaseOp
 	packages   []string
-	state      string
+	state      State
 	pkgsSource spec.SourceSpan
 }
 
@@ -261,7 +261,7 @@ func (op *ensureLatestPkgOp) OpDescription() spec.OpDescription {
 
 type ensurePkgDesc struct {
 	Pkgs  string
-	State string
+	State State
 }
 
 func (d ensurePkgDesc) PlanTemplate() spec.PlanTemplate {

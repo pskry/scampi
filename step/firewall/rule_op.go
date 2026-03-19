@@ -26,7 +26,7 @@ const (
 type ensureRuleOp struct {
 	sharedops.BaseOp
 	port   string
-	action string
+	action Action
 }
 
 // Backend Detection
@@ -104,7 +104,7 @@ func (op *ensureRuleOp) checkFirewalld(
 	ctx context.Context,
 	cmdr target.Command,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
-	if op.action == "allow" {
+	if op.action == ActionAllow {
 		result, err := cmdr.RunCommand(ctx, fmt.Sprintf("firewall-cmd --query-port=%s", op.port))
 		if err != nil {
 			return spec.CheckUnsatisfied, nil, sharedops.DiagnoseTargetError(err)
@@ -171,7 +171,7 @@ func (op *ensureRuleOp) executeUFW(
 		}
 		return spec.Result{}, RuleApplyError{
 			Port:   op.port,
-			Action: op.action,
+			Action: op.action.String(),
 			Stderr: stderr,
 		}
 	}
@@ -183,7 +183,7 @@ func (op *ensureRuleOp) executeFirewalld(
 	ctx context.Context,
 	cmdr target.Command,
 ) (spec.Result, error) {
-	if op.action == "allow" {
+	if op.action == ActionAllow {
 		cmd := fmt.Sprintf("firewall-cmd --permanent --add-port=%s", op.port)
 		result, err := cmdr.RunCommand(ctx, cmd)
 		if err != nil {
@@ -211,7 +211,7 @@ func (op *ensureRuleOp) executeFirewalld(
 	if reload.ExitCode != 0 {
 		return spec.Result{}, RuleApplyError{
 			Port:   op.port,
-			Action: op.action,
+			Action: op.action.String(),
 			Stderr: "reload failed: " + reload.Stderr,
 		}
 	}
@@ -229,7 +229,7 @@ func (op *ensureRuleOp) firewalldRichRule() string {
 	port, proto := parts[0], parts[1]
 
 	verb := "reject"
-	if op.action == "deny" {
+	if op.action == ActionDeny {
 		verb = "drop"
 	}
 
@@ -243,7 +243,7 @@ func (op *ensureRuleOp) applyError(result target.CommandResult) RuleApplyError {
 	}
 	return RuleApplyError{
 		Port:   op.port,
-		Action: op.action,
+		Action: op.action.String(),
 		Stderr: stderr,
 	}
 }
@@ -256,7 +256,7 @@ func (ensureRuleOp) RequiredCapabilities() capability.Capability {
 // -----------------------------------------------------------------------------
 
 type ensureRuleDesc struct {
-	Action string
+	Action Action
 	Port   string
 }
 

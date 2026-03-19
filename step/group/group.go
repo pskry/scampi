@@ -8,10 +8,35 @@ import (
 	"scampi.dev/scampi/spec"
 )
 
+// State represents the desired group state.
+type State uint8
+
 const (
-	StatePresent = "present"
-	StateAbsent  = "absent"
+	StatePresent State = iota + 1
+	StateAbsent
 )
+
+func (s State) String() string {
+	switch s {
+	case StatePresent:
+		return "present"
+	case StateAbsent:
+		return "absent"
+	default:
+		return "unknown"
+	}
+}
+
+func parseState(s string) State {
+	switch s {
+	case "present":
+		return StatePresent
+	case "absent":
+		return StateAbsent
+	default:
+		panic(errs.BUG("invalid group state %q — should have been caught by Validate", s))
+	}
+}
 
 type (
 	Group       struct{}
@@ -28,7 +53,7 @@ type (
 		idx    int
 		desc   string
 		name   string
-		state  string
+		state  State
 		gid    int
 		system bool
 		step   spec.StepInstance
@@ -52,7 +77,7 @@ func (g Group) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		idx:    idx,
 		desc:   cfg.Desc,
 		name:   cfg.Name,
-		state:  cfg.State,
+		state:  parseState(cfg.State),
 		gid:    cfg.GID,
 		system: cfg.System,
 		step:   step,
@@ -61,11 +86,11 @@ func (g Group) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 
 func (c *GroupConfig) Validate(step spec.StepInstance) error {
 	switch c.State {
-	case StatePresent, StateAbsent:
+	case "present", "absent":
 	default:
 		return InvalidStateError{
 			Got:     c.State,
-			Allowed: []string{StatePresent, StateAbsent},
+			Allowed: []string{"present", "absent"},
 			Source:  step.Fields["state"].Value,
 		}
 	}

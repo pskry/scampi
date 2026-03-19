@@ -27,7 +27,7 @@ func (op *restartOp) Check(
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	return spec.CheckUnsatisfied, []spec.DriftDetail{{
 		Field:   "state",
-		Desired: StateRestarted,
+		Desired: StateRestarted.String(),
 	}}, nil
 }
 

@@ -11,6 +11,41 @@ import (
 
 var portRe = regexp.MustCompile(`^(\d+)(:\d+)?/(tcp|udp)$`)
 
+// Action represents a firewall rule action.
+type Action uint8
+
+const (
+	ActionAllow Action = iota + 1
+	ActionDeny
+	ActionReject
+)
+
+func (a Action) String() string {
+	switch a {
+	case ActionAllow:
+		return "allow"
+	case ActionDeny:
+		return "deny"
+	case ActionReject:
+		return "reject"
+	default:
+		return "unknown"
+	}
+}
+
+func parseAction(s string) Action {
+	switch s {
+	case "allow":
+		return ActionAllow
+	case "deny":
+		return ActionDeny
+	case "reject":
+		return ActionReject
+	default:
+		panic(errs.BUG("invalid firewall action %q — should have been caught by validate", s))
+	}
+}
+
 type (
 	Firewall       struct{}
 	FirewallConfig struct {
@@ -24,7 +59,7 @@ type (
 		idx    int
 		desc   string
 		port   string
-		action string
+		action Action
 		step   spec.StepInstance
 	}
 )
@@ -46,7 +81,7 @@ func (Firewall) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		idx:    idx,
 		desc:   cfg.Desc,
 		port:   cfg.Port,
-		action: cfg.Action,
+		action: parseAction(cfg.Action),
 		step:   step,
 	}, nil
 }

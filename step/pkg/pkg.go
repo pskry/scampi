@@ -17,12 +17,40 @@ func keyCachePath(keyURL string) string {
 	return ".scampi-cache/repo-keys/" + hex.EncodeToString(h[:16])
 }
 
-// Desired package state values.
+// State represents the desired package state.
+type State uint8
+
 const (
-	StatePresent = "present"
-	StateAbsent  = "absent"
-	StateLatest  = "latest"
+	StatePresent State = iota + 1
+	StateAbsent
+	StateLatest
 )
+
+func (s State) String() string {
+	switch s {
+	case StatePresent:
+		return "present"
+	case StateAbsent:
+		return "absent"
+	case StateLatest:
+		return "latest"
+	default:
+		return "unknown"
+	}
+}
+
+func parseState(s string) State {
+	switch s {
+	case "present":
+		return StatePresent
+	case "absent":
+		return StateAbsent
+	case "latest":
+		return StateLatest
+	default:
+		panic(errs.BUG("invalid pkg state %q — should have been caught by Validate", s))
+	}
+}
 
 type (
 	Pkg       struct{}
@@ -38,7 +66,7 @@ type (
 		idx      int
 		desc     string
 		packages []string
-		state    string
+		state    State
 		source   spec.PkgSourceRef
 		step     spec.StepInstance
 	}
@@ -54,11 +82,11 @@ func (c *PkgConfig) Validate(step spec.StepInstance) error {
 		}
 	}
 	switch c.State {
-	case StatePresent, StateAbsent, StateLatest:
+	case "present", "absent", "latest":
 	default:
 		return InvalidStateError{
 			Got:     c.State,
-			Allowed: []string{StatePresent, StateAbsent, StateLatest},
+			Allowed: []string{"present", "absent", "latest"},
 			Source:  step.Fields["state"].Value,
 		}
 	}
@@ -79,7 +107,7 @@ func (p Pkg) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		idx:      idx,
 		desc:     cfg.Desc,
 		packages: cfg.Packages,
-		state:    cfg.State,
+		state:    parseState(cfg.State),
 		source:   cfg.Source,
 		step:     step,
 	}, nil

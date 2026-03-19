@@ -7,13 +7,45 @@ import (
 	"scampi.dev/scampi/spec"
 )
 
-// Desired service state values.
+// State represents the desired service state.
+type State uint8
+
 const (
-	StateRunning   = "running"
-	StateStopped   = "stopped"
-	StateRestarted = "restarted"
-	StateReloaded  = "reloaded"
+	StateRunning State = iota + 1
+	StateStopped
+	StateRestarted
+	StateReloaded
 )
+
+func (s State) String() string {
+	switch s {
+	case StateRunning:
+		return "running"
+	case StateStopped:
+		return "stopped"
+	case StateRestarted:
+		return "restarted"
+	case StateReloaded:
+		return "reloaded"
+	default:
+		return "unknown"
+	}
+}
+
+func parseState(s string) State {
+	switch s {
+	case "running":
+		return StateRunning
+	case "stopped":
+		return StateStopped
+	case "restarted":
+		return StateRestarted
+	case "reloaded":
+		return StateReloaded
+	default:
+		panic(errs.BUG("invalid service state %q — should have been caught by Validate", s))
+	}
+}
 
 type (
 	Service       struct{}
@@ -29,7 +61,7 @@ type (
 		idx     int
 		desc    string
 		name    string
-		state   string
+		state   State
 		enabled bool
 		step    spec.StepInstance
 	}
@@ -52,7 +84,7 @@ func (s Service) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 		idx:     idx,
 		desc:    cfg.Desc,
 		name:    cfg.Name,
-		state:   cfg.State,
+		state:   parseState(cfg.State),
 		enabled: cfg.Enabled,
 		step:    step,
 	}, nil
@@ -60,11 +92,11 @@ func (s Service) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 
 func (c *ServiceConfig) Validate(step spec.StepInstance) error {
 	switch c.State {
-	case StateRunning, StateStopped, StateRestarted, StateReloaded:
+	case "running", "stopped", "restarted", "reloaded":
 	default:
 		return InvalidStateError{
 			Got:     c.State,
-			Allowed: []string{StateRunning, StateStopped, StateRestarted, StateReloaded},
+			Allowed: []string{"running", "stopped", "restarted", "reloaded"},
 			Source:  step.Fields["state"].Value,
 		}
 	}

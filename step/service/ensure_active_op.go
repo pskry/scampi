@@ -17,7 +17,7 @@ const ensureActiveID = "builtin.ensure-service-active"
 type ensureActiveOp struct {
 	sharedops.BaseOp
 	name       string
-	state      string
+	state      State
 	nameSource spec.SourceSpan
 }
 
@@ -45,7 +45,7 @@ func (op *ensureActiveOp) Check(
 	return spec.CheckUnsatisfied, []spec.DriftDetail{{
 		Field:   "state",
 		Current: current,
-		Desired: op.state,
+		Desired: op.state.String(),
 	}}, nil
 }
 
@@ -102,7 +102,7 @@ func (ensureActiveOp) RequiredCapabilities() capability.Capability {
 
 type ensureActiveDesc struct {
 	Name  string
-	State string
+	State State
 }
 
 func (d ensureActiveDesc) PlanTemplate() spec.PlanTemplate {
