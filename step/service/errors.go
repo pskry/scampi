@@ -7,12 +7,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // InvalidStateError is raised when the state field has an unrecognized value.
 type InvalidStateError struct {
+	diagnostic.FatalError
 	Got     string
 	Allowed []string
 	Source  spec.SourceSpan
@@ -32,11 +32,9 @@ func (e InvalidStateError) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidStateError) Severity() signal.Severity { return signal.Error }
-func (InvalidStateError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // ServiceCommandError is emitted when a service command (start/stop/enable/disable) fails.
 type ServiceCommandError struct {
+	diagnostic.FatalError
 	Op     string
 	Name   string
 	Stderr string
@@ -58,11 +56,9 @@ func (e ServiceCommandError) EventTemplate() event.Template {
 	}
 }
 
-func (ServiceCommandError) Severity() signal.Severity { return signal.Error }
-func (ServiceCommandError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // DaemonReloadError is emitted when daemon-reload fails.
 type DaemonReloadError struct {
+	diagnostic.FatalError
 	Name   string
 	Stderr string
 	Source spec.SourceSpan
@@ -81,6 +77,3 @@ func (e DaemonReloadError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (DaemonReloadError) Severity() signal.Severity { return signal.Error }
-func (DaemonReloadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

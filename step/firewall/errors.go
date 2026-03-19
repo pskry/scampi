@@ -7,12 +7,13 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // BackendNotFoundError is emitted when neither ufw nor firewall-cmd is found.
-type BackendNotFoundError struct{}
+type BackendNotFoundError struct {
+	diagnostic.FatalError
+}
 
 func (e BackendNotFoundError) Error() string {
 	return "no supported firewall backend found"
@@ -27,11 +28,9 @@ func (e BackendNotFoundError) EventTemplate() event.Template {
 	}
 }
 
-func (BackendNotFoundError) Severity() signal.Severity { return signal.Error }
-func (BackendNotFoundError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // RuleCheckError is emitted when checking rule existence fails.
 type RuleCheckError struct {
+	diagnostic.FatalError
 	Port   string
 	Stderr string
 }
@@ -49,11 +48,9 @@ func (e RuleCheckError) EventTemplate() event.Template {
 	}
 }
 
-func (RuleCheckError) Severity() signal.Severity { return signal.Error }
-func (RuleCheckError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // RuleApplyError is emitted when applying a firewall rule fails.
 type RuleApplyError struct {
+	diagnostic.FatalError
 	Port   string
 	Action string
 	Stderr string
@@ -72,11 +69,9 @@ func (e RuleApplyError) EventTemplate() event.Template {
 	}
 }
 
-func (RuleApplyError) Severity() signal.Severity { return signal.Error }
-func (RuleApplyError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // InvalidPortError is returned during validation when the port format is invalid.
 type InvalidPortError struct {
+	diagnostic.FatalError
 	Port   string
 	Source spec.SourceSpan
 }
@@ -95,11 +90,9 @@ func (e InvalidPortError) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidPortError) Severity() signal.Severity { return signal.Error }
-func (InvalidPortError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // InvalidActionError is returned during validation when the action is not recognized.
 type InvalidActionError struct {
+	diagnostic.FatalError
 	Action string
 	Source spec.SourceSpan
 }
@@ -117,6 +110,3 @@ func (e InvalidActionError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (InvalidActionError) Severity() signal.Severity { return signal.Error }
-func (InvalidActionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

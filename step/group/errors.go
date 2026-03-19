@@ -8,12 +8,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // InvalidStateError is raised when the state field has an unrecognized value.
 type InvalidStateError struct {
+	diagnostic.FatalError
 	Got     string
 	Allowed []string
 	Source  spec.SourceSpan
@@ -33,11 +33,9 @@ func (e InvalidStateError) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidStateError) Severity() signal.Severity { return signal.Error }
-func (InvalidStateError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // GroupCreateError is emitted when creating a group fails.
 type GroupCreateError struct {
+	diagnostic.FatalError
 	Name   string
 	Err    error
 	Source spec.SourceSpan
@@ -59,11 +57,9 @@ func (e GroupCreateError) EventTemplate() event.Template {
 	}
 }
 
-func (GroupCreateError) Severity() signal.Severity { return signal.Error }
-func (GroupCreateError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // GroupDeleteError is emitted when deleting a group fails.
 type GroupDeleteError struct {
+	diagnostic.FatalError
 	Name   string
 	Err    error
 	Source spec.SourceSpan
@@ -84,6 +80,3 @@ func (e GroupDeleteError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (GroupDeleteError) Severity() signal.Severity { return signal.Error }
-func (GroupDeleteError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

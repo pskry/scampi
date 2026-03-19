@@ -8,11 +8,11 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 type CyclicDependencyError struct {
+	diagnostic.FatalError
 	Cycle []spec.Op
 }
 
@@ -48,9 +48,6 @@ func (e CyclicDependencyError) EventTemplate() event.Template {
 	}
 }
 
-func (e CyclicDependencyError) Severity() signal.Severity { return signal.Error }
-func (CyclicDependencyError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
-
 func DetectPlanCycles(em diagnostic.Emitter, plan spec.Plan) error {
 	var roots []spec.Op
 	for _, a := range plan.Unit.Actions {
@@ -84,6 +81,7 @@ func DetectPlanCycles(em diagnostic.Emitter, plan spec.Plan) error {
 
 // ActionCyclicDependencyError represents a cycle in the action dependency graph.
 type ActionCyclicDependencyError struct {
+	diagnostic.FatalError
 	Cycle []spec.Action
 }
 
@@ -115,9 +113,6 @@ func (e ActionCyclicDependencyError) EventTemplate() event.Template {
 		Data: ids,
 	}
 }
-
-func (e ActionCyclicDependencyError) Severity() signal.Severity { return signal.Error }
-func (ActionCyclicDependencyError) Impact() diagnostic.Impact   { return diagnostic.ImpactAbort }
 
 // detectHookCycles finds cycles in hook on_change chains using DFS.
 func detectHookCycles(em diagnostic.Emitter, hooks map[string][]spec.StepInstance) error {

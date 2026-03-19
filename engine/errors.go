@@ -13,7 +13,6 @@ import (
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
 	"scampi.dev/scampi/errs"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
@@ -34,6 +33,7 @@ func (CancelledError) Error() string {
 }
 
 type CapabilityMismatchError struct {
+	diagnostic.FatalError
 	StepIndex    int
 	StepKind     string
 	RequiredCaps capability.Capability
@@ -58,14 +58,6 @@ func (e CapabilityMismatchError) EventTemplate() event.Template {
 		Data:   e,
 		Source: &e.Source,
 	}
-}
-
-func (e CapabilityMismatchError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e CapabilityMismatchError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
 }
 
 func panicIfNotAbortError(err error) error {
@@ -157,6 +149,7 @@ func emitOpDiagnostic(
 // -----------------------------------------------------------------------------
 
 type UnknownIndexKindError struct {
+	diagnostic.FatalError
 	Kind string
 }
 
@@ -173,13 +166,11 @@ func (e UnknownIndexKindError) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownIndexKindError) Severity() signal.Severity { return signal.Error }
-func (UnknownIndexKindError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // Resolution errors
 // -----------------------------------------------------------------------------
 
 type UnknownDeployBlockError struct {
+	diagnostic.FatalError
 	Name string
 }
 
@@ -196,10 +187,7 @@ func (e UnknownDeployBlockError) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownDeployBlockError) Severity() signal.Severity { return signal.Error }
-func (UnknownDeployBlockError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
-type NoDeployBlocksError struct{}
+type NoDeployBlocksError struct{ diagnostic.FatalError }
 
 func (NoDeployBlocksError) Error() string {
 	return "no deploy blocks defined"
@@ -213,10 +201,8 @@ func (NoDeployBlocksError) EventTemplate() event.Template {
 	}
 }
 
-func (NoDeployBlocksError) Severity() signal.Severity { return signal.Error }
-func (NoDeployBlocksError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type NoTargetsInDeployError struct {
+	diagnostic.FatalError
 	Deploy string
 }
 
@@ -233,10 +219,8 @@ func (e NoTargetsInDeployError) EventTemplate() event.Template {
 	}
 }
 
-func (NoTargetsInDeployError) Severity() signal.Severity { return signal.Error }
-func (NoTargetsInDeployError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type UnknownTargetError struct {
+	diagnostic.FatalError
 	Name   string
 	Deploy string
 }
@@ -254,10 +238,8 @@ func (e UnknownTargetError) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownTargetError) Severity() signal.Severity { return signal.Error }
-func (UnknownTargetError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type TargetNotInDeployError struct {
+	diagnostic.FatalError
 	Target string
 	Deploy string
 }
@@ -275,13 +257,11 @@ func (e TargetNotInDeployError) EventTemplate() event.Template {
 	}
 }
 
-func (TargetNotInDeployError) Severity() signal.Severity { return signal.Error }
-func (TargetNotInDeployError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // Hook errors
 // -----------------------------------------------------------------------------
 
 type UnknownHookError struct {
+	diagnostic.FatalError
 	HookID   string
 	StepKind string
 	StepDesc string
@@ -302,10 +282,8 @@ func (e UnknownHookError) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownHookError) Severity() signal.Severity { return signal.Error }
-func (UnknownHookError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type HookCycleError struct {
+	diagnostic.FatalError
 	Chain  []string
 	Source spec.SourceSpan
 }
@@ -323,6 +301,3 @@ func (e HookCycleError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (HookCycleError) Severity() signal.Severity { return signal.Error }
-func (HookCycleError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

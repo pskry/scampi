@@ -71,11 +71,19 @@ type (
 		Severity() signal.Severity
 		Impact() Impact
 	}
+	// FatalError provides the Severity and Impact methods shared by all
+	// diagnostic errors that abort execution: Severity=Error, Impact=Abort.
+	// Embed it in error structs to avoid repeating these two methods.
+	FatalError struct{}
+
 	Diagnostics     []Diagnostic
 	MultiDiagnostic interface {
 		Diagnostics() []Diagnostic
 	}
 )
+
+func (FatalError) Severity() signal.Severity { return signal.Error }
+func (FatalError) Impact() Impact            { return ImpactAbort }
 
 func (d Diagnostics) Diagnostics() []Diagnostic { return d }
 func (d Diagnostics) Error() string {

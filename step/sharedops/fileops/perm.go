@@ -11,11 +11,11 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 type InvalidPermissionError struct {
+	diagnostic.FatalError
 	Value  string
 	Hint   string
 	Source spec.SourceSpan
@@ -38,9 +38,6 @@ func (e InvalidPermissionError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (InvalidPermissionError) Severity() signal.Severity { return signal.Error }
-func (InvalidPermissionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 var (
 	octalRe = regexp.MustCompile(`^0[0-7]{3}$`)

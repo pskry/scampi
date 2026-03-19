@@ -7,12 +7,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // ApplyError is emitted when the apply command fails.
 type ApplyError struct {
+	diagnostic.FatalError
 	Cmd    string
 	Stderr string
 	Source spec.SourceSpan
@@ -32,11 +32,9 @@ func (e ApplyError) EventTemplate() event.Template {
 	}
 }
 
-func (ApplyError) Severity() signal.Severity { return signal.Error }
-func (ApplyError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // PostApplyCheckError is emitted when the check command fails after apply.
 type PostApplyCheckError struct {
+	diagnostic.FatalError
 	CheckCmd string
 	ApplyCmd string
 	Stderr   string
@@ -57,11 +55,9 @@ func (e PostApplyCheckError) EventTemplate() event.Template {
 	}
 }
 
-func (PostApplyCheckError) Severity() signal.Severity { return signal.Error }
-func (PostApplyCheckError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // CheckAlwaysConflictError is raised when both check and always are set.
 type CheckAlwaysConflictError struct {
+	diagnostic.FatalError
 	Source spec.SourceSpan
 }
 
@@ -79,11 +75,9 @@ func (e CheckAlwaysConflictError) EventTemplate() event.Template {
 	}
 }
 
-func (CheckAlwaysConflictError) Severity() signal.Severity { return signal.Error }
-func (CheckAlwaysConflictError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // MissingCheckOrAlwaysError is raised when neither check nor always is provided.
 type MissingCheckOrAlwaysError struct {
+	diagnostic.FatalError
 	Source spec.SourceSpan
 }
 
@@ -100,6 +94,3 @@ func (e MissingCheckOrAlwaysError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (MissingCheckOrAlwaysError) Severity() signal.Severity { return signal.Error }
-func (MissingCheckOrAlwaysError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

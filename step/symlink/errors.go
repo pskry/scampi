@@ -7,11 +7,11 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 type LinkDirMissingError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -32,13 +32,12 @@ func (e LinkDirMissingError) EventTemplate() event.Template {
 	}
 }
 
-func (LinkDirMissingError) Severity() signal.Severity { return signal.Error }
-func (LinkDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 func (e LinkDirMissingError) DeferredResource() spec.Resource {
 	return spec.PathResource(e.Path)
 }
 
 type LinkReadError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -62,10 +61,8 @@ func (e LinkReadError) EventTemplate() event.Template {
 	}
 }
 
-func (LinkReadError) Severity() signal.Severity { return signal.Error }
-func (LinkReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type NotASymlinkError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 }
@@ -84,6 +81,3 @@ func (e NotASymlinkError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (NotASymlinkError) Severity() signal.Severity { return signal.Error }
-func (NotASymlinkError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

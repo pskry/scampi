@@ -10,7 +10,6 @@ import (
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
 	"scampi.dev/scampi/errs"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/sharedops"
@@ -227,6 +226,7 @@ func (op *EnsureOwnerOp) OpDescription() spec.OpDescription {
 }
 
 type ownerReadError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -249,6 +249,3 @@ func (e ownerReadError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (ownerReadError) Severity() signal.Severity { return signal.Error }
-func (ownerReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

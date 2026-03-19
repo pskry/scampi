@@ -11,7 +11,6 @@ import (
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/sharedops"
@@ -163,6 +162,7 @@ func (op *copyFileOp) OpDescription() spec.OpDescription {
 // -----------------------------------------------------------------------------
 
 type CopySourceMissingError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -183,10 +183,8 @@ func (e CopySourceMissingError) EventTemplate() event.Template {
 	}
 }
 
-func (CopySourceMissingError) Severity() signal.Severity { return signal.Error }
-func (CopySourceMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type CopyDestDirMissingError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -207,8 +205,6 @@ func (e CopyDestDirMissingError) EventTemplate() event.Template {
 	}
 }
 
-func (CopyDestDirMissingError) Severity() signal.Severity { return signal.Error }
-func (CopyDestDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 func (e CopyDestDirMissingError) DeferredResource() spec.Resource {
 	return spec.PathResource(e.Path)
 }

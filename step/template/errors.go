@@ -7,11 +7,11 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 type EnvKeyNotInValuesError struct {
+	diagnostic.FatalError
 	EnvVar string
 	Key    string
 	Source spec.SourceSpan
@@ -32,10 +32,8 @@ func (e EnvKeyNotInValuesError) EventTemplate() event.Template {
 	}
 }
 
-func (EnvKeyNotInValuesError) Severity() signal.Severity { return signal.Error }
-func (EnvKeyNotInValuesError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type TemplateSourceMissingError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -56,10 +54,8 @@ func (e TemplateSourceMissingError) EventTemplate() event.Template {
 	}
 }
 
-func (TemplateSourceMissingError) Severity() signal.Severity { return signal.Error }
-func (TemplateSourceMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type TemplateParseError struct {
+	diagnostic.FatalError
 	Err    error
 	Source spec.SourceSpan
 }
@@ -83,10 +79,8 @@ func (e TemplateParseError) EventTemplate() event.Template {
 	}
 }
 
-func (TemplateParseError) Severity() signal.Severity { return signal.Error }
-func (TemplateParseError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type TemplateExecError struct {
+	diagnostic.FatalError
 	Err    error
 	Source spec.SourceSpan
 }
@@ -110,10 +104,8 @@ func (e TemplateExecError) EventTemplate() event.Template {
 	}
 }
 
-func (TemplateExecError) Severity() signal.Severity { return signal.Error }
-func (TemplateExecError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type DestDirMissingError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -134,8 +126,6 @@ func (e DestDirMissingError) EventTemplate() event.Template {
 	}
 }
 
-func (DestDirMissingError) Severity() signal.Severity { return signal.Error }
-func (DestDirMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 func (e DestDirMissingError) DeferredResource() spec.Resource {
 	return spec.PathResource(e.Path)
 }

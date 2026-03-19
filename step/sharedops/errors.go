@@ -8,12 +8,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
 )
 
 type UnknownUserError struct {
+	diagnostic.FatalError
 	User   string
 	Source spec.SourceSpan
 	Err    error
@@ -37,13 +37,12 @@ func (e UnknownUserError) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownUserError) Severity() signal.Severity { return signal.Error }
-func (UnknownUserError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 func (e UnknownUserError) DeferredResource() spec.Resource {
 	return spec.UserResource(e.User)
 }
 
 type UnknownGroupError struct {
+	diagnostic.FatalError
 	Group  string
 	Source spec.SourceSpan
 	Err    error
@@ -67,13 +66,12 @@ func (e UnknownGroupError) EventTemplate() event.Template {
 	}
 }
 
-func (UnknownGroupError) Severity() signal.Severity { return signal.Error }
-func (UnknownGroupError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 func (e UnknownGroupError) DeferredResource() spec.Resource {
 	return spec.GroupResource(e.Group)
 }
 
 type PermissionDeniedError struct {
+	diagnostic.FatalError
 	Operation string
 	Source    spec.SourceSpan
 	Err       error
@@ -97,10 +95,8 @@ func (e PermissionDeniedError) EventTemplate() event.Template {
 	}
 }
 
-func (PermissionDeniedError) Severity() signal.Severity { return signal.Error }
-func (PermissionDeniedError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type RelativePathError struct {
+	diagnostic.FatalError
 	Field  string
 	Path   string
 	Source spec.SourceSpan
@@ -120,11 +116,9 @@ func (e RelativePathError) EventTemplate() event.Template {
 	}
 }
 
-func (RelativePathError) Severity() signal.Severity { return signal.Error }
-func (RelativePathError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // EscalationFailedError wraps a target.EscalationError with diagnostic metadata.
 type EscalationFailedError struct {
+	diagnostic.FatalError
 	target.EscalationError
 }
 
@@ -138,11 +132,9 @@ func (e EscalationFailedError) EventTemplate() event.Template {
 	}
 }
 
-func (EscalationFailedError) Severity() signal.Severity { return signal.Error }
-func (EscalationFailedError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // EscalationMissingError wraps a target.NoEscalationError with diagnostic metadata.
 type EscalationMissingError struct {
+	diagnostic.FatalError
 	target.NoEscalationError
 }
 
@@ -155,11 +147,9 @@ func (e EscalationMissingError) EventTemplate() event.Template {
 	}
 }
 
-func (EscalationMissingError) Severity() signal.Severity { return signal.Error }
-func (EscalationMissingError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // StagingFailedError wraps a target.StagingError with diagnostic metadata.
 type StagingFailedError struct {
+	diagnostic.FatalError
 	target.StagingError
 }
 
@@ -172,12 +162,10 @@ func (e StagingFailedError) EventTemplate() event.Template {
 	}
 }
 
-func (StagingFailedError) Severity() signal.Severity { return signal.Error }
-func (StagingFailedError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // VerifyMissingPlaceholderError is raised at plan time when verify is set
 // but does not contain the %s placeholder.
 type VerifyMissingPlaceholderError struct {
+	diagnostic.FatalError
 	Cmd    string
 	Source spec.SourceSpan
 }
@@ -195,9 +183,6 @@ func (e VerifyMissingPlaceholderError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (VerifyMissingPlaceholderError) Severity() signal.Severity { return signal.Error }
-func (VerifyMissingPlaceholderError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 // DiagnoseTargetError wraps known target-layer errors in diagnostic types.
 // Returns the original error unchanged if not a recognized target error.

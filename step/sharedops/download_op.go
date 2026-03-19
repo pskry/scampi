@@ -20,7 +20,6 @@ import (
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
@@ -318,6 +317,7 @@ func newHash(algo string) hash.Hash {
 // -----------------------------------------------------------------------------
 
 type DownloadError struct {
+	diagnostic.FatalError
 	URL    string
 	Detail string
 	Source spec.SourceSpan
@@ -337,10 +337,8 @@ func (e DownloadError) EventTemplate() event.Template {
 	}
 }
 
-func (DownloadError) Severity() signal.Severity { return signal.Error }
-func (DownloadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type ChecksumMismatchError struct {
+	diagnostic.FatalError
 	URL      string
 	Expected string
 	Got      string
@@ -361,6 +359,3 @@ func (e ChecksumMismatchError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (ChecksumMismatchError) Severity() signal.Severity { return signal.Error }
-func (ChecksumMismatchError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

@@ -459,39 +459,7 @@ func (e *Engine) runCheckAction(
 		}
 	}
 
-	var rep model.ActionReport
-	rep.Action = act
-
-	for _, n := range nodes {
-		or := model.OpReport{
-			Op:      n.op,
-			Outcome: n.outcome,
-			Result:  n.result,
-			Err:     n.err,
-		}
-		validateOpReport(or)
-		rep.Ops = append(rep.Ops, or)
-
-		rep.Summary.Total++
-
-		switch n.outcome {
-		case model.OpSucceeded:
-			rep.Summary.Succeeded++
-			if n.result != nil && n.result.Changed {
-				rep.Summary.Changed++
-			}
-		case model.OpFailed:
-			rep.Summary.Failed++
-		case model.OpAborted:
-			rep.Summary.Aborted++
-		case model.OpSkipped:
-			rep.Summary.Skipped++
-		case model.OpWouldChange:
-			rep.Summary.WouldChange++
-		}
-	}
-
-	return rep, err
+	return buildActionReport(act, nodes), err
 }
 
 func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (model.ExecutionReport, error) {
@@ -642,6 +610,10 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action, hookID
 		}
 	}
 
+	return buildActionReport(act, nodes), err
+}
+
+func buildActionReport(act spec.Action, nodes []*opNode) model.ActionReport {
 	var rep model.ActionReport
 	rep.Action = act
 
@@ -669,10 +641,12 @@ func (e *Engine) runAction(ctx context.Context, idx int, act spec.Action, hookID
 			rep.Summary.Aborted++
 		case model.OpSkipped:
 			rep.Summary.Skipped++
+		case model.OpWouldChange:
+			rep.Summary.WouldChange++
 		}
 	}
 
-	return rep, err
+	return rep
 }
 
 func buildPlan(ops []spec.Op) ([]*opNode, error) {

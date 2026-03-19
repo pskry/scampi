@@ -88,8 +88,8 @@ func TestDiagnoseTargetError_PassthroughUnknown(t *testing.T) {
 }
 
 func TestEscalationErrors_StableEventIDs(t *testing.T) {
-	missing := EscalationMissingError{target.NoEscalationError{Op: "chmod", Path: "/etc/foo"}}
-	failed := EscalationFailedError{target.EscalationError{
+	missing := EscalationMissingError{NoEscalationError: target.NoEscalationError{Op: "chmod", Path: "/etc/foo"}}
+	failed := EscalationFailedError{EscalationError: target.EscalationError{
 		Tool: "sudo", Op: "chmod", Path: "/etc/foo", ExitCode: 1,
 	}}
 

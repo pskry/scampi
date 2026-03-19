@@ -8,12 +8,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // PkgInstallError is emitted when a package install command fails.
 type PkgInstallError struct {
+	diagnostic.FatalError
 	Pkgs     []string
 	Stderr   string
 	ExitCode int
@@ -35,11 +35,9 @@ func (e PkgInstallError) EventTemplate() event.Template {
 	}
 }
 
-func (PkgInstallError) Severity() signal.Severity { return signal.Error }
-func (PkgInstallError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // PkgRemoveError is emitted when a package remove command fails.
 type PkgRemoveError struct {
+	diagnostic.FatalError
 	Pkgs     []string
 	Stderr   string
 	ExitCode int
@@ -61,11 +59,9 @@ func (e PkgRemoveError) EventTemplate() event.Template {
 	}
 }
 
-func (PkgRemoveError) Severity() signal.Severity { return signal.Error }
-func (PkgRemoveError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // PkgCacheError is emitted when a package cache update fails.
 type PkgCacheError struct {
+	diagnostic.FatalError
 	Stderr string
 	Source spec.SourceSpan
 }
@@ -85,11 +81,9 @@ func (e PkgCacheError) EventTemplate() event.Template {
 	}
 }
 
-func (PkgCacheError) Severity() signal.Severity { return signal.Error }
-func (PkgCacheError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // EmptyPackagesError is raised when packages list is empty.
 type EmptyPackagesError struct {
+	diagnostic.FatalError
 	Source spec.SourceSpan
 }
 
@@ -107,11 +101,9 @@ func (e EmptyPackagesError) EventTemplate() event.Template {
 	}
 }
 
-func (EmptyPackagesError) Severity() signal.Severity { return signal.Error }
-func (EmptyPackagesError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // InvalidStateError is raised when the state field has an unrecognized value.
 type InvalidStateError struct {
+	diagnostic.FatalError
 	Got     string
 	Allowed []string
 	Source  spec.SourceSpan
@@ -131,11 +123,9 @@ func (e InvalidStateError) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidStateError) Severity() signal.Severity { return signal.Error }
-func (InvalidStateError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // RepoKeyInstallError is emitted when installing a repo signing key fails.
 type RepoKeyInstallError struct {
+	diagnostic.FatalError
 	Name   string
 	Detail string
 }
@@ -153,11 +143,9 @@ func (e RepoKeyInstallError) EventTemplate() event.Template {
 	}
 }
 
-func (RepoKeyInstallError) Severity() signal.Severity { return signal.Error }
-func (RepoKeyInstallError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // RepoConfigError is emitted when writing a repo config fails.
 type RepoConfigError struct {
+	diagnostic.FatalError
 	Name   string
 	Detail string
 }
@@ -175,11 +163,9 @@ func (e RepoConfigError) EventTemplate() event.Template {
 	}
 }
 
-func (RepoConfigError) Severity() signal.Severity { return signal.Error }
-func (RepoConfigError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // SuiteDetectionError is emitted when the distro codename can't be determined.
 type SuiteDetectionError struct {
+	diagnostic.FatalError
 	Name string
 }
 
@@ -197,12 +183,10 @@ func (e SuiteDetectionError) EventTemplate() event.Template {
 	}
 }
 
-func (SuiteDetectionError) Severity() signal.Severity { return signal.Error }
-func (SuiteDetectionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // SourceBackendMismatchError is emitted when the source type doesn't match
 // the target's package manager (e.g. apt_repo on a dnf system).
 type SourceBackendMismatchError struct {
+	diagnostic.FatalError
 	SourceKind string
 	TargetKind string
 	Source     spec.SourceSpan
@@ -221,6 +205,3 @@ func (e SourceBackendMismatchError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (SourceBackendMismatchError) Severity() signal.Severity { return signal.Error }
-func (SourceBackendMismatchError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

@@ -12,12 +12,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // StarlarkError wraps a Starlark evaluation error with source position.
 type StarlarkError struct {
+	diagnostic.FatalError
 	Err    error
 	Source spec.SourceSpan
 }
@@ -32,14 +32,6 @@ func (e StarlarkError) EventTemplate() event.Template {
 		Data:   e,
 		Source: &e.Source,
 	}
-}
-
-func (e StarlarkError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e StarlarkError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
 }
 
 // wrapStarlarkError converts a starlark.EvalError into a diagnostic error.
@@ -170,6 +162,7 @@ type sourceSettable interface {
 
 // UnknownFieldError is raised when a call contains an unrecognized field name.
 type UnknownFieldError struct {
+	diagnostic.FatalError
 	Field      string
 	Suggestion string
 	Source     spec.SourceSpan
@@ -195,16 +188,9 @@ func (e UnknownFieldError) EventTemplate() event.Template {
 	return tmpl
 }
 
-func (e UnknownFieldError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e UnknownFieldError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 // DuplicateTargetError is raised when a target name is registered twice.
 type DuplicateTargetError struct {
+	diagnostic.FatalError
 	Name   string
 	Source spec.SourceSpan
 }
@@ -223,14 +209,6 @@ func (e DuplicateTargetError) EventTemplate() event.Template {
 	}
 }
 
-func (e DuplicateTargetError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e DuplicateTargetError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 func (e *DuplicateTargetError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -239,6 +217,7 @@ func (e *DuplicateTargetError) setSource(s spec.SourceSpan) {
 
 // DuplicateDeployError is raised when a deploy block name is registered twice.
 type DuplicateDeployError struct {
+	diagnostic.FatalError
 	Name   string
 	Source spec.SourceSpan
 }
@@ -257,14 +236,6 @@ func (e DuplicateDeployError) EventTemplate() event.Template {
 	}
 }
 
-func (e DuplicateDeployError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e DuplicateDeployError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 func (e *DuplicateDeployError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -273,6 +244,7 @@ func (e *DuplicateDeployError) setSource(s spec.SourceSpan) {
 
 // EnvVarRequiredError is raised when a required env var is unset.
 type EnvVarRequiredError struct {
+	diagnostic.FatalError
 	Key    string
 	Source spec.SourceSpan
 }
@@ -291,14 +263,6 @@ func (e EnvVarRequiredError) EventTemplate() event.Template {
 	}
 }
 
-func (e EnvVarRequiredError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e EnvVarRequiredError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 func (e *EnvVarRequiredError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -307,6 +271,7 @@ func (e *EnvVarRequiredError) setSource(s spec.SourceSpan) {
 
 // FileReadError is raised when a configuration file cannot be read.
 type FileReadError struct {
+	diagnostic.FatalError
 	Path   string
 	Cause  error
 	Source spec.SourceSpan
@@ -328,14 +293,6 @@ func (e FileReadError) EventTemplate() event.Template {
 	}
 }
 
-func (e FileReadError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e FileReadError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 func (e *FileReadError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -344,6 +301,7 @@ func (e *FileReadError) setSource(s spec.SourceSpan) {
 
 // TypeError is raised when a value has the wrong Starlark type.
 type TypeError struct {
+	diagnostic.FatalError
 	Context  string
 	Expected string
 	Got      string
@@ -376,14 +334,6 @@ func (e TypeError) EventTemplate() event.Template {
 	}
 }
 
-func (e TypeError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e TypeError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 func (e *TypeError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -392,6 +342,7 @@ func (e *TypeError) setSource(s spec.SourceSpan) {
 
 // EnvError is raised for invalid env() builtin usage.
 type EnvError struct {
+	diagnostic.FatalError
 	Detail string
 	Source spec.SourceSpan
 }
@@ -409,14 +360,6 @@ func (e EnvError) EventTemplate() event.Template {
 	}
 }
 
-func (e EnvError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e EnvError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 func (e *EnvError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -425,6 +368,7 @@ func (e *EnvError) setSource(s spec.SourceSpan) {
 
 // UnknownKeyError is raised when a dict contains an unrecognized key.
 type UnknownKeyError struct {
+	diagnostic.FatalError
 	Key     string
 	Allowed []string
 	Source  spec.SourceSpan
@@ -444,14 +388,6 @@ func (e UnknownKeyError) EventTemplate() event.Template {
 	}
 }
 
-func (e UnknownKeyError) Severity() signal.Severity {
-	return signal.Error
-}
-
-func (e UnknownKeyError) Impact() diagnostic.Impact {
-	return diagnostic.ImpactAbort
-}
-
 func (e *UnknownKeyError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -460,6 +396,7 @@ func (e *UnknownKeyError) setSource(s spec.SourceSpan) {
 
 // CircularLoadError is raised when load() forms a cycle.
 type CircularLoadError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 }
@@ -478,11 +415,9 @@ func (e CircularLoadError) EventTemplate() event.Template {
 	}
 }
 
-func (CircularLoadError) Severity() signal.Severity { return signal.Error }
-func (CircularLoadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // EmptyNameError is raised when a required name argument is empty.
 type EmptyNameError struct {
+	diagnostic.FatalError
 	Func   string
 	Source spec.SourceSpan
 }
@@ -500,11 +435,9 @@ func (e EmptyNameError) EventTemplate() event.Template {
 	}
 }
 
-func (EmptyNameError) Severity() signal.Severity { return signal.Error }
-func (EmptyNameError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // EmptyListError is raised when a required list argument is empty.
 type EmptyListError struct {
+	diagnostic.FatalError
 	Func   string
 	Field  string
 	Source spec.SourceSpan
@@ -523,11 +456,9 @@ func (e EmptyListError) EventTemplate() event.Template {
 	}
 }
 
-func (EmptyListError) Severity() signal.Severity { return signal.Error }
-func (EmptyListError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // SecretError is raised for invalid secret() builtin usage.
 type SecretError struct {
+	diagnostic.FatalError
 	Detail string
 	Source spec.SourceSpan
 }
@@ -545,9 +476,6 @@ func (e SecretError) EventTemplate() event.Template {
 	}
 }
 
-func (SecretError) Severity() signal.Severity { return signal.Error }
-func (SecretError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 func (e *SecretError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -556,6 +484,7 @@ func (e *SecretError) setSource(s spec.SourceSpan) {
 
 // SecretNotFoundError is raised when a secret key is not in the backend.
 type SecretNotFoundError struct {
+	diagnostic.FatalError
 	Key    string
 	Source spec.SourceSpan
 }
@@ -574,9 +503,6 @@ func (e SecretNotFoundError) EventTemplate() event.Template {
 	}
 }
 
-func (SecretNotFoundError) Severity() signal.Severity { return signal.Error }
-func (SecretNotFoundError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 func (e *SecretNotFoundError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -585,6 +511,7 @@ func (e *SecretNotFoundError) setSource(s spec.SourceSpan) {
 
 // SecretBackendError is raised when the secret backend returns an error.
 type SecretBackendError struct {
+	diagnostic.FatalError
 	Key    string
 	Cause  error
 	Source spec.SourceSpan
@@ -606,9 +533,6 @@ func (e SecretBackendError) EventTemplate() event.Template {
 	}
 }
 
-func (SecretBackendError) Severity() signal.Severity { return signal.Error }
-func (SecretBackendError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 func (e *SecretBackendError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -617,6 +541,7 @@ func (e *SecretBackendError) setSource(s spec.SourceSpan) {
 
 // SecretsConfigError is raised for invalid secrets() builtin usage.
 type SecretsConfigError struct {
+	diagnostic.FatalError
 	Detail string
 	Source spec.SourceSpan
 }
@@ -634,9 +559,6 @@ func (e SecretsConfigError) EventTemplate() event.Template {
 	}
 }
 
-func (SecretsConfigError) Severity() signal.Severity { return signal.Error }
-func (SecretsConfigError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 func (e *SecretsConfigError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -645,6 +567,7 @@ func (e *SecretsConfigError) setSource(s spec.SourceSpan) {
 
 // RemoteURLError is raised when remote() receives an invalid URL.
 type RemoteURLError struct {
+	diagnostic.FatalError
 	URL    string
 	Detail string
 	Source spec.SourceSpan
@@ -664,9 +587,6 @@ func (e RemoteURLError) EventTemplate() event.Template {
 	}
 }
 
-func (RemoteURLError) Severity() signal.Severity { return signal.Error }
-func (RemoteURLError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 func (e *RemoteURLError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -675,6 +595,7 @@ func (e *RemoteURLError) setSource(s spec.SourceSpan) {
 
 // RemoteChecksumError is raised when remote() receives a malformed checksum.
 type RemoteChecksumError struct {
+	diagnostic.FatalError
 	Checksum string
 	Detail   string
 	Source   spec.SourceSpan
@@ -694,9 +615,6 @@ func (e RemoteChecksumError) EventTemplate() event.Template {
 	}
 }
 
-func (RemoteChecksumError) Severity() signal.Severity { return signal.Error }
-func (RemoteChecksumError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 func (e *RemoteChecksumError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
@@ -706,6 +624,7 @@ func (e *RemoteChecksumError) setSource(s spec.SourceSpan) {
 // PoisonValueError is raised when a declaration builtin's return value is used
 // where a real value is expected (e.g. passed as a kwarg to a step).
 type PoisonValueError struct {
+	diagnostic.FatalError
 	FuncName string
 	Source   spec.SourceSpan
 }
@@ -723,9 +642,6 @@ func (e PoisonValueError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (PoisonValueError) Severity() signal.Severity { return signal.Error }
-func (PoisonValueError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 func (e *PoisonValueError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {

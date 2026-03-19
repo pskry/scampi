@@ -9,11 +9,11 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 type NoKnownHostsError struct {
+	diagnostic.FatalError
 	Path string
 	Err  error
 }
@@ -34,10 +34,8 @@ func (e NoKnownHostsError) EventTemplate() event.Template {
 	}
 }
 
-func (NoKnownHostsError) Severity() signal.Severity { return signal.Error }
-func (NoKnownHostsError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type NoSuchHostError struct {
+	diagnostic.FatalError
 	Host   string
 	Source spec.SourceSpan
 }
@@ -56,10 +54,8 @@ func (e NoSuchHostError) EventTemplate() event.Template {
 	}
 }
 
-func (NoSuchHostError) Severity() signal.Severity { return signal.Error }
-func (NoSuchHostError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type ConnectionError struct {
+	diagnostic.FatalError
 	Host string
 	Port int
 	Err  error
@@ -81,10 +77,8 @@ func (e ConnectionError) EventTemplate() event.Template {
 	}
 }
 
-func (ConnectionError) Severity() signal.Severity { return signal.Error }
-func (ConnectionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type UnknownKeyError struct {
+	diagnostic.FatalError
 	Err error
 }
 
@@ -101,9 +95,6 @@ func (e UnknownKeyError) EventTemplate() event.Template {
 		Hint: "connect manually once with ssh to add the host key, or use insecure: true to skip verification",
 	}
 }
-
-func (UnknownKeyError) Severity() signal.Severity { return signal.Error }
-func (UnknownKeyError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
 
 func toKnownKeys(keys []knownhosts.KnownKey) []KnownKey {
 	l := len(keys)
@@ -143,6 +134,7 @@ type KnownKey struct {
 }
 
 type KeyMismatchError struct {
+	diagnostic.FatalError
 	Known []KnownKey
 	Err   error
 }
@@ -166,10 +158,8 @@ func (e KeyMismatchError) EventTemplate() event.Template {
 	}
 }
 
-func (KeyMismatchError) Severity() signal.Severity { return signal.Error }
-func (KeyMismatchError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type KeyRevokedError struct {
+	diagnostic.FatalError
 	Revoked KnownKey
 	Err     error
 }
@@ -191,10 +181,8 @@ func (e KeyRevokedError) EventTemplate() event.Template {
 	}
 }
 
-func (KeyRevokedError) Severity() signal.Severity { return signal.Error }
-func (KeyRevokedError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type KeyReadError struct {
+	diagnostic.FatalError
 	Path string
 	Err  error
 }
@@ -212,10 +200,8 @@ func (e KeyReadError) EventTemplate() event.Template {
 	}
 }
 
-func (KeyReadError) Severity() signal.Severity { return signal.Error }
-func (KeyReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type KeyParseError struct {
+	diagnostic.FatalError
 	Path        string
 	IsPublicKey bool
 	Err         error
@@ -235,10 +221,9 @@ func (e KeyParseError) EventTemplate() event.Template {
 	}
 }
 
-func (KeyParseError) Severity() signal.Severity { return signal.Error }
-func (KeyParseError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
-type NoAuthMethodError struct{}
+type NoAuthMethodError struct {
+	diagnostic.FatalError
+}
 
 func (NoAuthMethodError) Error() string {
 	return "no SSH authentication method available (no key specified and SSH agent not available)"
@@ -254,10 +239,8 @@ func (e NoAuthMethodError) EventTemplate() event.Template {
 	}
 }
 
-func (NoAuthMethodError) Severity() signal.Severity { return signal.Error }
-func (NoAuthMethodError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type AuthError struct {
+	diagnostic.FatalError
 	Err error
 }
 
@@ -276,10 +259,8 @@ func (e AuthError) EventTemplate() event.Template {
 	}
 }
 
-func (AuthError) Severity() signal.Severity { return signal.Error }
-func (AuthError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type InvalidTimeoutError struct {
+	diagnostic.FatalError
 	Value  string
 	Source spec.SourceSpan
 	Err    error
@@ -301,10 +282,8 @@ func (e InvalidTimeoutError) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidTimeoutError) Severity() signal.Severity { return signal.Error }
-func (InvalidTimeoutError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type SFTPSessionError struct {
+	diagnostic.FatalError
 	Err error
 }
 
@@ -322,6 +301,3 @@ func (e SFTPSessionError) EventTemplate() event.Template {
 		Data: e,
 	}
 }
-
-func (SFTPSessionError) Severity() signal.Severity { return signal.Error }
-func (SFTPSessionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

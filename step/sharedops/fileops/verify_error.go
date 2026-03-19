@@ -7,12 +7,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // VerifyError is returned when a verify command exits non-zero.
 type VerifyError struct {
+	diagnostic.FatalError
 	Cmd      string
 	Dest     string
 	ExitCode int
@@ -34,6 +34,3 @@ func (e *VerifyError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (*VerifyError) Severity() signal.Severity { return signal.Error }
-func (*VerifyError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

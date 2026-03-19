@@ -8,12 +8,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // InvalidStateError is raised when the state field has an unrecognized value.
 type InvalidStateError struct {
+	diagnostic.FatalError
 	Got     string
 	Allowed []string
 	Source  spec.SourceSpan
@@ -33,11 +33,9 @@ func (e InvalidStateError) EventTemplate() event.Template {
 	}
 }
 
-func (InvalidStateError) Severity() signal.Severity { return signal.Error }
-func (InvalidStateError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // UserCreateError is emitted when creating a user fails.
 type UserCreateError struct {
+	diagnostic.FatalError
 	Name   string
 	Err    error
 	Source spec.SourceSpan
@@ -59,11 +57,9 @@ func (e UserCreateError) EventTemplate() event.Template {
 	}
 }
 
-func (UserCreateError) Severity() signal.Severity { return signal.Error }
-func (UserCreateError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // UserModifyError is emitted when modifying a user fails.
 type UserModifyError struct {
+	diagnostic.FatalError
 	Name   string
 	Err    error
 	Source spec.SourceSpan
@@ -85,11 +81,9 @@ func (e UserModifyError) EventTemplate() event.Template {
 	}
 }
 
-func (UserModifyError) Severity() signal.Severity { return signal.Error }
-func (UserModifyError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // UserDeleteError is emitted when deleting a user fails.
 type UserDeleteError struct {
+	diagnostic.FatalError
 	Name   string
 	Err    error
 	Source spec.SourceSpan
@@ -110,6 +104,3 @@ func (e UserDeleteError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (UserDeleteError) Severity() signal.Severity { return signal.Error }
-func (UserDeleteError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

@@ -11,7 +11,6 @@ import (
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
 	"scampi.dev/scampi/errs"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/sharedops"
@@ -181,6 +180,7 @@ func (op *EnsureModeOp) OpDescription() spec.OpDescription {
 }
 
 type modeReadError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -203,6 +203,3 @@ func (e modeReadError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (modeReadError) Severity() signal.Severity { return signal.Error }
-func (modeReadError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

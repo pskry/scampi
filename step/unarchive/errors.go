@@ -8,12 +8,12 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
 
 // UnsupportedArchiveError is raised at plan time for unknown archive extensions.
 type UnsupportedArchiveError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 }
@@ -32,11 +32,9 @@ func (e UnsupportedArchiveError) EventTemplate() event.Template {
 	}
 }
 
-func (UnsupportedArchiveError) Severity() signal.Severity { return signal.Error }
-func (UnsupportedArchiveError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // ArchiveNotFoundError is raised when the source archive does not exist.
 type ArchiveNotFoundError struct {
+	diagnostic.FatalError
 	Path   string
 	Source spec.SourceSpan
 	Err    error
@@ -56,11 +54,9 @@ func (e ArchiveNotFoundError) EventTemplate() event.Template {
 	}
 }
 
-func (ArchiveNotFoundError) Severity() signal.Severity { return signal.Error }
-func (ArchiveNotFoundError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // ExtractionError is raised when the extract command fails.
 type ExtractionError struct {
+	diagnostic.FatalError
 	Cmd    string
 	Stderr string
 	Advice string
@@ -92,12 +88,10 @@ func extractionAdvice(stderr string) string {
 	return "check that the archive is not corrupt and required tools are installed"
 }
 
-func (ExtractionError) Severity() signal.Severity { return signal.Error }
-func (ExtractionError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 // PartialOwnershipError is raised at plan time when owner is set without group
 // or vice versa.
 type PartialOwnershipError struct {
+	diagnostic.FatalError
 	Set     string
 	Missing string
 	Source  spec.SourceSpan
@@ -116,6 +110,3 @@ func (e PartialOwnershipError) EventTemplate() event.Template {
 		Source: &e.Source,
 	}
 }
-
-func (PartialOwnershipError) Severity() signal.Severity { return signal.Error }
-func (PartialOwnershipError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }

@@ -9,7 +9,6 @@ import (
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
-	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
@@ -114,6 +113,7 @@ type inspectableOp struct {
 // -----------------------------------------------------------------------------
 
 type noInspectableOpsError struct {
+	diagnostic.FatalError
 	CfgPath string
 	Filter  string
 }
@@ -141,10 +141,8 @@ func (e noInspectableOpsError) EventTemplate() event.Template {
 	}
 }
 
-func (noInspectableOpsError) Severity() signal.Severity { return signal.Error }
-func (noInspectableOpsError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
-
 type multipleInspectableOpsError struct {
+	diagnostic.FatalError
 	CfgPath string
 	Count   int
 	Paths   []string
@@ -162,6 +160,3 @@ func (e multipleInspectableOpsError) EventTemplate() event.Template {
 		Data: e,
 	}
 }
-
-func (multipleInspectableOpsError) Severity() signal.Severity { return signal.Error }
-func (multipleInspectableOpsError) Impact() diagnostic.Impact { return diagnostic.ImpactAbort }
