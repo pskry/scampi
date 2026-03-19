@@ -27,6 +27,22 @@ func newPlanRenderer(glyphs glyphSet, width int, verbosity signal.Verbosity, f *
 	return &planRenderer{glyphs: glyphs, width: width, verbosity: verbosity, fmt: f}
 }
 
+type actionEntry struct {
+	innerLines []string
+	headerIdx  int
+	layerSize  int
+	posInLayer int
+	deps       []int
+}
+
+type planLayout struct {
+	maxHeaderWidth  int
+	depsStrs        []string
+	maxParDepsWidth int
+	hasParallel     bool
+	bracketCol      int
+}
+
 func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 	d := *e.Detail
 
@@ -41,7 +57,6 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 	}
 
 	var out []renderEvent
-	v := p.verbosity
 
 	out = append(out, renderEvent{stream: streamOut, line: ""})
 
@@ -58,19 +73,20 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 	out = append(out, renderEvent{stream: streamOut, line: hdr})
 
 	planDAG := dag.Build(d)
+	actions := p.buildActionEntries(planDAG)
+	ly := p.measureLayout(actions)
+	out = p.renderActions(out, actions, ly)
 
-	digits10 := func(i int) int {
-		if i == 0 {
-			return 1
-		}
-		n := 0
-		for i > 0 {
-			i /= 10
-			n++
-		}
-		return n
-	}
+	out = append(out, renderEvent{stream: streamOut, line: p.fmt.fmtMsg(colPlanRail, p.glyphs.planEnd)})
+	out = append(out, renderEvent{stream: streamOut, line: ""})
 
+	return out
+}
+
+// buildActionEntries
+// -----------------------------------------------------------------------------
+
+func (p *planRenderer) buildActionEntries(planDAG dag.PlanDAG) []actionEntry {
 	maxIndex := 0
 	for _, layer := range planDAG.ActionLayers {
 		for _, act := range layer {
@@ -79,16 +95,8 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 			}
 		}
 	}
-
 	indexWidth := digits10(maxIndex)
-
-	type actionEntry struct {
-		innerLines []string
-		headerIdx  int
-		layerSize  int
-		posInLayer int
-		deps       []int
-	}
+	v := p.verbosity
 
 	var actions []actionEntry
 
@@ -163,41 +171,36 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 		}
 	}
 
-	maxHeaderWidth := 0
+	return actions
+}
+
+// measureLayout
+// -----------------------------------------------------------------------------
+
+func (p *planRenderer) measureLayout(actions []actionEntry) planLayout {
+	var ly planLayout
+
 	for _, ae := range actions {
-		if w := layout.VisibleLen(ae.innerLines[ae.headerIdx]); w > maxHeaderWidth {
-			maxHeaderWidth = w
+		if w := layout.VisibleLen(ae.innerLines[ae.headerIdx]); w > ly.maxHeaderWidth {
+			ly.maxHeaderWidth = w
 		}
 	}
 
-	fmtDeps := func(deps []int) string {
-		if len(deps) == 0 {
-			return ""
-		}
-		parts := make([]string, len(deps))
-		for i, d := range deps {
-			parts[i] = strconv.Itoa(d)
-		}
-		return p.glyphs.depsArrow + " [" + strings.Join(parts, ", ") + "]"
-	}
-
-	depsStrs := make([]string, len(actions))
-	maxParDepsWidth := 0
+	ly.depsStrs = make([]string, len(actions))
 
 	for i, ae := range actions {
-		depsStrs[i] = fmtDeps(ae.deps)
+		ly.depsStrs[i] = p.fmtDeps(ae.deps)
 		if ae.layerSize > 1 {
-			if w := layout.VisibleLen(depsStrs[i]); w > maxParDepsWidth {
-				maxParDepsWidth = w
+			if w := layout.VisibleLen(ly.depsStrs[i]); w > ly.maxParDepsWidth {
+				ly.maxParDepsWidth = w
 			}
 		}
 	}
 
-	hasParallel := false
 	maxParLineWidth := 0
 	for _, ae := range actions {
 		if ae.layerSize > 1 {
-			hasParallel = true
+			ly.hasParallel = true
 			for _, line := range ae.innerLines {
 				if w := layout.VisibleLen(line); w > maxParLineWidth {
 					maxParLineWidth = w
@@ -206,16 +209,26 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 		}
 	}
 
-	bracketCol := 0
-	if hasParallel {
-		headerBased := maxHeaderWidth + 2
-		if maxParDepsWidth > 0 {
-			headerBased = maxHeaderWidth + 2 + maxParDepsWidth + 2
+	if ly.hasParallel {
+		headerBased := ly.maxHeaderWidth + 2
+		if ly.maxParDepsWidth > 0 {
+			headerBased = ly.maxHeaderWidth + 2 + ly.maxParDepsWidth + 2
 		}
 		contentBased := maxParLineWidth + 2
-		bracketCol = max(headerBased, contentBased)
+		ly.bracketCol = max(headerBased, contentBased)
 	}
 
+	return ly
+}
+
+// renderActions
+// -----------------------------------------------------------------------------
+
+func (p *planRenderer) renderActions(
+	out []renderEvent,
+	actions []actionEntry,
+	ly planLayout,
+) []renderEvent {
 	rail := p.fmt.fmtMsg(colPlanRail, p.glyphs.planRail)
 
 	for i, ae := range actions {
@@ -226,29 +239,26 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 			fullLine := rail + innerLine
 
 			if isHeader {
-				if pad := maxHeaderWidth - layout.VisibleLen(innerLine); pad > 0 {
+				if pad := ly.maxHeaderWidth - layout.VisibleLen(innerLine); pad > 0 {
 					fullLine += strings.Repeat(" ", pad)
 				}
-				if depsStrs[i] != "" {
-					fullLine += p.fmt.fmtMsg(colPlanDeps, "  "+depsStrs[i])
+				if ly.depsStrs[i] != "" {
+					fullLine += p.fmt.fmtMsg(colPlanDeps, "  "+ly.depsStrs[i])
 				}
 			}
 
 			if ae.layerSize > 1 {
 				var currentWidth int
 				if isHeader {
-					currentWidth = maxHeaderWidth
-					if depsStrs[i] != "" {
-						currentWidth += 2 + layout.VisibleLen(depsStrs[i])
+					currentWidth = ly.maxHeaderWidth
+					if ly.depsStrs[i] != "" {
+						currentWidth += 2 + layout.VisibleLen(ly.depsStrs[i])
 					}
 				} else {
 					currentWidth = layout.VisibleLen(innerLine)
 				}
 
-				pad := bracketCol - currentWidth
-				if pad < 1 {
-					pad = 1
-				}
+				pad := max(ly.bracketCol-currentWidth, 1)
 				fullLine += strings.Repeat(" ", pad)
 
 				switch {
@@ -265,10 +275,33 @@ func (p *planRenderer) renderPlan(e event.PlanEvent) []renderEvent {
 		}
 	}
 
-	out = append(out, renderEvent{stream: streamOut, line: p.fmt.fmtMsg(colPlanRail, p.glyphs.planEnd)})
-	out = append(out, renderEvent{stream: streamOut, line: ""})
-
 	return out
+}
+
+// Helpers
+// -----------------------------------------------------------------------------
+
+func (p *planRenderer) fmtDeps(deps []int) string {
+	if len(deps) == 0 {
+		return ""
+	}
+	parts := make([]string, len(deps))
+	for i, d := range deps {
+		parts[i] = strconv.Itoa(d)
+	}
+	return p.glyphs.depsArrow + " [" + strings.Join(parts, ", ") + "]"
+}
+
+func digits10(i int) int {
+	if i == 0 {
+		return 1
+	}
+	n := 0
+	for i > 0 {
+		i /= 10
+		n++
+	}
+	return n
 }
 
 func (p *planRenderer) collectOpTreeLines(

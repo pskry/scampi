@@ -184,11 +184,8 @@ changes when the current state differs from the declared state.`,
 
 			store := spec.NewSourceStore()
 
-			displ := newDisplayer(opts, store)
-			defer func() {
-				displ.Close()
-				recoverAndReport(recover())
-			}()
+			displ, cleanup := withDisplayer(opts, store)
+			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)
 			em := diagnostic.NewEmitter(pol, displ)
@@ -234,11 +231,8 @@ the actual system state.`,
 
 			store := spec.NewSourceStore()
 
-			displ := newDisplayer(opts, store)
-			defer func() {
-				displ.Close()
-				recoverAndReport(recover())
-			}()
+			displ, cleanup := withDisplayer(opts, store)
+			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)
 			em := diagnostic.NewEmitter(pol, displ)
@@ -287,11 +281,8 @@ Falls back to plain diff(1).`,
 
 			store := spec.NewSourceStore()
 
-			displ := newDisplayer(opts, store)
-			defer func() {
-				displ.Close()
-				recoverAndReport(recover())
-			}()
+			displ, cleanup := withDisplayer(opts, store)
+			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)
 			em := diagnostic.NewEmitter(pol, displ)
@@ -343,11 +334,8 @@ does not inspect or modify the target system.`,
 
 			store := spec.NewSourceStore()
 
-			displ := newDisplayer(opts, store)
-			defer func() {
-				displ.Close()
-				recoverAndReport(recover())
-			}()
+			displ, cleanup := withDisplayer(opts, store)
+			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)
 			em := diagnostic.NewEmitter(pol, displ)
@@ -381,11 +369,8 @@ shown, including fields, behavior, and examples.`,
 				Verbosity:        opts.verbosity,
 			}
 
-			displ := newDisplayer(opts, nil)
-			defer func() {
-				displ.Close()
-				recoverAndReport(recover())
-			}()
+			displ, cleanup := withDisplayer(opts, nil)
+			defer cleanup()
 
 			em := diagnostic.NewEmitter(pol, displ)
 			args := cmd.Args()
@@ -420,8 +405,8 @@ func legendCmd() *cli.Command {
 and color semantics used in scampi CLI output.`,
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
-			displ := newDisplayer(opts, nil)
-			defer displ.Close()
+			displ, cleanup := withDisplayer(opts, nil)
+			defer cleanup()
 			displ.EmitLegend()
 			return nil
 		},
@@ -499,6 +484,17 @@ func newDisplayer(opts globalOpts, store *spec.SourceStore) render.Displayer {
 	interruptHook = d.Interrupt
 	interruptMu.Unlock()
 	return d
+}
+
+// withDisplayer creates a displayer and returns a cleanup function that
+// should be deferred. The cleanup function closes the displayer and
+// recovers from panics.
+func withDisplayer(opts globalOpts, store *spec.SourceStore) (render.Displayer, func()) {
+	d := newDisplayer(opts, store)
+	return d, func() {
+		d.Close()
+		recoverAndReport(recover())
+	}
 }
 
 func resolveFlags() []cli.Flag {

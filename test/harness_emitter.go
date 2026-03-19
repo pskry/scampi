@@ -148,95 +148,24 @@ func (r *recordingDisplayer) collectDiagnosticIDs() []string {
 	return ids
 }
 
-func (e engineEvents) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
+func marshalSection(header string, v any) string {
+	j, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		panic(err)
 	}
-	return "----- ENGINE DIAGNOSTICS -----\n" +
-		string(j)
+	return "----- " + header + " -----\n" + string(j)
 }
 
-func (e planEvents) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- PLAN DIAGNOSTICS -----\n" +
-		string(j)
-}
-
-func (e actionEvents) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- ACTION DIAGNOSTICS -----\n" +
-		string(j)
-}
-
-func (e opEvents) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- OP EVENTS -----\n" +
-		string(j)
-}
-
-func (e indexAllEvents) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- INDEX_ALL EVENTS -----\n" +
-		string(j)
-}
-
-func (e indexStepEvents) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- INDEX_STEP EVENTS -----\n" +
-		string(j)
-}
-
-func (e engineDiagnostics) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- ENGINE DIAGNOSTICS -----\n" +
-		string(j)
-}
-
-func (e planDiagnostics) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- PLAN DIAGNOSTICS (DIAGS) -----\n" +
-		string(j)
-}
-
-func (e actionDiagnostics) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- ACTION DIAGNOSTICS (DIAGS) -----\n" +
-		string(j)
-}
-
-func (e opDiagnostics) String() string {
-	j, err := json.MarshalIndent(e, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return "----- OP DIAGNOSTICS (DIAGS) -----\n" +
-		string(j)
-}
+func (e engineEvents) String() string      { return marshalSection("ENGINE EVENTS", e) }
+func (e planEvents) String() string        { return marshalSection("PLAN EVENTS", e) }
+func (e actionEvents) String() string      { return marshalSection("ACTION EVENTS", e) }
+func (e opEvents) String() string          { return marshalSection("OP EVENTS", e) }
+func (e indexAllEvents) String() string    { return marshalSection("INDEX_ALL EVENTS", e) }
+func (e indexStepEvents) String() string   { return marshalSection("INDEX_STEP EVENTS", e) }
+func (e engineDiagnostics) String() string { return marshalSection("ENGINE DIAGNOSTICS", e) }
+func (e planDiagnostics) String() string   { return marshalSection("PLAN DIAGNOSTICS", e) }
+func (e actionDiagnostics) String() string { return marshalSection("ACTION DIAGNOSTICS", e) }
+func (e opDiagnostics) String() string     { return marshalSection("OP DIAGNOSTICS", e) }
 
 func (noopEmitter) EmitEngineLifecycle(event.EngineEvent)       {}
 func (noopEmitter) EmitPlanLifecycle(event.PlanEvent)           {}

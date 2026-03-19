@@ -5,6 +5,7 @@ package engine
 import (
 	"context"
 	"path/filepath"
+	"slices"
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/errs"
@@ -68,12 +69,8 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 
 		var targetNames []string
 		if len(opts.TargetNames) > 0 {
-			blockTargets := make(map[string]bool)
-			for _, t := range block.Targets {
-				blockTargets[t] = true
-			}
 			for _, t := range opts.TargetNames {
-				if blockTargets[t] {
+				if slices.Contains(block.Targets, t) {
 					targetNames = append(targetNames, t)
 				}
 			}
@@ -154,14 +151,7 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 		}
 	}
 
-	var found bool
-	for _, t := range block.Targets {
-		if t == targetName {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(block.Targets, targetName) {
 		return spec.ResolvedConfig{}, TargetNotInDeployError{
 			Target: targetName,
 			Deploy: deployName,
