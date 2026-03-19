@@ -1,0 +1,8 @@
+{
+  "files": {},
+  "pkgs": {
+    "nginx": false,
+    "curl": false
+  },
+  "cacheStale": true
+}

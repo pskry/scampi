@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strings"
+	"time"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/errs"
@@ -19,6 +20,7 @@ var (
 	ErrUnknownUser     = errors.New("unknown user")
 	ErrUnknownGroup    = errors.New("unknown group")
 	ErrCommandNotFound = errors.New("command not found on target")
+	ErrNoCacheInfo     = errors.New("package cache age not available")
 )
 
 type (
@@ -66,6 +68,7 @@ type (
 	PkgUpdater interface {
 		UpdateCache(ctx context.Context) error
 		IsUpgradable(ctx context.Context, pkg string) (bool, error)
+		CacheAge(ctx context.Context) (time.Duration, error)
 	}
 	ServiceManager interface {
 		IsActive(ctx context.Context, name string) (bool, error)

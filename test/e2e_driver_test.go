@@ -93,6 +93,7 @@ func (d *MemDriver) Setup(t *testing.T, initial E2EFiles) (target.Target, spec.T
 	for pkg, upgradable := range initial.Upgradable {
 		d.tgt.Upgradable[pkg] = upgradable
 	}
+	d.tgt.CacheStale = initial.CacheStale
 	for svc, active := range initial.Services {
 		d.tgt.Services[svc] = active
 	}

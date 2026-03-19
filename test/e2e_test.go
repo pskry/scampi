@@ -41,6 +41,7 @@ type E2EFiles struct {
 	Restarts        map[string]int              `json:"restarts,omitempty"`        // service name -> restart call count
 	Reloads         map[string]int              `json:"reloads,omitempty"`         // service name -> reload call count
 	Commands        map[string]E2ECommandResult `json:"commands,omitempty"`        // cmd string -> result
+	CacheStale      bool                        `json:"cacheStale,omitempty"`      // simulate stale package cache
 	Users           map[string]E2EUserInfo      `json:"users,omitempty"`           // username -> user info
 	Groups          map[string]E2EGroupInfo     `json:"groups,omitempty"`          // group name -> group info
 }

@@ -14,6 +14,7 @@ type Backend struct {
 	IsUpgradable   string // exit 0 = upgradable (single %s for pkg name)
 	UpdateCache    string // command to refresh package index
 	CacheNeedsRoot bool   // whether cache refresh needs root
+	CheckCacheAge  string // command that prints cache mtime as unix epoch; empty = unknown
 }
 
 func (b *Backend) SupportsUpgrade() bool {
@@ -32,6 +33,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "brew outdated %s | grep -q .",
 		UpdateCache:    "brew update --quiet",
 		CacheNeedsRoot: false,
+		CheckCacheAge:  "stat -f %m \"$(brew --repository)/.git/HEAD\" 2>/dev/null",
 	},
 	"freebsd": {
 		Name:           "pkg",
@@ -42,6 +44,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "pkg upgrade -n %s 2>/dev/null | grep -q .",
 		UpdateCache:    "pkg update -q",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -f %m /var/db/pkg/repo-FreeBSD.sqlite 2>/dev/null",
 	},
 	"debian": {
 		Name:           "apt",
@@ -52,6 +55,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "apt list --upgradable %s 2>/dev/null | grep -q .",
 		UpdateCache:    "apt-get update -qq",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -c %Y /var/cache/apt/pkgcache.bin 2>/dev/null",
 	},
 	"ubuntu": {
 		Name:           "apt",
@@ -62,6 +66,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "apt list --upgradable %s 2>/dev/null | grep -q .",
 		UpdateCache:    "apt-get update -qq",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -c %Y /var/cache/apt/pkgcache.bin 2>/dev/null",
 	},
 	"alpine": {
 		Name:           "apk",
@@ -72,6 +77,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "apk version -l '<' %s 2>/dev/null | tail -n +2 | grep -q .",
 		UpdateCache:    "apk update -q",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -c %Y /var/cache/apk/APKINDEX.*.tar.gz 2>/dev/null | sort -n | tail -1",
 	},
 	"fedora": {
 		Name:           "dnf",
@@ -82,6 +88,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "dnf check-update %s >/dev/null 2>&1; [ $? -eq 100 ]",
 		UpdateCache:    "dnf makecache -q",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -c %Y /var/cache/dnf/*/repodata/repomd.xml 2>/dev/null | sort -n | tail -1",
 	},
 	"rhel": {
 		Name:           "dnf",
@@ -92,6 +99,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "dnf check-update %s >/dev/null 2>&1; [ $? -eq 100 ]",
 		UpdateCache:    "dnf makecache -q",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -c %Y /var/cache/dnf/*/repodata/repomd.xml 2>/dev/null | sort -n | tail -1",
 	},
 	"arch": {
 		Name:           "pacman",
@@ -102,6 +110,7 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "pacman -Qu %s >/dev/null 2>&1",
 		UpdateCache:    "pacman -Sy --noconfirm",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -c %Y /var/lib/pacman/sync/core.db 2>/dev/null",
 	},
 	"suse": {
 		Name:           "zypper",
@@ -112,5 +121,6 @@ var backendsByFamily = map[string]Backend{
 		IsUpgradable:   "zypper --non-interactive list-updates 2>/dev/null | grep -q %s",
 		UpdateCache:    "zypper refresh -q",
 		CacheNeedsRoot: true,
+		CheckCacheAge:  "stat -c %Y /var/cache/zypp/solv/*/cookie 2>/dev/null | sort -n | tail -1",
 	},
 }

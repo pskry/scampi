@@ -1,0 +1,11 @@
+{
+  "target": {
+    "files": {},
+    "pkgs": {
+      "nginx": true,
+      "curl": true
+    }
+  },
+  "changed": 1,
+  "memOnly": true
+}

@@ -4,8 +4,10 @@ package pkg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/source"
@@ -15,6 +17,12 @@ import (
 )
 
 const ensurePkgID = "builtin.ensure-pkg"
+
+// cacheStaleThreshold is the maximum age we consider a package cache "fresh".
+// If CacheAge reports a younger cache, we skip the refresh on install failure.
+// Set low (1s) so backends that report real ages still effectively always
+// refresh — raise once we trust the heuristic.
+const cacheStaleThreshold = 1 * time.Second
 
 type ensurePkgOp struct {
 	sharedops.BaseOp
@@ -92,10 +100,12 @@ func (op *ensurePkgOp) Execute(ctx context.Context, _ source.Source, tgt target.
 	switch op.state {
 	case StatePresent:
 		if err := pm.InstallPkgs(ctx, actionable); err != nil {
-			return spec.Result{}, PkgInstallError{
-				Pkgs:   actionable,
-				Stderr: err.Error(),
-				Source: op.pkgsSource,
+			if retryErr := op.retryWithCacheRefresh(ctx, tgt, actionable); retryErr != nil {
+				return spec.Result{}, PkgInstallError{
+					Pkgs:   actionable,
+					Stderr: retryErr.Error(),
+					Source: op.pkgsSource,
+				}
 			}
 		}
 	case StateAbsent:
@@ -109,6 +119,28 @@ func (op *ensurePkgOp) Execute(ctx context.Context, _ source.Source, tgt target.
 	}
 
 	return spec.Result{Changed: true}, nil
+}
+
+// retryWithCacheRefresh refreshes the package cache and retries the install.
+// Returns nil on success, or the retry's error. When the target doesn't
+// support cache updates, returns the original error unchanged.
+func (op *ensurePkgOp) retryWithCacheRefresh(ctx context.Context, tgt target.Target, pkgs []string) error {
+	updater, ok := tgt.(target.PkgUpdater)
+	if !ok {
+		return fmt.Errorf("target does not support cache refresh")
+	}
+	age, err := updater.CacheAge(ctx)
+	if err != nil && !errors.Is(err, target.ErrNoCacheInfo) {
+		return err
+	}
+	if err == nil && age < cacheStaleThreshold {
+		return fmt.Errorf("cache is fresh (%s old), not retrying", age)
+	}
+	if err := updater.UpdateCache(ctx); err != nil {
+		return err
+	}
+	pm := target.Must[target.PkgManager](ensurePkgID, tgt)
+	return pm.InstallPkgs(ctx, pkgs)
 }
 
 func (ensurePkgOp) RequiredCapabilities() capability.Capability {

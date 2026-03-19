@@ -5,7 +5,9 @@ package local
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/target"
@@ -113,6 +115,21 @@ func (t POSIXTarget) IsUpgradable(ctx context.Context, pkg string) (bool, error)
 		return false, err
 	}
 	return result.ExitCode == 0, nil
+}
+
+func (t POSIXTarget) CacheAge(ctx context.Context) (time.Duration, error) {
+	if t.pkgBackend.CheckCacheAge == "" {
+		return 0, target.ErrNoCacheInfo
+	}
+	result, err := t.RunCommand(ctx, t.pkgBackend.CheckCacheAge)
+	if err != nil || result.ExitCode != 0 {
+		return 0, target.ErrNoCacheInfo
+	}
+	epoch, err := strconv.ParseInt(strings.TrimSpace(result.Stdout), 10, 64)
+	if err != nil {
+		return 0, target.ErrNoCacheInfo
+	}
+	return time.Since(time.Unix(epoch, 0)), nil
 }
 
 // PkgInstallError is returned when a package install command fails.

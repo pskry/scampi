@@ -4,6 +4,7 @@ package target
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ type MemTarget struct {
 	Symlinks   map[string]string
 	Pkgs       map[string]bool
 	Upgradable map[string]bool
+	CacheStale bool
 
 	Services          map[string]bool // service name -> active (running)
 	EnabledServices   map[string]bool // service name -> enabled at boot
@@ -351,6 +353,9 @@ func (m *MemTarget) IsInstalled(_ context.Context, pkg string) (bool, error) {
 func (m *MemTarget) InstallPkgs(_ context.Context, pkgs []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.CacheStale {
+		return fmt.Errorf("unable to locate package %s", pkgs[0])
+	}
 	for _, pkg := range pkgs {
 		m.Pkgs[pkg] = true
 	}
@@ -367,7 +372,14 @@ func (m *MemTarget) RemovePkgs(_ context.Context, pkgs []string) error {
 }
 
 func (m *MemTarget) UpdateCache(_ context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.CacheStale = false
 	return nil
+}
+
+func (m *MemTarget) CacheAge(_ context.Context) (time.Duration, error) {
+	return 0, ErrNoCacheInfo
 }
 
 func (m *MemTarget) IsUpgradable(_ context.Context, pkg string) (bool, error) {
