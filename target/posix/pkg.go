@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-package local
+package posix
 
 import (
 	"context"
@@ -13,28 +13,31 @@ import (
 	"scampi.dev/scampi/target"
 )
 
-func (t POSIXTarget) IsInstalled(ctx context.Context, pkg string) (bool, error) {
-	cmd := fmt.Sprintf(t.pkgBackend.IsInstalled, target.ShellQuote(pkg))
-	result, err := t.RunCommand(ctx, cmd)
+// PkgManager
+// -----------------------------------------------------------------------------
+
+func (b Base) IsInstalled(ctx context.Context, pkg string) (bool, error) {
+	cmd := fmt.Sprintf(b.PkgBackend.IsInstalled, target.ShellQuote(pkg))
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return false, err
 	}
 	return result.ExitCode == 0, nil
 }
 
-func (t POSIXTarget) InstallPkgs(ctx context.Context, pkgs []string) error {
-	if t.pkgBackend.NeedsRoot && !t.isRoot && t.escalate == "" {
-		return target.NoEscalationError{Op: t.pkgBackend.Kind.String() + " install"}
+func (b Base) InstallPkgs(ctx context.Context, pkgs []string) error {
+	if b.PkgBackend.NeedsRoot && b.NeedsEscalation() {
+		return target.NoEscalationError{Op: b.PkgBackend.Kind.String() + " install"}
 	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		quoted[i] = target.ShellQuote(p)
 	}
-	cmd := fmt.Sprintf(t.pkgBackend.Install, strings.Join(quoted, " "))
-	if t.pkgBackend.NeedsRoot && t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	cmd := fmt.Sprintf(b.PkgBackend.Install, strings.Join(quoted, " "))
+	if b.PkgBackend.NeedsRoot && b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -48,19 +51,19 @@ func (t POSIXTarget) InstallPkgs(ctx context.Context, pkgs []string) error {
 	return nil
 }
 
-func (t POSIXTarget) RemovePkgs(ctx context.Context, pkgs []string) error {
-	if t.pkgBackend.NeedsRoot && !t.isRoot && t.escalate == "" {
-		return target.NoEscalationError{Op: t.pkgBackend.Kind.String() + " remove"}
+func (b Base) RemovePkgs(ctx context.Context, pkgs []string) error {
+	if b.PkgBackend.NeedsRoot && b.NeedsEscalation() {
+		return target.NoEscalationError{Op: b.PkgBackend.Kind.String() + " remove"}
 	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		quoted[i] = target.ShellQuote(p)
 	}
-	cmd := fmt.Sprintf(t.pkgBackend.Remove, strings.Join(quoted, " "))
-	if t.pkgBackend.NeedsRoot && t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	cmd := fmt.Sprintf(b.PkgBackend.Remove, strings.Join(quoted, " "))
+	if b.PkgBackend.NeedsRoot && b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -74,21 +77,24 @@ func (t POSIXTarget) RemovePkgs(ctx context.Context, pkgs []string) error {
 	return nil
 }
 
-func (t POSIXTarget) UpdateCache(ctx context.Context) error {
-	if !t.pkgBackend.SupportsUpgrade() {
+// PkgUpdater
+// -----------------------------------------------------------------------------
+
+func (b Base) UpdateCache(ctx context.Context) error {
+	if !b.PkgBackend.SupportsUpgrade() {
 		return errs.BUG(
 			"%s backend does not support upgrade checks — capability should have prevented this call",
-			t.pkgBackend.Kind.String(),
+			b.PkgBackend.Kind.String(),
 		)
 	}
-	if t.pkgBackend.CacheNeedsRoot && !t.isRoot && t.escalate == "" {
-		return target.NoEscalationError{Op: t.pkgBackend.Kind.String() + " update-cache"}
+	if b.PkgBackend.CacheNeedsRoot && b.NeedsEscalation() {
+		return target.NoEscalationError{Op: b.PkgBackend.Kind.String() + " update-cache"}
 	}
-	cmd := t.pkgBackend.UpdateCache
-	if t.pkgBackend.CacheNeedsRoot && t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	cmd := b.PkgBackend.UpdateCache
+	if b.PkgBackend.CacheNeedsRoot && b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -101,27 +107,27 @@ func (t POSIXTarget) UpdateCache(ctx context.Context) error {
 	return nil
 }
 
-func (t POSIXTarget) IsUpgradable(ctx context.Context, pkg string) (bool, error) {
-	if !t.pkgBackend.SupportsUpgrade() {
+func (b Base) IsUpgradable(ctx context.Context, pkg string) (bool, error) {
+	if !b.PkgBackend.SupportsUpgrade() {
 		return false, errs.BUG(
 			"%s backend does not support upgrade checks"+
 				" — capability should have prevented this call",
-			t.pkgBackend.Kind.String(),
+			b.PkgBackend.Kind.String(),
 		)
 	}
-	cmd := fmt.Sprintf(t.pkgBackend.IsUpgradable, target.ShellQuote(pkg))
-	result, err := t.RunCommand(ctx, cmd)
+	cmd := fmt.Sprintf(b.PkgBackend.IsUpgradable, target.ShellQuote(pkg))
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return false, err
 	}
 	return result.ExitCode == 0, nil
 }
 
-func (t POSIXTarget) CacheAge(ctx context.Context) (time.Duration, error) {
-	if t.pkgBackend.CheckCacheAge == "" {
+func (b Base) CacheAge(ctx context.Context) (time.Duration, error) {
+	if b.PkgBackend.CheckCacheAge == "" {
 		return 0, target.ErrNoCacheInfo
 	}
-	result, err := t.RunCommand(ctx, t.pkgBackend.CheckCacheAge)
+	result, err := b.Runner(ctx, b.PkgBackend.CheckCacheAge)
 	if err != nil || result.ExitCode != 0 {
 		return 0, target.ErrNoCacheInfo
 	}
@@ -132,7 +138,9 @@ func (t POSIXTarget) CacheAge(ctx context.Context) (time.Duration, error) {
 	return time.Since(time.Unix(epoch, 0)), nil
 }
 
-// PkgInstallError is returned when a package install command fails.
+// Errors
+// -----------------------------------------------------------------------------
+
 type PkgInstallError struct {
 	Pkgs     []string
 	Stderr   string
@@ -143,7 +151,6 @@ func (e PkgInstallError) Error() string {
 	return fmt.Sprintf("pkg install failed (exit %d): %s", e.ExitCode, e.Stderr)
 }
 
-// PkgRemoveError is returned when a package remove command fails.
 type PkgRemoveError struct {
 	Pkgs     []string
 	Stderr   string
@@ -154,7 +161,6 @@ func (e PkgRemoveError) Error() string {
 	return fmt.Sprintf("pkg remove failed (exit %d): %s", e.ExitCode, e.Stderr)
 }
 
-// CacheUpdateError is returned when a package cache refresh command fails.
 type CacheUpdateError struct {
 	Stderr   string
 	ExitCode int

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-package local
+package posix
 
 import (
 	"context"
@@ -14,33 +14,31 @@ import (
 // UserManager
 // -----------------------------------------------------------------------------
 
-func (t POSIXTarget) UserExists(ctx context.Context, name string) (bool, error) {
-	result, err := t.RunCommand(ctx, "getent passwd "+target.ShellQuote(name))
+func (b Base) UserExists(ctx context.Context, name string) (bool, error) {
+	result, err := b.Runner(ctx, "getent passwd "+target.ShellQuote(name))
 	if err != nil {
 		return false, err
 	}
 	return result.ExitCode == 0, nil
 }
 
-func (t POSIXTarget) GetUser(ctx context.Context, name string) (target.UserInfo, error) {
-	result, err := t.RunCommand(ctx, "getent passwd "+target.ShellQuote(name))
+func (b Base) GetUser(ctx context.Context, name string) (target.UserInfo, error) {
+	result, err := b.Runner(ctx, "getent passwd "+target.ShellQuote(name))
 	if err != nil {
 		return target.UserInfo{}, err
 	}
 	if result.ExitCode != 0 {
 		return target.UserInfo{}, target.ErrUnknownUser
 	}
-	info, err := parsePasswdLine(strings.TrimSpace(result.Stdout))
+	info, err := ParsePasswdLine(strings.TrimSpace(result.Stdout))
 	if err != nil {
 		return target.UserInfo{}, err
 	}
 
-	// Fetch supplementary groups
-	grResult, err := t.RunCommand(ctx, "id -Gn "+target.ShellQuote(name))
+	grResult, err := b.Runner(ctx, "id -Gn "+target.ShellQuote(name))
 	if err == nil && grResult.ExitCode == 0 {
 		allGroups := strings.Fields(strings.TrimSpace(grResult.Stdout))
-		// Filter out primary group
-		pgResult, _ := t.RunCommand(ctx, "id -gn "+target.ShellQuote(name))
+		pgResult, _ := b.Runner(ctx, "id -gn "+target.ShellQuote(name))
 		primaryGroup := strings.TrimSpace(pgResult.Stdout)
 		var supplementary []string
 		for _, g := range allGroups {
@@ -54,8 +52,8 @@ func (t POSIXTarget) GetUser(ctx context.Context, name string) (target.UserInfo,
 	return info, nil
 }
 
-func (t POSIXTarget) CreateUser(ctx context.Context, info target.UserInfo) error {
-	if !t.isRoot && t.escalate == "" {
+func (b Base) CreateUser(ctx context.Context, info target.UserInfo) error {
+	if b.NeedsEscalation() {
 		return target.NoEscalationError{Op: "useradd"}
 	}
 
@@ -77,11 +75,11 @@ func (t POSIXTarget) CreateUser(ctx context.Context, info target.UserInfo) error
 	}
 	cmd += " " + target.ShellQuote(info.Name)
 
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	if b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
 
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -91,8 +89,8 @@ func (t POSIXTarget) CreateUser(ctx context.Context, info target.UserInfo) error
 	return nil
 }
 
-func (t POSIXTarget) ModifyUser(ctx context.Context, info target.UserInfo) error {
-	if !t.isRoot && t.escalate == "" {
+func (b Base) ModifyUser(ctx context.Context, info target.UserInfo) error {
+	if b.NeedsEscalation() {
 		return target.NoEscalationError{Op: "usermod"}
 	}
 
@@ -111,11 +109,11 @@ func (t POSIXTarget) ModifyUser(ctx context.Context, info target.UserInfo) error
 	}
 	cmd += " " + target.ShellQuote(info.Name)
 
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	if b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
 
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -125,17 +123,17 @@ func (t POSIXTarget) ModifyUser(ctx context.Context, info target.UserInfo) error
 	return nil
 }
 
-func (t POSIXTarget) DeleteUser(ctx context.Context, name string) error {
-	if !t.isRoot && t.escalate == "" {
+func (b Base) DeleteUser(ctx context.Context, name string) error {
+	if b.NeedsEscalation() {
 		return target.NoEscalationError{Op: "userdel"}
 	}
 
 	cmd := "userdel " + target.ShellQuote(name)
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	if b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
 
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -148,27 +146,27 @@ func (t POSIXTarget) DeleteUser(ctx context.Context, name string) error {
 // GroupManager
 // -----------------------------------------------------------------------------
 
-func (t POSIXTarget) GroupExists(ctx context.Context, name string) (bool, error) {
-	result, err := t.RunCommand(ctx, "getent group "+target.ShellQuote(name))
+func (b Base) GroupExists(ctx context.Context, name string) (bool, error) {
+	result, err := b.Runner(ctx, "getent group "+target.ShellQuote(name))
 	if err != nil {
 		return false, err
 	}
 	return result.ExitCode == 0, nil
 }
 
-func (t POSIXTarget) GetGroup(ctx context.Context, name string) (target.GroupInfo, error) {
-	result, err := t.RunCommand(ctx, "getent group "+target.ShellQuote(name))
+func (b Base) GetGroup(ctx context.Context, name string) (target.GroupInfo, error) {
+	result, err := b.Runner(ctx, "getent group "+target.ShellQuote(name))
 	if err != nil {
 		return target.GroupInfo{}, err
 	}
 	if result.ExitCode != 0 {
 		return target.GroupInfo{}, target.ErrUnknownGroup
 	}
-	return parseGroupLine(strings.TrimSpace(result.Stdout))
+	return ParseGroupLine(strings.TrimSpace(result.Stdout))
 }
 
-func (t POSIXTarget) CreateGroup(ctx context.Context, info target.GroupInfo) error {
-	if !t.isRoot && t.escalate == "" {
+func (b Base) CreateGroup(ctx context.Context, info target.GroupInfo) error {
+	if b.NeedsEscalation() {
 		return target.NoEscalationError{Op: "groupadd"}
 	}
 
@@ -181,11 +179,11 @@ func (t POSIXTarget) CreateGroup(ctx context.Context, info target.GroupInfo) err
 	}
 	cmd += " " + target.ShellQuote(info.Name)
 
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	if b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
 
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -195,17 +193,17 @@ func (t POSIXTarget) CreateGroup(ctx context.Context, info target.GroupInfo) err
 	return nil
 }
 
-func (t POSIXTarget) DeleteGroup(ctx context.Context, name string) error {
-	if !t.isRoot && t.escalate == "" {
+func (b Base) DeleteGroup(ctx context.Context, name string) error {
+	if b.NeedsEscalation() {
 		return target.NoEscalationError{Op: "groupdel"}
 	}
 
 	cmd := "groupdel " + target.ShellQuote(name)
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
+	if b.Escalate != "" {
+		cmd = b.Escalate + " " + cmd
 	}
 
-	result, err := t.RunCommand(ctx, cmd)
+	result, err := b.Runner(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -218,8 +216,8 @@ func (t POSIXTarget) DeleteGroup(ctx context.Context, name string) error {
 // Helpers
 // -----------------------------------------------------------------------------
 
-// parsePasswdLine parses a getent passwd line: name:x:uid:gid:gecos:home:shell
-func parsePasswdLine(line string) (target.UserInfo, error) {
+// ParsePasswdLine parses a getent passwd line: name:x:uid:gid:gecos:home:shell
+func ParsePasswdLine(line string) (target.UserInfo, error) {
 	parts := strings.Split(line, ":")
 	if len(parts) < 7 {
 		return target.UserInfo{}, fmt.Errorf("unexpected passwd format: %q", line)
@@ -235,8 +233,8 @@ func parsePasswdLine(line string) (target.UserInfo, error) {
 	}, nil
 }
 
-// parseGroupLine parses a getent group line: name:x:gid:member1,member2
-func parseGroupLine(line string) (target.GroupInfo, error) {
+// ParseGroupLine parses a getent group line: name:x:gid:member1,member2
+func ParseGroupLine(line string) (target.GroupInfo, error) {
 	parts := strings.Split(line, ":")
 	if len(parts) < 4 {
 		return target.GroupInfo{}, fmt.Errorf("unexpected group format: %q", line)

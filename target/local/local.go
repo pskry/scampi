@@ -11,6 +11,7 @@ import (
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/pkgmgr"
+	"scampi.dev/scampi/target/posix"
 	"scampi.dev/scampi/target/svcmgr"
 )
 
@@ -20,6 +21,7 @@ func (Local) Kind() string   { return "local" }
 func (Local) NewConfig() any { return &Config{} }
 func (Local) Create(ctx context.Context, _ source.Source, _ spec.TargetInstance) (target.Target, error) {
 	tgt := &POSIXTarget{}
+	tgt.Runner = tgt.RunCommand
 
 	// OS detection for package manager support.
 	// Phase 1: kernel via uname -s
@@ -36,11 +38,11 @@ func (Local) Create(ctx context.Context, _ source.Source, _ spec.TargetInstance)
 		}
 	}
 
-	tgt.osInfo = osInfo
-	tgt.pkgBackend = pkgmgr.Detect(osInfo)
+	tgt.OSInfo = osInfo
+	tgt.PkgBackend = pkgmgr.Detect(osInfo)
 
 	// Init system detection for service management.
-	tgt.svcBackend = svcmgr.Detect(func(cmd string) (int, error) {
+	tgt.SvcBackend = svcmgr.Detect(func(cmd string) (int, error) {
 		result, err := tgt.RunCommand(ctx, cmd)
 		if err != nil {
 			return -1, err
@@ -49,23 +51,10 @@ func (Local) Create(ctx context.Context, _ source.Source, _ spec.TargetInstance)
 	})
 
 	// Privilege escalation detection.
-	tgt.isRoot = os.Getuid() == 0
-	tgt.escalate = detectEscalation(ctx, tgt)
+	tgt.IsRoot = os.Getuid() == 0
+	tgt.Escalate = posix.DetectEscalation(ctx, tgt.RunCommand, tgt.IsRoot)
 
 	return tgt, nil
-}
-
-func detectEscalation(ctx context.Context, tgt *POSIXTarget) string {
-	if tgt.isRoot {
-		return ""
-	}
-	if result, err := tgt.RunCommand(ctx, "command -v sudo"); err == nil && result.ExitCode == 0 {
-		return "sudo"
-	}
-	if result, err := tgt.RunCommand(ctx, "command -v doas"); err == nil && result.ExitCode == 0 {
-		return "doas"
-	}
-	return ""
 }
 
 type Config struct{}

@@ -22,6 +22,7 @@ import (
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/pkgmgr"
+	"scampi.dev/scampi/target/posix"
 	"scampi.dev/scampi/target/svcmgr"
 )
 
@@ -113,8 +114,7 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 		return nil, ConnectionError{
 			Host: cfg.Host,
 			Port: cfg.Port,
-			// Source: tgt.Fields["host"].Value,
-			Err: rootErr,
+			Err:  rootErr,
 		}
 	}
 
@@ -131,26 +131,27 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 		sftp:       sftpClient,
 		closeAgent: closeAgent,
 	}
+	sshTgt.Runner = sshTgt.RunCommand
 
 	// OS detection for package manager support.
 	// Phase 1: kernel via uname -s
 	if result, err := sshTgt.RunCommand(ctx, "uname -s"); err == nil {
-		sshTgt.osInfo.Kernel = strings.TrimSpace(result.Stdout)
+		sshTgt.OSInfo.Kernel = strings.TrimSpace(result.Stdout)
 	}
 
 	// Phase 2: distro detection (Linux only) via /etc/os-release
-	if sshTgt.osInfo.Kernel == pkgmgr.KernelLinux {
+	if sshTgt.OSInfo.Kernel == pkgmgr.KernelLinux {
 		if osRelease, err := sshTgt.ReadFile(ctx, "/etc/os-release"); err == nil {
 			info := pkgmgr.ParseOSRelease(osRelease)
 			info.Kernel = pkgmgr.KernelLinux
-			sshTgt.osInfo = info
+			sshTgt.OSInfo = info
 		}
 	}
 
-	sshTgt.pkgBackend = pkgmgr.Detect(sshTgt.osInfo)
+	sshTgt.PkgBackend = pkgmgr.Detect(sshTgt.OSInfo)
 
 	// Init system detection for service management.
-	sshTgt.svcBackend = svcmgr.Detect(func(cmd string) (int, error) {
+	sshTgt.SvcBackend = svcmgr.Detect(func(cmd string) (int, error) {
 		result, err := sshTgt.RunCommand(ctx, cmd)
 		if err != nil {
 			return -1, err
@@ -160,24 +161,11 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 
 	// Privilege escalation detection.
 	if result, err := sshTgt.RunCommand(ctx, "id -u"); err == nil {
-		sshTgt.isRoot = strings.TrimSpace(result.Stdout) == "0"
+		sshTgt.IsRoot = strings.TrimSpace(result.Stdout) == "0"
 	}
-	sshTgt.escalate = detectEscalation(ctx, sshTgt)
+	sshTgt.Escalate = posix.DetectEscalation(ctx, sshTgt.RunCommand, sshTgt.IsRoot)
 
 	return sshTgt, nil
-}
-
-func detectEscalation(ctx context.Context, tgt *SSHTarget) string {
-	if tgt.isRoot {
-		return ""
-	}
-	if result, err := tgt.RunCommand(ctx, "command -v sudo"); err == nil && result.ExitCode == 0 {
-		return "sudo"
-	}
-	if result, err := tgt.RunCommand(ctx, "command -v doas"); err == nil && result.ExitCode == 0 {
-		return "doas"
-	}
-	return ""
 }
 
 func buildSSHConfig(
@@ -261,8 +249,6 @@ func isHostResolvable(h string) bool {
 	return false
 }
 
-// expandTilde expands ~ to home directory. Relative paths are returned as-is
-// to allow the rooted source to resolve them relative to the config file.
 func expandTilde(p string) (string, error) {
 	if p == "" {
 		return "", nil

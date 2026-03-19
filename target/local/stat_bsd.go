@@ -23,8 +23,8 @@ func (t POSIXTarget) Stat(ctx context.Context, path string) (fs.FileInfo, error)
 		if os.IsNotExist(err) {
 			return nil, errs.WrapErrf(target.ErrNotExist, "%q", path)
 		}
-		if os.IsPermission(err) && t.escalate != "" {
-			return escalate.BSDStat(ctx, t, t.escalate, path, true)
+		if os.IsPermission(err) && t.Escalate != "" {
+			return escalate.BSDStat(ctx, t, t.Escalate, path, true)
 		}
 		return nil, err
 	}
@@ -37,8 +37,8 @@ func (t POSIXTarget) Lstat(ctx context.Context, path string) (fs.FileInfo, error
 		if os.IsNotExist(err) {
 			return nil, errs.WrapErrf(target.ErrNotExist, "%q", path)
 		}
-		if os.IsPermission(err) && t.escalate != "" {
-			return escalate.BSDStat(ctx, t, t.escalate, path, false)
+		if os.IsPermission(err) && t.Escalate != "" {
+			return escalate.BSDStat(ctx, t, t.Escalate, path, false)
 		}
 		return nil, err
 	}
@@ -51,8 +51,8 @@ func (t POSIXTarget) GetOwner(ctx context.Context, path string) (target.Owner, e
 		if os.IsNotExist(err) {
 			return target.Owner{}, errs.WrapErrf(target.ErrNotExist, "%q", path)
 		}
-		if os.IsPermission(err) && t.escalate != "" {
-			return escalate.BSDGetOwner(ctx, t, t.escalate, path)
+		if os.IsPermission(err) && t.Escalate != "" {
+			return escalate.BSDGetOwner(ctx, t, t.Escalate, path)
 		}
 		return target.Owner{}, err
 	}

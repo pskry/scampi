@@ -15,28 +15,22 @@ import (
 	"os/user"
 	"strconv"
 
-	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/target"
-	"scampi.dev/scampi/target/pkgmgr"
-	"scampi.dev/scampi/target/svcmgr"
+	"scampi.dev/scampi/target/posix"
 )
 
 type POSIXTarget struct {
-	osInfo     pkgmgr.OSInfo
-	pkgBackend *pkgmgr.Backend
-	svcBackend svcmgr.Backend
-	escalate   string // "sudo", "doas", or "" (none)
-	isRoot     bool
+	posix.Base
 }
 
 func (t POSIXTarget) ReadFile(ctx context.Context, path string) ([]byte, error) {
 	data, err := os.ReadFile(path)
 	if os.IsPermission(err) {
-		if t.escalate != "" {
+		if t.Escalate != "" {
 			return t.escalatedReadFile(ctx, path)
 		}
-		if !t.isRoot {
+		if !t.IsRoot {
 			return nil, target.NoEscalationError{Op: "read", Path: path}
 		}
 	}
@@ -46,10 +40,10 @@ func (t POSIXTarget) ReadFile(ctx context.Context, path string) ([]byte, error) 
 func (t POSIXTarget) WriteFile(ctx context.Context, path string, data []byte) error {
 	err := os.WriteFile(path, data, 0o644)
 	if os.IsPermission(err) {
-		if t.escalate != "" {
+		if t.Escalate != "" {
 			return t.escalatedWriteFile(ctx, path, data)
 		}
-		if !t.isRoot {
+		if !t.IsRoot {
 			return target.NoEscalationError{Op: "write", Path: path}
 		}
 	}
@@ -63,10 +57,10 @@ func (POSIXTarget) Readlink(_ context.Context, path string) (string, error) {
 func (t POSIXTarget) Symlink(ctx context.Context, tgt, link string) error {
 	err := os.Symlink(tgt, link)
 	if os.IsPermission(err) {
-		if t.escalate != "" {
+		if t.Escalate != "" {
 			return t.escalatedSymlink(ctx, tgt, link)
 		}
-		if !t.isRoot {
+		if !t.IsRoot {
 			return target.NoEscalationError{Op: "symlink", Path: link}
 		}
 	}
@@ -76,10 +70,10 @@ func (t POSIXTarget) Symlink(ctx context.Context, tgt, link string) error {
 func (t POSIXTarget) Remove(ctx context.Context, path string) error {
 	err := os.Remove(path)
 	if os.IsPermission(err) {
-		if t.escalate != "" {
+		if t.Escalate != "" {
 			return t.escalatedRemove(ctx, path)
 		}
-		if !t.isRoot {
+		if !t.IsRoot {
 			return target.NoEscalationError{Op: "remove", Path: path}
 		}
 	}
@@ -89,10 +83,10 @@ func (t POSIXTarget) Remove(ctx context.Context, path string) error {
 func (t POSIXTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) error {
 	err := os.MkdirAll(path, mode)
 	if os.IsPermission(err) {
-		if t.escalate != "" {
+		if t.Escalate != "" {
 			return t.escalatedMkdir(ctx, path, mode)
 		}
-		if !t.isRoot {
+		if !t.IsRoot {
 			return target.NoEscalationError{Op: "mkdir", Path: path}
 		}
 	}
@@ -119,10 +113,10 @@ func (t POSIXTarget) Chown(ctx context.Context, path string, owner target.Owner)
 
 	err = os.Chown(path, uid, gid)
 	if os.IsPermission(err) {
-		if t.escalate != "" {
+		if t.Escalate != "" {
 			return t.escalatedChown(ctx, path, owner)
 		}
-		if !t.isRoot {
+		if !t.IsRoot {
 			return target.NoEscalationError{Op: "chown", Path: path}
 		}
 	}
@@ -132,53 +126,14 @@ func (t POSIXTarget) Chown(ctx context.Context, path string, owner target.Owner)
 func (t POSIXTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) error {
 	err := os.Chmod(path, mode)
 	if os.IsPermission(err) {
-		if t.escalate != "" {
+		if t.Escalate != "" {
 			return t.escalatedChmod(ctx, path, mode)
 		}
-		if !t.isRoot {
+		if !t.IsRoot {
 			return target.NoEscalationError{Op: "chmod", Path: path}
 		}
 	}
 	return err
-}
-
-func (t POSIXTarget) ChmodRecursive(ctx context.Context, path string, mode fs.FileMode) error {
-	octal := fmt.Sprintf("%04o", mode.Perm())
-	cmd := "chmod -R " + octal + " " + target.ShellQuote(path)
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
-	}
-	result, err := t.RunCommand(ctx, cmd)
-	if err != nil {
-		return err
-	}
-	if result.ExitCode != 0 {
-		return target.EscalationError{
-			Tool: t.escalate, Op: "chmod -R", Path: path,
-			Stderr: result.Stderr, ExitCode: result.ExitCode,
-		}
-	}
-	return nil
-}
-
-func (t POSIXTarget) ChownRecursive(ctx context.Context, path string, owner target.Owner) error {
-	cmd := "chown -R " +
-		target.ShellQuote(owner.User) + ":" + target.ShellQuote(owner.Group) +
-		" " + target.ShellQuote(path)
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
-	}
-	result, err := t.RunCommand(ctx, cmd)
-	if err != nil {
-		return err
-	}
-	if result.ExitCode != 0 {
-		return target.EscalationError{
-			Tool: t.escalate, Op: "chown -R", Path: path,
-			Stderr: result.Stderr, ExitCode: result.ExitCode,
-		}
-	}
-	return nil
 }
 
 func (POSIXTarget) HasUser(_ context.Context, user string) bool {
@@ -215,41 +170,17 @@ func (POSIXTarget) RunCommand(ctx context.Context, cmd string) (target.CommandRe
 	}, nil
 }
 
-func (t POSIXTarget) RunPrivileged(ctx context.Context, cmd string) (target.CommandResult, error) {
-	if t.escalate != "" {
-		cmd = t.escalate + " " + cmd
-	}
-	return t.RunCommand(ctx, cmd)
-}
-
-func (t POSIXTarget) Capabilities() capability.Capability {
-	caps := capability.POSIX // includes User | Group
-	if t.pkgBackend != nil {
-		caps |= capability.Pkg
-		if t.pkgBackend.SupportsUpgrade() {
-			caps |= capability.PkgUpdate
-		}
-		if t.pkgBackend.SupportsRepoSetup() {
-			caps |= capability.PkgRepo
-		}
-	}
-	if t.svcBackend != nil {
-		caps |= capability.Service
-	}
-	return caps
-}
-
 // Escalated fallback methods
 // -----------------------------------------------------------------------------
 
 func (t POSIXTarget) escalatedReadFile(ctx context.Context, path string) ([]byte, error) {
-	result, err := t.RunCommand(ctx, t.escalate+" cat "+target.ShellQuote(path))
+	result, err := t.RunCommand(ctx, t.Escalate+" cat "+target.ShellQuote(path))
 	if err != nil {
 		return nil, err
 	}
 	if result.ExitCode != 0 {
 		return nil, target.EscalationError{
-			Tool: t.escalate, Op: "cat", Path: path,
+			Tool: t.Escalate, Op: "cat", Path: path,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}
@@ -268,13 +199,13 @@ func (t POSIXTarget) escalatedWriteFile(ctx context.Context, path string, data [
 	}
 	defer func() { _ = os.Remove(tmp) }()
 
-	result, err := t.RunCommand(ctx, t.escalate+" cp "+target.ShellQuote(tmp)+" "+target.ShellQuote(path))
+	result, err := t.RunCommand(ctx, t.Escalate+" cp "+target.ShellQuote(tmp)+" "+target.ShellQuote(path))
 	if err != nil {
 		return err
 	}
 	if result.ExitCode != 0 {
 		return target.EscalationError{
-			Tool: t.escalate, Op: "cp", Path: path,
+			Tool: t.Escalate, Op: "cp", Path: path,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}
@@ -282,13 +213,13 @@ func (t POSIXTarget) escalatedWriteFile(ctx context.Context, path string, data [
 }
 
 func (t POSIXTarget) escalatedRemove(ctx context.Context, path string) error {
-	result, err := t.RunCommand(ctx, t.escalate+" rm "+target.ShellQuote(path))
+	result, err := t.RunCommand(ctx, t.Escalate+" rm "+target.ShellQuote(path))
 	if err != nil {
 		return err
 	}
 	if result.ExitCode != 0 {
 		return target.EscalationError{
-			Tool: t.escalate, Op: "rm", Path: path,
+			Tool: t.Escalate, Op: "rm", Path: path,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}
@@ -297,14 +228,14 @@ func (t POSIXTarget) escalatedRemove(ctx context.Context, path string) error {
 
 func (t POSIXTarget) escalatedChmod(ctx context.Context, path string, mode fs.FileMode) error {
 	octal := fmt.Sprintf("%04o", mode.Perm())
-	cmd := t.escalate + " chmod " + octal + " " + target.ShellQuote(path)
+	cmd := t.Escalate + " chmod " + octal + " " + target.ShellQuote(path)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
 	}
 	if result.ExitCode != 0 {
 		return target.EscalationError{
-			Tool: t.escalate, Op: "chmod", Path: path,
+			Tool: t.Escalate, Op: "chmod", Path: path,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}
@@ -312,7 +243,7 @@ func (t POSIXTarget) escalatedChmod(ctx context.Context, path string, mode fs.Fi
 }
 
 func (t POSIXTarget) escalatedChown(ctx context.Context, path string, owner target.Owner) error {
-	cmd := t.escalate + " chown " +
+	cmd := t.Escalate + " chown " +
 		target.ShellQuote(owner.User) + ":" + target.ShellQuote(owner.Group) +
 		" " + target.ShellQuote(path)
 	result, err := t.RunCommand(ctx, cmd)
@@ -321,7 +252,7 @@ func (t POSIXTarget) escalatedChown(ctx context.Context, path string, owner targ
 	}
 	if result.ExitCode != 0 {
 		return target.EscalationError{
-			Tool: t.escalate, Op: "chown", Path: path,
+			Tool: t.Escalate, Op: "chown", Path: path,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}
@@ -329,7 +260,7 @@ func (t POSIXTarget) escalatedChown(ctx context.Context, path string, owner targ
 }
 
 func (t POSIXTarget) escalatedSymlink(ctx context.Context, tgt, link string) error {
-	cmd := t.escalate + " ln -sfn " +
+	cmd := t.Escalate + " ln -sfn " +
 		target.ShellQuote(tgt) + " " + target.ShellQuote(link)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
@@ -337,7 +268,7 @@ func (t POSIXTarget) escalatedSymlink(ctx context.Context, tgt, link string) err
 	}
 	if result.ExitCode != 0 {
 		return target.EscalationError{
-			Tool: t.escalate, Op: "ln", Path: link,
+			Tool: t.Escalate, Op: "ln", Path: link,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}
@@ -346,15 +277,15 @@ func (t POSIXTarget) escalatedSymlink(ctx context.Context, tgt, link string) err
 
 func (t POSIXTarget) escalatedMkdir(ctx context.Context, path string, mode fs.FileMode) error {
 	octal := fmt.Sprintf("%04o", mode.Perm())
-	cmd := t.escalate + " mkdir -p " + target.ShellQuote(path) +
-		" && " + t.escalate + " chmod " + octal + " " + target.ShellQuote(path)
+	cmd := t.Escalate + " mkdir -p " + target.ShellQuote(path) +
+		" && " + t.Escalate + " chmod " + octal + " " + target.ShellQuote(path)
 	result, err := t.RunCommand(ctx, cmd)
 	if err != nil {
 		return err
 	}
 	if result.ExitCode != 0 {
 		return target.EscalationError{
-			Tool: t.escalate, Op: "mkdir", Path: path,
+			Tool: t.Escalate, Op: "mkdir", Path: path,
 			Stderr: result.Stderr, ExitCode: result.ExitCode,
 		}
 	}

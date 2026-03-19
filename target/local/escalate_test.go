@@ -12,6 +12,7 @@ import (
 
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/pkgmgr"
+	"scampi.dev/scampi/target/posix"
 )
 
 // newCaptureTarget creates a POSIXTarget whose escalation tool is a
@@ -30,7 +31,8 @@ func newCaptureTarget(t *testing.T) (POSIXTarget, func() string) {
 		t.Fatal(err)
 	}
 
-	tgt := POSIXTarget{escalate: script}
+	tgt := POSIXTarget{Base: posix.Base{Escalate: script}}
+	tgt.Runner = tgt.RunCommand
 	readLog := func() string {
 		data, _ := os.ReadFile(logFile)
 		return strings.TrimSpace(string(data))
@@ -51,7 +53,9 @@ func newFailTarget(t *testing.T) POSIXTarget {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return POSIXTarget{escalate: script}
+	tgt := POSIXTarget{Base: posix.Base{Escalate: script}}
+	tgt.Runner = tgt.RunCommand
+	return tgt
 }
 
 // Detection
@@ -61,8 +65,9 @@ func TestDetectEscalation(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("requires non-root")
 	}
-	tgt := &POSIXTarget{}
-	result := detectEscalation(context.Background(), tgt)
+	var tgt POSIXTarget
+	tgt.Runner = tgt.RunCommand
+	result := posix.DetectEscalation(context.Background(), tgt.RunCommand, false)
 	switch result {
 	case "sudo", "doas", "":
 	default:
@@ -86,7 +91,8 @@ func newStatTarget(t *testing.T, output string) (POSIXTarget, func() string) {
 		t.Fatal(err)
 	}
 
-	tgt := POSIXTarget{escalate: script}
+	tgt := POSIXTarget{Base: posix.Base{Escalate: script}}
+	tgt.Runner = tgt.RunCommand
 	readLog := func() string {
 		data, _ := os.ReadFile(logFile)
 		return strings.TrimSpace(string(data))
@@ -321,7 +327,7 @@ func TestReadFile_NoEscalationErrorWhenNoTool(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tgt := POSIXTarget{} // no escalation, not root
+	var tgt POSIXTarget // no escalation, not root
 	_, err := tgt.ReadFile(context.Background(), path)
 
 	var noEsc target.NoEscalationError
@@ -347,7 +353,7 @@ func TestWriteFile_NoEscalationErrorWhenNoTool(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tgt := POSIXTarget{} // no escalation, not root
+	var tgt POSIXTarget // no escalation, not root
 	err := tgt.WriteFile(context.Background(), path, []byte("new"))
 
 	var noEsc target.NoEscalationError
@@ -360,13 +366,12 @@ func TestWriteFile_NoEscalationErrorWhenNoTool(t *testing.T) {
 }
 
 func TestInstallPkgs_NoEscalationErrorWhenNoTool(t *testing.T) {
-	tgt := POSIXTarget{
-		pkgBackend: &pkgmgr.Backend{
-			Kind:      pkgmgr.Apk,
-			Install:   "apk add %s",
-			NeedsRoot: true,
-		},
-		// escalate is "", isRoot is false (zero values)
+	var tgt POSIXTarget
+	tgt.Runner = tgt.RunCommand
+	tgt.PkgBackend = &pkgmgr.Backend{
+		Kind:      pkgmgr.Apk,
+		Install:   "apk add %s",
+		NeedsRoot: true,
 	}
 
 	err := tgt.InstallPkgs(context.Background(), []string{"curl"})
@@ -381,12 +386,12 @@ func TestInstallPkgs_NoEscalationErrorWhenNoTool(t *testing.T) {
 }
 
 func TestRemovePkgs_NoEscalationErrorWhenNoTool(t *testing.T) {
-	tgt := POSIXTarget{
-		pkgBackend: &pkgmgr.Backend{
-			Kind:      pkgmgr.Apt,
-			Remove:    "apt-get remove -y %s",
-			NeedsRoot: true,
-		},
+	var tgt POSIXTarget
+	tgt.Runner = tgt.RunCommand
+	tgt.PkgBackend = &pkgmgr.Backend{
+		Kind:      pkgmgr.Apt,
+		Remove:    "apt-get remove -y %s",
+		NeedsRoot: true,
 	}
 
 	err := tgt.RemovePkgs(context.Background(), []string{"nginx"})
@@ -402,8 +407,8 @@ func TestRemovePkgs_NoEscalationErrorWhenNoTool(t *testing.T) {
 
 func TestInstallPkgs_NoErrorWhenRoot(t *testing.T) {
 	tgt, _ := newCaptureTarget(t)
-	tgt.isRoot = true
-	tgt.pkgBackend = &pkgmgr.Backend{
+	tgt.IsRoot = true
+	tgt.PkgBackend = &pkgmgr.Backend{
 		Install:   "echo install %s",
 		NeedsRoot: true,
 	}
@@ -419,7 +424,7 @@ func TestInstallPkgs_NoErrorWhenRoot(t *testing.T) {
 
 func TestInstallPkgs_Escalated(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	tgt.pkgBackend = &pkgmgr.Backend{
+	tgt.PkgBackend = &pkgmgr.Backend{
 		Install:   "echo install %s",
 		NeedsRoot: true,
 	}
@@ -437,7 +442,7 @@ func TestInstallPkgs_Escalated(t *testing.T) {
 
 func TestRemovePkgs_Escalated(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	tgt.pkgBackend = &pkgmgr.Backend{
+	tgt.PkgBackend = &pkgmgr.Backend{
 		Remove:    "echo remove %s",
 		NeedsRoot: true,
 	}
@@ -455,7 +460,7 @@ func TestRemovePkgs_Escalated(t *testing.T) {
 
 func TestInstallPkgs_NoEscalationWithoutNeedsRoot(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	tgt.pkgBackend = &pkgmgr.Backend{
+	tgt.PkgBackend = &pkgmgr.Backend{
 		Install:   "echo install %s",
 		NeedsRoot: false,
 	}
@@ -474,13 +479,13 @@ func TestInstallPkgs_NoEscalationWithoutNeedsRoot(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestUpdateCache_NoEscalationErrorWhenNoTool(t *testing.T) {
-	tgt := POSIXTarget{
-		pkgBackend: &pkgmgr.Backend{
-			Kind:           pkgmgr.Apt,
-			UpdateCache:    "apt-get update -qq",
-			IsUpgradable:   "apt list --upgradable %s",
-			CacheNeedsRoot: true,
-		},
+	var tgt POSIXTarget
+	tgt.Runner = tgt.RunCommand
+	tgt.PkgBackend = &pkgmgr.Backend{
+		Kind:           pkgmgr.Apt,
+		UpdateCache:    "apt-get update -qq",
+		IsUpgradable:   "apt list --upgradable %s",
+		CacheNeedsRoot: true,
 	}
 
 	err := tgt.UpdateCache(context.Background())
@@ -496,7 +501,7 @@ func TestUpdateCache_NoEscalationErrorWhenNoTool(t *testing.T) {
 
 func TestUpdateCache_Escalated(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	tgt.pkgBackend = &pkgmgr.Backend{
+	tgt.PkgBackend = &pkgmgr.Backend{
 		UpdateCache:    "echo update-cache",
 		IsUpgradable:   "true %s",
 		CacheNeedsRoot: true,
@@ -515,7 +520,7 @@ func TestUpdateCache_Escalated(t *testing.T) {
 
 func TestUpdateCache_NoEscalationWithoutCacheNeedsRoot(t *testing.T) {
 	tgt, readLog := newCaptureTarget(t)
-	tgt.pkgBackend = &pkgmgr.Backend{
+	tgt.PkgBackend = &pkgmgr.Backend{
 		UpdateCache:    "echo update-cache",
 		IsUpgradable:   "true %s",
 		CacheNeedsRoot: false,
@@ -532,13 +537,13 @@ func TestUpdateCache_NoEscalationWithoutCacheNeedsRoot(t *testing.T) {
 }
 
 func TestUpdateCache_NoUpgradeSupport(t *testing.T) {
-	tgt := POSIXTarget{
-		pkgBackend: &pkgmgr.Backend{
-			Kind:        pkgmgr.Apt,
-			IsInstalled: "dpkg -s %s",
-			Install:     "apt-get install -y %s",
-			Remove:      "apt-get remove -y %s",
-		},
+	var tgt POSIXTarget
+	tgt.Runner = tgt.RunCommand
+	tgt.PkgBackend = &pkgmgr.Backend{
+		Kind:        pkgmgr.Apt,
+		IsInstalled: "dpkg -s %s",
+		Install:     "apt-get install -y %s",
+		Remove:      "apt-get remove -y %s",
 	}
 
 	err := tgt.UpdateCache(context.Background())
@@ -554,7 +559,7 @@ func TestUpdateCache_NoUpgradeSupport(t *testing.T) {
 
 func TestUpdateCache_CacheUpdateError(t *testing.T) {
 	tgt := newFailTarget(t)
-	tgt.pkgBackend = &pkgmgr.Backend{
+	tgt.PkgBackend = &pkgmgr.Backend{
 		UpdateCache:    "false",
 		IsUpgradable:   "true %s",
 		CacheNeedsRoot: false,
@@ -562,7 +567,7 @@ func TestUpdateCache_CacheUpdateError(t *testing.T) {
 
 	err := tgt.UpdateCache(context.Background())
 
-	var cacheErr CacheUpdateError
+	var cacheErr posix.CacheUpdateError
 	if !errors.As(err, &cacheErr) {
 		t.Fatalf("expected CacheUpdateError, got %T: %v", err, err)
 	}
