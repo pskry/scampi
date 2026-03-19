@@ -20,6 +20,7 @@ import (
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/escalate"
+	"scampi.dev/scampi/target/pkgmgr"
 	"scampi.dev/scampi/target/posix"
 )
 
@@ -88,7 +89,7 @@ func (t *SSHTarget) Stat(ctx context.Context, path string) (fs.FileInfo, error) 
 	info, err := t.sftp.Stat(path)
 	if err != nil {
 		if isPermission(err) && t.Escalate != "" {
-			return escalate.GNUStat(ctx, t, t.Escalate, path, true)
+			return t.escalatedStat(ctx, path, true)
 		}
 		return nil, normalizeError(err)
 	}
@@ -158,7 +159,7 @@ func (t *SSHTarget) Lstat(ctx context.Context, path string) (fs.FileInfo, error)
 	info, err := t.sftp.Lstat(path)
 	if err != nil {
 		if isPermission(err) && t.Escalate != "" {
-			return escalate.GNUStat(ctx, t, t.Escalate, path, false)
+			return t.escalatedStat(ctx, path, false)
 		}
 		return nil, normalizeError(err)
 	}
@@ -200,7 +201,7 @@ func (t *SSHTarget) GetOwner(ctx context.Context, path string) (target.Owner, er
 	info, err := t.sftp.Stat(path)
 	if err != nil {
 		if isPermission(err) && t.Escalate != "" {
-			return escalate.GNUGetOwner(ctx, t, t.Escalate, path)
+			return t.escalatedGetOwner(ctx, path)
 		}
 		return target.Owner{}, normalizeError(err)
 	}
@@ -352,6 +353,35 @@ func (t *SSHTarget) RunCommand(_ context.Context, cmd string) (target.CommandRes
 
 // Escalated fallback methods
 // -----------------------------------------------------------------------------
+
+func (t *SSHTarget) escalatedStat(
+	ctx context.Context,
+	path string,
+	followSymlinks bool,
+) (fs.FileInfo, error) {
+	switch t.OSInfo.Kernel {
+	case pkgmgr.KernelLinux:
+		return escalate.GNUStat(ctx, t, t.Escalate, path, followSymlinks)
+	case pkgmgr.KernelDarwin, pkgmgr.KernelFreeBSD:
+		return escalate.BSDStat(ctx, t, t.Escalate, path, followSymlinks)
+	default:
+		panic(errs.BUG("escalated stat: unsupported kernel %q", t.OSInfo.Kernel))
+	}
+}
+
+func (t *SSHTarget) escalatedGetOwner(
+	ctx context.Context,
+	path string,
+) (target.Owner, error) {
+	switch t.OSInfo.Kernel {
+	case pkgmgr.KernelLinux:
+		return escalate.GNUGetOwner(ctx, t, t.Escalate, path)
+	case pkgmgr.KernelDarwin, pkgmgr.KernelFreeBSD:
+		return escalate.BSDGetOwner(ctx, t, t.Escalate, path)
+	default:
+		panic(errs.BUG("escalated stat: unsupported kernel %q", t.OSInfo.Kernel))
+	}
+}
 
 func (t *SSHTarget) escalatedReadFile(ctx context.Context, path string) ([]byte, error) {
 	result, err := t.RunCommand(ctx, t.Escalate+" cat "+target.ShellQuote(path))
