@@ -5,7 +5,9 @@ package fileops
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"math/rand/v2"
+	"path"
 	"strings"
 
 	"scampi.dev/scampi/target"
@@ -15,6 +17,9 @@ import (
 // and only writes to dest if the command exits 0. The temp file is always
 // cleaned up. The verifyCmd must contain %s which is replaced with the
 // temp file path.
+//
+// The temp file preserves the basename of dest so that tools which
+// auto-detect format from the filename (e.g. Caddy, nginx) work correctly.
 func VerifiedWrite(
 	ctx context.Context,
 	tgt target.Target,
@@ -25,14 +30,22 @@ func VerifiedWrite(
 	fsTgt := target.Must[target.Filesystem]("verify", tgt)
 	cmdTgt := target.Must[target.Command]("verify", tgt)
 
-	tmp := tempPath()
+	tmpDir := tempDir()
+	tmpFile := path.Join(tmpDir, path.Base(dest))
 
-	if err := fsTgt.WriteFile(ctx, tmp, content); err != nil {
+	if err := fsTgt.Mkdir(ctx, tmpDir, fs.FileMode(0o700)); err != nil {
+		return fmt.Errorf("create temp dir for verify: %w", err)
+	}
+	defer func() {
+		_ = fsTgt.Remove(ctx, tmpFile)
+		_ = fsTgt.Remove(ctx, tmpDir)
+	}()
+
+	if err := fsTgt.WriteFile(ctx, tmpFile, content); err != nil {
 		return fmt.Errorf("write temp file for verify: %w", err)
 	}
-	defer func() { _ = fsTgt.Remove(ctx, tmp) }()
 
-	cmd := strings.Replace(verifyCmd, "%s", tmp, 1)
+	cmd := strings.Replace(verifyCmd, "%s", tmpFile, 1)
 	result, err := cmdTgt.RunCommand(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("verify command: %w", err)
@@ -49,6 +62,6 @@ func VerifiedWrite(
 	return fsTgt.WriteFile(ctx, dest, content)
 }
 
-func tempPath() string {
+func tempDir() string {
 	return fmt.Sprintf("/tmp/.scampi-%016x", rand.Uint64())
 }

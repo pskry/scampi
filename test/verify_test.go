@@ -68,8 +68,12 @@ deploy(name="test", targets=["local"], steps=[
 	if len(tgt.Commands) == 0 {
 		t.Fatal("expected verify command to be called")
 	}
-	if !strings.HasPrefix(tgt.Commands[0].Cmd, "visudo -cf /tmp/.scampi-") {
-		t.Errorf("unexpected verify command: %s", tgt.Commands[0].Cmd)
+	cmd := tgt.Commands[0].Cmd
+	if !strings.HasPrefix(cmd, "visudo -cf /tmp/.scampi-") {
+		t.Errorf("unexpected verify command: %s", cmd)
+	}
+	if !strings.HasSuffix(cmd, "/sudoers-hal9000") {
+		t.Errorf("verify command should preserve dest basename, got: %s", cmd)
 	}
 }
 
@@ -242,6 +246,14 @@ deploy(name="test", targets=["local"], steps=[
 	want := "server_name example.com;"
 	if got != want {
 		t.Errorf("content = %q, want %q", got, want)
+	}
+
+	if len(tgt.Commands) == 0 {
+		t.Fatal("expected verify command to be called")
+	}
+	cmd := tgt.Commands[0].Cmd
+	if !strings.HasSuffix(cmd, "/app.conf") {
+		t.Errorf("verify command should preserve dest basename, got: %s", cmd)
 	}
 }
 
@@ -418,6 +430,11 @@ deploy(name="test", targets=["local"], steps=[
 	for path := range tgt.Files {
 		if strings.HasPrefix(path, "/tmp/.scampi-") {
 			t.Errorf("temp file not cleaned up: %s", path)
+		}
+	}
+	for path := range tgt.Dirs {
+		if strings.HasPrefix(path, "/tmp/.scampi-") {
+			t.Errorf("temp dir not cleaned up: %s", path)
 		}
 	}
 }

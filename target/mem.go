@@ -331,6 +331,12 @@ func (m *MemTarget) Remove(_ context.Context, path string) error {
 		return nil
 	}
 
+	// Check directories
+	if _, ok := m.Dirs[path]; ok {
+		delete(m.Dirs, path)
+		return nil
+	}
+
 	// Check regular files
 	if _, ok := m.Files[path]; ok {
 		delete(m.Files, path)
