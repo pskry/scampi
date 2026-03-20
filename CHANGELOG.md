@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.1.0-alpha.3 — 2026-03-20
+
+### Features
+- Step: pkg_repo — manage package repository sources (#50)
+- Implicit package cache management for pkg step (#54)
+- get.scampi.dev install endpoint (#68)
+
+### Enhancements
+- Step: automatic daemon-reload on unit file changes (#53)
+- Replace stringly-typed closed sets with proper enums (#59)
+- Deduplicate target/local and target/ssh implementations (#61)
+- Reduce boilerplate in engine package (#62)
+- Normalize step implementation patterns (#63)
+- Audit source.Source write methods against read-only boundary (#64)
+- Minor code polish: helpers, complexity, readability (#65)
+- Custom 404 page for scampi.dev (#70)
+
+### Bug Fixes
+- SSH target assumes GNU/Linux for escalated stat (#66)
+- SSH test container not cleaned up after test run (#67)
+- Verify temp file must preserve original filename (#69)
+
 ## v0.1.0-alpha.2 — 2026-03-18
 
 ### Features
