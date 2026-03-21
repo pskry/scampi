@@ -1,0 +1,322 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+package container
+
+import (
+	"context"
+	"sort"
+
+	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/step/sharedops"
+	"scampi.dev/scampi/target"
+)
+
+const ensureContainerID = "builtin.ensure-container"
+
+type ensureContainerOp struct {
+	sharedops.BaseOp
+	name    string
+	image   string
+	state   State
+	restart string
+	ports   []string
+	step    spec.StepInstance
+}
+
+func (op *ensureContainerOp) Check(
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
+) (spec.CheckResult, []spec.DriftDetail, error) {
+	cm := target.Must[target.ContainerManager](ensureContainerID, tgt)
+
+	info, exists, err := cm.InspectContainer(ctx, op.name)
+	if err != nil {
+		return spec.CheckUnsatisfied, nil, ContainerCommandError{
+			Op:     "inspect",
+			Name:   op.name,
+			Stderr: err.Error(),
+			Source: op.step.Source,
+		}
+	}
+
+	switch op.state {
+	case StateAbsent:
+		if !exists {
+			return spec.CheckSatisfied, nil, nil
+		}
+		return spec.CheckUnsatisfied, []spec.DriftDetail{{
+			Field:   "state",
+			Current: "present",
+			Desired: "absent",
+		}}, nil
+
+	case StateStopped:
+		if !exists {
+			return spec.CheckUnsatisfied, []spec.DriftDetail{{
+				Field:   "state",
+				Current: "(absent)",
+				Desired: "stopped",
+			}}, nil
+		}
+		drift := op.configDrift(info)
+		if info.Running {
+			drift = append(drift, spec.DriftDetail{
+				Field:   "state",
+				Current: "running",
+				Desired: "stopped",
+			})
+		}
+		if len(drift) > 0 {
+			return spec.CheckUnsatisfied, drift, nil
+		}
+		return spec.CheckSatisfied, nil, nil
+
+	default: // StateRunning
+		if !exists {
+			return spec.CheckUnsatisfied, []spec.DriftDetail{{
+				Field:   "state",
+				Current: "(absent)",
+				Desired: "running",
+			}}, nil
+		}
+		drift := op.configDrift(info)
+		if !info.Running {
+			drift = append(drift, spec.DriftDetail{
+				Field:   "state",
+				Current: "stopped",
+				Desired: "running",
+			})
+		}
+		if len(drift) > 0 {
+			return spec.CheckUnsatisfied, drift, nil
+		}
+		return spec.CheckSatisfied, nil, nil
+	}
+}
+
+func (op *ensureContainerOp) configDrift(info target.ContainerInfo) []spec.DriftDetail {
+	var drift []spec.DriftDetail
+
+	if info.Image != op.image {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "image",
+			Current: info.Image,
+			Desired: op.image,
+		})
+	}
+	if info.Restart != op.restart {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "restart",
+			Current: info.Restart,
+			Desired: op.restart,
+		})
+	}
+
+	have := make([]string, len(info.Ports))
+	copy(have, info.Ports)
+	sort.Strings(have)
+	want := make([]string, len(op.ports))
+	copy(want, op.ports)
+	sort.Strings(want)
+
+	if !portsEqual(have, want) {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "ports",
+			Current: portsStr(have),
+			Desired: portsStr(want),
+		})
+	}
+
+	return drift
+}
+
+func (op *ensureContainerOp) Execute(
+	ctx context.Context,
+	_ source.Source,
+	tgt target.Target,
+) (spec.Result, error) {
+	cm := target.Must[target.ContainerManager](ensureContainerID, tgt)
+
+	info, exists, err := cm.InspectContainer(ctx, op.name)
+	if err != nil {
+		return spec.Result{}, ContainerCommandError{
+			Op:     "inspect",
+			Name:   op.name,
+			Stderr: err.Error(),
+			Source: op.step.Source,
+		}
+	}
+
+	switch op.state {
+	case StateAbsent:
+		return op.executeAbsent(ctx, cm, info, exists)
+	case StateStopped:
+		return op.executeStopped(ctx, cm, info, exists)
+	default:
+		return op.executeRunning(ctx, cm, info, exists)
+	}
+}
+
+func (op *ensureContainerOp) executeAbsent(
+	ctx context.Context,
+	cm target.ContainerManager,
+	info target.ContainerInfo,
+	exists bool,
+) (spec.Result, error) {
+	if !exists {
+		return spec.Result{}, nil
+	}
+	if info.Running {
+		if err := cm.StopContainer(ctx, op.name); err != nil {
+			return spec.Result{}, op.cmdErr("stop", err)
+		}
+	}
+	if err := cm.RemoveContainer(ctx, op.name); err != nil {
+		return spec.Result{}, op.cmdErr("remove", err)
+	}
+	return spec.Result{Changed: true}, nil
+}
+
+func (op *ensureContainerOp) executeStopped(
+	ctx context.Context,
+	cm target.ContainerManager,
+	info target.ContainerInfo,
+	exists bool,
+) (spec.Result, error) {
+	if exists && len(op.configDrift(info)) > 0 {
+		if info.Running {
+			if err := cm.StopContainer(ctx, op.name); err != nil {
+				return spec.Result{}, op.cmdErr("stop", err)
+			}
+		}
+		if err := cm.RemoveContainer(ctx, op.name); err != nil {
+			return spec.Result{}, op.cmdErr("remove", err)
+		}
+		exists = false
+	}
+	if !exists {
+		if err := op.create(ctx, cm); err != nil {
+			return spec.Result{}, err
+		}
+		return spec.Result{Changed: true}, nil
+	}
+	if info.Running {
+		if err := cm.StopContainer(ctx, op.name); err != nil {
+			return spec.Result{}, op.cmdErr("stop", err)
+		}
+		return spec.Result{Changed: true}, nil
+	}
+	return spec.Result{}, nil
+}
+
+func (op *ensureContainerOp) executeRunning(
+	ctx context.Context,
+	cm target.ContainerManager,
+	info target.ContainerInfo,
+	exists bool,
+) (spec.Result, error) {
+	if exists && len(op.configDrift(info)) > 0 {
+		if info.Running {
+			if err := cm.StopContainer(ctx, op.name); err != nil {
+				return spec.Result{}, op.cmdErr("stop", err)
+			}
+		}
+		if err := cm.RemoveContainer(ctx, op.name); err != nil {
+			return spec.Result{}, op.cmdErr("remove", err)
+		}
+		exists = false
+	}
+	if !exists {
+		if err := op.create(ctx, cm); err != nil {
+			return spec.Result{}, err
+		}
+		if err := cm.StartContainer(ctx, op.name); err != nil {
+			return spec.Result{}, op.cmdErr("start", err)
+		}
+		return spec.Result{Changed: true}, nil
+	}
+	if !info.Running {
+		if err := cm.StartContainer(ctx, op.name); err != nil {
+			return spec.Result{}, op.cmdErr("start", err)
+		}
+		return spec.Result{Changed: true}, nil
+	}
+	return spec.Result{}, nil
+}
+
+func (op *ensureContainerOp) create(ctx context.Context, cm target.ContainerManager) error {
+	err := cm.CreateContainer(ctx, target.ContainerInfo{
+		Name:    op.name,
+		Image:   op.image,
+		Restart: op.restart,
+		Ports:   op.ports,
+	})
+	if err != nil {
+		return op.cmdErr("create", err)
+	}
+	return nil
+}
+
+func (op *ensureContainerOp) cmdErr(operation string, err error) ContainerCommandError {
+	return ContainerCommandError{
+		Op:     operation,
+		Name:   op.name,
+		Stderr: err.Error(),
+		Source: op.step.Source,
+	}
+}
+
+func (ensureContainerOp) RequiredCapabilities() capability.Capability {
+	return capability.Container
+}
+
+func portsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func portsStr(ports []string) string {
+	if len(ports) == 0 {
+		return "(none)"
+	}
+	s := ports[0]
+	for _, p := range ports[1:] {
+		s += ", " + p
+	}
+	return s
+}
+
+// OpDescription
+// -----------------------------------------------------------------------------
+
+type ensureContainerDesc struct {
+	Name  string
+	State string
+	Image string
+}
+
+func (d ensureContainerDesc) PlanTemplate() spec.PlanTemplate {
+	return spec.PlanTemplate{
+		ID:   ensureContainerID,
+		Text: `ensure container "{{.Name}}" is {{.State}} ({{.Image}})`,
+		Data: d,
+	}
+}
+
+func (op *ensureContainerOp) OpDescription() spec.OpDescription {
+	return ensureContainerDesc{
+		Name:  op.name,
+		State: op.state.String(),
+		Image: op.image,
+	}
+}

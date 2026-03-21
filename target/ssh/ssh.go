@@ -21,6 +21,7 @@ import (
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/ctrmgr"
 	"scampi.dev/scampi/target/pkgmgr"
 	"scampi.dev/scampi/target/posix"
 	"scampi.dev/scampi/target/svcmgr"
@@ -148,14 +149,16 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 
 	sshTgt.PkgBackend = pkgmgr.Detect(sshTgt.OSInfo.Platform)
 
-	// Init system detection for service management.
-	sshTgt.SvcBackend = svcmgr.Detect(func(cmd string) (int, error) {
+	// Init system and container runtime detection.
+	detectCmd := func(cmd string) (int, error) {
 		result, err := sshTgt.RunCommand(ctx, cmd)
 		if err != nil {
 			return -1, err
 		}
 		return result.ExitCode, nil
-	})
+	}
+	sshTgt.SvcBackend = svcmgr.Detect(detectCmd)
+	sshTgt.CtrBackend = ctrmgr.Detect(detectCmd)
 
 	// Privilege escalation detection.
 	if result, err := sshTgt.RunCommand(ctx, "id -u"); err == nil {

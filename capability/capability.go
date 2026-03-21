@@ -26,6 +26,7 @@ const (
 	User                                // UserExists, CreateUser, ModifyUser, DeleteUser, GetUser
 	Group                               // GroupExists, CreateGroup, DeleteGroup, GetGroup
 	PkgRepo                             // HasRepo, HasRepoKey, InstallRepoKey, WriteRepoConfig
+	Container                           // ContainerInspect, ContainerCreate, ContainerStart, ContainerStop, ContainerRm
 )
 
 const (
@@ -83,6 +84,9 @@ func (c Capability) String() string {
 	}
 	if c&PkgRepo != 0 {
 		parts = append(parts, "PkgRepo")
+	}
+	if c&Container != 0 {
+		parts = append(parts, "Container")
 	}
 
 	// If no known flags matched, show raw value

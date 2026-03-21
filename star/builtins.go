@@ -34,6 +34,7 @@ func predeclared() starlark.StringDict {
 		"template":  starlark.NewBuiltin("template", builtinTemplate),
 		"unarchive": starlark.NewBuiltin("unarchive", builtinUnarchive),
 		"user":      starlark.NewBuiltin("user", builtinUser),
+		"container": containerModule(),
 		"target":    targetModule(),
 		"deploy":    starlark.NewBuiltin("deploy", builtinDeploy),
 		"env":       starlark.NewBuiltin("env", builtinEnv),

@@ -10,6 +10,7 @@ import (
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/ctrmgr"
 	"scampi.dev/scampi/target/pkgmgr"
 	"scampi.dev/scampi/target/posix"
 	"scampi.dev/scampi/target/svcmgr"
@@ -41,13 +42,15 @@ func (Local) Create(ctx context.Context, _ source.Source, _ spec.TargetInstance)
 	tgt.PkgBackend = pkgmgr.Detect(osInfo.Platform)
 
 	// Init system detection for service management.
-	tgt.SvcBackend = svcmgr.Detect(func(cmd string) (int, error) {
+	detectCmd := func(cmd string) (int, error) {
 		result, err := tgt.RunCommand(ctx, cmd)
 		if err != nil {
 			return -1, err
 		}
 		return result.ExitCode, nil
-	})
+	}
+	tgt.SvcBackend = svcmgr.Detect(detectCmd)
+	tgt.CtrBackend = ctrmgr.Detect(detectCmd)
 
 	// Privilege escalation detection.
 	tgt.IsRoot = os.Getuid() == 0

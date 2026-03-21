@@ -1,0 +1,255 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+package test
+
+import (
+	"context"
+	"testing"
+
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/source"
+	"scampi.dev/scampi/target"
+)
+
+func TestContainer_CreateAndRun(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", image="nginx:1.25"),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info, ok := tgt.Containers["app"]
+	if !ok {
+		t.Fatal("container not created")
+	}
+	if !info.Running {
+		t.Error("container should be running")
+	}
+	if info.Image != "nginx:1.25" {
+		t.Errorf("image: got %q, want %q", info.Image, "nginx:1.25")
+	}
+	if info.Restart != "unless-stopped" {
+		t.Errorf("restart: got %q, want %q", info.Restart, "unless-stopped")
+	}
+}
+
+func TestContainer_Idempotent(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", image="nginx:1.25"),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	if !tgt.Containers["app"].Running {
+		t.Error("container should still be running")
+	}
+	for _, ev := range rec.opEvents {
+		if ev.Kind == event.OpExecuted {
+			t.Error("expected no op executions on idempotent run")
+		}
+	}
+}
+
+func TestContainer_ImageDrift_Recreates(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", image="nginx:1.26"),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info := tgt.Containers["app"]
+	if info.Image != "nginx:1.26" {
+		t.Errorf("image: got %q, want %q", info.Image, "nginx:1.26")
+	}
+	if !info.Running {
+		t.Error("container should be running after recreate")
+	}
+}
+
+func TestContainer_Stopped(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", image="nginx:1.25", state="stopped"),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info := tgt.Containers["app"]
+	if info.Running {
+		t.Error("container should be stopped")
+	}
+}
+
+func TestContainer_Absent(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", state="absent"),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	if _, ok := tgt.Containers["app"]; ok {
+		t.Error("container should have been removed")
+	}
+}
+
+func TestContainer_Absent_AlreadyGone(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", state="absent"),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	for _, ev := range rec.opEvents {
+		if ev.Kind == event.OpExecuted {
+			t.Error("expected no op executions when already absent")
+		}
+	}
+}
+
+func TestContainer_PortDrift_Recreates(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", image="nginx:1.25", ports=["9090:80"]),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped", Ports: []string{"8080:80"},
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info := tgt.Containers["app"]
+	if len(info.Ports) != 1 || info.Ports[0] != "9090:80" {
+		t.Errorf("ports: got %v, want [9090:80]", info.Ports)
+	}
+	if !info.Running {
+		t.Error("container should be running after recreate")
+	}
+}

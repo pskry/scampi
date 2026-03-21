@@ -44,6 +44,8 @@ type MemTarget struct {
 	RepoKeys map[string]bool       // name -> installed
 	Codename string                // for OSInfoProvider
 
+	Containers map[string]ContainerInfo // name -> info
+
 	Commands    []commandCall
 	CommandFunc func(cmd string) (CommandResult, error)
 }
@@ -66,6 +68,7 @@ func NewMemTarget() *MemTarget {
 		Groups:          make(map[string]GroupInfo),
 		Repos:           make(map[string]RepoConfig),
 		RepoKeys:        make(map[string]bool),
+		Containers:      make(map[string]ContainerInfo),
 	}
 }
 
@@ -383,7 +386,7 @@ func (m *MemTarget) Remove(_ context.Context, path string) error {
 func (m *MemTarget) Capabilities() capability.Capability {
 	return capability.POSIX |
 		capability.Pkg | capability.PkgUpdate | capability.PkgRepo |
-		capability.Service |
+		capability.Service | capability.Container |
 		capability.User | capability.Group
 }
 
@@ -490,6 +493,63 @@ func (m *MemTarget) SupportsReload() bool {
 }
 
 func (m *MemTarget) DaemonReload(_ context.Context) error {
+	return nil
+}
+
+// ContainerManager
+// -----------------------------------------------------------------------------
+
+func (m *MemTarget) InspectContainer(_ context.Context, name string) (ContainerInfo, bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	info, ok := m.Containers[name]
+	if !ok {
+		return ContainerInfo{}, false, nil
+	}
+	return info, true, nil
+}
+
+func (m *MemTarget) CreateContainer(_ context.Context, opts ContainerInfo) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Containers[opts.Name] = ContainerInfo{
+		Name:    opts.Name,
+		Image:   opts.Image,
+		Running: false,
+		Restart: opts.Restart,
+		Ports:   opts.Ports,
+	}
+	return nil
+}
+
+func (m *MemTarget) StartContainer(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	info, ok := m.Containers[name]
+	if !ok {
+		return errs.WrapErrf(ErrNotExist, "container %q", name)
+	}
+	info.Running = true
+	m.Containers[name] = info
+	return nil
+}
+
+func (m *MemTarget) StopContainer(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	info, ok := m.Containers[name]
+	if !ok {
+		return nil
+	}
+	info.Running = false
+	m.Containers[name] = info
+	return nil
+}
+
+func (m *MemTarget) RemoveContainer(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.Containers, name)
 	return nil
 }
 

@@ -83,6 +83,20 @@ type (
 		Reload(ctx context.Context, name string) error
 		SupportsReload() bool
 	}
+	ContainerInfo struct {
+		Name    string
+		Image   string
+		Running bool
+		Restart string
+		Ports   []string // "host:container" format
+	}
+	ContainerManager interface {
+		InspectContainer(ctx context.Context, name string) (ContainerInfo, bool, error)
+		CreateContainer(ctx context.Context, opts ContainerInfo) error
+		StartContainer(ctx context.Context, name string) error
+		StopContainer(ctx context.Context, name string) error
+		RemoveContainer(ctx context.Context, name string) error
+	}
 	CommandResult struct {
 		Stdout   string
 		Stderr   string

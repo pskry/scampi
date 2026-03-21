@@ -9,6 +9,7 @@ import (
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/ctrmgr"
 	"scampi.dev/scampi/target/pkgmgr"
 	"scampi.dev/scampi/target/svcmgr"
 )
@@ -22,6 +23,7 @@ type Base struct {
 	OSInfo     target.OSInfo
 	PkgBackend *pkgmgr.Backend
 	SvcBackend svcmgr.Backend
+	CtrBackend *ctrmgr.Backend
 	Escalate   string
 	IsRoot     bool
 }
@@ -45,6 +47,9 @@ func (b Base) Capabilities() capability.Capability {
 	}
 	if b.SvcBackend != nil {
 		caps |= capability.Service
+	}
+	if b.CtrBackend != nil {
+		caps |= capability.Container
 	}
 	return caps
 }

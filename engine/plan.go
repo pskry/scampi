@@ -336,3 +336,23 @@ func (capabilityTarget) InstallPkgs(_ context.Context, _ []string) error {
 func (capabilityTarget) RemovePkgs(_ context.Context, _ []string) error {
 	panic(errs.BUG("RemovePkgs called on capability-only target"))
 }
+
+func (capabilityTarget) InspectContainer(_ context.Context, _ string) (target.ContainerInfo, bool, error) {
+	panic(errs.BUG("InspectContainer called on capability-only target"))
+}
+
+func (capabilityTarget) CreateContainer(_ context.Context, _ target.ContainerInfo) error {
+	panic(errs.BUG("CreateContainer called on capability-only target"))
+}
+
+func (capabilityTarget) StartContainer(_ context.Context, _ string) error {
+	panic(errs.BUG("StartContainer called on capability-only target"))
+}
+
+func (capabilityTarget) StopContainer(_ context.Context, _ string) error {
+	panic(errs.BUG("StopContainer called on capability-only target"))
+}
+
+func (capabilityTarget) RemoveContainer(_ context.Context, _ string) error {
+	panic(errs.BUG("RemoveContainer called on capability-only target"))
+}

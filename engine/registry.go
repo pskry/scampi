@@ -4,6 +4,7 @@ package engine
 
 import (
 	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/step/container"
 	"scampi.dev/scampi/step/copy"
 	"scampi.dev/scampi/step/dir"
 	"scampi.dev/scampi/step/firewall"
@@ -27,6 +28,7 @@ type Registry struct {
 
 func NewRegistry() *Registry {
 	stepTypes := []spec.StepType{
+		container.Instance{},
 		copy.Copy{},
 		dir.Dir{},
 		firewall.Firewall{},

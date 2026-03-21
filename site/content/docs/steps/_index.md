@@ -27,6 +27,7 @@ scampi leaves it alone. If you want scampi to manage it, set it explicitly.
 ## Built-in steps
 
 {{< cards >}}
+  {{< card link="container" title="container" subtitle="Manage containers via Docker or Podman" >}}
   {{< card link="copy" title="copy" subtitle="Copy files with owner and permission management" >}}
   {{< card link="dir" title="dir" subtitle="Ensure a directory exists" >}}
   {{< card link="firewall" title="firewall" subtitle="Manage firewall rules via UFW or firewalld" >}}
