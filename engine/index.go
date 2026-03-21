@@ -15,7 +15,7 @@ func IndexAll(_ context.Context, em diagnostic.Emitter) error {
 
 	docs := make([]spec.StepDoc, 0, len(types))
 	for _, t := range types {
-		docs = append(docs, LoadStepDoc(t.Kind()))
+		docs = append(docs, loadStepDoc(reg, t.Kind()))
 	}
 
 	em.EmitIndexAll(diagnostic.IndexAllProduced(docs))
@@ -30,7 +30,7 @@ func IndexStep(_ context.Context, stepKind string, em diagnostic.Emitter) error 
 		return AbortError{}
 	}
 
-	em.EmitIndexStep(diagnostic.IndexStepProduced(LoadStepDoc(stepKind)))
+	em.EmitIndexStep(diagnostic.IndexStepProduced(loadStepDoc(reg, stepKind)))
 	return nil
 }
 
