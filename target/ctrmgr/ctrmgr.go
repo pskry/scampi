@@ -4,6 +4,7 @@ package ctrmgr
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"scampi.dev/scampi/target"
@@ -29,6 +30,16 @@ func (b *Backend) CmdCreate(opts CreateOpts) string {
 	}
 	for _, p := range opts.Ports {
 		parts = append(parts, "-p", target.ShellQuote(p))
+	}
+	if len(opts.Env) > 0 {
+		keys := make([]string, 0, len(opts.Env))
+		for k := range opts.Env {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			parts = append(parts, "--env", target.ShellQuote(k+"="+opts.Env[k]))
+		}
 	}
 	parts = append(parts, target.ShellQuote(opts.Image))
 	return strings.Join(parts, " ")
@@ -56,4 +67,5 @@ type CreateOpts struct {
 	Image   string
 	Restart string
 	Ports   []string
+	Env     map[string]string
 }

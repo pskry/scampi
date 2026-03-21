@@ -20,7 +20,7 @@ func containerModule() *starlarkstruct.Module {
 	}
 }
 
-// container.instance(name, image, state?, restart?, ports?, desc?, on_change?)
+// container.instance(name, image, state?, restart?, ports?, env?, desc?, on_change?)
 func builtinContainerInstance(
 	thread *starlark.Thread,
 	_ *starlark.Builtin,
@@ -33,6 +33,7 @@ func builtinContainerInstance(
 		state       = "running"
 		restart     = "unless-stopped"
 		portsVal    *starlark.List
+		envVal      *starlark.Dict
 		desc        string
 		onChangeVal starlark.Value
 	)
@@ -42,6 +43,7 @@ func builtinContainerInstance(
 		"state?", &state,
 		"restart?", &restart,
 		"ports?", &portsVal,
+		"env?", &envVal,
 		"desc?", &desc,
 		"on_change?", &onChangeVal,
 	); err != nil {
@@ -61,8 +63,16 @@ func builtinContainerInstance(
 		}
 	}
 
+	var env map[string]string
+	if envVal != nil {
+		env, err = starlarkDictToStringMap(envVal, "container.instance env")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	span := callSpan(thread)
-	fields := kwargsFieldSpans(thread, "name", "image", "state", "restart", "ports")
+	fields := kwargsFieldSpans(thread, "name", "image", "state", "restart", "ports", "env")
 
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
@@ -71,6 +81,7 @@ func builtinContainerInstance(
 			Config: &container.InstanceConfig{
 				Desc: desc, Name: name, Image: image,
 				State: state, Restart: restart, Ports: ports,
+				Env: env,
 			},
 			OnChange: hookIDs,
 			Source:   span,

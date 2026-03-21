@@ -22,6 +22,7 @@ type ensureContainerOp struct {
 	state   State
 	restart string
 	ports   []string
+	env     map[string]string
 	step    spec.StepInstance
 }
 
@@ -130,6 +131,30 @@ func (op *ensureContainerOp) configDrift(info target.ContainerInfo) []spec.Drift
 		})
 	}
 
+	drift = append(drift, op.envDrift(info.Env)...)
+
+	return drift
+}
+
+func (op *ensureContainerOp) envDrift(current map[string]string) []spec.DriftDetail {
+	var drift []spec.DriftDetail
+	for k, want := range op.env {
+		got, ok := current[k]
+		if !ok {
+			drift = append(drift, spec.DriftDetail{
+				Field:   "env." + k,
+				Current: "(unset)",
+				Desired: want,
+			})
+		} else if got != want {
+			drift = append(drift, spec.DriftDetail{
+				Field:   "env." + k,
+				Current: got,
+				Desired: want,
+			})
+		}
+	}
+	sort.Slice(drift, func(i, j int) bool { return drift[i].Field < drift[j].Field })
 	return drift
 }
 
@@ -253,6 +278,7 @@ func (op *ensureContainerOp) create(ctx context.Context, cm target.ContainerMana
 		Image:   op.image,
 		Restart: op.restart,
 		Ports:   op.ports,
+		Env:     op.env,
 	})
 	if err != nil {
 		return op.cmdErr("create", err)

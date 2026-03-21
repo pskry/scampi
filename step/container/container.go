@@ -47,12 +47,13 @@ type (
 	InstanceConfig struct {
 		_ struct{} `summary:"Manage container lifecycle: running, stopped, or absent"`
 
-		Desc    string   `step:"Human-readable description" optional:"true"`
-		Name    string   `step:"Container name" example:"prometheus"`
-		Image   string   `step:"Container image" example:"prom/prometheus:v3.2.0"`
-		State   string   `step:"Desired container state" default:"running" example:"stopped|absent"`
-		Restart string   `step:"Restart policy" default:"unless-stopped" example:"always|on-failure|no"`
-		Ports   []string `step:"Port mappings (host:container)" optional:"true" example:"[\"9090:9090\"]"`
+		Desc    string            `step:"Human-readable description" optional:"true"`
+		Name    string            `step:"Container name" example:"prometheus"`
+		Image   string            `step:"Container image" example:"prom/prometheus:v3.2.0"`
+		State   string            `step:"Desired container state" default:"running" example:"stopped|absent"`
+		Restart string            `step:"Restart policy" default:"unless-stopped" example:"always|on-failure|no"`
+		Ports   []string          `step:"Port mappings (host:container)" optional:"true" example:"[\"9090:9090\"]"`
+		Env     map[string]string `step:"Environment variables" optional:"true" example:"{\"DB_HOST\": \"db.local\"}"`
 	}
 	instanceAction struct {
 		desc    string
@@ -61,6 +62,7 @@ type (
 		state   State
 		restart string
 		ports   []string
+		env     map[string]string
 		step    spec.StepInstance
 	}
 )
@@ -85,6 +87,7 @@ func (Instance) Plan(step spec.StepInstance) (spec.Action, error) {
 		state:   parseState(cfg.State),
 		restart: cfg.Restart,
 		ports:   cfg.Ports,
+		env:     cfg.Env,
 		step:    step,
 	}, nil
 }
@@ -129,6 +132,7 @@ func (a *instanceAction) Ops() []spec.Op {
 		state:   a.state,
 		restart: a.restart,
 		ports:   a.ports,
+		env:     a.env,
 		step:    a.step,
 	}
 	op.SetAction(a)

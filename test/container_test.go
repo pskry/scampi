@@ -218,6 +218,125 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
+func TestContainer_WithEnv(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		env={"DB_HOST": "db.local", "DB_PORT": "5432"},
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info, ok := tgt.Containers["app"]
+	if !ok {
+		t.Fatal("container not created")
+	}
+	if info.Env["DB_HOST"] != "db.local" {
+		t.Errorf("env DB_HOST: got %q, want %q", info.Env["DB_HOST"], "db.local")
+	}
+	if info.Env["DB_PORT"] != "5432" {
+		t.Errorf("env DB_PORT: got %q, want %q", info.Env["DB_PORT"], "5432")
+	}
+}
+
+func TestContainer_EnvIdempotent(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		env={"DB_HOST": "db.local"},
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+		Env:     map[string]string{"DB_HOST": "db.local", "PATH": "/usr/bin"},
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	for _, ev := range rec.opEvents {
+		if ev.Kind == event.OpExecuted {
+			t.Error("expected no op executions on idempotent run")
+		}
+	}
+}
+
+func TestContainer_EnvDrift_Recreates(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		env={"DB_HOST": "db.new"},
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+		Env:     map[string]string{"DB_HOST": "db.old"},
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info := tgt.Containers["app"]
+	if info.Env["DB_HOST"] != "db.new" {
+		t.Errorf("env DB_HOST: got %q, want %q", info.Env["DB_HOST"], "db.new")
+	}
+	if !info.Running {
+		t.Error("container should be running after recreate")
+	}
+}
+
 func TestContainer_PortDrift_Recreates(t *testing.T) {
 	cfgStr := `
 target.local(name="local")

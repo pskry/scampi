@@ -6,8 +6,8 @@ Manage container lifecycle: running, stopped, or absent. See the
 [container module overview](../) for supported runtimes.
 
 > [!TIP]
-> This is the MVP surface. Volumes, environment variables, networks, labels,
-> healthchecks, and command arguments are planned for future releases.
+> This is the MVP surface. Volumes, networks, labels, healthchecks, and
+> command arguments are planned for future releases.
 
 ## Fields
 
@@ -19,6 +19,7 @@ Manage container lifecycle: running, stopped, or absent. See the
 | `state`   | string |          | `"running"`        | Desired state (see below)          |
 | `restart` | string |          | `"unless-stopped"` | Restart policy (see below)         |
 | `ports`   | list   |          |                    | Port mappings (`"host:container"`) |
+| `env`     | dict   |          |                    | Environment variables              |
 
 \* `image` is required when state is `running` or `stopped`, optional when `absent`.
 
@@ -70,8 +71,9 @@ core principle, that's the wrong default.
 
 The step produces a single op that handles the full lifecycle:
 
-1. **Check**: inspect the container. Compare image, restart policy, and ports
-   against the declared config. Any drift → unsatisfied.
+1. **Check**: inspect the container. Compare image, restart policy, ports,
+   and environment variables against the declared config. Any drift →
+   unsatisfied.
 2. **Execute**: depending on the desired state and current state:
    - **Create**: create with the declared config, then start
    - **Recreate**: stop → remove → create → start
@@ -102,6 +104,19 @@ container.instance(
     restart = "unless-stopped",
 )
 ```
+
+### Pass environment variables
+
+```python
+container.instance(
+    name = "app",
+    image = "myapp:latest",
+    env = {"DB_HOST": "db.local", "DB_PORT": "5432"},
+)
+```
+
+Only declared variables are checked for drift — extra variables set by the
+base image are ignored.
 
 ### Remove a container
 

@@ -151,6 +151,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os,os/exec,net",
 		},
 		{
+			pattern:        "test/container_lifecycle_test.go",
+			allowedImports: "os",
+		},
+		{
 			pattern:        "test/ssh_connection_test.go",
 			allowedImports: "os",
 		},

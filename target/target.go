@@ -89,6 +89,7 @@ type (
 		Running bool
 		Restart string
 		Ports   []string // "host:container" format
+		Env     map[string]string
 	}
 	ContainerManager interface {
 		InspectContainer(ctx context.Context, name string) (ContainerInfo, bool, error)

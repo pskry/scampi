@@ -518,6 +518,7 @@ func (m *MemTarget) CreateContainer(_ context.Context, opts ContainerInfo) error
 		Running: false,
 		Restart: opts.Restart,
 		Ports:   opts.Ports,
+		Env:     opts.Env,
 	}
 	return nil
 }
