@@ -101,7 +101,7 @@ func (c *cli) commitRenderEvents(events []renderEvent) {
 	for i := range events {
 		events[i].line = strings.NewReplacer("\n", " ", "\r", "").Replace(events[i].line)
 		if !events[i].wrap {
-			events[i].line = layout.FitLine(events[i].line, c.width)
+			events[i].line = layout.FitLine(events[i].line, c.width, c.glyphs.ellipsis)
 		}
 		if c.shouldUseColor() {
 			events[i].line += ansi.Reset
@@ -562,7 +562,7 @@ func (c *cli) EmitLegend() {
 	})...)
 	events = append(events, renderEvent{stream: streamOut, line: ""})
 
-	planBoundary := fmt.Sprintf("%s ··· %s", c.glyphs.planStart, c.glyphs.planEnd)
+	planBoundary := fmt.Sprintf("%s %s %s", c.glyphs.planStart, c.glyphs.separator, c.glyphs.planEnd)
 	actionHeader := fmt.Sprintf("%s [0] copy", c.glyphs.actionStart)
 	opBranch := fmt.Sprintf("%s %s CopyCheck", c.glyphs.actionRail, c.glyphs.opBranch)
 	opLast := fmt.Sprintf("%s %s CopyExec", c.glyphs.actionRail, c.glyphs.opLast)
@@ -700,7 +700,7 @@ func (c *cli) renderActionFinished(e event.ActionEvent) []renderEvent {
 
 	line := c.formatter.fmtfMsg(color, "[%s]%s", st.id, glyphR(glyph))
 	if e.Step.StepDesc != "" {
-		line += c.formatter.fmtfMsg(color, " %s —", e.Step.StepDesc)
+		line += c.formatter.fmtfMsg(color, " %s %s", e.Step.StepDesc, c.glyphs.emDash)
 	}
 	line += c.formatter.fmtfMsg(color, " %s (%s)", fmtActionSummary(smry), d.Duration)
 
@@ -738,8 +738,8 @@ func (c *cli) renderHookTriggered(e event.ActionEvent) []renderEvent {
 		glyph = c.glyphs.ok
 	}
 
-	line := c.formatter.fmtfMsg(color, "[hook:%s]%s %s — %s (%s)",
-		h.HookID, glyphR(glyph), h.TriggerBy, fmtSummary(), h.Duration)
+	line := c.formatter.fmtfMsg(color, "[hook:%s]%s %s %s %s (%s)",
+		h.HookID, glyphR(glyph), h.TriggerBy, c.glyphs.emDash, fmtSummary(), h.Duration)
 
 	return []renderEvent{{stream: streamOut, line: line}}
 }

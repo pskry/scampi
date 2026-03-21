@@ -19,7 +19,8 @@ func VisibleLen(s string) int {
 }
 
 // FitLine truncates a string to maxLen visible characters, preserving ANSI codes.
-func FitLine(s string, maxLen int) string {
+// The ellipsis string is appended when truncation occurs.
+func FitLine(s string, maxLen int, ellipsis string) string {
 	if maxLen <= 0 {
 		return s
 	}
@@ -28,9 +29,11 @@ func FitLine(s string, maxLen int) string {
 		return s
 	}
 
-	if maxLen == 1 {
-		return "…"
+	ew := runewidth.StringWidth(ellipsis)
+	if maxLen <= ew {
+		return ellipsis
 	}
+	limit := maxLen - ew
 
 	var out strings.Builder
 	var lastColor string
@@ -52,7 +55,7 @@ func FitLine(s string, maxLen int) string {
 		}
 
 		rw := runewidth.RuneWidth(r)
-		if width+rw >= maxLen {
+		if width+rw > limit {
 			break
 		}
 
@@ -64,7 +67,7 @@ func FitLine(s string, maxLen int) string {
 	if lastColor != "" {
 		out.WriteString(lastColor)
 	}
-	out.WriteString("…")
+	out.WriteString(ellipsis)
 
 	return out.String()
 }

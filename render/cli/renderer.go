@@ -191,7 +191,7 @@ func (r *renderer) drawLive() {
 			line += r.formatter.fmtfMsg(colSpinner, " %s", a.desc)
 		}
 		if interrupted {
-			line += r.formatter.fmtfMsg(colSpinner, " — interrupted, finishing...")
+			line += r.formatter.fmtfMsg(colSpinner, " %s interrupted, finishing%s", r.glyphs.emDash, r.glyphs.ellipsis)
 		}
 		_, _ = fmt.Fprintln(r.out, line+ansi.Reset)
 		lines++

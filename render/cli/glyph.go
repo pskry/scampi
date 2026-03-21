@@ -27,6 +27,10 @@ type glyphSet struct {
 	opBranch             string
 	opLast               string
 
+	emDash    string
+	ellipsis  string
+	separator string
+
 	depsArrow string
 
 	parallelTop   string
@@ -63,6 +67,10 @@ var (
 		opBranch:             "├─",
 		opLast:               "└─",
 
+		emDash:    "—",
+		ellipsis:  "…",
+		separator: "···",
+
 		depsArrow: "←",
 
 		parallelTop:   "╮",
@@ -97,6 +105,10 @@ var (
 		actionEnd:            "#",
 		opBranch:             "|-",
 		opLast:               "`-",
+
+		emDash:    "--",
+		ellipsis:  "...",
+		separator: "...",
 
 		depsArrow: "<-",
 
