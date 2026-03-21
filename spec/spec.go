@@ -85,7 +85,7 @@ type (
 		// NewConfig MUST return a pointer to a freshly allocated config struct.
 		// Returning a value will cause undefined behavior.
 		NewConfig() any
-		Plan(idx int, step StepInstance) (Action, error)
+		Plan(step StepInstance) (Action, error)
 	}
 	FieldSpan struct {
 		Field SourceSpan

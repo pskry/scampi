@@ -56,7 +56,6 @@ type (
 		Action string `step:"Rule action" default:"allow" example:"allow|deny|reject"`
 	}
 	firewallAction struct {
-		idx    int
 		desc   string
 		port   string
 		action Action
@@ -67,7 +66,7 @@ type (
 func (Firewall) Kind() string   { return "firewall" }
 func (Firewall) NewConfig() any { return &FirewallConfig{} }
 
-func (Firewall) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (Firewall) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*FirewallConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &FirewallConfig{}, step.Config)
@@ -78,7 +77,6 @@ func (Firewall) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &firewallAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		port:   cfg.Port,
 		action: parseAction(cfg.Action),

@@ -27,7 +27,6 @@ type (
 		Link   string `step:"Path where symlink is created (like ln -s ... LINK)" example:"/etc/app/config.yaml"`
 	}
 	symlinkAction struct {
-		idx    int
 		desc   string
 		kind   string
 		target string
@@ -39,7 +38,7 @@ type (
 func (Symlink) Kind() string   { return "symlink" }
 func (Symlink) NewConfig() any { return &SymlinkConfig{} }
 
-func (s Symlink) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (s Symlink) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*SymlinkConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &SymlinkConfig{}, step.Config)
@@ -54,7 +53,6 @@ func (s Symlink) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &symlinkAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		kind:   s.Kind(),
 		target: cfg.Target,

@@ -169,7 +169,7 @@ type stubStepType struct {
 
 func (s *stubStepType) Kind() string   { return s.kind }
 func (s *stubStepType) NewConfig() any { return &struct{}{} }
-func (s *stubStepType) Plan(_ int, _ spec.StepInstance) (spec.Action, error) {
+func (s *stubStepType) Plan(_ spec.StepInstance) (spec.Action, error) {
 	return s.action, nil
 }
 

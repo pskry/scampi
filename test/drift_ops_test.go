@@ -30,7 +30,7 @@ func planOps(
 		Config: cfg,
 		Fields: fields,
 	}
-	action, err := stepType.Plan(0, step)
+	action, err := stepType.Plan(step)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

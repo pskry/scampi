@@ -58,7 +58,6 @@ type (
 		Enabled bool   `step:"Whether the service should start at boot" default:"true"`
 	}
 	serviceAction struct {
-		idx     int
 		desc    string
 		name    string
 		state   State
@@ -70,7 +69,7 @@ type (
 func (Service) Kind() string   { return "service" }
 func (Service) NewConfig() any { return &ServiceConfig{} }
 
-func (s Service) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (s Service) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*ServiceConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &ServiceConfig{}, step.Config)
@@ -81,7 +80,6 @@ func (s Service) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &serviceAction{
-		idx:     idx,
 		desc:    cfg.Desc,
 		name:    cfg.Name,
 		state:   parseState(cfg.State),

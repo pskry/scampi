@@ -63,7 +63,6 @@ type (
 		Source   spec.PkgSourceRef `step:"Package source" example:"system()|apt_repo(url=..., key_url=...)"`
 	}
 	pkgAction struct {
-		idx      int
 		desc     string
 		packages []string
 		state    State
@@ -93,7 +92,7 @@ func (c *PkgConfig) Validate(step spec.StepInstance) error {
 	return nil
 }
 
-func (p Pkg) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (p Pkg) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*PkgConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &PkgConfig{}, step.Config)
@@ -104,7 +103,6 @@ func (p Pkg) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &pkgAction{
-		idx:      idx,
 		desc:     cfg.Desc,
 		packages: cfg.Packages,
 		state:    parseState(cfg.State),

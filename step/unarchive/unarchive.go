@@ -26,7 +26,6 @@ type (
 		Perm  string         `step:"Permissions applied recursively after extraction" optional:"true" example:"0755"`
 	}
 	unarchiveAction struct {
-		idx    int
 		desc   string
 		kind   string
 		src    string
@@ -44,7 +43,7 @@ type (
 func (Unarchive) Kind() string   { return "unarchive" }
 func (Unarchive) NewConfig() any { return &UnarchiveConfig{} }
 
-func (u Unarchive) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (u Unarchive) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*UnarchiveConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &UnarchiveConfig{}, step.Config)
@@ -89,7 +88,6 @@ func (u Unarchive) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &unarchiveAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		kind:   u.Kind(),
 		src:    cfg.Src.Path,

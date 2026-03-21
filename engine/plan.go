@@ -82,7 +82,7 @@ func plan(
 	}
 
 	for i, step := range cfg.Steps {
-		act, err := step.Type.Plan(i, step)
+		act, err := step.Type.Plan(step)
 		if err != nil {
 			impact, _ := emitPlanDiagnostic(em, i, step.Type.Kind(), step.Desc, err)
 			impacts = append(impacts, impact)
@@ -120,7 +120,7 @@ func plan(
 		var hookActions []spec.Action
 		hookFailed := false
 		for _, step := range steps {
-			act, err := step.Type.Plan(-1, step)
+			act, err := step.Type.Plan(step)
 			if err != nil {
 				impact, _ := emitPlanDiagnostic(em, -1, step.Type.Kind(), step.Desc, err)
 				impacts = append(impacts, impact)

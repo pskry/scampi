@@ -50,7 +50,6 @@ type (
 		System bool   `step:"Create as system group" optional:"true"`
 	}
 	groupAction struct {
-		idx    int
 		desc   string
 		name   string
 		state  State
@@ -63,7 +62,7 @@ type (
 func (Group) Kind() string   { return "group" }
 func (Group) NewConfig() any { return &GroupConfig{} }
 
-func (g Group) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (g Group) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*GroupConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &GroupConfig{}, step.Config)
@@ -74,7 +73,6 @@ func (g Group) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &groupAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		name:   cfg.Name,
 		state:  parseState(cfg.State),

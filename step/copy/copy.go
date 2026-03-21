@@ -29,7 +29,6 @@ type (
 		Verify string         `step:"Validation command (%s = temp file)" optional:"true" example:"visudo -cf %s"`
 	}
 	copyAction struct {
-		idx    int
 		desc   string
 		kind   string
 		src    string
@@ -46,7 +45,7 @@ type (
 func (Copy) Kind() string   { return "copy" }
 func (Copy) NewConfig() any { return &CopyConfig{} }
 
-func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (c Copy) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*CopyConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &CopyConfig{}, step.Config)
@@ -73,7 +72,6 @@ func (c Copy) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &copyAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		kind:   c.Kind(),
 		src:    cfg.Src.Path,

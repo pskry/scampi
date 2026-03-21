@@ -53,7 +53,6 @@ type (
 		Groups   []string `step:"Supplementary groups" optional:"true" example:"[\"sudo\", \"docker\"]"`
 	}
 	userAction struct {
-		idx    int
 		desc   string
 		name   string
 		state  State
@@ -69,7 +68,7 @@ type (
 func (User) Kind() string   { return "user" }
 func (User) NewConfig() any { return &UserConfig{} }
 
-func (u User) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (u User) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*UserConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &UserConfig{}, step.Config)
@@ -80,7 +79,6 @@ func (u User) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &userAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		name:   cfg.Name,
 		state:  parseState(cfg.State),

@@ -18,7 +18,6 @@ type (
 		Always bool   `step:"Always run apply, skip check" optional:"true" exclusive:"trigger" default:"false"`
 	}
 	runAction struct {
-		idx    int
 		desc   string
 		apply  string
 		check  string
@@ -30,7 +29,7 @@ type (
 func (Run) Kind() string   { return "run" }
 func (Run) NewConfig() any { return &RunConfig{} }
 
-func (Run) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (Run) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*RunConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &RunConfig{}, step.Config)
@@ -41,7 +40,6 @@ func (Run) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &runAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		apply:  cfg.Apply,
 		check:  cfg.Check,

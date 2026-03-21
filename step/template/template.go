@@ -32,7 +32,6 @@ type (
 		Env    map[string]string
 	}
 	templateAction struct {
-		idx    int
 		desc   string
 		kind   string
 		src    string
@@ -50,7 +49,7 @@ type (
 func (Template) Kind() string   { return "template" }
 func (Template) NewConfig() any { return &TemplateConfig{} }
 
-func (t Template) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (t Template) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*TemplateConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &TemplateConfig{}, step.Config)
@@ -77,7 +76,6 @@ func (t Template) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &templateAction{
-		idx:    idx,
 		desc:   cfg.Desc,
 		kind:   t.Kind(),
 		src:    cfg.Src.Path,

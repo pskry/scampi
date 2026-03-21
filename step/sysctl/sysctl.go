@@ -20,7 +20,6 @@ type (
 		Persist bool   `step:"Write to /etc/sysctl.d/ for persistence across reboots" default:"true"`
 	}
 	sysctlAction struct {
-		idx     int
 		desc    string
 		key     string
 		value   string
@@ -32,14 +31,13 @@ type (
 func (Sysctl) Kind() string   { return "sysctl" }
 func (Sysctl) NewConfig() any { return &SysctlConfig{} }
 
-func (Sysctl) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (Sysctl) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*SysctlConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &SysctlConfig{}, step.Config)
 	}
 
 	return &sysctlAction{
-		idx:     idx,
 		desc:    cfg.Desc,
 		key:     cfg.Key,
 		value:   cfg.Value,

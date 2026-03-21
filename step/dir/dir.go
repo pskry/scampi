@@ -29,7 +29,6 @@ type (
 		Group string `step:"Owner group name or GID" optional:"true" example:"root"`
 	}
 	dirAction struct {
-		idx  int
 		desc string
 		kind string
 		path string
@@ -40,7 +39,7 @@ type (
 func (Dir) Kind() string   { return "dir" }
 func (Dir) NewConfig() any { return &DirConfig{} }
 
-func (d Dir) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
+func (d Dir) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*DirConfig)
 	if !ok {
 		return nil, errs.BUG("expected %T got %T", &DirConfig{}, step.Config)
@@ -74,7 +73,6 @@ func (d Dir) Plan(idx int, step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &dirAction{
-		idx:  idx,
 		desc: cfg.Desc,
 		kind: d.Kind(),
 		path: cfg.Path,
