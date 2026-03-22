@@ -107,6 +107,7 @@ type (
 		Ports   []string // "host:container" format
 		Env     map[string]string
 		Mounts  []Mount
+		Args    []string
 	}
 	ContainerManager interface {
 		InspectContainer(ctx context.Context, name string) (ContainerInfo, bool, error)

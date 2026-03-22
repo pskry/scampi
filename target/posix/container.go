@@ -45,6 +45,7 @@ func (b Base) CreateContainer(ctx context.Context, opts target.ContainerInfo) er
 		Ports:   opts.Ports,
 		Env:     opts.Env,
 		Mounts:  opts.Mounts,
+		Args:    opts.Args,
 	})
 	result, err := b.runContainer(ctx, cmd)
 	if err != nil {
@@ -98,6 +99,7 @@ func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 		Config struct {
 			Image string   `json:"Image"`
 			Env   []string `json:"Env"`
+			Cmd   []string `json:"Cmd"`
 		} `json:"Config"`
 		State struct {
 			Running bool `json:"Running"`
@@ -161,5 +163,6 @@ func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 		Ports:   ports,
 		Env:     env,
 		Mounts:  mounts,
+		Args:    raw.Config.Cmd,
 	}, nil
 }

@@ -6,8 +6,8 @@ Manage container lifecycle: running, stopped, or absent. See the
 [container module overview](../) for supported runtimes.
 
 > [!TIP]
-> This is the MVP surface. Named volumes, networks, labels, healthchecks,
-> and command arguments are planned for future releases.
+> This is the MVP surface.
+> Named volumes, networks, labels and healthchecks are planned for future releases.
 
 ## Fields
 
@@ -21,6 +21,7 @@ Manage container lifecycle: running, stopped, or absent. See the
 | `ports`   | list   |          |                    | Port mappings (`"host:container"`)    |
 | `env`     | dict   |          |                    | Environment variables                 |
 | `mounts`  | list   |          |                    | Bind mounts (`"host:container[:ro]"`) |
+| `args`    | list   |          |                    | Arguments for container entrypoint    |
 
 [^1]: Required when state is `running` or `stopped`, optional when `absent`.
 
@@ -73,7 +74,7 @@ core principle, that's the wrong default.
 The step produces a single op that handles the full lifecycle:
 
 1. **Check**: inspect the container. Compare image, restart policy, ports,
-   environment variables, and bind mounts against the declared config.
+   environment variables, bind mounts, and args against the declared config.
    Any drift → unsatisfied.
 2. **Execute**: depending on the desired state and current state:
    - **Create**: create with the declared config, then start
@@ -140,6 +141,23 @@ Append `:ro` to make the mount read-only:
 ```python
 mounts = ["/opt/config:/etc/app:ro"],
 ```
+
+### Pass arguments to the entrypoint
+
+```python
+container.instance(
+    name = "prometheus",
+    image = "prom/prometheus:v3.2.0",
+    args = [
+        "--config.file=/etc/prometheus/prometheus.yml",
+        "--storage.tsdb.retention.time=30d",
+    ],
+)
+```
+
+Arguments are passed to the container's entrypoint. If `args` is not
+declared, the image's default command is left untouched and not checked
+for drift.
 
 ### Remove a container
 

@@ -246,6 +246,42 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
+func TestContainerLifecycle_Args(t *testing.T) {
+	name := containerName(t)
+	tgt := setupContainerTest(t, name)
+
+	cfgStr := fmt.Sprintf(`
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="%s",
+		image="traefik/whoami",
+		args=["--verbose", "--port", "8080"],
+	),
+])
+`, name)
+
+	applyContainerConfig(t, cfgStr, tgt)
+
+	cm := tgt.(target.ContainerManager)
+	info, exists, err := cm.InspectContainer(context.Background(), name)
+	if err != nil {
+		t.Fatalf("inspect: %v", err)
+	}
+	if !exists {
+		t.Fatal("container should exist")
+	}
+	want := []string{"--verbose", "--port", "8080"}
+	if len(info.Args) != len(want) {
+		t.Fatalf("args: got %v, want %v", info.Args, want)
+	}
+	for i, a := range want {
+		if info.Args[i] != a {
+			t.Errorf("args[%d]: got %q, want %q", i, info.Args[i], a)
+		}
+	}
+}
+
 func TestContainerLifecycle_Mounts(t *testing.T) {
 	name := containerName(t)
 	tgt := setupContainerTest(t, name)

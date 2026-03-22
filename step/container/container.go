@@ -56,6 +56,7 @@ type (
 		Ports   []string          `step:"Port mappings (host:container)" optional:"true" example:"[\"9090:9090\"]"`
 		Env     map[string]string `step:"Environment variables" optional:"true" example:"{\"DB_HOST\": \"db.local\"}"`
 		Mounts  []target.Mount    `step:"Bind mounts (host:container[:ro])" optional:"true" example:"[\"/data:/data\"]"`
+		Args    []string          `step:"Arguments for container entrypoint" optional:"true" example:"[\"--verbose\"]"`
 	}
 	instanceAction struct {
 		desc    string
@@ -66,6 +67,7 @@ type (
 		ports   []string
 		env     map[string]string
 		mounts  []target.Mount
+		args    []string
 		step    spec.StepInstance
 	}
 )
@@ -92,6 +94,7 @@ func (Instance) Plan(step spec.StepInstance) (spec.Action, error) {
 		ports:   cfg.Ports,
 		env:     cfg.Env,
 		mounts:  cfg.Mounts,
+		args:    cfg.Args,
 		step:    step,
 	}, nil
 }
@@ -172,6 +175,7 @@ func (a *instanceAction) Ops() []spec.Op {
 		ports:   a.ports,
 		env:     a.env,
 		mounts:  a.mounts,
+		args:    a.args,
 		step:    a.step,
 	}
 	op.SetAction(a)

@@ -49,6 +49,9 @@ func (b *Backend) CmdCreate(opts CreateOpts) string {
 		}
 	}
 	parts = append(parts, target.ShellQuote(opts.Image))
+	for _, a := range opts.Args {
+		parts = append(parts, target.ShellQuote(a))
+	}
 	return strings.Join(parts, " ")
 }
 
@@ -76,4 +79,5 @@ type CreateOpts struct {
 	Ports   []string
 	Env     map[string]string
 	Mounts  []target.Mount
+	Args    []string
 }

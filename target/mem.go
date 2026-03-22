@@ -520,6 +520,7 @@ func (m *MemTarget) CreateContainer(_ context.Context, opts ContainerInfo) error
 		Ports:   opts.Ports,
 		Env:     opts.Env,
 		Mounts:  opts.Mounts,
+		Args:    opts.Args,
 	}
 	return nil
 }

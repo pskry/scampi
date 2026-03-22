@@ -25,6 +25,7 @@ type ensureContainerOp struct {
 	ports   []string
 	env     map[string]string
 	mounts  []target.Mount
+	args    []string
 	step    spec.StepInstance
 }
 
@@ -143,6 +144,14 @@ func (op *ensureContainerOp) configDrift(info target.ContainerInfo) []spec.Drift
 
 	drift = append(drift, op.envDrift(info.Env)...)
 	drift = append(drift, op.mountDrift(info.Mounts)...)
+
+	if len(op.args) > 0 && !slicesEqual(info.Args, op.args) {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "args",
+			Current: joinOrNone(info.Args),
+			Desired: joinOrNone(op.args),
+		})
+	}
 
 	return drift
 }
@@ -336,6 +345,7 @@ func (op *ensureContainerOp) create(ctx context.Context, cm target.ContainerMana
 		Ports:   op.ports,
 		Env:     op.env,
 		Mounts:  op.mounts,
+		Args:    op.args,
 	})
 	if err != nil {
 		return op.cmdErr("create", err)
