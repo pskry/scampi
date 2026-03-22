@@ -29,7 +29,7 @@ func (b *Backend) CmdCreate(opts CreateOpts) string {
 		"--restart", target.ShellQuote(opts.Restart),
 	}
 	for _, p := range opts.Ports {
-		parts = append(parts, "-p", target.ShellQuote(p))
+		parts = append(parts, "-p", target.ShellQuote(p.Flag()))
 	}
 	for _, m := range opts.Mounts {
 		flag := "type=bind,source=" + m.Source + ",target=" + m.Target
@@ -86,7 +86,7 @@ type CreateOpts struct {
 	Name    string
 	Image   string
 	Restart string
-	Ports   []string
+	Ports   []target.Port
 	Env     map[string]string
 	Mounts  []target.Mount
 	Args    []string

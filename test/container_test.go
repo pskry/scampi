@@ -242,6 +242,62 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
+func TestContainer_PortWithIPAndProto(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		ports=["127.0.0.1:9090:80", "3000:3000/udp"],
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info, ok := tgt.Containers["app"]
+	if !ok {
+		t.Fatal("container not created")
+	}
+
+	wantBound := target.Port{
+		HostIP: "127.0.0.1", HostPort: "9090", ContainerPort: "80",
+	}
+	wantUDP := target.Port{
+		HostPort: "3000", ContainerPort: "3000", Proto: target.ProtoUDP,
+	}
+
+	foundBound, foundUDP := false, false
+	for _, p := range info.Ports {
+		if p == wantBound {
+			foundBound = true
+		}
+		if p == wantUDP {
+			foundUDP = true
+		}
+	}
+	if !foundBound {
+		t.Errorf("missing bound port %s in %v", wantBound, info.Ports)
+	}
+	if !foundUDP {
+		t.Errorf("missing UDP port %s in %v", wantUDP, info.Ports)
+	}
+}
+
 func TestContainer_WithArgs(t *testing.T) {
 	cfgStr := `
 target.local(name="local")
@@ -804,7 +860,8 @@ deploy(name="test", targets=["local"], steps=[
 	tgt := target.NewMemTarget()
 	tgt.Containers["app"] = target.ContainerInfo{
 		Name: "app", Image: "nginx:1.25", Running: true,
-		Restart: "unless-stopped", Ports: []string{"8080:80"},
+		Restart: "unless-stopped",
+		Ports:   []target.Port{{HostPort: "8080", ContainerPort: "80"}},
 	}
 	rec := &recordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -821,7 +878,8 @@ deploy(name="test", targets=["local"], steps=[
 	}
 
 	info := tgt.Containers["app"]
-	if len(info.Ports) != 1 || info.Ports[0] != "9090:80" {
+	wantPort := target.Port{HostPort: "9090", ContainerPort: "80"}
+	if len(info.Ports) != 1 || info.Ports[0] != wantPort {
 		t.Errorf("ports: got %v, want [9090:80]", info.Ports)
 	}
 	if !info.Running {

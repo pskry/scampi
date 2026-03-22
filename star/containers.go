@@ -64,11 +64,14 @@ func builtinContainerInstance(
 		return nil, err
 	}
 
-	var ports []string
+	var ports []target.Port
 	if portsVal != nil {
-		ports, err = stringList(portsVal, "container.instance", "ports")
-		if err != nil {
-			return nil, err
+		raw, parseErr := stringList(portsVal, "container.instance", "ports")
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		for _, s := range raw {
+			ports = append(ports, parsePort(s))
 		}
 	}
 
@@ -140,4 +143,33 @@ func parseMount(s string) target.Mount {
 		m.ReadOnly = true
 	}
 	return m
+}
+
+// parsePort parses port formats:
+//   - "hostPort:containerPort"
+//   - "hostPort:containerPort/proto"
+//   - "ip:hostPort:containerPort"
+//   - "ip:hostPort:containerPort/proto"
+func parsePort(s string) target.Port {
+	p := target.Port{Proto: target.ProtoTCP}
+
+	// Split off /proto suffix
+	if base, proto, ok := strings.Cut(s, "/"); ok {
+		s = base
+		p.Proto = target.ParsePortProto(proto)
+	}
+
+	parts := strings.SplitN(s, ":", 3)
+	switch len(parts) {
+	case 2:
+		p.HostPort = parts[0]
+		p.ContainerPort = parts[1]
+	case 3:
+		p.HostIP = parts[0]
+		p.HostPort = parts[1]
+		p.ContainerPort = parts[2]
+	default:
+		p.ContainerPort = s
+	}
+	return p
 }

@@ -22,7 +22,7 @@ type ensureContainerOp struct {
 	image   string
 	state   State
 	restart string
-	ports   []string
+	ports   []target.Port
 	env     map[string]string
 	mounts  []target.Mount
 	args    []string
@@ -128,20 +128,7 @@ func (op *ensureContainerOp) configDrift(info target.ContainerInfo) []spec.Drift
 		})
 	}
 
-	have := make([]string, len(info.Ports))
-	copy(have, info.Ports)
-	sort.Strings(have)
-	want := make([]string, len(op.ports))
-	copy(want, op.ports)
-	sort.Strings(want)
-
-	if !slicesEqual(have, want) {
-		drift = append(drift, spec.DriftDetail{
-			Field:   "ports",
-			Current: joinOrNone(have),
-			Desired: joinOrNone(want),
-		})
-	}
+	drift = append(drift, op.portDrift(info.Ports)...)
 
 	drift = append(drift, op.envDrift(info.Env)...)
 	drift = append(drift, op.mountDrift(info.Mounts)...)
@@ -179,6 +166,51 @@ func (op *ensureContainerOp) labelDrift(current map[string]string) []spec.DriftD
 	}
 	sort.Slice(drift, func(i, j int) bool { return drift[i].Field < drift[j].Field })
 	return drift
+}
+
+func (op *ensureContainerOp) portDrift(current []target.Port) []spec.DriftDetail {
+	have := portSet(current)
+	want := portSet(op.ports)
+	if portsEqual(have, want) {
+		return nil
+	}
+	return []spec.DriftDetail{{
+		Field:   "ports",
+		Current: portsStr(current),
+		Desired: portsStr(op.ports),
+	}}
+}
+
+func portSet(ports []target.Port) map[target.Port]bool {
+	s := make(map[target.Port]bool, len(ports))
+	for _, p := range ports {
+		s[p] = true
+	}
+	return s
+}
+
+func portsEqual(a, b map[target.Port]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if !b[k] {
+			return false
+		}
+	}
+	return true
+}
+
+func portsStr(ports []target.Port) string {
+	if len(ports) == 0 {
+		return "(none)"
+	}
+	strs := make([]string, len(ports))
+	for i, p := range ports {
+		strs[i] = p.String()
+	}
+	sort.Strings(strs)
+	return strings.Join(strs, ", ")
 }
 
 func (op *ensureContainerOp) mountDrift(current []target.Mount) []spec.DriftDetail {

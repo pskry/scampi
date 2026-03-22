@@ -117,6 +117,7 @@ func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 				Name string `json:"Name"`
 			} `json:"RestartPolicy"`
 			PortBindings map[string][]struct {
+				HostIP   string `json:"HostIp"`
 				HostPort string `json:"HostPort"`
 			} `json:"PortBindings"`
 		} `json:"HostConfig"`
@@ -125,18 +126,22 @@ func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 		return target.ContainerInfo{}, err
 	}
 
-	var ports []string
+	var ports []target.Port
 	for containerPort, bindings := range raw.HostConfig.PortBindings {
-		// containerPort is like "9090/tcp"
-		cp := strings.TrimSuffix(containerPort, "/tcp")
-		cp = strings.TrimSuffix(cp, "/udp")
+		// containerPort is like "9090/tcp" or "3000/udp"
+		cPort, proto, _ := strings.Cut(containerPort, "/")
 		for _, b := range bindings {
 			if b.HostPort != "" {
-				ports = append(ports, b.HostPort+":"+cp)
+				ports = append(ports, target.Port{
+					HostIP:        b.HostIP,
+					HostPort:      b.HostPort,
+					ContainerPort: cPort,
+					Proto:         target.ParsePortProto(proto),
+				})
 			}
 		}
 	}
-	sort.Strings(ports)
+	sort.Slice(ports, func(i, j int) bool { return ports[i].String() < ports[j].String() })
 
 	env := make(map[string]string, len(raw.Config.Env))
 	for _, entry := range raw.Config.Env {

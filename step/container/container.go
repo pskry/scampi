@@ -55,7 +55,7 @@ type (
 		Image   string            `step:"Container image" example:"prom/prometheus:v3.2.0"`
 		State   string            `step:"Desired container state" default:"running" example:"stopped|absent"`
 		Restart string            `step:"Restart policy" default:"unless-stopped" example:"always|on-failure|no"`
-		Ports   []string          `step:"Port mappings (host:container)" optional:"true" example:"[\"9090:9090\"]"`
+		Ports   []target.Port     `step:"Port mappings (host:container)" optional:"true" example:"[\"9090:9090\"]"`
 		Env     map[string]string `step:"Environment variables" optional:"true" example:"{\"DB_HOST\": \"db.local\"}"`
 		Mounts  []target.Mount    `step:"Bind mounts (host:container[:ro])" optional:"true" example:"[\"/data:/data\"]"`
 		Args    []string          `step:"Arguments for container entrypoint" optional:"true" example:"[\"--verbose\"]"`
@@ -67,7 +67,7 @@ type (
 		image   string
 		state   State
 		restart string
-		ports   []string
+		ports   []target.Port
 		env     map[string]string
 		mounts  []target.Mount
 		args    []string

@@ -88,6 +88,13 @@ type (
 		Target   string // container path (absolute)
 		ReadOnly bool
 	}
+	PortProto uint8
+	Port      struct {
+		HostIP        string    // bind address ("", "127.0.0.1", etc.)
+		HostPort      string    // host port number
+		ContainerPort string    // container port number
+		Proto         PortProto // protocol (default: TCP)
+	}
 )
 
 func (m Mount) String() string {
@@ -98,13 +105,49 @@ func (m Mount) String() string {
 	return s
 }
 
+const (
+	ProtoTCP PortProto = iota
+	ProtoUDP
+)
+
+func ParsePortProto(s string) PortProto {
+	if s == "udp" {
+		return ProtoUDP
+	}
+	return ProtoTCP
+}
+
+func (p PortProto) String() string {
+	if p == ProtoUDP {
+		return "udp"
+	}
+	return "tcp"
+}
+
+func (p Port) String() string {
+	s := ""
+	if p.HostIP != "" {
+		s += p.HostIP + ":"
+	}
+	s += p.HostPort + ":" + p.ContainerPort
+	if p.Proto != ProtoTCP {
+		s += "/" + p.Proto.String()
+	}
+	return s
+}
+
+// Flag returns the value for the -p flag passed to docker/podman create.
+func (p Port) Flag() string {
+	return p.String()
+}
+
 type (
 	ContainerInfo struct {
 		Name    string
 		Image   string
 		Running bool
 		Restart string
-		Ports   []string // "host:container" format
+		Ports   []Port
 		Env     map[string]string
 		Mounts  []Mount
 		Args    []string

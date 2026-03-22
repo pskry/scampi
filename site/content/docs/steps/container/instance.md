@@ -15,9 +15,9 @@ Manage container lifecycle: running, stopped, or absent. See the
 | `name`    | string |    ✓     |                    | Container name                        |
 | `image`   | string |  ✓[^1]   |                    | Container image (tag or digest)       |
 | `desc`    | string |          |                    | Human-readable description            |
-| `state`   | string |          | `"running"`        | Desired state (see below)             |
-| `restart` | string |          | `"unless-stopped"` | Restart policy (see below)            |
-| `ports`   | list   |          |                    | Port mappings (`"host:container"`)    |
+| `state`   | string |          | `"running"`        | Desired [state](#states)              |
+| `restart` | string |          | `"unless-stopped"` | [Restart policy](#restart-policies)   |
+| `ports`   | list   |          |                    | [Port mappings](#port-mappings)       |
 | `env`     | dict   |          |                    | Environment variables                 |
 | `mounts`  | list   |          |                    | Bind mounts (`"host:container[:ro]"`) |
 | `args`    | list   |          |                    | Arguments for container entrypoint    |
@@ -68,6 +68,26 @@ With `always`, a manual stop is silently undone on the next reboot. That's
 surprising — you stopped something and it came back on its own, without
 anyone running scampi. For a convergence tool where explicit changes are a
 core principle, that's the wrong default.
+
+## Port mappings
+
+Ports are specified as strings in the format `"hostPort:containerPort"`:
+
+```python
+ports = ["8080:80", "9090:9090"]
+```
+
+Extended formats:
+
+| Format                            | Example                 | Description           |
+| --------------------------------- | ----------------------- | --------------------- |
+| `hostPort:containerPort`          | `"8080:80"`             | Bind to all addresses |
+| `ip:hostPort:containerPort`       | `"127.0.0.1:8080:80"`   | Bind to specific IP   |
+| `hostPort:containerPort/proto`    | `"5000:5000/udp"`       | UDP instead of TCP    |
+| `ip:hostPort:containerPort/proto` | `"127.0.0.1:53:53/udp"` | IP + UDP              |
+
+TCP is the default protocol. All four fields are preserved across check,
+drift detection, and recreate.
 
 ## How it works
 

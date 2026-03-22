@@ -235,14 +235,66 @@ deploy(name="test", targets=["local"], steps=[
 	if !exists {
 		t.Fatal("container should exist")
 	}
+	wantPort := target.Port{HostPort: "18080", ContainerPort: "80"}
 	found := false
 	for _, p := range info.Ports {
-		if p == "18080:80" {
+		if p == wantPort {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("ports: got %v, want to contain 18080:80", info.Ports)
+		t.Errorf("ports: got %v, want to contain %s", info.Ports, wantPort)
+	}
+}
+
+func TestContainerLifecycle_PortIPAndProto(t *testing.T) {
+	name := containerName(t)
+	tgt := setupContainerTest(t, name)
+
+	cfgStr := fmt.Sprintf(`
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="%s",
+		image="traefik/whoami",
+		ports=["127.0.0.1:18091:80", "18092:80/udp"],
+	),
+])
+`, name)
+
+	applyContainerConfig(t, cfgStr, tgt)
+
+	cm := tgt.(target.ContainerManager)
+	info, exists, err := cm.InspectContainer(context.Background(), name)
+	if err != nil {
+		t.Fatalf("inspect: %v", err)
+	}
+	if !exists {
+		t.Fatal("container should exist")
+	}
+
+	wantBound := target.Port{
+		HostIP: "127.0.0.1", HostPort: "18091", ContainerPort: "80",
+		Proto: target.ProtoTCP,
+	}
+	wantUDP := target.Port{
+		HostPort: "18092", ContainerPort: "80", Proto: target.ProtoUDP,
+	}
+
+	foundBound, foundUDP := false, false
+	for _, p := range info.Ports {
+		if p == wantBound {
+			foundBound = true
+		}
+		if p == wantUDP {
+			foundUDP = true
+		}
+	}
+	if !foundBound {
+		t.Errorf("missing bound port %s in %v", wantBound, info.Ports)
+	}
+	if !foundUDP {
+		t.Errorf("missing UDP port %s in %v", wantUDP, info.Ports)
 	}
 }
 
