@@ -513,15 +513,16 @@ func (m *MemTarget) CreateContainer(_ context.Context, opts ContainerInfo) error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.Containers[opts.Name] = ContainerInfo{
-		Name:    opts.Name,
-		Image:   opts.Image,
-		Running: false,
-		Restart: opts.Restart,
-		Ports:   opts.Ports,
-		Env:     opts.Env,
-		Mounts:  opts.Mounts,
-		Args:    opts.Args,
-		Labels:  opts.Labels,
+		Name:        opts.Name,
+		Image:       opts.Image,
+		Running:     false,
+		Restart:     opts.Restart,
+		Ports:       opts.Ports,
+		Env:         opts.Env,
+		Mounts:      opts.Mounts,
+		Args:        opts.Args,
+		Labels:      opts.Labels,
+		Healthcheck: opts.Healthcheck,
 	}
 	return nil
 }
@@ -534,6 +535,9 @@ func (m *MemTarget) StartContainer(_ context.Context, name string) error {
 		return errs.WrapErrf(ErrNotExist, "container %q", name)
 	}
 	info.Running = true
+	if info.Healthcheck != nil {
+		info.HealthStatus = "healthy"
+	}
 	m.Containers[name] = info
 	return nil
 }

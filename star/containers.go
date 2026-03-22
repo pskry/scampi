@@ -3,7 +3,9 @@
 package star
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
@@ -19,6 +21,12 @@ func containerModule() *starlarkstruct.Module {
 		Name: "container",
 		Members: starlark.StringDict{
 			"instance": starlark.NewBuiltin("container.instance", builtinContainerInstance),
+			"healthcheck": &starlarkstruct.Module{
+				Name: "container.healthcheck",
+				Members: starlark.StringDict{
+					"cmd": starlark.NewBuiltin("container.healthcheck.cmd", builtinHealthcheckCmd),
+				},
+			},
 		},
 	}
 }
@@ -31,17 +39,18 @@ func builtinContainerInstance(
 	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
 	var (
-		name        string
-		image       string
-		state       = "running"
-		restart     = "unless-stopped"
-		portsVal    *starlark.List
-		envVal      *starlark.Dict
-		mountsVal   *starlark.List
-		argsVal     *starlark.List
-		labelsVal   *starlark.Dict
-		desc        string
-		onChangeVal starlark.Value
+		name           string
+		image          string
+		state          = "running"
+		restart        = "unless-stopped"
+		portsVal       *starlark.List
+		envVal         *starlark.Dict
+		mountsVal      *starlark.List
+		argsVal        *starlark.List
+		labelsVal      *starlark.Dict
+		healthcheckVal starlark.Value
+		desc           string
+		onChangeVal    starlark.Value
 	)
 	if err := starlark.UnpackArgs("container.instance", args, kwargs,
 		"name", &name,
@@ -53,6 +62,7 @@ func builtinContainerInstance(
 		"mounts?", &mountsVal,
 		"args?", &argsVal,
 		"labels?", &labelsVal,
+		"healthcheck?", &healthcheckVal,
 		"desc?", &desc,
 		"on_change?", &onChangeVal,
 	); err != nil {
@@ -110,8 +120,24 @@ func builtinContainerInstance(
 		}
 	}
 
+	var hc *target.Healthcheck
+	if healthcheckVal != nil && healthcheckVal != starlark.None {
+		shc, ok := healthcheckVal.(*StarlarkHealthcheck)
+		if !ok {
+			return nil, fmt.Errorf(
+				"container.instance: healthcheck must be container.healthcheck.cmd(...), got %s",
+				healthcheckVal.Type(),
+			)
+		}
+		hc = &shc.HC
+	}
+
 	span := callSpan(thread)
-	fields := kwargsFieldSpans(thread, "name", "image", "state", "restart", "ports", "env", "mounts", "args", "labels")
+	fieldNames := []string{
+		"name", "image", "state", "restart", "ports", "env",
+		"mounts", "args", "labels", "healthcheck",
+	}
+	fields := kwargsFieldSpans(thread, fieldNames...)
 
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
@@ -121,7 +147,7 @@ func builtinContainerInstance(
 				Desc: desc, Name: name, Image: image,
 				State: state, Restart: restart, Ports: ports,
 				Env: env, Mounts: mounts, Args: ctrArgs,
-				Labels: labels,
+				Labels: labels, Healthcheck: hc,
 			},
 			OnChange: hookIDs,
 			Source:   span,
@@ -172,4 +198,87 @@ func parsePort(s string) target.Port {
 		p.ContainerPort = s
 	}
 	return p
+}
+
+// StarlarkHealthcheck
+// -----------------------------------------------------------------------------
+
+type StarlarkHealthcheck struct {
+	HC target.Healthcheck
+}
+
+func (s *StarlarkHealthcheck) String() string        { return "container.healthcheck.cmd(...)" }
+func (s *StarlarkHealthcheck) Type() string          { return "healthcheck" }
+func (s *StarlarkHealthcheck) Freeze()               {}
+func (s *StarlarkHealthcheck) Truth() starlark.Bool  { return true }
+func (s *StarlarkHealthcheck) Hash() (uint32, error) { return 0, nil }
+
+func builtinHealthcheckCmd(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var (
+		cmd         string
+		interval    string
+		timeout     string
+		retries     int
+		startPeriod string
+	)
+	if err := starlark.UnpackArgs("container.healthcheck.cmd", args, kwargs,
+		"cmd", &cmd,
+		"interval?", &interval,
+		"timeout?", &timeout,
+		"retries?", &retries,
+		"start_period?", &startPeriod,
+	); err != nil {
+		return nil, err
+	}
+
+	hc := target.Healthcheck{
+		Cmd:      cmd,
+		Interval: 30 * time.Second,
+		Timeout:  30 * time.Second,
+		Retries:  3,
+	}
+
+	if retries > 0 {
+		hc.Retries = retries
+	}
+	if interval != "" {
+		d, err := time.ParseDuration(interval)
+		if err != nil {
+			return nil, &InvalidDurationError{
+				Field:  "interval",
+				Got:    interval,
+				Source: resolveArgSpan(thread, "interval"),
+			}
+		}
+		hc.Interval = d
+	}
+	if timeout != "" {
+		d, err := time.ParseDuration(timeout)
+		if err != nil {
+			return nil, &InvalidDurationError{
+				Field:  "timeout",
+				Got:    timeout,
+				Source: resolveArgSpan(thread, "timeout"),
+			}
+		}
+		hc.Timeout = d
+	}
+	if startPeriod != "" {
+		d, err := time.ParseDuration(startPeriod)
+		if err != nil {
+			return nil, &InvalidDurationError{
+				Field:  "start_period",
+				Got:    startPeriod,
+				Source: resolveArgSpan(thread, "start_period"),
+			}
+		}
+		hc.StartPeriod = d
+	}
+
+	return &StarlarkHealthcheck{HC: hc}, nil
 }

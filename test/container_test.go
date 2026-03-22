@@ -5,6 +5,7 @@ package test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
@@ -445,6 +446,193 @@ deploy(name="test", targets=["local"], steps=[
 	for _, ev := range rec.opEvents {
 		if ev.Kind == event.OpExecuted {
 			t.Error("expected no op executions — image default args should not cause drift")
+		}
+	}
+}
+
+func TestContainer_WithHealthcheck(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		healthcheck=container.healthcheck.cmd(
+			cmd="curl -f http://localhost/",
+			interval="10s",
+			timeout="5s",
+			retries=5,
+		),
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info, ok := tgt.Containers["app"]
+	if !ok {
+		t.Fatal("container not created")
+	}
+	if !info.Running {
+		t.Error("container should be running")
+	}
+	if info.Healthcheck == nil {
+		t.Fatal("healthcheck should be set")
+	}
+	if info.Healthcheck.Cmd != "curl -f http://localhost/" {
+		t.Errorf("healthcheck cmd: got %q", info.Healthcheck.Cmd)
+	}
+	if info.Healthcheck.Interval != 10*time.Second {
+		t.Errorf("healthcheck interval: got %v", info.Healthcheck.Interval)
+	}
+	if info.Healthcheck.Timeout != 5*time.Second {
+		t.Errorf("healthcheck timeout: got %v", info.Healthcheck.Timeout)
+	}
+	if info.Healthcheck.Retries != 5 {
+		t.Errorf("healthcheck retries: got %d", info.Healthcheck.Retries)
+	}
+	if info.HealthStatus != "healthy" {
+		t.Errorf("health status: got %q, want %q", info.HealthStatus, "healthy")
+	}
+}
+
+func TestContainer_HealthcheckDefaults(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		healthcheck=container.healthcheck.cmd(cmd="true"),
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info := tgt.Containers["app"]
+	hc := info.Healthcheck
+	if hc == nil {
+		t.Fatal("healthcheck should be set")
+	}
+	if hc.Interval != 30*time.Second {
+		t.Errorf("default interval: got %v, want 30s", hc.Interval)
+	}
+	if hc.Timeout != 30*time.Second {
+		t.Errorf("default timeout: got %v, want 30s", hc.Timeout)
+	}
+	if hc.Retries != 3 {
+		t.Errorf("default retries: got %d, want 3", hc.Retries)
+	}
+}
+
+func TestContainer_HealthcheckDrift_Recreates(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		healthcheck=container.healthcheck.cmd(cmd="curl -f http://localhost/new"),
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+		Healthcheck: &target.Healthcheck{
+			Cmd:      "curl -f http://localhost/old",
+			Interval: 30 * time.Second,
+			Timeout:  30 * time.Second,
+			Retries:  3,
+		},
+		HealthStatus: "healthy",
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info := tgt.Containers["app"]
+	if info.Healthcheck.Cmd != "curl -f http://localhost/new" {
+		t.Errorf("cmd: got %q", info.Healthcheck.Cmd)
+	}
+}
+
+func TestContainer_NoHealthcheckDeclared_ImageDefaultIgnored(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(name="app", image="nginx:1.25"),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+		Healthcheck: &target.Healthcheck{
+			Cmd:      "curl -f http://localhost/",
+			Interval: 30 * time.Second,
+			Timeout:  30 * time.Second,
+			Retries:  3,
+		},
+		HealthStatus: "healthy",
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	for _, ev := range rec.opEvents {
+		if ev.Kind == event.OpExecuted {
+			t.Error("expected no op executions — image healthcheck should not cause drift")
 		}
 	}
 }

@@ -406,6 +406,51 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
+func TestContainerLifecycle_Healthcheck(t *testing.T) {
+	name := containerName(t)
+	tgt := setupContainerTest(t, name)
+
+	cfgStr := fmt.Sprintf(`
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="%s",
+		image="nginx:alpine",
+		healthcheck=container.healthcheck.cmd(
+			cmd="wget -qO- http://localhost/ || exit 1",
+			interval="2s",
+			timeout="2s",
+			retries=3,
+			start_period="1s",
+		),
+	),
+])
+`, name)
+
+	applyContainerConfig(t, cfgStr, tgt)
+
+	cm := tgt.(target.ContainerManager)
+	info, exists, err := cm.InspectContainer(context.Background(), name)
+	if err != nil {
+		t.Fatalf("inspect: %v", err)
+	}
+	if !exists {
+		t.Fatal("container should exist")
+	}
+	if !info.Running {
+		t.Error("container should be running")
+	}
+	if info.HealthStatus != "healthy" {
+		t.Errorf("health status: got %q, want %q", info.HealthStatus, "healthy")
+	}
+	if info.Healthcheck == nil {
+		t.Fatal("healthcheck config should be set")
+	}
+	if info.Healthcheck.Cmd != "wget -qO- http://localhost/ || exit 1" {
+		t.Errorf("healthcheck cmd: got %q", info.Healthcheck.Cmd)
+	}
+}
+
 func TestContainerLifecycle_Stopped(t *testing.T) {
 	name := containerName(t)
 	tgt := setupContainerTest(t, name)

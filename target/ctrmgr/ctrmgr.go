@@ -58,6 +58,16 @@ func (b *Backend) CmdCreate(opts CreateOpts) string {
 			parts = append(parts, "--label", target.ShellQuote(k+"="+opts.Labels[k]))
 		}
 	}
+	if opts.Healthcheck != nil {
+		hc := opts.Healthcheck
+		parts = append(parts,
+			"--health-cmd", target.ShellQuote(hc.Cmd),
+			"--health-interval", hc.Interval.String(),
+			"--health-timeout", hc.Timeout.String(),
+			"--health-retries", fmt.Sprintf("%d", hc.Retries),
+			"--health-start-period", hc.StartPeriod.String(),
+		)
+	}
 	parts = append(parts, target.ShellQuote(opts.Image))
 	for _, a := range opts.Args {
 		parts = append(parts, target.ShellQuote(a))
@@ -83,12 +93,13 @@ func (b *Backend) CmdPull(image string) string {
 
 // CreateOpts holds parameters for creating a container.
 type CreateOpts struct {
-	Name    string
-	Image   string
-	Restart string
-	Ports   []target.Port
-	Env     map[string]string
-	Mounts  []target.Mount
-	Args    []string
-	Labels  map[string]string
+	Name        string
+	Image       string
+	Restart     string
+	Ports       []target.Port
+	Env         map[string]string
+	Mounts      []target.Mount
+	Args        []string
+	Labels      map[string]string
+	Healthcheck *target.Healthcheck
 }

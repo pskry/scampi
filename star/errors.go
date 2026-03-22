@@ -621,6 +621,34 @@ func (e *RemoteChecksumError) setSource(s spec.SourceSpan) {
 	}
 }
 
+// InvalidDurationError is raised when a duration field receives a malformed value.
+type InvalidDurationError struct {
+	diagnostic.FatalError
+	Field  string
+	Got    string
+	Source spec.SourceSpan
+}
+
+func (e InvalidDurationError) Error() string {
+	return fmt.Sprintf("invalid duration for %s: %q", e.Field, e.Got)
+}
+
+func (e InvalidDurationError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.InvalidDuration",
+		Text:   `invalid duration for {{.Field}}: "{{.Got}}"`,
+		Hint:   `accepted formats: "300ms", "1.5s", "2m30s", "1h"`,
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (e *InvalidDurationError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
 // PoisonValueError is raised when a declaration builtin's return value is used
 // where a real value is expected (e.g. passed as a kwarg to a step).
 type PoisonValueError struct {

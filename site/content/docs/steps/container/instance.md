@@ -6,22 +6,23 @@ Manage container lifecycle: running, stopped, or absent. See the
 [container module overview](../) for supported runtimes.
 
 > [!TIP]
-> Named volumes, networks and healthchecks are planned for future releases.
+> Named volumes and networks are planned for future releases.
 
 ## Fields
 
-| Field     | Type   | Required | Default            | Description                           |
-| --------- | ------ | :------: | ------------------ | ------------------------------------- |
-| `name`    | string |    ✓     |                    | Container name                        |
-| `image`   | string |  ✓[^1]   |                    | Container image (tag or digest)       |
-| `desc`    | string |          |                    | Human-readable description            |
-| `state`   | string |          | `"running"`        | Desired [state](#states)              |
-| `restart` | string |          | `"unless-stopped"` | [Restart policy](#restart-policies)   |
-| `ports`   | list   |          |                    | [Port mappings](#port-mappings)       |
-| `env`     | dict   |          |                    | Environment variables                 |
-| `mounts`  | list   |          |                    | Bind mounts (`"host:container[:ro]"`) |
-| `args`    | list   |          |                    | Arguments for container entrypoint    |
-| `labels`  | dict   |          |                    | Container labels                      |
+| Field         | Type        | Required | Default            | Description                           |
+| ------------- | ----------- | :------: | ------------------ | ------------------------------------- |
+| `name`        | string      |    ✓     |                    | Container name                        |
+| `image`       | string      |  ✓[^1]   |                    | Container image (tag or digest)       |
+| `desc`        | string      |          |                    | Human-readable description            |
+| `state`       | string      |          | `"running"`        | Desired [state](#states)              |
+| `restart`     | string      |          | `"unless-stopped"` | [Restart policy](#restart-policies)   |
+| `ports`       | list        |          |                    | [Port mappings](#port-mappings)       |
+| `env`         | dict        |          |                    | Environment variables                 |
+| `mounts`      | list        |          |                    | Bind mounts (`"host:container[:ro]"`) |
+| `args`        | list        |          |                    | Arguments for container entrypoint    |
+| `labels`      | dict        |          |                    | Container labels                      |
+| `healthcheck` | healthcheck |          |                    | [Healthcheck config](#healthchecks)   |
 
 [^1]: Required when state is `running` or `stopped`, optional when `absent`.
 
@@ -89,13 +90,54 @@ Extended formats:
 TCP is the default protocol. All four fields are preserved across check,
 drift detection, and recreate.
 
+## Healthchecks
+
+> [!IMPORTANT]
+> Health check commands are currently executed as shell commands
+> (`/bin/sh -c`) inside the container. The image must have `/bin/sh`
+> available — distroless and scratch-based images cannot use healthchecks
+> yet. Exec-form healthchecks (without a shell) are planned.
+
+Use `container.healthcheck.cmd()` to define a health probe:
+
+```python
+container.instance(
+    name = "app",
+    image = "myapp:latest",
+    healthcheck = container.healthcheck.cmd(
+        cmd = "curl -f http://localhost:8080/health",
+        interval = "10s",
+        timeout = "5s",
+        retries = 5,
+    ),
+)
+```
+
+| Field          | Type   | Default | Description                         |
+| -------------- | ------ | ------- | ----------------------------------- |
+| `cmd`          | string | —       | Health check command (required)     |
+| `interval`     | string | `"30s"` | Time between checks                 |
+| `timeout`      | string | `"30s"` | Maximum time for one check          |
+| `retries`      | int    | `3`     | Failures before reporting unhealthy |
+| `start_period` | string | `"0s"`  | Grace period before checks start    |
+
+Duration fields accept Go duration strings: `"300ms"`, `"1.5s"`, `"2m30s"`,
+`"1h"`. Valid units are `ns`, `us`/`µs`, `ms`, `s`, `m`, `h`.
+
+Defaults are set explicitly by scampi, not inherited from the container
+runtime, so behavior is identical across runtimes.
+
+When a healthcheck is defined and `state = "running"`, scampi waits for
+the container to report healthy after starting it. If the container
+becomes unhealthy, the apply fails with a diagnostic.
+
 ## How it works
 
 The step produces a single op that handles the full lifecycle:
 
 1. **Check**: inspect the container. Compare image, restart policy, ports,
-   environment variables, bind mounts, and args against the declared config.
-   Any drift → unsatisfied.
+   environment variables, bind mounts, args, labels, and healthcheck
+   against the declared config. Any drift → unsatisfied.
 2. **Execute**: depending on the desired state and current state:
    - **Create**: create with the declared config, then start
    - **Recreate**: stop → remove → create → start

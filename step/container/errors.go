@@ -138,6 +138,46 @@ func (e MountSourceMissingError) DeferredResource() spec.Resource {
 	return spec.PathResource(e.Path)
 }
 
+type HealthWaitTimeoutError struct {
+	diagnostic.FatalError
+	Name   string
+	Source spec.SourceSpan
+}
+
+func (e HealthWaitTimeoutError) Error() string {
+	return fmt.Sprintf("container %q did not become healthy in time", e.Name)
+}
+
+func (e HealthWaitTimeoutError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.container.HealthWaitTimeout",
+		Text:   `container "{{.Name}}" did not become healthy in time`,
+		Hint:   "check container logs for healthcheck failures",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+type ContainerUnhealthyError struct {
+	diagnostic.FatalError
+	Name   string
+	Source spec.SourceSpan
+}
+
+func (e ContainerUnhealthyError) Error() string {
+	return fmt.Sprintf("container %q reported unhealthy", e.Name)
+}
+
+func (e ContainerUnhealthyError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.container.Unhealthy",
+		Text:   `container "{{.Name}}" reported unhealthy`,
+		Hint:   "check container logs for healthcheck failures",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
 type ContainerCommandError struct {
 	diagnostic.FatalError
 	Op     string

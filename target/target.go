@@ -88,6 +88,13 @@ type (
 		Target   string // container path (absolute)
 		ReadOnly bool
 	}
+	Healthcheck struct {
+		Cmd         string
+		Interval    time.Duration
+		Timeout     time.Duration
+		Retries     int
+		StartPeriod time.Duration
+	}
 	PortProto uint8
 	Port      struct {
 		HostIP        string    // bind address ("", "127.0.0.1", etc.)
@@ -143,15 +150,17 @@ func (p Port) Flag() string {
 
 type (
 	ContainerInfo struct {
-		Name    string
-		Image   string
-		Running bool
-		Restart string
-		Ports   []Port
-		Env     map[string]string
-		Mounts  []Mount
-		Args    []string
-		Labels  map[string]string
+		Name         string
+		Image        string
+		Running      bool
+		Restart      string
+		Ports        []Port
+		Env          map[string]string
+		Mounts       []Mount
+		Args         []string
+		Labels       map[string]string
+		Healthcheck  *Healthcheck
+		HealthStatus string // "", "starting", "healthy", "unhealthy"
 	}
 	ContainerManager interface {
 		InspectContainer(ctx context.Context, name string) (ContainerInfo, bool, error)

@@ -55,24 +55,27 @@ type (
 		Image   string            `step:"Container image" example:"prom/prometheus:v3.2.0"`
 		State   string            `step:"Desired container state" default:"running" example:"stopped|absent"`
 		Restart string            `step:"Restart policy" default:"unless-stopped" example:"always|on-failure|no"`
-		Ports   []target.Port     `step:"Port mappings (host:container)" optional:"true" example:"[\"9090:9090\"]"`
+		Ports   []target.Port     `step:"Port mappings" optional:"true" example:"[\"9090:9090\"]"`
 		Env     map[string]string `step:"Environment variables" optional:"true" example:"{\"DB_HOST\": \"db.local\"}"`
-		Mounts  []target.Mount    `step:"Bind mounts (host:container[:ro])" optional:"true" example:"[\"/data:/data\"]"`
-		Args    []string          `step:"Arguments for container entrypoint" optional:"true" example:"[\"--verbose\"]"`
+		Mounts  []target.Mount    `step:"Bind mounts" optional:"true" example:"[\"/data:/data\"]"`
+		Args    []string          `step:"Entrypoint arguments" optional:"true" example:"[\"--verbose\"]"`
 		Labels  map[string]string `step:"Container labels" optional:"true" example:"{\"app\": \"myapp\"}"`
+
+		Healthcheck *target.Healthcheck `step:"Healthcheck" optional:"true"`
 	}
 	instanceAction struct {
-		desc    string
-		name    string
-		image   string
-		state   State
-		restart string
-		ports   []target.Port
-		env     map[string]string
-		mounts  []target.Mount
-		args    []string
-		labels  map[string]string
-		step    spec.StepInstance
+		desc        string
+		name        string
+		image       string
+		state       State
+		restart     string
+		ports       []target.Port
+		env         map[string]string
+		mounts      []target.Mount
+		args        []string
+		labels      map[string]string
+		healthcheck *target.Healthcheck
+		step        spec.StepInstance
 	}
 )
 
@@ -90,17 +93,18 @@ func (Instance) Plan(step spec.StepInstance) (spec.Action, error) {
 	}
 
 	return &instanceAction{
-		desc:    cfg.Desc,
-		name:    cfg.Name,
-		image:   cfg.Image,
-		state:   parseState(cfg.State),
-		restart: cfg.Restart,
-		ports:   cfg.Ports,
-		env:     cfg.Env,
-		mounts:  cfg.Mounts,
-		args:    cfg.Args,
-		labels:  cfg.Labels,
-		step:    step,
+		desc:        cfg.Desc,
+		name:        cfg.Name,
+		image:       cfg.Image,
+		state:       parseState(cfg.State),
+		restart:     cfg.Restart,
+		ports:       cfg.Ports,
+		env:         cfg.Env,
+		mounts:      cfg.Mounts,
+		args:        cfg.Args,
+		labels:      cfg.Labels,
+		healthcheck: cfg.Healthcheck,
+		step:        step,
 	}, nil
 }
 
@@ -190,16 +194,17 @@ func (a *instanceAction) Promises() []spec.Resource { return nil }
 
 func (a *instanceAction) Ops() []spec.Op {
 	op := &ensureContainerOp{
-		name:    a.name,
-		image:   a.image,
-		state:   a.state,
-		restart: a.restart,
-		ports:   a.ports,
-		env:     a.env,
-		mounts:  a.mounts,
-		args:    a.args,
-		labels:  a.labels,
-		step:    a.step,
+		name:        a.name,
+		image:       a.image,
+		state:       a.state,
+		restart:     a.restart,
+		ports:       a.ports,
+		env:         a.env,
+		mounts:      a.mounts,
+		args:        a.args,
+		labels:      a.labels,
+		healthcheck: a.healthcheck,
+		step:        a.step,
 	}
 	op.SetAction(a)
 	return []spec.Op{op}

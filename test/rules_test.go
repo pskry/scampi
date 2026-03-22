@@ -422,7 +422,9 @@ func isExcludedCall(name string) bool {
 	if isFormatCall(name) {
 		return true
 	}
-	return strings.HasSuffix(name, ".UnpackArgs") || name == "UnpackArgs"
+	return strings.HasSuffix(name, ".UnpackArgs") ||
+		name == "UnpackArgs" ||
+		name == "append"
 }
 
 func checkCallArgs(

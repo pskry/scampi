@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/ctrmgr"
@@ -39,14 +40,15 @@ func (b Base) InspectContainer(ctx context.Context, name string) (target.Contain
 
 func (b Base) CreateContainer(ctx context.Context, opts target.ContainerInfo) error {
 	cmd := b.CtrBackend.CmdCreate(ctrmgr.CreateOpts{
-		Name:    opts.Name,
-		Image:   opts.Image,
-		Restart: opts.Restart,
-		Ports:   opts.Ports,
-		Env:     opts.Env,
-		Mounts:  opts.Mounts,
-		Args:    opts.Args,
-		Labels:  opts.Labels,
+		Name:        opts.Name,
+		Image:       opts.Image,
+		Restart:     opts.Restart,
+		Ports:       opts.Ports,
+		Env:         opts.Env,
+		Mounts:      opts.Mounts,
+		Args:        opts.Args,
+		Labels:      opts.Labels,
+		Healthcheck: opts.Healthcheck,
 	})
 	result, err := b.runContainer(ctx, cmd)
 	if err != nil {
@@ -98,13 +100,23 @@ func (b Base) RemoveContainer(ctx context.Context, name string) error {
 func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 	var raw struct {
 		Config struct {
-			Image  string            `json:"Image"`
-			Env    []string          `json:"Env"`
-			Cmd    []string          `json:"Cmd"`
-			Labels map[string]string `json:"Labels"`
+			Image       string            `json:"Image"`
+			Env         []string          `json:"Env"`
+			Cmd         []string          `json:"Cmd"`
+			Labels      map[string]string `json:"Labels"`
+			Healthcheck *struct {
+				Test        []string `json:"Test"`
+				Interval    int64    `json:"Interval"`
+				Timeout     int64    `json:"Timeout"`
+				Retries     int      `json:"Retries"`
+				StartPeriod int64    `json:"StartPeriod"`
+			} `json:"Healthcheck"`
 		} `json:"Config"`
 		State struct {
 			Running bool `json:"Running"`
+			Health  *struct {
+				Status string `json:"Status"`
+			} `json:"Health"`
 		} `json:"State"`
 		Mounts []struct {
 			Type        string `json:"Type"`
@@ -163,14 +175,40 @@ func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 	}
 	sort.Slice(mounts, func(i, j int) bool { return mounts[i].Source < mounts[j].Source })
 
+	var hc *target.Healthcheck
+	if raw.Config.Healthcheck != nil && len(raw.Config.Healthcheck.Test) >= 2 {
+		// Test is ["CMD-SHELL", "cmd"] or ["CMD", "arg0", "arg1", ...]
+		var cmd string
+		switch raw.Config.Healthcheck.Test[0] {
+		case "CMD-SHELL":
+			cmd = raw.Config.Healthcheck.Test[1]
+		case "CMD":
+			cmd = strings.Join(raw.Config.Healthcheck.Test[1:], " ")
+		}
+		hc = &target.Healthcheck{
+			Cmd:         cmd,
+			Interval:    time.Duration(raw.Config.Healthcheck.Interval),
+			Timeout:     time.Duration(raw.Config.Healthcheck.Timeout),
+			Retries:     raw.Config.Healthcheck.Retries,
+			StartPeriod: time.Duration(raw.Config.Healthcheck.StartPeriod),
+		}
+	}
+
+	var healthStatus string
+	if raw.State.Health != nil {
+		healthStatus = raw.State.Health.Status
+	}
+
 	return target.ContainerInfo{
-		Image:   raw.Config.Image,
-		Running: raw.State.Running,
-		Restart: raw.HostConfig.RestartPolicy.Name,
-		Ports:   ports,
-		Env:     env,
-		Mounts:  mounts,
-		Args:    raw.Config.Cmd,
-		Labels:  raw.Config.Labels,
+		Image:        raw.Config.Image,
+		Running:      raw.State.Running,
+		Restart:      raw.HostConfig.RestartPolicy.Name,
+		Ports:        ports,
+		Env:          env,
+		Mounts:       mounts,
+		Args:         raw.Config.Cmd,
+		Labels:       raw.Config.Labels,
+		Healthcheck:  hc,
+		HealthStatus: healthStatus,
 	}, nil
 }

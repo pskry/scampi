@@ -1,0 +1,15 @@
+{
+  "abort": true,
+  "diagnostics": [
+    {
+      "id": "star.InvalidDuration",
+      "scope": "ScopeEngine",
+      "severity": "Error",
+      "kind": "DiagnosticRaised",
+      "source": {
+        "line": 6,
+        "col": 68
+      }
+    }
+  ]
+}

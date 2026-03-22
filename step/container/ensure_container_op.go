@@ -4,8 +4,10 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/source"
@@ -16,18 +18,24 @@ import (
 
 const ensureContainerID = "builtin.ensure-container"
 
+// healthPollCeil is the maximum interval between health status polls.
+// We poll at min(healthcheck.Interval, healthPollCeil) to catch state
+// changes promptly without hammering inspect.
+const healthPollCeil = 2 * time.Second
+
 type ensureContainerOp struct {
 	sharedops.BaseOp
-	name    string
-	image   string
-	state   State
-	restart string
-	ports   []target.Port
-	env     map[string]string
-	mounts  []target.Mount
-	args    []string
-	labels  map[string]string
-	step    spec.StepInstance
+	name        string
+	image       string
+	state       State
+	restart     string
+	ports       []target.Port
+	env         map[string]string
+	mounts      []target.Mount
+	args        []string
+	labels      map[string]string
+	healthcheck *target.Healthcheck
+	step        spec.StepInstance
 }
 
 func (op *ensureContainerOp) Check(
@@ -142,6 +150,7 @@ func (op *ensureContainerOp) configDrift(info target.ContainerInfo) []spec.Drift
 	}
 
 	drift = append(drift, op.labelDrift(info.Labels)...)
+	drift = append(drift, op.healthcheckDrift(info.Healthcheck)...)
 
 	return drift
 }
@@ -165,6 +174,60 @@ func (op *ensureContainerOp) labelDrift(current map[string]string) []spec.DriftD
 		}
 	}
 	sort.Slice(drift, func(i, j int) bool { return drift[i].Field < drift[j].Field })
+	return drift
+}
+
+func (op *ensureContainerOp) healthcheckDrift(current *target.Healthcheck) []spec.DriftDetail {
+	if op.healthcheck == nil {
+		return nil
+	}
+	var drift []spec.DriftDetail
+	want := op.healthcheck
+
+	if current == nil {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "healthcheck.cmd",
+			Current: "(none)",
+			Desired: want.Cmd,
+		})
+		return drift
+	}
+
+	if current.Cmd != want.Cmd {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "healthcheck.cmd",
+			Current: current.Cmd,
+			Desired: want.Cmd,
+		})
+	}
+	if current.Interval != want.Interval {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "healthcheck.interval",
+			Current: current.Interval.String(),
+			Desired: want.Interval.String(),
+		})
+	}
+	if current.Timeout != want.Timeout {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "healthcheck.timeout",
+			Current: current.Timeout.String(),
+			Desired: want.Timeout.String(),
+		})
+	}
+	if current.Retries != want.Retries {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "healthcheck.retries",
+			Current: fmt.Sprintf("%d", current.Retries),
+			Desired: fmt.Sprintf("%d", want.Retries),
+		})
+	}
+	if current.StartPeriod != want.StartPeriod {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "healthcheck.start_period",
+			Current: current.StartPeriod.String(),
+			Desired: want.StartPeriod.String(),
+		})
+	}
 	return drift
 }
 
@@ -383,27 +446,97 @@ func (op *ensureContainerOp) executeRunning(
 		if err := cm.StartContainer(ctx, op.name); err != nil {
 			return spec.Result{}, op.cmdErr("start", err)
 		}
+		if err := op.waitHealthy(ctx, cm); err != nil {
+			return spec.Result{}, err
+		}
 		return spec.Result{Changed: true}, nil
 	}
 	if !info.Running {
 		if err := cm.StartContainer(ctx, op.name); err != nil {
 			return spec.Result{}, op.cmdErr("start", err)
 		}
+		if err := op.waitHealthy(ctx, cm); err != nil {
+			return spec.Result{}, err
+		}
 		return spec.Result{Changed: true}, nil
 	}
 	return spec.Result{}, nil
 }
 
+func (op *ensureContainerOp) waitHealthy(ctx context.Context, cm target.ContainerManager) error {
+	if op.healthcheck == nil {
+		return nil
+	}
+
+	poll := min(op.healthcheck.Interval, healthPollCeil)
+	if poll == 0 {
+		poll = healthPollCeil
+	}
+
+	// Timeout: start_period + interval * retries, or 60s minimum.
+	retries := op.healthcheck.Retries
+	if retries == 0 {
+		retries = 3
+	}
+	deadline := op.healthcheck.StartPeriod + poll*time.Duration(retries+1)
+	if deadline < 60*time.Second {
+		deadline = 60 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, deadline)
+	defer cancel()
+
+	ticker := time.NewTicker(poll)
+	defer ticker.Stop()
+
+	check := func() (done bool, err error) {
+		info, exists, inspectErr := cm.InspectContainer(ctx, op.name)
+		if inspectErr != nil || !exists {
+			return false, nil
+		}
+		switch info.HealthStatus {
+		case "healthy":
+			return true, nil
+		case "unhealthy":
+			return true, ContainerUnhealthyError{
+				Name:   op.name,
+				Source: op.step.Source,
+			}
+		}
+		return false, nil
+	}
+
+	// Check immediately, then poll at interval.
+	if done, err := check(); done || err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return HealthWaitTimeoutError{
+				Name:   op.name,
+				Source: op.step.Source,
+			}
+		case <-ticker.C:
+			if done, err := check(); done || err != nil {
+				return err
+			}
+		}
+	}
+}
+
 func (op *ensureContainerOp) create(ctx context.Context, cm target.ContainerManager) error {
 	err := cm.CreateContainer(ctx, target.ContainerInfo{
-		Name:    op.name,
-		Image:   op.image,
-		Restart: op.restart,
-		Ports:   op.ports,
-		Env:     op.env,
-		Mounts:  op.mounts,
-		Args:    op.args,
-		Labels:  op.labels,
+		Name:        op.name,
+		Image:       op.image,
+		Restart:     op.restart,
+		Ports:       op.ports,
+		Env:         op.env,
+		Mounts:      op.mounts,
+		Args:        op.args,
+		Labels:      op.labels,
+		Healthcheck: op.healthcheck,
 	})
 	if err != nil {
 		return op.cmdErr("create", err)
