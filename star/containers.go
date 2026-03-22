@@ -3,11 +3,14 @@
 package star
 
 import (
+	"strings"
+
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/container"
+	"scampi.dev/scampi/target"
 )
 
 // containerModule builds the `container` namespace (container.instance).
@@ -20,7 +23,7 @@ func containerModule() *starlarkstruct.Module {
 	}
 }
 
-// container.instance(name, image, state?, restart?, ports?, env?, desc?, on_change?)
+// container.instance(name, image, state?, restart?, ports?, env?, mounts?, desc?, on_change?)
 func builtinContainerInstance(
 	thread *starlark.Thread,
 	_ *starlark.Builtin,
@@ -34,6 +37,7 @@ func builtinContainerInstance(
 		restart     = "unless-stopped"
 		portsVal    *starlark.List
 		envVal      *starlark.Dict
+		mountsVal   *starlark.List
 		desc        string
 		onChangeVal starlark.Value
 	)
@@ -44,6 +48,7 @@ func builtinContainerInstance(
 		"restart?", &restart,
 		"ports?", &portsVal,
 		"env?", &envVal,
+		"mounts?", &mountsVal,
 		"desc?", &desc,
 		"on_change?", &onChangeVal,
 	); err != nil {
@@ -71,8 +76,19 @@ func builtinContainerInstance(
 		}
 	}
 
+	var mounts []target.Mount
+	if mountsVal != nil {
+		raw, parseErr := stringList(mountsVal, "container.instance", "mounts")
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		for _, s := range raw {
+			mounts = append(mounts, parseMount(s))
+		}
+	}
+
 	span := callSpan(thread)
-	fields := kwargsFieldSpans(thread, "name", "image", "state", "restart", "ports", "env")
+	fields := kwargsFieldSpans(thread, "name", "image", "state", "restart", "ports", "env", "mounts")
 
 	return &StarlarkStep{
 		Instance: spec.StepInstance{
@@ -81,11 +97,26 @@ func builtinContainerInstance(
 			Config: &container.InstanceConfig{
 				Desc: desc, Name: name, Image: image,
 				State: state, Restart: restart, Ports: ports,
-				Env: env,
+				Env: env, Mounts: mounts,
 			},
 			OnChange: hookIDs,
 			Source:   span,
 			Fields:   fields,
 		},
 	}, nil
+}
+
+func parseMount(s string) target.Mount {
+	parts := strings.SplitN(s, ":", 3)
+	m := target.Mount{}
+	if len(parts) >= 1 {
+		m.Source = parts[0]
+	}
+	if len(parts) >= 2 {
+		m.Target = parts[1]
+	}
+	if len(parts) == 3 && parts[2] == "ro" {
+		m.ReadOnly = true
+	}
+	return m
 }

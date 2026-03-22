@@ -5,6 +5,7 @@ package container
 import (
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 // State represents the desired container state.
@@ -54,6 +55,7 @@ type (
 		Restart string            `step:"Restart policy" default:"unless-stopped" example:"always|on-failure|no"`
 		Ports   []string          `step:"Port mappings (host:container)" optional:"true" example:"[\"9090:9090\"]"`
 		Env     map[string]string `step:"Environment variables" optional:"true" example:"{\"DB_HOST\": \"db.local\"}"`
+		Mounts  []target.Mount    `step:"Bind mounts (host:container[:ro])" optional:"true" example:"[\"/data:/data\"]"`
 	}
 	instanceAction struct {
 		desc    string
@@ -63,6 +65,7 @@ type (
 		restart string
 		ports   []string
 		env     map[string]string
+		mounts  []target.Mount
 		step    spec.StepInstance
 	}
 )
@@ -88,6 +91,7 @@ func (Instance) Plan(step spec.StepInstance) (spec.Action, error) {
 		restart: cfg.Restart,
 		ports:   cfg.Ports,
 		env:     cfg.Env,
+		mounts:  cfg.Mounts,
 		step:    step,
 	}, nil
 }
@@ -119,11 +123,45 @@ func (c *InstanceConfig) validate(step spec.StepInstance) error {
 		}
 	}
 
+	for _, m := range c.Mounts {
+		if m.Source == "" || m.Target == "" {
+			return InvalidMountError{
+				Got:    m.String(),
+				Reason: `must be "host:container" or "host:container:ro"`,
+				Source: step.Fields["mounts"].Value,
+			}
+		}
+		if m.Source[0] != '/' {
+			return InvalidMountError{
+				Got:    m.String(),
+				Reason: "host path must be absolute",
+				Source: step.Fields["mounts"].Value,
+			}
+		}
+		if m.Target[0] != '/' {
+			return InvalidMountError{
+				Got:    m.String(),
+				Reason: "container path must be absolute",
+				Source: step.Fields["mounts"].Value,
+			}
+		}
+	}
+
 	return nil
 }
 
 func (a *instanceAction) Desc() string { return a.desc }
 func (a *instanceAction) Kind() string { return "container.instance" }
+
+func (a *instanceAction) Inputs() []spec.Resource {
+	var r []spec.Resource
+	for _, m := range a.mounts {
+		r = append(r, spec.PathResource(m.Source))
+	}
+	return r
+}
+
+func (a *instanceAction) Promises() []spec.Resource { return nil }
 
 func (a *instanceAction) Ops() []spec.Op {
 	op := &ensureContainerOp{
@@ -133,6 +171,7 @@ func (a *instanceAction) Ops() []spec.Op {
 		restart: a.restart,
 		ports:   a.ports,
 		env:     a.env,
+		mounts:  a.mounts,
 		step:    a.step,
 	}
 	op.SetAction(a)

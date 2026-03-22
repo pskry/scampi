@@ -72,6 +72,51 @@ func (e EmptyImageError) EventTemplate() event.Template {
 	}
 }
 
+type InvalidMountError struct {
+	diagnostic.FatalError
+	Got    string
+	Reason string
+	Source spec.SourceSpan
+}
+
+func (e InvalidMountError) Error() string {
+	return fmt.Sprintf("invalid mount %q: %s", e.Got, e.Reason)
+}
+
+func (e InvalidMountError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.container.InvalidMount",
+		Text:   `invalid mount "{{.Got}}"`,
+		Hint:   "{{.Reason}}",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+type MountSourceMissingError struct {
+	diagnostic.FatalError
+	Path   string
+	Source spec.SourceSpan
+}
+
+func (e MountSourceMissingError) Error() string {
+	return fmt.Sprintf("mount source directory %q does not exist", e.Path)
+}
+
+func (e MountSourceMissingError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.container.MountSourceMissing",
+		Text:   `mount source "{{.Path}}" does not exist`,
+		Hint:   `add dir(path = "{{.Path}}") before this step`,
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+func (e MountSourceMissingError) DeferredResource() spec.Resource {
+	return spec.PathResource(e.Path)
+}
+
 type ContainerCommandError struct {
 	diagnostic.FatalError
 	Op     string

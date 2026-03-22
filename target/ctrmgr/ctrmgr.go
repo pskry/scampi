@@ -31,6 +31,13 @@ func (b *Backend) CmdCreate(opts CreateOpts) string {
 	for _, p := range opts.Ports {
 		parts = append(parts, "-p", target.ShellQuote(p))
 	}
+	for _, m := range opts.Mounts {
+		flag := "type=bind,source=" + m.Source + ",target=" + m.Target
+		if m.ReadOnly {
+			flag += ",readonly"
+		}
+		parts = append(parts, "--mount", target.ShellQuote(flag))
+	}
 	if len(opts.Env) > 0 {
 		keys := make([]string, 0, len(opts.Env))
 		for k := range opts.Env {
@@ -68,4 +75,5 @@ type CreateOpts struct {
 	Restart string
 	Ports   []string
 	Env     map[string]string
+	Mounts  []target.Mount
 }

@@ -44,6 +44,7 @@ func (b Base) CreateContainer(ctx context.Context, opts target.ContainerInfo) er
 		Restart: opts.Restart,
 		Ports:   opts.Ports,
 		Env:     opts.Env,
+		Mounts:  opts.Mounts,
 	})
 	result, err := b.runContainer(ctx, cmd)
 	if err != nil {
@@ -101,6 +102,12 @@ func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 		State struct {
 			Running bool `json:"Running"`
 		} `json:"State"`
+		Mounts []struct {
+			Type        string `json:"Type"`
+			Source      string `json:"Source"`
+			Destination string `json:"Destination"`
+			RW          bool   `json:"RW"`
+		} `json:"Mounts"`
 		HostConfig struct {
 			RestartPolicy struct {
 				Name string `json:"Name"`
@@ -134,11 +141,25 @@ func parseInspect(jsonStr string) (target.ContainerInfo, error) {
 		}
 	}
 
+	var mounts []target.Mount
+	for _, m := range raw.Mounts {
+		if m.Type != "bind" {
+			continue
+		}
+		mounts = append(mounts, target.Mount{
+			Source:   m.Source,
+			Target:   m.Destination,
+			ReadOnly: !m.RW,
+		})
+	}
+	sort.Slice(mounts, func(i, j int) bool { return mounts[i].Source < mounts[j].Source })
+
 	return target.ContainerInfo{
 		Image:   raw.Config.Image,
 		Running: raw.State.Running,
 		Restart: raw.HostConfig.RestartPolicy.Name,
 		Ports:   ports,
 		Env:     env,
+		Mounts:  mounts,
 	}, nil
 }

@@ -337,6 +337,192 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
+func TestContainer_WithMounts(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		mounts=["/opt/data:/data", "/opt/config:/config:ro"],
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Dirs["/opt/data"] = 0o755
+	tgt.Dirs["/opt/config"] = 0o755
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info, ok := tgt.Containers["app"]
+	if !ok {
+		t.Fatal("container not created")
+	}
+	if len(info.Mounts) != 2 {
+		t.Fatalf("mounts: got %d, want 2", len(info.Mounts))
+	}
+}
+
+func TestContainer_MountIdempotent(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		mounts=["/opt/data:/data"],
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+		Mounts:  []target.Mount{{Source: "/opt/data", Target: "/data"}},
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	for _, ev := range rec.opEvents {
+		if ev.Kind == event.OpExecuted {
+			t.Error("expected no op executions on idempotent run")
+		}
+	}
+}
+
+func TestContainer_MountDrift_Recreates(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		mounts=["/opt/new:/data"],
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.Dirs["/opt/new"] = 0o755
+	tgt.Containers["app"] = target.ContainerInfo{
+		Name: "app", Image: "nginx:1.25", Running: true,
+		Restart: "unless-stopped",
+		Mounts:  []target.Mount{{Source: "/opt/old", Target: "/data"}},
+	}
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info := tgt.Containers["app"]
+	wantMount := target.Mount{Source: "/opt/new", Target: "/data"}
+	if len(info.Mounts) != 1 || info.Mounts[0] != wantMount {
+		t.Errorf("mounts: got %v, want [%s]", info.Mounts, wantMount)
+	}
+	if !info.Running {
+		t.Error("container should be running after recreate")
+	}
+}
+
+func TestContainer_MountSourceMissing_Aborts(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		mounts=["/nonexistent:/data"],
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	err = e.Apply(context.Background())
+	if err == nil {
+		t.Fatal("expected abort when mount source does not exist")
+	}
+}
+
+func TestContainer_MountSourcePromised_Deferred(t *testing.T) {
+	cfgStr := `
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	dir(path="/opt/data"),
+	container.instance(
+		name="app",
+		image="nginx:1.25",
+		mounts=["/opt/data:/data"],
+	),
+])
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	if err := e.Apply(context.Background()); err != nil {
+		t.Fatalf("Apply: %v\n%s", err, rec)
+	}
+
+	info, ok := tgt.Containers["app"]
+	if !ok {
+		t.Fatal("container not created")
+	}
+	if !info.Running {
+		t.Error("container should be running")
+	}
+}
+
 func TestContainer_PortDrift_Recreates(t *testing.T) {
 	cfgStr := `
 target.local(name="local")

@@ -83,6 +83,22 @@ type (
 		Reload(ctx context.Context, name string) error
 		SupportsReload() bool
 	}
+	Mount struct {
+		Source   string // host path (absolute)
+		Target   string // container path (absolute)
+		ReadOnly bool
+	}
+)
+
+func (m Mount) String() string {
+	s := m.Source + ":" + m.Target
+	if m.ReadOnly {
+		s += ":ro"
+	}
+	return s
+}
+
+type (
 	ContainerInfo struct {
 		Name    string
 		Image   string
@@ -90,6 +106,7 @@ type (
 		Restart string
 		Ports   []string // "host:container" format
 		Env     map[string]string
+		Mounts  []Mount
 	}
 	ContainerManager interface {
 		InspectContainer(ctx context.Context, name string) (ContainerInfo, bool, error)

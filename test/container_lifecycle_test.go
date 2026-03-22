@@ -246,6 +246,45 @@ deploy(name="test", targets=["local"], steps=[
 	}
 }
 
+func TestContainerLifecycle_Mounts(t *testing.T) {
+	name := containerName(t)
+	tgt := setupContainerTest(t, name)
+
+	mountDir := t.TempDir()
+
+	cfgStr := fmt.Sprintf(`
+target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+	container.instance(
+		name="%s",
+		image="traefik/whoami",
+		mounts=["%s:/data:ro"],
+	),
+])
+`, name, mountDir)
+
+	applyContainerConfig(t, cfgStr, tgt)
+
+	cm := tgt.(target.ContainerManager)
+	info, exists, err := cm.InspectContainer(context.Background(), name)
+	if err != nil {
+		t.Fatalf("inspect: %v", err)
+	}
+	if !exists {
+		t.Fatal("container should exist")
+	}
+	wantMount := target.Mount{Source: mountDir, Target: "/data", ReadOnly: true}
+	found := false
+	for _, m := range info.Mounts {
+		if m == wantMount {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("mounts: got %v, want to contain %s", info.Mounts, wantMount)
+	}
+}
+
 func TestContainerLifecycle_Stopped(t *testing.T) {
 	name := containerName(t)
 	tgt := setupContainerTest(t, name)

@@ -6,22 +6,23 @@ Manage container lifecycle: running, stopped, or absent. See the
 [container module overview](../) for supported runtimes.
 
 > [!TIP]
-> This is the MVP surface. Volumes, networks, labels, healthchecks, and
-> command arguments are planned for future releases.
+> This is the MVP surface. Named volumes, networks, labels, healthchecks,
+> and command arguments are planned for future releases.
 
 ## Fields
 
-| Field     | Type   | Required | Default            | Description                        |
-| --------- | ------ | :------: | ------------------ | ---------------------------------- |
-| `name`    | string |    ✓     |                    | Container name                     |
-| `image`   | string |    ✓*    |                    | Container image (tag or digest)    |
-| `desc`    | string |          |                    | Human-readable description         |
-| `state`   | string |          | `"running"`        | Desired state (see below)          |
-| `restart` | string |          | `"unless-stopped"` | Restart policy (see below)         |
-| `ports`   | list   |          |                    | Port mappings (`"host:container"`) |
-| `env`     | dict   |          |                    | Environment variables              |
+| Field     | Type   | Required | Default            | Description                           |
+| --------- | ------ | :------: | ------------------ | ------------------------------------- |
+| `name`    | string |    ✓     |                    | Container name                        |
+| `image`   | string |  ✓[^1]   |                    | Container image (tag or digest)       |
+| `desc`    | string |          |                    | Human-readable description            |
+| `state`   | string |          | `"running"`        | Desired state (see below)             |
+| `restart` | string |          | `"unless-stopped"` | Restart policy (see below)            |
+| `ports`   | list   |          |                    | Port mappings (`"host:container"`)    |
+| `env`     | dict   |          |                    | Environment variables                 |
+| `mounts`  | list   |          |                    | Bind mounts (`"host:container[:ro]"`) |
 
-\* `image` is required when state is `running` or `stopped`, optional when `absent`.
+[^1]: Required when state is `running` or `stopped`, optional when `absent`.
 
 ## States
 
@@ -72,8 +73,8 @@ core principle, that's the wrong default.
 The step produces a single op that handles the full lifecycle:
 
 1. **Check**: inspect the container. Compare image, restart policy, ports,
-   and environment variables against the declared config. Any drift →
-   unsatisfied.
+   environment variables, and bind mounts against the declared config.
+   Any drift → unsatisfied.
 2. **Execute**: depending on the desired state and current state:
    - **Create**: create with the declared config, then start
    - **Recreate**: stop → remove → create → start
@@ -117,6 +118,28 @@ container.instance(
 
 Only declared variables are checked for drift — extra variables set by the
 base image are ignored.
+
+### Bind mount host directories
+
+```python
+dir(path = "/opt/prometheus/data")
+
+container.instance(
+    name = "prometheus",
+    image = "prom/prometheus:v3.2.0",
+    mounts = ["/opt/prometheus/data:/prometheus"],
+)
+```
+
+Host directories are **not** created by the container step — use `dir()`
+before it. The engine automatically orders the `dir` step before the
+container step via resource dependencies.
+
+Append `:ro` to make the mount read-only:
+
+```python
+mounts = ["/opt/config:/etc/app:ro"],
+```
 
 ### Remove a container
 

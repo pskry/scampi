@@ -5,6 +5,7 @@ package container
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/source"
@@ -23,6 +24,7 @@ type ensureContainerOp struct {
 	restart string
 	ports   []string
 	env     map[string]string
+	mounts  []target.Mount
 	step    spec.StepInstance
 }
 
@@ -40,6 +42,14 @@ func (op *ensureContainerOp) Check(
 			Name:   op.name,
 			Stderr: err.Error(),
 			Source: op.step.Source,
+		}
+	}
+
+	// When the container will be created (or recreated), verify mount sources.
+	needsCreate := !exists || (op.state != StateAbsent && len(op.configDrift(info)) > 0)
+	if needsCreate && op.state != StateAbsent {
+		if err := op.checkMountSources(ctx, tgt); err != nil {
+			return spec.CheckUnsatisfied, nil, err
 		}
 	}
 
@@ -123,17 +133,63 @@ func (op *ensureContainerOp) configDrift(info target.ContainerInfo) []spec.Drift
 	copy(want, op.ports)
 	sort.Strings(want)
 
-	if !portsEqual(have, want) {
+	if !slicesEqual(have, want) {
 		drift = append(drift, spec.DriftDetail{
 			Field:   "ports",
-			Current: portsStr(have),
-			Desired: portsStr(want),
+			Current: joinOrNone(have),
+			Desired: joinOrNone(want),
 		})
 	}
 
 	drift = append(drift, op.envDrift(info.Env)...)
+	drift = append(drift, op.mountDrift(info.Mounts)...)
 
 	return drift
+}
+
+func (op *ensureContainerOp) mountDrift(current []target.Mount) []spec.DriftDetail {
+	have := mountSet(current)
+	want := mountSet(op.mounts)
+	if mountsEqual(have, want) {
+		return nil
+	}
+	return []spec.DriftDetail{{
+		Field:   "mounts",
+		Current: mountsStr(current),
+		Desired: mountsStr(op.mounts),
+	}}
+}
+
+func mountSet(mounts []target.Mount) map[target.Mount]bool {
+	s := make(map[target.Mount]bool, len(mounts))
+	for _, m := range mounts {
+		s[m] = true
+	}
+	return s
+}
+
+func mountsEqual(a, b map[target.Mount]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if !b[k] {
+			return false
+		}
+	}
+	return true
+}
+
+func mountsStr(mounts []target.Mount) string {
+	if len(mounts) == 0 {
+		return "(none)"
+	}
+	strs := make([]string, len(mounts))
+	for i, m := range mounts {
+		strs[i] = m.String()
+	}
+	sort.Strings(strs)
+	return strings.Join(strs, ", ")
 }
 
 func (op *ensureContainerOp) envDrift(current map[string]string) []spec.DriftDetail {
@@ -279,9 +335,34 @@ func (op *ensureContainerOp) create(ctx context.Context, cm target.ContainerMana
 		Restart: op.restart,
 		Ports:   op.ports,
 		Env:     op.env,
+		Mounts:  op.mounts,
 	})
 	if err != nil {
 		return op.cmdErr("create", err)
+	}
+	return nil
+}
+
+func (op *ensureContainerOp) checkMountSources(ctx context.Context, tgt target.Target) error {
+	fs := target.Must[target.Filesystem](ensureContainerID, tgt)
+	for _, m := range op.mounts {
+		info, err := fs.Stat(ctx, m.Source)
+		if err != nil {
+			if target.IsNotExist(err) {
+				return MountSourceMissingError{
+					Path:   m.Source,
+					Source: op.step.Fields["mounts"].Value,
+				}
+			}
+			return err
+		}
+		if !info.IsDir() {
+			return InvalidMountError{
+				Got:    m.String(),
+				Reason: "mount source is not a directory",
+				Source: op.step.Fields["mounts"].Value,
+			}
+		}
 	}
 	return nil
 }
@@ -295,11 +376,15 @@ func (op *ensureContainerOp) cmdErr(operation string, err error) ContainerComman
 	}
 }
 
-func (ensureContainerOp) RequiredCapabilities() capability.Capability {
-	return capability.Container
+func (op ensureContainerOp) RequiredCapabilities() capability.Capability {
+	caps := capability.Container
+	if len(op.mounts) > 0 {
+		caps |= capability.Filesystem
+	}
+	return caps
 }
 
-func portsEqual(a, b []string) bool {
+func slicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -311,7 +396,7 @@ func portsEqual(a, b []string) bool {
 	return true
 }
 
-func portsStr(ports []string) string {
+func joinOrNone(ports []string) string {
 	if len(ports) == 0 {
 		return "(none)"
 	}
