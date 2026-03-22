@@ -78,6 +78,40 @@ func (e ExtractionError) EventTemplate() event.Template {
 	}
 }
 
+// ArchiveReadError is raised when reading archive contents fails during extraction.
+type ArchiveReadError struct {
+	diagnostic.FatalError
+	Format string
+	Entry  string
+	Err    error
+}
+
+func (e ArchiveReadError) Error() string {
+	if e.Entry != "" {
+		return fmt.Sprintf("reading %s entry %q: %v", e.Format, e.Entry, e.Err)
+	}
+	return fmt.Sprintf("reading %s: %v", e.Format, e.Err)
+}
+
+func (e ArchiveReadError) Unwrap() error { return e.Err }
+
+func (e ArchiveReadError) EventTemplate() event.Template {
+	if e.Entry != "" {
+		return event.Template{
+			ID:   "builtin.unarchive.ArchiveReadEntry",
+			Text: `reading {{.Format}} entry "{{.Entry}}" failed`,
+			Hint: "the archive may be corrupt or truncated",
+			Data: e,
+		}
+	}
+	return event.Template{
+		ID:   "builtin.unarchive.ArchiveRead",
+		Text: "reading {{.Format}} failed",
+		Hint: "the archive may be corrupt or truncated",
+		Data: e,
+	}
+}
+
 func extractionAdvice(stderr string) string {
 	lower := strings.ToLower(stderr)
 	if strings.Contains(lower, "cannot open") ||

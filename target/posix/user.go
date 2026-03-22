@@ -4,10 +4,10 @@ package posix
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
+	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/target"
 )
 
@@ -84,7 +84,8 @@ func (b Base) CreateUser(ctx context.Context, info target.UserInfo) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("useradd %s failed (exit %d): %s", info.Name, result.ExitCode, result.Stderr)
+		// bare-error: system command error, wrapped by step before reaching engine
+		return errs.Errorf("useradd %s failed (exit %d): %s", info.Name, result.ExitCode, result.Stderr)
 	}
 	return nil
 }
@@ -118,7 +119,8 @@ func (b Base) ModifyUser(ctx context.Context, info target.UserInfo) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("usermod %s failed (exit %d): %s", info.Name, result.ExitCode, result.Stderr)
+		// bare-error: system command error, wrapped by step before reaching engine
+		return errs.Errorf("usermod %s failed (exit %d): %s", info.Name, result.ExitCode, result.Stderr)
 	}
 	return nil
 }
@@ -138,7 +140,8 @@ func (b Base) DeleteUser(ctx context.Context, name string) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("userdel %s failed (exit %d): %s", name, result.ExitCode, result.Stderr)
+		// bare-error: system command error, wrapped by step before reaching engine
+		return errs.Errorf("userdel %s failed (exit %d): %s", name, result.ExitCode, result.Stderr)
 	}
 	return nil
 }
@@ -188,7 +191,8 @@ func (b Base) CreateGroup(ctx context.Context, info target.GroupInfo) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("groupadd %s failed (exit %d): %s", info.Name, result.ExitCode, result.Stderr)
+		// bare-error: system command error, wrapped by step before reaching engine
+		return errs.Errorf("groupadd %s failed (exit %d): %s", info.Name, result.ExitCode, result.Stderr)
 	}
 	return nil
 }
@@ -208,7 +212,8 @@ func (b Base) DeleteGroup(ctx context.Context, name string) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("groupdel %s failed (exit %d): %s", name, result.ExitCode, result.Stderr)
+		// bare-error: system command error, wrapped by step before reaching engine
+		return errs.Errorf("groupdel %s failed (exit %d): %s", name, result.ExitCode, result.Stderr)
 	}
 	return nil
 }
@@ -220,7 +225,8 @@ func (b Base) DeleteGroup(ctx context.Context, name string) error {
 func ParsePasswdLine(line string) (target.UserInfo, error) {
 	parts := strings.Split(line, ":")
 	if len(parts) < 7 {
-		return target.UserInfo{}, fmt.Errorf("unexpected passwd format: %q", line)
+		// bare-error: parse error, wrapped by step before reaching engine
+		return target.UserInfo{}, errs.Errorf("unexpected passwd format: %q", line)
 	}
 	uid, _ := strconv.Atoi(parts[2])
 	gid, _ := strconv.Atoi(parts[3])
@@ -237,7 +243,8 @@ func ParsePasswdLine(line string) (target.UserInfo, error) {
 func ParseGroupLine(line string) (target.GroupInfo, error) {
 	parts := strings.Split(line, ":")
 	if len(parts) < 4 {
-		return target.GroupInfo{}, fmt.Errorf("unexpected group format: %q", line)
+		// bare-error: parse error, wrapped by step before reaching engine
+		return target.GroupInfo{}, errs.Errorf("unexpected group format: %q", line)
 	}
 	gid, _ := strconv.Atoi(parts[2])
 	var members []string

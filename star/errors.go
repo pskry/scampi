@@ -676,3 +676,62 @@ func (e *PoisonValueError) setSource(s spec.SourceSpan) {
 		e.Source = s
 	}
 }
+
+// UnhashableTypeError
+// -----------------------------------------------------------------------------
+
+type UnhashableTypeError struct {
+	diagnostic.FatalError
+	TypeName string
+	Source   spec.SourceSpan
+}
+
+func (e UnhashableTypeError) Error() string {
+	return e.TypeName + " values cannot be used as dictionary keys"
+}
+
+func (e UnhashableTypeError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "star.UnhashableType",
+		Text: "{{.TypeName}} values cannot be used as dictionary keys",
+		Hint: "steps, sources, and other complex values can only be used in lists, not as keys",
+		Data: e,
+	}
+}
+
+func (e *UnhashableTypeError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}
+
+// InlineCacheError
+// -----------------------------------------------------------------------------
+
+type InlineCacheError struct {
+	diagnostic.FatalError
+	Detail string
+	Err    error
+	Source spec.SourceSpan
+}
+
+func (e InlineCacheError) Error() string {
+	return "inline: " + e.Detail + ": " + e.Err.Error()
+}
+
+func (e InlineCacheError) Unwrap() error { return e.Err }
+
+func (e InlineCacheError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "star.InlineCacheError",
+		Text: "inline: {{.Detail}}",
+		Hint: "check filesystem permissions on the .scampi-cache directory",
+		Data: e,
+	}
+}
+
+func (e *InlineCacheError) setSource(s spec.SourceSpan) {
+	if e.Source == (spec.SourceSpan{}) {
+		e.Source = s
+	}
+}

@@ -23,7 +23,7 @@ func (p poisonValue) Type() string         { return "declaration" }
 func (p poisonValue) Freeze()              {}
 func (p poisonValue) Truth() starlark.Bool { return starlark.False }
 func (p poisonValue) Hash() (uint32, error) {
-	return 0, fmt.Errorf("%s() is a top-level declaration and cannot be used as a value", p.funcName)
+	return 0, &PoisonValueError{FuncName: p.funcName}
 }
 
 // checkPoison returns an error if v is a poisonValue or contains one nested

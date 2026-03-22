@@ -12,6 +12,7 @@ import (
 	gotmpl "text/template"
 
 	"scampi.dev/scampi/capability"
+	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/sharedops"
@@ -257,7 +258,8 @@ func (op *renderTemplateOp) execError(err error, tmplContent string) TemplateExe
 	key := extractMissingKey(err)
 	if key != "" {
 		return TemplateExecError{
-			Err:    fmt.Errorf("missing template variable %q", key),
+			// bare-error: inner detail of TemplateExecError diagnostic
+			Err:    errs.Errorf("missing template variable %q", key),
 			Source: span,
 		}
 	}

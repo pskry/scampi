@@ -4,11 +4,12 @@ package osutil
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"scampi.dev/scampi/errs"
 )
 
 // RunDiffTool writes current and desired content to temp files and execs the
@@ -20,7 +21,8 @@ import (
 func RunDiffTool(ctx context.Context, tool, destPath string, current, desired []byte) error {
 	dir, err := os.MkdirTemp("", "scampi-inspect-")
 	if err != nil {
-		return fmt.Errorf("creating temp dir: %w", err)
+		// bare-error: diff tool infrastructure, only used for CLI display
+		return errs.Errorf("creating temp dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 
@@ -29,20 +31,24 @@ func RunDiffTool(ctx context.Context, tool, destPath string, current, desired []
 	desiredDir := filepath.Join(dir, "desired")
 
 	if err := os.MkdirAll(currentDir, 0o700); err != nil {
-		return fmt.Errorf("creating current dir: %w", err)
+		// bare-error: diff tool infrastructure, only used for CLI display
+		return errs.Errorf("creating current dir: %w", err)
 	}
 	if err := os.MkdirAll(desiredDir, 0o700); err != nil {
-		return fmt.Errorf("creating desired dir: %w", err)
+		// bare-error: diff tool infrastructure, only used for CLI display
+		return errs.Errorf("creating desired dir: %w", err)
 	}
 
 	currentFile := filepath.Join(currentDir, base)
 	desiredFile := filepath.Join(desiredDir, base)
 
 	if err := os.WriteFile(currentFile, current, 0o600); err != nil {
-		return fmt.Errorf("writing current file: %w", err)
+		// bare-error: diff tool infrastructure, only used for CLI display
+		return errs.Errorf("writing current file: %w", err)
 	}
 	if err := os.WriteFile(desiredFile, desired, 0o600); err != nil {
-		return fmt.Errorf("writing desired file: %w", err)
+		// bare-error: diff tool infrastructure, only used for CLI display
+		return errs.Errorf("writing desired file: %w", err)
 	}
 
 	parts := strings.Fields(tool)
@@ -58,7 +64,8 @@ func RunDiffTool(ctx context.Context, tool, destPath string, current, desired []
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 			return nil
 		}
-		return fmt.Errorf("diff tool %q: %w", parts[0], err)
+		// bare-error: diff tool infrastructure, only used for CLI display
+		return errs.Errorf("diff tool %q: %w", parts[0], err)
 	}
 
 	return nil

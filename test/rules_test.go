@@ -627,3 +627,165 @@ func TestMarkdownTableAlignment(t *testing.T) {
 		walkFile(t, "README.md", readme)
 	}
 }
+
+// Bare error constructors
+// -----------------------------------------------------------------------------
+//
+// fmt.Errorf and errors.New produce errors without diagnostic IDs, source
+// spans, or hints. In user-facing code they cause BUG panics when they leak
+// through the engine boundary (panicIfNotAbortError). Use typed error structs
+// implementing diagnostic.Diagnostic, or errs.BUG for invariant violations.
+//
+// errs.Errorf is allowed when a rationale comment appears on the line
+// immediately above the call. Internal packages (target, secret, etc.) are
+// sanctioned for fmt.Errorf/errors.New because their errors are wrapped by
+// op/step code before reaching the engine.
+
+func TestBareErrorBan(t *testing.T) {
+	root := ".."
+
+	// Always banned — use typed errors or errs.BUG instead.
+	hardBanned := []string{
+		"fmt.Errorf",
+		"errors.New",
+	}
+
+	// Sanctioned files: internal helpers whose fmt.Errorf/errors.New
+	// errors are wrapped before reaching the engine.
+	sanctioned := []string{
+		// none
+	}
+
+	usedSanctions := map[string]bool{}
+
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		if strings.HasSuffix(p, "_test.go") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+
+		// errs/ defines the wrappers — always exempt
+		if strings.HasPrefix(rel, "errs/") {
+			return nil
+		}
+		// test/ is test infrastructure — always exempt
+		if strings.HasPrefix(rel, "test/") {
+			return nil
+		}
+
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, p, nil, parser.ParseComments)
+		if err != nil {
+			return err
+		}
+
+		ast.Inspect(file, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			ident, ok := sel.X.(*ast.Ident)
+			if !ok {
+				return true
+			}
+
+			name := ident.Name + "." + sel.Sel.Name
+			pos := fset.Position(call.Pos())
+
+			// errs.Errorf and errs.New are allowed with a rationale
+			// comment on the preceding line, or above an enclosing
+			// var/const block.
+			if name == "errs.Errorf" || name == "errs.New" {
+				if hasRationaleComment(file, fset, pos.Line-1) ||
+					hasRationaleAboveBlock(file, fset, pos.Line) {
+					return true
+				}
+				t.Errorf(
+					"%s:%d: %s requires a \"// %s ...\" comment on the line above (or above the enclosing var/const block)",
+					rel, pos.Line, name, bareErrorRationale,
+				)
+				return true
+			}
+
+			if !slices.Contains(hardBanned, name) {
+				return true
+			}
+
+			if slices.Contains(sanctioned, rel) {
+				usedSanctions[rel] = true
+				return true
+			}
+
+			t.Errorf(
+				"%s:%d: %s produces bare errors without diagnostic IDs or source spans; "+
+					"use a typed error implementing diagnostic.Diagnostic, or errs.BUG for invariant violations",
+				rel, pos.Line, name,
+			)
+			return true
+		})
+
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Flag stale sanctions
+	for _, s := range sanctioned {
+		if !usedSanctions[s] {
+			t.Errorf("sanctioned file %q no longer uses bare error constructors (remove from sanctioned list)", s)
+		}
+	}
+}
+
+const bareErrorRationale = "bare-error:"
+
+func hasRationaleComment(file *ast.File, fset *token.FileSet, line int) bool {
+	for _, cg := range file.Comments {
+		for _, c := range cg.List {
+			if fset.Position(c.Pos()).Line == line {
+				text := strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
+				if strings.HasPrefix(text, bareErrorRationale) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// hasRationaleAboveBlock checks whether the call at callLine sits inside a
+// var() or const() block that has a bare-error: comment on the line above
+// its opening paren.
+func hasRationaleAboveBlock(file *ast.File, fset *token.FileSet, callLine int) bool {
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || (gd.Tok != token.VAR && gd.Tok != token.CONST) {
+			continue
+		}
+		if gd.Lparen == 0 {
+			continue // not a grouped block
+		}
+		openLine := fset.Position(gd.Lparen).Line
+		closeLine := fset.Position(gd.Rparen).Line
+		if callLine >= openLine && callLine <= closeLine {
+			return hasRationaleComment(file, fset, openLine-1)
+		}
+	}
+	return false
+}

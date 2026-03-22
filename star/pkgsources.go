@@ -37,7 +37,7 @@ func (s *StarlarkPkgSource) Freeze()              {}
 func (s *StarlarkPkgSource) Truth() starlark.Bool { return starlark.True }
 
 func (s *StarlarkPkgSource) Hash() (uint32, error) {
-	return 0, fmt.Errorf("unhashable type: pkg_source")
+	return 0, &UnhashableTypeError{TypeName: "pkg_source"}
 }
 
 // system()

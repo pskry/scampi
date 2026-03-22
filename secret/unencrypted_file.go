@@ -4,7 +4,8 @@ package secret
 
 import (
 	"encoding/json"
-	"fmt"
+
+	"scampi.dev/scampi/errs"
 )
 
 // FileBackend loads secrets from a flat JSON key-value file.
@@ -15,7 +16,8 @@ type FileBackend struct {
 func NewFileBackend(data []byte) (*FileBackend, error) {
 	var raw map[string]string
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parsing secrets file: %w", err)
+		// bare-error: secret backend error, wrapped by SecretBackendError before reaching engine
+		return nil, errs.Errorf("parsing secrets file: %w", err)
 	}
 	return &FileBackend{secrets: raw}, nil
 }

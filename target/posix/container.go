@@ -5,11 +5,11 @@ package posix
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
 
+	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/ctrmgr"
 )
@@ -32,7 +32,8 @@ func (b Base) InspectContainer(ctx context.Context, name string) (target.Contain
 	}
 	info, err := parseInspect(result.Stdout)
 	if err != nil {
-		return target.ContainerInfo{}, false, fmt.Errorf("parsing container inspect: %w", err)
+		// bare-error: container runtime error, wrapped by step before reaching engine
+		return target.ContainerInfo{}, false, errs.Errorf("parsing container inspect: %w", err)
 	}
 	info.Name = name
 	return info, true, nil
@@ -55,7 +56,8 @@ func (b Base) CreateContainer(ctx context.Context, opts target.ContainerInfo) er
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("create container %q: %s", opts.Name, strings.TrimSpace(result.Stderr))
+		// bare-error: container runtime error, wrapped by step before reaching engine
+		return errs.Errorf("create container %q: %s", opts.Name, strings.TrimSpace(result.Stderr))
 	}
 	return nil
 }
@@ -67,7 +69,8 @@ func (b Base) StartContainer(ctx context.Context, name string) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("start container %q: %s", name, strings.TrimSpace(result.Stderr))
+		// bare-error: container runtime error, wrapped by step before reaching engine
+		return errs.Errorf("start container %q: %s", name, strings.TrimSpace(result.Stderr))
 	}
 	return nil
 }
@@ -79,7 +82,8 @@ func (b Base) StopContainer(ctx context.Context, name string) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("stop container %q: %s", name, strings.TrimSpace(result.Stderr))
+		// bare-error: container runtime error, wrapped by step before reaching engine
+		return errs.Errorf("stop container %q: %s", name, strings.TrimSpace(result.Stderr))
 	}
 	return nil
 }
@@ -91,7 +95,8 @@ func (b Base) RemoveContainer(ctx context.Context, name string) error {
 		return err
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("remove container %q: %s", name, strings.TrimSpace(result.Stderr))
+		// bare-error: container runtime error, wrapped by step before reaching engine
+		return errs.Errorf("remove container %q: %s", name, strings.TrimSpace(result.Stderr))
 	}
 	return nil
 }

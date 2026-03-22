@@ -14,13 +14,14 @@ import (
 	"scampi.dev/scampi/errs"
 )
 
+// bare-error: target sentinels, checked via errors.Is by step code
 var (
-	ErrNotExist        = errors.New("path does not exist")
-	ErrPermission      = errors.New("permission denied")
-	ErrUnknownUser     = errors.New("unknown user")
-	ErrUnknownGroup    = errors.New("unknown group")
-	ErrCommandNotFound = errors.New("command not found on target")
-	ErrNoCacheInfo     = errors.New("package cache age not available")
+	ErrNotExist        = errs.New("path does not exist")
+	ErrPermission      = errs.New("permission denied")
+	ErrUnknownUser     = errs.New("unknown user")
+	ErrUnknownGroup    = errs.New("unknown group")
+	ErrCommandNotFound = errs.New("command not found on target")
+	ErrNoCacheInfo     = errs.New("package cache age not available")
 )
 
 type (

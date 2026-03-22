@@ -3,7 +3,6 @@
 package star
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -124,10 +123,12 @@ func builtinContainerInstance(
 	if healthcheckVal != nil && healthcheckVal != starlark.None {
 		shc, ok := healthcheckVal.(*StarlarkHealthcheck)
 		if !ok {
-			return nil, fmt.Errorf(
-				"container.instance: healthcheck must be container.healthcheck.cmd(...), got %s",
-				healthcheckVal.Type(),
-			)
+			return nil, &TypeError{
+				Context:  "container.instance: healthcheck",
+				Expected: "container.healthcheck.cmd(...)",
+				Got:      healthcheckVal.Type(),
+				Source:   resolveArgSpan(thread, "healthcheck"),
+			}
 		}
 		hc = &shc.HC
 	}

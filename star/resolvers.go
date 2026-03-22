@@ -38,7 +38,7 @@ func (s *StarlarkSource) Freeze()              {}
 func (s *StarlarkSource) Truth() starlark.Bool { return starlark.True }
 
 func (s *StarlarkSource) Hash() (uint32, error) {
-	return 0, fmt.Errorf("unhashable type: source")
+	return 0, &UnhashableTypeError{TypeName: "source"}
 }
 
 // local(path)
@@ -83,10 +83,10 @@ func builtinInline(
 	cachePath := ".scampi-cache/inline/" + hexHash
 
 	if err := c.src.EnsureDir(c.ctx, ".scampi-cache/inline"); err != nil {
-		return nil, fmt.Errorf("inline: creating cache dir: %w", err)
+		return nil, &InlineCacheError{Detail: "creating cache dir", Err: err}
 	}
 	if err := c.src.WriteFile(c.ctx, cachePath, []byte(content)); err != nil {
-		return nil, fmt.Errorf("inline: writing cache file: %w", err)
+		return nil, &InlineCacheError{Detail: "writing cache file", Err: err}
 	}
 
 	return &StarlarkSource{

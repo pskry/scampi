@@ -296,7 +296,7 @@ func extractTar(ctx context.Context, fsTgt target.Filesystem, r io.Reader, dest 
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("reading tar: %w", err)
+			return ArchiveReadError{Format: "tar", Err: err}
 		}
 
 		path := filepath.Join(dest, hdr.Name)
@@ -312,7 +312,7 @@ func extractTar(ctx context.Context, fsTgt target.Filesystem, r io.Reader, dest 
 			_ = fsTgt.Mkdir(ctx, dir, 0o755)
 			data, err := io.ReadAll(tr)
 			if err != nil {
-				return fmt.Errorf("reading tar entry %q: %w", hdr.Name, err)
+				return ArchiveReadError{Format: "tar", Entry: hdr.Name, Err: err}
 			}
 			if err := fsTgt.WriteFile(ctx, path, data); err != nil {
 				return err
@@ -324,7 +324,7 @@ func extractTar(ctx context.Context, fsTgt target.Filesystem, r io.Reader, dest 
 func extractZip(ctx context.Context, fsTgt target.Filesystem, data []byte, dest string) error {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return fmt.Errorf("reading zip: %w", err)
+		return ArchiveReadError{Format: "zip", Err: err}
 	}
 
 	for _, f := range zr.File {
@@ -343,12 +343,12 @@ func extractZip(ctx context.Context, fsTgt target.Filesystem, data []byte, dest 
 
 		rc, err := f.Open()
 		if err != nil {
-			return fmt.Errorf("opening zip entry %q: %w", f.Name, err)
+			return ArchiveReadError{Format: "zip", Entry: f.Name, Err: err}
 		}
 		fileData, err := io.ReadAll(rc)
 		_ = rc.Close()
 		if err != nil {
-			return fmt.Errorf("reading zip entry %q: %w", f.Name, err)
+			return ArchiveReadError{Format: "zip", Entry: f.Name, Err: err}
 		}
 		if err := fsTgt.WriteFile(ctx, path, fileData); err != nil {
 			return err

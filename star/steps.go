@@ -43,7 +43,7 @@ func (s *StarlarkStep) Freeze()              {}
 func (s *StarlarkStep) Truth() starlark.Bool { return starlark.True }
 
 func (s *StarlarkStep) Hash() (uint32, error) {
-	return 0, fmt.Errorf("unhashable type: step")
+	return 0, &UnhashableTypeError{TypeName: "step"}
 }
 
 // Step builtin: copy

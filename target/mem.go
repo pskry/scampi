@@ -4,7 +4,6 @@ package target
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"strings"
 	"sync"
@@ -400,7 +399,8 @@ func (m *MemTarget) InstallPkgs(_ context.Context, pkgs []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.CacheStale {
-		return fmt.Errorf("unable to locate package %s", pkgs[0])
+		// bare-error: test-only mock, not reachable through engine
+		return errs.Errorf("unable to locate package %s", pkgs[0])
 	}
 	for _, pkg := range pkgs {
 		m.Pkgs[pkg] = true

@@ -3,11 +3,11 @@
 package secret
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
 	"filippo.io/age"
+	"scampi.dev/scampi/errs"
 )
 
 const (
@@ -31,7 +31,8 @@ func ResolveIdentities(
 	if raw, ok := lookupEnv(envAgeKey); ok && raw != "" {
 		id, err := age.ParseX25519Identity(strings.TrimSpace(raw))
 		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", envAgeKey, err)
+			// bare-error: identity file error, wrapped by SecretBackendError before reaching engine
+			return nil, errs.Errorf("parsing %s: %w", envAgeKey, err)
 		}
 		return []age.Identity{id}, nil
 	}
@@ -40,7 +41,8 @@ func ResolveIdentities(
 	if path, ok := lookupEnv(envAgeKeyFile); ok && path != "" {
 		ids, err := parseKeyFile(readFile, path)
 		if err != nil {
-			return nil, fmt.Errorf("reading %s (%s): %w", envAgeKeyFile, path, err)
+			// bare-error: identity file error, wrapped by SecretBackendError before reaching engine
+			return nil, errs.Errorf("reading %s (%s): %w", envAgeKeyFile, path, err)
 		}
 		return ids, nil
 	}
@@ -52,7 +54,8 @@ func ResolveIdentities(
 		return ids, nil
 	}
 
-	return nil, fmt.Errorf(
+	// bare-error: identity file error, wrapped by SecretBackendError before reaching engine
+	return nil, errs.Errorf(
 		"no age identity found: set $%s, $%s, or create %s",
 		envAgeKey, envAgeKeyFile, defaultPath,
 	)
@@ -83,7 +86,8 @@ func parseKeyFile(readFile func(string) ([]byte, error), path string) ([]age.Ide
 	}
 	ids, err := age.ParseIdentities(strings.NewReader(string(data)))
 	if err != nil {
-		return nil, fmt.Errorf("parsing key file %s: %w", path, err)
+		// bare-error: identity file error, wrapped by SecretBackendError before reaching engine
+		return nil, errs.Errorf("parsing key file %s: %w", path, err)
 	}
 	return ids, nil
 }

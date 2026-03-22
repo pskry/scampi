@@ -329,7 +329,8 @@ func (t *SSHTarget) resolveGID(ctx context.Context, gid int) string {
 	return fmt.Sprintf("%d", gid)
 }
 
-var errSession = errors.New("ssh session")
+// bare-error: sentinel for SSH session errors, wrapped via errs.WrapErrf
+var errSession = errs.New("ssh session")
 
 func (t *SSHTarget) RunCommand(_ context.Context, cmd string) (target.CommandResult, error) {
 	session, err := t.client.NewSession()

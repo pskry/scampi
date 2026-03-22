@@ -11,6 +11,10 @@ func BUG(format string, args ...any) error {
 	return fmt.Errorf("BUG: "+format, args...)
 }
 
+func New(text string) error {
+	return errors.New(text)
+}
+
 func Errorf(format string, args ...any) error {
 	return fmt.Errorf(format, args...)
 }

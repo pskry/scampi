@@ -85,7 +85,8 @@ func main() {
 					case "auto", "always", "never":
 						return nil
 					default:
-						return fmt.Errorf("invalid --color value %q (expected auto, always, or never)", s)
+						// bare-error: CLI flag validation, not reachable through engine
+						return errs.Errorf("invalid --color value %q (expected auto, always, or never)", s)
 					}
 				},
 			},
@@ -448,6 +449,7 @@ func parseColorMode(cmd *cli.Command) (signal.ColorMode, error) {
 	case "never":
 		return signal.ColorNever, nil
 	default:
+		// bare-error: CLI flag validation, not reachable through engine
 		return 0, errs.Errorf("invalid --color value %q (expected auto, always, or never)", s)
 	}
 }

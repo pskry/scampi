@@ -7,7 +7,6 @@ package escalate
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strconv"
@@ -130,7 +129,8 @@ func getOwner(
 	}
 	fields := strings.Fields(strings.TrimSpace(result.Stdout))
 	if len(fields) != 2 {
-		return target.Owner{}, fmt.Errorf("unexpected stat output for %q: %q", path, result.Stdout)
+		// bare-error: wrapped by step before reaching engine
+		return target.Owner{}, errs.Errorf("unexpected stat output for %q: %q", path, result.Stdout)
 	}
 	return target.Owner{User: fields[0], Group: fields[1]}, nil
 }
@@ -156,22 +156,26 @@ func (s StatInfo) Sys() any           { return nil }
 func ParseStatOutput(output, path string) (fs.FileInfo, error) {
 	fields := strings.Fields(strings.TrimSpace(output))
 	if len(fields) < 3 {
-		return nil, fmt.Errorf("unexpected stat output for %q: %q", path, output)
+		// bare-error: stat parse error, wrapped by step before reaching engine
+		return nil, errs.Errorf("unexpected stat output for %q: %q", path, output)
 	}
 
 	rawMode, err := strconv.ParseUint(fields[0], 16, 32)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse mode %q for %q: %w", fields[0], path, err)
+		// bare-error: stat parse error, wrapped by step before reaching engine
+		return nil, errs.Errorf("cannot parse mode %q for %q: %w", fields[0], path, err)
 	}
 
 	size, err := strconv.ParseInt(fields[1], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse size %q for %q: %w", fields[1], path, err)
+		// bare-error: stat parse error, wrapped by step before reaching engine
+		return nil, errs.Errorf("cannot parse size %q for %q: %w", fields[1], path, err)
 	}
 
 	epoch, err := strconv.ParseInt(fields[2], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse mtime %q for %q: %w", fields[2], path, err)
+		// bare-error: stat parse error, wrapped by step before reaching engine
+		return nil, errs.Errorf("cannot parse mtime %q for %q: %w", fields[2], path, err)
 	}
 
 	return StatInfo{

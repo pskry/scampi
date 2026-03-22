@@ -34,7 +34,7 @@ func VerifiedWrite(
 	tmpFile := path.Join(tmpDir, path.Base(dest))
 
 	if err := fsTgt.Mkdir(ctx, tmpDir, fs.FileMode(0o700)); err != nil {
-		return fmt.Errorf("create temp dir for verify: %w", err)
+		return newVerifyIOError("create temp dir", err)
 	}
 	defer func() {
 		_ = fsTgt.Remove(ctx, tmpFile)
@@ -42,13 +42,13 @@ func VerifiedWrite(
 	}()
 
 	if err := fsTgt.WriteFile(ctx, tmpFile, content); err != nil {
-		return fmt.Errorf("write temp file for verify: %w", err)
+		return newVerifyIOError("write temp file", err)
 	}
 
 	cmd := strings.Replace(verifyCmd, "%s", tmpFile, 1)
 	result, err := cmdTgt.RunCommand(ctx, cmd)
 	if err != nil {
-		return fmt.Errorf("verify command: %w", err)
+		return newVerifyIOError("run verify command", err)
 	}
 	if result.ExitCode != 0 {
 		return &VerifyError{
