@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/url"
 	"path"
-	"strings"
 
 	"go.starlark.net/starlark"
 
@@ -133,14 +132,17 @@ func builtinRemote(
 		}
 	}
 
+	var cs spec.Checksum
 	if checksum != "" {
-		if detail := validateChecksum(checksum); detail != "" {
+		parsed, parseErr := spec.ParseChecksum(checksum)
+		if parseErr != nil {
 			return nil, &RemoteChecksumError{
 				Checksum: checksum,
-				Detail:   detail,
+				Detail:   parseErr.Error(),
 				Source:   resolveArgSpan(thread, "checksum"),
 			}
 		}
+		cs = parsed
 	}
 
 	h := sha256.Sum256([]byte(rawURL))
@@ -156,23 +158,9 @@ func builtinRemote(
 			Kind:     spec.SourceRemote,
 			Path:     cachePath,
 			URL:      rawURL,
-			Checksum: checksum,
+			Checksum: cs,
 		},
 	}, nil
-}
-
-func validateChecksum(s string) string {
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 || parts[1] == "" {
-		return fmt.Sprintf("checksum must be \"algo:hex\", got %q", s)
-	}
-	algo := parts[0]
-	switch algo {
-	case "sha256", "sha384", "sha512", "sha1", "md5":
-		return ""
-	default:
-		return fmt.Sprintf("unsupported checksum algorithm %q", algo)
-	}
 }
 
 // resolveArgSpan returns the source span for a kwarg value in a remote() call,

@@ -15,7 +15,6 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"strings"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/diagnostic"
@@ -32,7 +31,7 @@ const downloadID = "builtin.download"
 type DownloadOp struct {
 	BaseOp
 	URL       string
-	Checksum  string // "algo:hex" or empty
+	Checksum  spec.Checksum
 	CachePath string // where to write the downloaded file
 	Client    *http.Client
 }
@@ -59,7 +58,7 @@ func (op *DownloadOp) Check(
 	cached, _ := src.Stat(ctx, op.CachePath)
 
 	// If we have a checksum, we can verify the cached file without a network call.
-	if op.Checksum != "" && cached.Exists {
+	if !op.Checksum.IsZero() && cached.Exists {
 		data, err := src.ReadFile(ctx, op.CachePath)
 		if err == nil {
 			if verifyChecksum(data, op.Checksum) {
@@ -67,7 +66,7 @@ func (op *DownloadOp) Check(
 			}
 			return spec.CheckUnsatisfied, []spec.DriftDetail{{
 				Field:   "checksum",
-				Desired: op.Checksum,
+				Desired: op.Checksum.String(),
 			}}, nil
 		}
 	}
@@ -135,7 +134,7 @@ func (op *DownloadOp) Execute(
 	_ target.Target,
 ) (spec.Result, error) {
 	// Idempotency re-check for checksum-verified files.
-	if op.Checksum != "" {
+	if !op.Checksum.IsZero() {
 		data, err := src.ReadFile(ctx, op.CachePath)
 		if err == nil && verifyChecksum(data, op.Checksum) {
 			return spec.Result{Changed: false}, nil
@@ -175,11 +174,11 @@ func (op *DownloadOp) Execute(
 		}
 	}
 
-	if op.Checksum != "" {
+	if !op.Checksum.IsZero() {
 		if !verifyChecksum(data, op.Checksum) {
 			return spec.Result{}, ChecksumMismatchError{
 				URL:      op.URL,
-				Expected: op.Checksum,
+				Expected: op.Checksum.String(),
 				Got:      computeChecksum(data, op.Checksum),
 				Source:   op.SrcSpan,
 			}
@@ -267,46 +266,30 @@ func (op *DownloadOp) saveMeta(ctx context.Context, src source.Source, meta down
 	_ = src.WriteFile(ctx, op.metaPath(), data)
 }
 
-func verifyChecksum(data []byte, checksum string) bool {
-	algo, expected, ok := parseChecksum(checksum)
-	if !ok {
-		return false
-	}
-	h := newHash(algo)
+// Checksum helpers
+// -----------------------------------------------------------------------------
+
+func verifyChecksum(data []byte, cs spec.Checksum) bool {
+	h := newHash(cs.Algo)
 	_, _ = h.Write(data)
-	got := hex.EncodeToString(h.Sum(nil))
-	return got == expected
+	return hex.EncodeToString(h.Sum(nil)) == cs.Hex
 }
 
-func computeChecksum(data []byte, checksum string) string {
-	algo, _, ok := parseChecksum(checksum)
-	if !ok {
-		return ""
-	}
-	h := newHash(algo)
+func computeChecksum(data []byte, cs spec.Checksum) string {
+	h := newHash(cs.Algo)
 	_, _ = h.Write(data)
-	return algo + ":" + hex.EncodeToString(h.Sum(nil))
+	return cs.Algo.String() + ":" + hex.EncodeToString(h.Sum(nil))
 }
 
-func parseChecksum(s string) (algo, hex string, ok bool) {
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 {
-		return "", "", false
-	}
-	return parts[0], parts[1], true
-}
-
-func newHash(algo string) hash.Hash {
+func newHash(algo spec.ChecksumAlgo) hash.Hash {
 	switch algo {
-	case "sha256":
-		return sha256.New()
-	case "sha384":
+	case spec.AlgoSHA384:
 		return sha512.New384()
-	case "sha512":
+	case spec.AlgoSHA512:
 		return sha512.New()
-	case "sha1":
+	case spec.AlgoSHA1:
 		return sha1.New()
-	case "md5":
+	case spec.AlgoMD5:
 		return md5.New()
 	default:
 		return sha256.New()

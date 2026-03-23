@@ -16,10 +16,10 @@ const (
 // deterministic cache path where the download op will write the file.
 type SourceRef struct {
 	Kind     SourceRefKind
-	Path     string // cache path (set for all kinds after eval)
-	Content  string // SourceInline only: original content (for display/diagnostics)
-	URL      string // SourceRemote only: download URL
-	Checksum string // SourceRemote only: expected checksum ("algo:hex")
+	Path     string   // cache path (set for all kinds after eval)
+	Content  string   // SourceInline only: original content (for display/diagnostics)
+	URL      string   // SourceRemote only: download URL
+	Checksum Checksum // SourceRemote only: expected checksum
 }
 
 func (r SourceRef) NeedsResolution() bool {
