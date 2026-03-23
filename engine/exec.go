@@ -22,9 +22,16 @@ import (
 	"scampi.dev/scampi/target"
 )
 
-const actionTimeout = 5 * time.Minute
+const defaultOpTimeout = 30 * time.Second
 
 const opOutcomeUnknown = model.OpOutcome(0xff)
+
+func opTimeout(op spec.Op) time.Duration {
+	if t, ok := op.(spec.OpTimeout); ok {
+		return t.Timeout()
+	}
+	return defaultOpTimeout
+}
 
 func validateOpReport(r model.OpReport) {
 	switch r.Outcome {
@@ -104,7 +111,10 @@ func (s *scheduler) schedule(n *opNode) {
 			displayID,
 		))
 
-		res, err := n.op.Execute(s.ctx, s.src, s.tgt)
+		opCtx, opCancel := context.WithTimeout(s.ctx, opTimeout(n.op))
+		defer opCancel()
+
+		res, err := n.op.Execute(opCtx, s.src, s.tgt)
 
 		s.emitOp(diagnostic.OpExecuted(
 			s.actIdx,
@@ -161,7 +171,10 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 				displayID,
 			))
 
-			res, drift, err := n.op.Check(ctx, s.src, s.tgt)
+			opCtx, opCancel := context.WithTimeout(ctx, opTimeout(n.op))
+			defer opCancel()
+
+			res, drift, err := n.op.Check(opCtx, s.src, s.tgt)
 			if err != nil {
 				if s.isDeferred(err) {
 					s.mu.Lock()
@@ -379,10 +392,7 @@ func (e *Engine) checkAction(
 	desc := act.Desc()
 	e.em.EmitActionLifecycle(diagnostic.ActionStarted(idx, kind, desc))
 
-	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
-	defer cancel()
-
-	res, err := e.runCheckAction(actCtx, idx, act, promised, "")
+	res, err := e.runCheckAction(ctx, idx, act, promised, "")
 
 	e.em.EmitActionLifecycle(
 		diagnostic.ActionFinished(
@@ -525,10 +535,7 @@ func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (m
 	desc := act.Desc()
 	e.em.EmitActionLifecycle(diagnostic.ActionStarted(idx, kind, desc))
 
-	actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
-	defer cancel()
-
-	res, err := e.runAction(actCtx, idx, act, "")
+	res, err := e.runAction(ctx, idx, act, "")
 
 	e.em.EmitActionLifecycle(
 		diagnostic.ActionFinished(

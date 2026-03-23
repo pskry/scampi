@@ -5,6 +5,7 @@ package spec
 
 import (
 	"context"
+	"time"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/source"
@@ -143,6 +144,11 @@ type (
 		Desired string
 	}
 
+	// OpTimeout is an optional interface that ops can implement to declare
+	// a per-op timeout. Ops that don't implement it get the default.
+	OpTimeout interface {
+		Timeout() time.Duration
+	}
 	// Inspectable is an optional interface that ops producing file content
 	// can implement to support `scampi inspect`.
 	Inspectable interface {

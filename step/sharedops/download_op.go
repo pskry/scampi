@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"time"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/diagnostic"
@@ -39,6 +40,8 @@ type DownloadOp struct {
 func (op *DownloadOp) metaPath() string {
 	return op.CachePath + ".meta"
 }
+
+func (*DownloadOp) Timeout() time.Duration { return 10 * time.Minute }
 
 // downloadMeta stores HTTP caching headers alongside downloaded files.
 type downloadMeta struct {

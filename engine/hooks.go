@@ -77,16 +77,13 @@ func (e *Engine) executeHooks(
 		for _, act := range actions {
 			hookIdx := len(stepReport.Actions) + len(hookReports)
 
-			actCtx, cancel := context.WithTimeout(ctx, actionTimeout)
-
 			var ar model.ActionReport
 			var err error
 			if checkOnly {
-				ar, err = e.runCheckAction(actCtx, hookIdx, act, promisedPaths, hookID)
+				ar, err = e.runCheckAction(ctx, hookIdx, act, promisedPaths, hookID)
 			} else {
-				ar, err = e.runAction(actCtx, hookIdx, act, hookID)
+				ar, err = e.runAction(ctx, hookIdx, act, hookID)
 			}
-			cancel()
 
 			hookReports = append(hookReports, ar)
 			addSummary(&aggregate, ar.Summary)
