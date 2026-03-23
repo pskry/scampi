@@ -38,6 +38,12 @@ assign-issue number user:
     "{{codeberg_api}}" "{{codeberg_repo}}" \
     "{{number}}" "{{user}}"
 
+[doc("Add a label to an issue (without removing existing labels)")]
+add-label number label:
+  ./scripts/codeberg-add-label.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" \
+    "{{number}}" "{{label}}"
+
 [doc("Comment on an issue")]
 comment-issue number body:
   ./scripts/codeberg-comment-issue.sh \
