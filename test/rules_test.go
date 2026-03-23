@@ -716,7 +716,8 @@ func TestBareErrorBan(t *testing.T) {
 					return true
 				}
 				t.Errorf(
-					"%s:%d: %s requires a \"// %s ...\" comment on the line above (or above the enclosing var/const block)",
+					"%s:%d: %s requires a \"// %s ...\" comment on the line above"+
+						" (or above the enclosing var/const block)",
 					rel, pos.Line, name, bareErrorRationale,
 				)
 				return true
