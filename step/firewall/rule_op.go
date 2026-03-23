@@ -25,7 +25,7 @@ const (
 
 type ensureRuleOp struct {
 	sharedops.BaseOp
-	port   string
+	port   FirewallPort
 	action Action
 }
 
@@ -81,12 +81,12 @@ func (op *ensureRuleOp) checkUFW(
 			stderr = fmt.Sprintf("exit %d", result.ExitCode)
 		}
 		return spec.CheckUnsatisfied, nil, RuleCheckError{
-			Port:   op.port,
+			Port:   op.port.String(),
 			Stderr: stderr,
 		}
 	}
 
-	needle := fmt.Sprintf("ufw %s %s", op.action, op.port)
+	needle := fmt.Sprintf("ufw %s %s", op.action, op.port.String())
 	for _, line := range strings.Split(result.Stdout, "\n") {
 		if strings.TrimSpace(line) == needle {
 			return spec.CheckSatisfied, nil, nil
@@ -96,7 +96,7 @@ func (op *ensureRuleOp) checkUFW(
 	return spec.CheckUnsatisfied, []spec.DriftDetail{{
 		Field:   "rule",
 		Current: "(absent)",
-		Desired: fmt.Sprintf("%s %s", op.action, op.port),
+		Desired: fmt.Sprintf("%s %s", op.action, op.port.String()),
 	}}, nil
 }
 
@@ -105,7 +105,7 @@ func (op *ensureRuleOp) checkFirewalld(
 	cmdr target.Command,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
 	if op.action == ActionAllow {
-		result, err := cmdr.RunCommand(ctx, fmt.Sprintf("firewall-cmd --query-port=%s", op.port))
+		result, err := cmdr.RunCommand(ctx, fmt.Sprintf("firewall-cmd --query-port=%s", op.port.String()))
 		if err != nil {
 			return spec.CheckUnsatisfied, nil, sharedops.DiagnoseTargetError(err)
 		}
@@ -126,7 +126,7 @@ func (op *ensureRuleOp) checkFirewalld(
 	return spec.CheckUnsatisfied, []spec.DriftDetail{{
 		Field:   "rule",
 		Current: "(absent)",
-		Desired: fmt.Sprintf("%s %s", op.action, op.port),
+		Desired: fmt.Sprintf("%s %s", op.action, op.port.String()),
 	}}, nil
 }
 
@@ -159,7 +159,7 @@ func (op *ensureRuleOp) executeUFW(
 	ctx context.Context,
 	cmdr target.Command,
 ) (spec.Result, error) {
-	cmd := fmt.Sprintf("ufw %s %s", op.action, op.port)
+	cmd := fmt.Sprintf("ufw %s %s", op.action, op.port.String())
 	result, err := cmdr.RunCommand(ctx, cmd)
 	if err != nil {
 		return spec.Result{}, sharedops.DiagnoseTargetError(err)
@@ -170,7 +170,7 @@ func (op *ensureRuleOp) executeUFW(
 			stderr = fmt.Sprintf("exit %d", result.ExitCode)
 		}
 		return spec.Result{}, RuleApplyError{
-			Port:   op.port,
+			Port:   op.port.String(),
 			Action: op.action.String(),
 			Stderr: stderr,
 		}
@@ -184,7 +184,7 @@ func (op *ensureRuleOp) executeFirewalld(
 	cmdr target.Command,
 ) (spec.Result, error) {
 	if op.action == ActionAllow {
-		cmd := fmt.Sprintf("firewall-cmd --permanent --add-port=%s", op.port)
+		cmd := fmt.Sprintf("firewall-cmd --permanent --add-port=%s", op.port.String())
 		result, err := cmdr.RunCommand(ctx, cmd)
 		if err != nil {
 			return spec.Result{}, sharedops.DiagnoseTargetError(err)
@@ -210,7 +210,7 @@ func (op *ensureRuleOp) executeFirewalld(
 	}
 	if reload.ExitCode != 0 {
 		return spec.Result{}, RuleApplyError{
-			Port:   op.port,
+			Port:   op.port.String(),
 			Action: op.action.String(),
 			Stderr: "reload failed: " + reload.Stderr,
 		}
@@ -222,18 +222,18 @@ func (op *ensureRuleOp) executeFirewalld(
 // Helpers
 // -----------------------------------------------------------------------------
 
-// firewalldRichRule builds a rich rule for deny/reject actions.
-// Port string is expected to be validated as <port>/<proto> or <start>:<end>/<proto>.
 func (op *ensureRuleOp) firewalldRichRule() string {
-	parts := strings.SplitN(op.port, "/", 2)
-	port, proto := parts[0], parts[1]
+	port := op.port.Port
+	if op.port.EndPort != "" {
+		port = op.port.Port + "-" + op.port.EndPort
+	}
 
 	verb := "reject"
 	if op.action == ActionDeny {
 		verb = "drop"
 	}
 
-	return fmt.Sprintf("rule port port=%s protocol=%s %s", port, proto, verb)
+	return fmt.Sprintf("rule port port=%s protocol=%s %s", port, op.port.Proto, verb)
 }
 
 func (op *ensureRuleOp) applyError(result target.CommandResult) RuleApplyError {
@@ -242,7 +242,7 @@ func (op *ensureRuleOp) applyError(result target.CommandResult) RuleApplyError {
 		stderr = fmt.Sprintf("exit %d", result.ExitCode)
 	}
 	return RuleApplyError{
-		Port:   op.port,
+		Port:   op.port.String(),
 		Action: op.action.String(),
 		Stderr: stderr,
 	}
@@ -269,5 +269,5 @@ func (d ensureRuleDesc) PlanTemplate() spec.PlanTemplate {
 }
 
 func (op *ensureRuleOp) OpDescription() spec.OpDescription {
-	return ensureRuleDesc{Action: op.action, Port: op.port}
+	return ensureRuleDesc{Action: op.action, Port: op.port.String()}
 }

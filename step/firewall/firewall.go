@@ -3,13 +3,78 @@
 package firewall
 
 import (
-	"regexp"
+	"strconv"
+	"strings"
 
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
-var portRe = regexp.MustCompile(`^(\d+)(:\d+)?/(tcp|udp)$`)
+// FirewallPort represents a parsed port/protocol specification.
+type FirewallPort struct {
+	Port    string           // single port or range start
+	EndPort string           // range end, empty for single port
+	Proto   target.PortProto // TCP or UDP
+}
+
+// String reconstructs the original port spec, e.g. "22/tcp" or "6000:6007/tcp".
+func (p FirewallPort) String() string {
+	if p.EndPort != "" {
+		return p.Port + ":" + p.EndPort + "/" + p.Proto.String()
+	}
+	return p.Port + "/" + p.Proto.String()
+}
+
+func ParseFirewallPort(s string) (FirewallPort, error) {
+	portPart, proto, ok := strings.Cut(s, "/")
+	if !ok {
+		return FirewallPort{}, portParseError("missing protocol suffix")
+	}
+	var p target.PortProto
+	switch proto {
+	case "tcp":
+		p = target.ProtoTCP
+	case "udp":
+		p = target.ProtoUDP
+	default:
+		return FirewallPort{}, portParseError("unsupported protocol \"" + proto + "\"")
+	}
+
+	start, end, isRange := strings.Cut(portPart, ":")
+	if err := validatePortNumber(start); err != nil {
+		return FirewallPort{}, err
+	}
+	if isRange {
+		if err := validatePortNumber(end); err != nil {
+			return FirewallPort{}, err
+		}
+	}
+
+	fp := FirewallPort{Port: start, Proto: p}
+	if isRange {
+		fp.EndPort = end
+	}
+	return fp, nil
+}
+
+func validatePortNumber(s string) error {
+	if s == "" {
+		return portParseError("empty port number")
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return portParseError("\"" + s + "\" is not a number")
+	}
+	if n < 0 || n > 65535 {
+		return portParseError(strconv.Itoa(n) + " is out of range (0–65535)")
+	}
+	return nil
+}
+
+type portParseError string
+
+func (e portParseError) Error() string { return string(e) }
 
 // Action represents a firewall rule action.
 type Action uint8
@@ -57,7 +122,7 @@ type (
 	}
 	firewallAction struct {
 		desc   string
-		port   string
+		port   FirewallPort
 		action Action
 		step   spec.StepInstance
 	}
@@ -72,36 +137,30 @@ func (Firewall) Plan(step spec.StepInstance) (spec.Action, error) {
 		return nil, errs.BUG("expected %T got %T", &FirewallConfig{}, step.Config)
 	}
 
-	if err := cfg.validate(step); err != nil {
-		return nil, err
-	}
-
-	return &firewallAction{
-		desc:   cfg.Desc,
-		port:   cfg.Port,
-		action: parseAction(cfg.Action),
-		step:   step,
-	}, nil
-}
-
-func (c *FirewallConfig) validate(step spec.StepInstance) error {
-	if !portRe.MatchString(c.Port) {
-		return InvalidPortError{
-			Port:   c.Port,
+	port, parseErr := ParseFirewallPort(cfg.Port)
+	if parseErr != nil {
+		return nil, InvalidPortError{
+			Port:   cfg.Port,
+			Detail: parseErr.Error(),
 			Source: step.Fields["port"].Value,
 		}
 	}
 
-	switch c.Action {
+	switch cfg.Action {
 	case "allow", "deny", "reject":
 	default:
-		return InvalidActionError{
-			Action: c.Action,
+		return nil, InvalidActionError{
+			Action: cfg.Action,
 			Source: step.Fields["action"].Value,
 		}
 	}
 
-	return nil
+	return &firewallAction{
+		desc:   cfg.Desc,
+		port:   port,
+		action: parseAction(cfg.Action),
+		step:   step,
+	}, nil
 }
 
 func (a *firewallAction) Desc() string { return a.desc }

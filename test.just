@@ -27,6 +27,8 @@ containers:
 [doc("Run all tests with race-detector and containers")]
 everything:
   SCAMPI_TEST_CONTAINERS=1 go test -race -v ./...
+  go test ./test -bench=. -benchmem -count=1 -benchtime=1x
+  just test fuzz 5s
 
 # Focused
 # ##############################################################################

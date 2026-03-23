@@ -73,17 +73,21 @@ func (e RuleApplyError) EventTemplate() event.Template {
 type InvalidPortError struct {
 	diagnostic.FatalError
 	Port   string
+	Detail string
 	Source spec.SourceSpan
 }
 
 func (e InvalidPortError) Error() string {
+	if e.Detail != "" {
+		return fmt.Sprintf("invalid port %q: %s", e.Port, e.Detail)
+	}
 	return fmt.Sprintf("invalid port %q", e.Port)
 }
 
 func (e InvalidPortError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "builtin.firewall.InvalidPort",
-		Text:   `invalid port "{{.Port}}"`,
+		Text:   `invalid port "{{.Port}}": {{.Detail}}`,
 		Hint:   `use <port>/<proto> or <start>:<end>/<proto>, e.g. "22/tcp", "53/udp", "6000:6007/tcp"`,
 		Data:   e,
 		Source: &e.Source,
