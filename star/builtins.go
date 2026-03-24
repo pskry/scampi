@@ -21,6 +21,7 @@ func predeclared() starlark.StringDict {
 		"dir":       starlark.NewBuiltin("dir", builtinDir),
 		"dnf_repo":  starlark.NewBuiltin("dnf_repo", builtinDnfRepo),
 		"firewall":  starlark.NewBuiltin("firewall", builtinFirewall),
+		"mount":     starlark.NewBuiltin("mount", builtinMount),
 		"group":     starlark.NewBuiltin("group", builtinGroup),
 		"inline":    starlark.NewBuiltin("inline", builtinInline),
 		"local":     starlark.NewBuiltin("local", builtinLocal),

@@ -12,6 +12,7 @@ import (
 	"scampi.dev/scampi/step/dir"
 	"scampi.dev/scampi/step/firewall"
 	"scampi.dev/scampi/step/group"
+	stepmount "scampi.dev/scampi/step/mount"
 	"scampi.dev/scampi/step/pkg"
 	"scampi.dev/scampi/step/run"
 	"scampi.dev/scampi/step/service"
@@ -200,6 +201,57 @@ func builtinFirewall(
 			OnChange: hookIDs,
 			Source:   span,
 			Fields:   kwargsFieldSpans(thread, "port", "action", "on_change"),
+		},
+	}, nil
+}
+
+// Step builtin: mount
+// -----------------------------------------------------------------------------
+
+func builtinMount(
+	thread *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var (
+		src         string
+		dest        string
+		fstype      string
+		opts        = "defaults"
+		state       = "mounted"
+		desc        string
+		onChangeVal starlark.Value
+	)
+	if err := starlark.UnpackArgs("mount", args, kwargs,
+		"src", &src,
+		"dest", &dest,
+		"type", &fstype,
+		"opts?", &opts,
+		"state?", &state,
+		"desc?", &desc,
+		"on_change?", &onChangeVal,
+	); err != nil {
+		return nil, err
+	}
+
+	hookIDs, err := unpackOnChange(thread, onChangeVal, "mount")
+	if err != nil {
+		return nil, err
+	}
+
+	span := callSpan(thread)
+	return &StarlarkStep{
+		Instance: spec.StepInstance{
+			Desc: desc,
+			Type: stepmount.Mount{},
+			Config: &stepmount.MountConfig{
+				Desc: desc, Src: src, Dest: dest,
+				Type: fstype, Opts: opts, State: state,
+			},
+			OnChange: hookIDs,
+			Source:   span,
+			Fields:   kwargsFieldSpans(thread, "src", "dest", "type", "opts", "state", "on_change"),
 		},
 	}, nil
 }

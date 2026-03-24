@@ -5,6 +5,7 @@ package test
 import (
 	"errors"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"strings"
 	"testing"
@@ -282,13 +283,12 @@ func extractStringFields(t *testing.T, typeName string, cl *ast.CompositeLit, fi
 		if !wanted[ident.Name] {
 			continue
 		}
-		lit, ok := kv.Value.(*ast.BasicLit)
+		s, ok := resolveStringExpr(kv.Value)
 		if !ok {
 			t.Errorf("%s: field %s must be a string literal, got %T", typeName, ident.Name, kv.Value)
 			continue
 		}
-		// Strip quotes from string literal
-		result[ident.Name] = stripQuotes(lit.Value)
+		result[ident.Name] = s
 	}
 	return result
 }
@@ -439,6 +439,30 @@ func zeroForBasic(typ types.Type) any {
 		return 3.14
 	default:
 		return "test"
+	}
+}
+
+// resolveStringExpr extracts a string value from an AST expression.
+// Handles basic literals and binary + (string concatenation).
+func resolveStringExpr(expr ast.Expr) (string, bool) {
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		return stripQuotes(e.Value), true
+	case *ast.BinaryExpr:
+		if e.Op != token.ADD {
+			return "", false
+		}
+		left, ok := resolveStringExpr(e.X)
+		if !ok {
+			return "", false
+		}
+		right, ok := resolveStringExpr(e.Y)
+		if !ok {
+			return "", false
+		}
+		return left + right, true
+	default:
+		return "", false
 	}
 }
 

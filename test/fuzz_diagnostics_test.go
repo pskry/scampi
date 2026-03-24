@@ -156,6 +156,30 @@ deploy(name="test", targets=["local"], steps=[
     firewall(port="not-a-port", action="allow"),
 ])`,
 
+		// mount step
+		`target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+    mount(src="10.10.2.2:/data", dest="/mnt/data", type="nfs"),
+])`,
+
+		// mount step with options
+		`target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+    mount(src="//server/share", dest="/mnt/share", type="cifs", opts="credentials=/etc/smbcreds,uid=1000"),
+])`,
+
+		// mount step absent
+		`target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+    mount(src="10.10.2.2:/data", dest="/mnt/data", type="nfs", state="absent"),
+])`,
+
+		// mount step invalid state
+		`target.local(name="local")
+deploy(name="test", targets=["local"], steps=[
+    mount(src="10.10.2.2:/data", dest="/mnt/data", type="nfs", state="bogus"),
+])`,
+
 		// firewall step invalid action
 		`target.local(name="local")
 deploy(name="test", targets=["local"], steps=[

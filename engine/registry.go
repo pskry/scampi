@@ -9,6 +9,7 @@ import (
 	"scampi.dev/scampi/step/dir"
 	"scampi.dev/scampi/step/firewall"
 	"scampi.dev/scampi/step/group"
+	"scampi.dev/scampi/step/mount"
 	"scampi.dev/scampi/step/pkg"
 	"scampi.dev/scampi/step/run"
 	"scampi.dev/scampi/step/service"
@@ -33,6 +34,7 @@ func NewRegistry() *Registry {
 		dir.Dir{},
 		firewall.Firewall{},
 		group.Group{},
+		mount.Mount{},
 		pkg.Pkg{},
 		run.Run{},
 		service.Service{},
