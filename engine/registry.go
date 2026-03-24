@@ -19,6 +19,7 @@ import (
 	"scampi.dev/scampi/step/unarchive"
 	stepuser "scampi.dev/scampi/step/user"
 	"scampi.dev/scampi/target/local"
+	"scampi.dev/scampi/target/rest"
 	"scampi.dev/scampi/target/ssh"
 )
 
@@ -47,6 +48,7 @@ func NewRegistry() *Registry {
 
 	targetTypes := []spec.TargetType{
 		local.Local{},
+		rest.REST{},
 		ssh.SSH{},
 	}
 

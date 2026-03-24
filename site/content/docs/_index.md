@@ -17,7 +17,8 @@ idempotent operations to make reality match.
 {{< cards >}}
   {{< card link="getting-started" title="Getting Started" subtitle="Install scampi and write your first config" >}}
   {{< card link="concepts" title="Concepts" subtitle="Understand the mental model: steps, actions, ops, targets" >}}
-  {{< card link="configuration" title="Configuration" subtitle="Targets, deploy blocks, variables, and project layout" >}}
+  {{< card link="configuration" title="Configuration" subtitle="Deploy blocks, source resolvers, secrets, and project layout" >}}
+  {{< card link="targets" title="Target Reference" subtitle="Local, SSH, and REST target types" >}}
   {{< card link="steps" title="Step Reference" subtitle="Every built-in step type, with fields and examples" >}}
   {{< card link="cli" title="CLI" subtitle="Subcommands, flags, output semantics, and exit codes" >}}
 {{< /cards >}}

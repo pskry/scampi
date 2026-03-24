@@ -229,6 +229,20 @@ type (
 	OSInfoProvider interface {
 		VersionCodename() string
 	}
+	HTTPRequest struct {
+		Method  string
+		Path    string
+		Headers map[string]string
+		Body    []byte
+	}
+	HTTPResponse struct {
+		StatusCode int
+		Headers    map[string][]string
+		Body       []byte
+	}
+	HTTPClient interface {
+		Do(ctx context.Context, req HTTPRequest) (*HTTPResponse, error)
+	}
 )
 
 func IsNotExist(err error) bool        { return errors.Is(err, ErrNotExist) }

@@ -1,6 +1,6 @@
 ---
 title: CLI
-weight: 5
+weight: 7
 ---
 
 Scampi's CLI is organized into subcommands, each covering a different phase of

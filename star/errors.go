@@ -735,3 +735,52 @@ func (e *InlineCacheError) setSource(s spec.SourceSpan) {
 		e.Source = s
 	}
 }
+
+// CACertReadError
+// -----------------------------------------------------------------------------
+
+type CACertReadError struct {
+	diagnostic.FatalError
+	Path   string
+	Source spec.SourceSpan
+	Err    error
+}
+
+func (e CACertReadError) Error() string {
+	return fmt.Sprintf("reading CA certificate %q: %s", e.Path, e.Err)
+}
+
+func (e CACertReadError) Unwrap() error { return e.Err }
+
+func (e CACertReadError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.CACertRead",
+		Text:   `reading CA certificate "{{.Path}}"`,
+		Hint:   "check the path and make sure the file exists",
+		Source: &e.Source,
+		Data:   e,
+	}
+}
+
+// CACertParseError
+// -----------------------------------------------------------------------------
+
+type CACertParseError struct {
+	diagnostic.FatalError
+	Path   string
+	Source spec.SourceSpan
+}
+
+func (e CACertParseError) Error() string {
+	return fmt.Sprintf("CA certificate %q contains no valid PEM data", e.Path)
+}
+
+func (e CACertParseError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "star.CACertParse",
+		Text:   `CA certificate "{{.Path}}" contains no valid PEM data`,
+		Hint:   "the file must be a PEM-encoded certificate (starts with -----BEGIN CERTIFICATE-----)",
+		Source: &e.Source,
+		Data:   e,
+	}
+}

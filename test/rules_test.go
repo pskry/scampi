@@ -187,6 +187,26 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os/exec",
 		},
 		{
+			pattern:        "target/rest/rest.go",
+			allowedImports: "net/http",
+		},
+		{
+			pattern:        "target/rest/tls.go",
+			allowedImports: "crypto/tls, crypto/x509",
+		},
+		{
+			pattern:        "target/rest/auth.go",
+			allowedImports: "net/http",
+		},
+		{
+			pattern:        "test/rest_test.go",
+			allowedImports: "net/http, net/http/httptest",
+		},
+		{
+			pattern:        "star/rest.go",
+			allowedImports: "crypto/x509",
+		},
+		{
 			pattern:        "star/resolvers.go",
 			allowedImports: "crypto/sha256, net/url",
 		},

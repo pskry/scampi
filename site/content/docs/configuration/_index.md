@@ -8,35 +8,14 @@ Python-like language — if you know Python, you already know Starlark.
 
 ## Targets
 
-A target defines where steps execute. Currently supported:
+A target defines where steps execute. Deploy blocks reference targets by name.
 
-### Local
-
-```python {filename="deploy.star"}
-target.local(name="my-machine")
+```python
+target.ssh(name="web", host="app.example.com", user="deploy")
 ```
 
-The local target runs steps on the machine where scampi is invoked. There can
-only be one local target — you only have one local machine.
-
-### SSH
-
-```python {filename="deploy.star"}
-target.ssh(
-    name = "web",
-    host = "app.example.com",
-    user = "deploy",
-)
-```
-
-SSH targets connect to a remote host. Authentication uses your SSH agent or key
-files.
-
-| Field  | Required | Description                            |
-| ------ | :------: | -------------------------------------- |
-| `host` |    ✓     | Hostname or IP address                 |
-| `name` |    ✓     | Identifier referenced by deploy blocks |
-| `user` |    ✓     | SSH user                               |
+See the [Target Reference]({{< relref "../targets" >}}) for all available
+target types and their fields.
 
 ## Deploy blocks
 
@@ -160,7 +139,7 @@ Secrets are managed through a two-step setup: configure a backend with
 
 ### Configure a backend
 
-```python {filename="deploy.star"}
+```python
 secrets(backend="age", path="secrets.age.json")
 ```
 
@@ -194,7 +173,7 @@ a template that writes it into a file).
 
 Use `load()` to split configs across files:
 
-```python {filename="deploy.star"}
+```python
 load("targets.star", "web", "db")
 
 deploy(
