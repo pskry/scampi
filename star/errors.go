@@ -48,6 +48,12 @@ func wrapStarlarkError(err error, c *Collector) error {
 
 		var diag diagnostic.Diagnostic
 		if errors.As(cause, &diag) {
+			// Try field-level refinement first (precise span), then
+			// fall back to call-site span. setSource only writes once
+			// (guards against overwrite), so order matters.
+			if fl, ok := diag.(fieldLocator); ok {
+				refineFieldSpan(diag, c, span, fl.FieldName())
+			}
 			if ss, ok := diag.(sourceSettable); ok {
 				ss.setSource(span)
 			}
@@ -64,6 +70,27 @@ func wrapStarlarkError(err error, c *Collector) error {
 		return StarlarkError{Err: err, Source: span}
 	}
 	return StarlarkError{Err: err}
+}
+
+// refineFieldSpan narrows a diagnostic's source span from the call site to the
+// specific kwarg value position. Errors implement fieldLocator to opt in.
+func refineFieldSpan(diag diagnostic.Diagnostic, c *Collector, callSite spec.SourceSpan, field string) {
+	if c == nil || field == "" {
+		return
+	}
+	f := c.AST(callSite.Filename)
+	if f == nil {
+		return
+	}
+	call := findCallExpr(f, posFromSpan(callSite))
+	if call == nil {
+		return
+	}
+	if refined, ok := kwargValueSpan(call, field); ok {
+		if ss, ok := diag.(sourceSettable); ok {
+			ss.setSource(refined)
+		}
+	}
 }
 
 // asUnknownFieldError attempts to convert an UnpackArgs "unexpected keyword
@@ -160,6 +187,13 @@ type sourceSettable interface {
 	setSource(spec.SourceSpan)
 }
 
+// fieldLocator is an optional interface that diagnostic errors can implement
+// to declare which kwarg they're about. wrapStarlarkError uses this to refine
+// the source span from the call site to the specific kwarg value position.
+type fieldLocator interface {
+	FieldName() string
+}
+
 // UnknownFieldError is raised when a call contains an unrecognized field name.
 type UnknownFieldError struct {
 	diagnostic.FatalError
@@ -191,19 +225,22 @@ func (e UnknownFieldError) EventTemplate() event.Template {
 // DuplicateTargetError is raised when a target name is registered twice.
 type DuplicateTargetError struct {
 	diagnostic.FatalError
-	Name   string
-	Source spec.SourceSpan
+	Name      string
+	FirstDecl spec.SourceSpan
+	Source    spec.SourceSpan
 }
 
 func (e DuplicateTargetError) Error() string {
 	return fmt.Sprintf("duplicate target %q", e.Name)
 }
 
+func (e DuplicateTargetError) FieldName() string { return "name" }
+
 func (e DuplicateTargetError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "star.DuplicateTarget",
 		Text:   `duplicate target "{{.Name}}"`,
-		Hint:   "each target name must be unique",
+		Hint:   `already declared at {{.FirstDecl.Filename}}:{{.FirstDecl.StartLine}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -218,19 +255,22 @@ func (e *DuplicateTargetError) setSource(s spec.SourceSpan) {
 // DuplicateDeployError is raised when a deploy block name is registered twice.
 type DuplicateDeployError struct {
 	diagnostic.FatalError
-	Name   string
-	Source spec.SourceSpan
+	Name      string
+	FirstDecl spec.SourceSpan
+	Source    spec.SourceSpan
 }
 
 func (e DuplicateDeployError) Error() string {
 	return fmt.Sprintf("duplicate deploy block %q", e.Name)
 }
 
+func (e DuplicateDeployError) FieldName() string { return "name" }
+
 func (e DuplicateDeployError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     "star.DuplicateDeploy",
 		Text:   `duplicate deploy block "{{.Name}}"`,
-		Hint:   "each deploy block name must be unique",
+		Hint:   `already declared at {{.FirstDecl.Filename}}:{{.FirstDecl.StartLine}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -338,6 +378,13 @@ func (e *TypeError) setSource(s spec.SourceSpan) {
 	if e.Source == (spec.SourceSpan{}) {
 		e.Source = s
 	}
+}
+
+func (e TypeError) FieldName() string {
+	if i := strings.LastIndex(e.Context, ": "); i >= 0 {
+		return e.Context[i+2:]
+	}
+	return ""
 }
 
 // EnvError is raised for invalid env() builtin usage.

@@ -212,11 +212,16 @@ func assertDiagnostics(
 			if tmpl.Source.Filename != cfgPath {
 				t.Fatalf("[%d] expected source file %q, got %q", i, cfgPath, tmpl.Source.Filename)
 			}
-			if tmpl.Source.StartLine != exp.Source.Line {
-				t.Fatalf("[%d] expected line %d, got %d", i, exp.Source.Line, tmpl.Source.StartLine)
-			}
-			if exp.Source.Col != 0 && tmpl.Source.StartCol != exp.Source.Col {
-				t.Fatalf("[%d] expected col %d, got %d", i, exp.Source.Col, tmpl.Source.StartCol)
+			s := tmpl.Source
+			e := exp.Source
+			startMatch := s.StartLine == e.StartLine && s.StartCol == e.StartCol
+			endMatch := s.EndLine == e.EndLine && s.EndCol == e.EndCol
+			if !startMatch || !endMatch {
+				t.Fatalf("[%d] source span mismatch:\n  got:  %d:%d → %d:%d\n  want: %d:%d → %d:%d",
+					i,
+					s.StartLine, s.StartCol, s.EndLine, s.EndCol,
+					e.StartLine, e.StartCol, e.EndLine, e.EndCol,
+				)
 			}
 		}
 

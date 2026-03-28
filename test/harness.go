@@ -23,8 +23,10 @@ type ExpectedDiagnostic struct {
 }
 
 type ExpectedSource struct {
-	Line int `json:"line"`
-	Col  int `json:"col,omitempty"`
+	StartLine int `json:"start_line"`
+	StartCol  int `json:"start_col"`
+	EndLine   int `json:"end_line"`
+	EndCol    int `json:"end_col"`
 }
 
 type ExpectedStep struct {

@@ -7,8 +7,10 @@
       "severity": "Error",
       "kind": "DiagnosticRaised",
       "source": {
-        "line": 3,
-        "col": 18
+        "start_line": 3,
+        "start_col": 18,
+        "end_line": 3,
+        "end_col": 20
       },
       "step": {
         "index": 0,

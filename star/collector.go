@@ -57,9 +57,9 @@ func (c *Collector) AST(name string) *syntax.File {
 
 // AddTarget registers a target instance. Returns an error if the name
 // is already taken.
-func (c *Collector) AddTarget(name string, inst spec.TargetInstance, span spec.SourceSpan) error {
-	if _, exists := c.targets[name]; exists {
-		return &DuplicateTargetError{Name: name, Source: span}
+func (c *Collector) AddTarget(name string, inst spec.TargetInstance, _ spec.SourceSpan) error {
+	if first, exists := c.targets[name]; exists {
+		return &DuplicateTargetError{Name: name, FirstDecl: first.Source}
 	}
 	c.targets[name] = inst
 	return nil
@@ -67,9 +67,9 @@ func (c *Collector) AddTarget(name string, inst spec.TargetInstance, span spec.S
 
 // AddDeploy registers a deploy block. Returns an error if the name
 // is already taken.
-func (c *Collector) AddDeploy(name string, block spec.DeployBlock, span spec.SourceSpan) error {
-	if _, exists := c.deploy[name]; exists {
-		return &DuplicateDeployError{Name: name, Source: span}
+func (c *Collector) AddDeploy(name string, block spec.DeployBlock, _ spec.SourceSpan) error {
+	if first, exists := c.deploy[name]; exists {
+		return &DuplicateDeployError{Name: name, FirstDecl: first.Source}
 	}
 	c.deploy[name] = block
 	return nil
