@@ -38,14 +38,24 @@ func (s *stepOutputs) Load(id spec.StepID) (any, bool) {
 	return v, ok
 }
 
+// refPending is a sentinel value returned by the check-mode resolver when
+// the referenced step has no output yet (would change). Downstream steps
+// see this as an unresolvable value, causing drift detection to report
+// "would change" rather than erroring.
+type refPending struct{}
+
 // buildRefResolver creates a spec.RefResolver that looks up step outputs
-// and evaluates jq expressions against them.
-func buildRefResolver(outputs *stepOutputs) spec.RefResolver {
+// and evaluates jq expressions against them. In check mode, missing outputs
+// return a pending sentinel instead of erroring.
+func buildRefResolver(outputs *stepOutputs, checkMode bool) spec.RefResolver {
 	return func(ref spec.Ref) (any, error) {
 		src := &ref.Source
 
 		out, ok := outputs.Load(ref.TargetID)
 		if !ok {
+			if checkMode {
+				return refPending{}, nil
+			}
 			return nil, RefError{
 				Expr:   ref.Expr,
 				Detail: "referenced step has no output — is it included in the steps list?",

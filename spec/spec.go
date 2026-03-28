@@ -171,6 +171,15 @@ type (
 	OpDescriber interface {
 		OpDescription() OpDescription
 	}
+
+	// Deduplicatable is an optional interface that step configs can implement
+	// to enable dedup when the same logical step appears multiple times in a
+	// steps list (e.g. returned from multiple helper functions). Steps with
+	// the same Kind + DedupKey are collapsed to one; refs to dropped IDs are
+	// remapped to the survivor.
+	Deduplicatable interface {
+		DedupKey() string
+	}
 	// OutputProvider is an optional interface that ops can implement to
 	// expose their settled state after execution. The engine captures this
 	// for ref() resolution in downstream steps.

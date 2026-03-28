@@ -215,22 +215,116 @@ func extractSteps(list *starlark.List, fn string) ([]spec.StepInstance, error) {
 	}
 	out := make([]spec.StepInstance, 0, list.Len())
 	for i := 0; i < list.Len(); i++ {
-		v := list.Index(i)
-		step, ok := v.(*StarlarkStep)
-		if !ok {
-			return nil, &TypeError{
-				Context:  fmt.Sprintf("%s: steps[%d]", fn, i),
-				Expected: "step",
-				Got:      v.Type(),
+		if err := flattenStep(&out, list.Index(i), fn, i); err != nil {
+			return nil, err
+		}
+	}
+	return dedupSteps(out), nil
+}
+
+// dedupSteps collapses duplicate steps (same Kind + DedupKey) and remaps
+// refs from dropped step IDs to the surviving step's ID.
+func dedupSteps(steps []spec.StepInstance) []spec.StepInstance {
+	type key struct{ kind, dedup string }
+
+	seen := map[key]spec.StepID{}   // dedup key → survivor ID
+	remap := map[spec.StepID]spec.StepID{} // dropped ID → survivor ID
+	var out []spec.StepInstance
+
+	for _, s := range steps {
+		dk, ok := s.Config.(spec.Deduplicatable)
+		if !ok || dk.DedupKey() == "" {
+			out = append(out, s)
+			continue
+		}
+
+		k := key{kind: s.Type.Kind(), dedup: dk.DedupKey()}
+		if survivor, exists := seen[k]; exists {
+			remap[s.ID] = survivor
+			continue
+		}
+
+		seen[k] = s.ID
+		out = append(out, s)
+	}
+
+	if len(remap) > 0 {
+		for i := range out {
+			remapRefs(out[i].Config, remap)
+		}
+	}
+
+	return out
+}
+
+// remapRefs walks a step config's state dict and replaces ref TargetIDs
+// that point to deduped (dropped) steps with the survivor's ID.
+func remapRefs(config any, remap map[spec.StepID]spec.StepID) {
+	type refMapHolder interface {
+		RefMaps() []map[string]any
+	}
+	rh, ok := config.(refMapHolder)
+	if !ok {
+		return
+	}
+	for _, m := range rh.RefMaps() {
+		remapRefsInMap(m, remap)
+	}
+}
+
+func remapRefsInMap(m map[string]any, remap map[spec.StepID]spec.StepID) {
+	for k, v := range m {
+		switch val := v.(type) {
+		case spec.Ref:
+			if newID, ok := remap[val.TargetID]; ok {
+				val.TargetID = newID
+				m[k] = val
+			}
+		case map[string]any:
+			remapRefsInMap(val, remap)
+		case []any:
+			for i, elem := range val {
+				if ref, ok := elem.(spec.Ref); ok {
+					if newID, ok := remap[ref.TargetID]; ok {
+						ref.TargetID = newID
+						val[i] = ref
+					}
+				}
 			}
 		}
-		inst := step.Instance
-		if inst.Desc == "" && inst.Type != nil {
-			inst.Desc = fmt.Sprintf("%s[%d]", inst.Type.Kind(), i)
-		}
-		out = append(out, inst)
 	}
-	return out, nil
+}
+
+func flattenStep(out *[]spec.StepInstance, v starlark.Value, fn string, idx int) error {
+	switch val := v.(type) {
+	case *StarlarkStep:
+		inst := val.Instance
+		if inst.Desc == "" && inst.Type != nil {
+			inst.Desc = fmt.Sprintf("%s[%d]", inst.Type.Kind(), idx)
+		}
+		*out = append(*out, inst)
+		return nil
+	case *starlark.List:
+		for i := 0; i < val.Len(); i++ {
+			if err := flattenStep(out, val.Index(i), fn, idx); err != nil {
+				return err
+			}
+		}
+		return nil
+	case starlark.Tuple:
+		for _, elem := range val {
+			if err := flattenStep(out, elem, fn, idx); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return &TypeError{
+			Context:  fmt.Sprintf("%s: steps[%d]", fn, idx),
+			Expected: "step or list of steps",
+			Got:      v.Type(),
+		}
+	}
 }
 
 // env(key, default?)

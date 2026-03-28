@@ -30,6 +30,39 @@ type (
 func (Resource) Kind() string   { return "rest.resource" }
 func (Resource) NewConfig() any { return &ResourceConfig{} }
 
+func (c *ResourceConfig) RefMaps() []map[string]any {
+	var maps []map[string]any
+	if c.State != nil {
+		maps = append(maps, c.State)
+	}
+	if c.Missing != nil && c.Missing.Body != nil {
+		if jb, ok := c.Missing.Body.(JSONBody); ok {
+			if m, ok := jb.Data.(map[string]any); ok {
+				maps = append(maps, m)
+			}
+		}
+	}
+	if c.Found != nil && c.Found.Body != nil {
+		if jb, ok := c.Found.Body.(JSONBody); ok {
+			if m, ok := jb.Data.(map[string]any); ok {
+				maps = append(maps, m)
+			}
+		}
+	}
+	return maps
+}
+
+func (c *ResourceConfig) DedupKey() string {
+	if c.Query == nil || c.Query.Check == nil {
+		return ""
+	}
+	jq, ok := c.Query.Check.(*JQCheck)
+	if !ok {
+		return ""
+	}
+	return c.Query.Method + ":" + c.Query.Path + ":" + jq.Expr
+}
+
 func (Resource) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*ResourceConfig)
 	if !ok {
@@ -91,13 +124,22 @@ func (a *resourceAction) Promises() []spec.Resource {
 }
 
 func (a *resourceAction) Inputs() []spec.Resource {
-	return collectRefs(a.cfg.State)
+	var refs []spec.Resource
+	for _, m := range a.cfg.RefMaps() {
+		refs = append(refs, collectRefs(m)...)
+	}
+	return refs
 }
 
-// ResolveRefs replaces spec.Ref markers in the state dict with concrete
-// values from previously executed steps.
+// ResolveRefs replaces spec.Ref markers in all ref-bearing maps with
+// concrete values from previously executed steps.
 func (a *resourceAction) ResolveRefs(resolve spec.RefResolver) error {
-	return resolveMapRefs(a.cfg.State, resolve)
+	for _, m := range a.cfg.RefMaps() {
+		if err := resolveMapRefs(m, resolve); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func collectRefs(m map[string]any) []spec.Resource {

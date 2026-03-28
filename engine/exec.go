@@ -337,7 +337,7 @@ func (e *Engine) checkPlan(ctx context.Context, plan spec.Plan) (model.Execution
 			// Resolve ref() markers before check (output available
 			// from already-checked upstream steps).
 			if r, ok := n.action.(refResolvable); ok {
-				if err := r.ResolveRefs(buildRefResolver(outputs)); err != nil {
+				if err := r.ResolveRefs(buildRefResolver(outputs, true)); err != nil {
 					emitActionDiagnostic(e.em, n.idx, n.action.Kind(), n.action.Desc(), err)
 					abortErr := AbortError{Causes: []error{err}}
 					mu.Lock()
@@ -513,7 +513,7 @@ func (e *Engine) executePlan(ctx context.Context, plan spec.Plan) (model.Executi
 
 			// Resolve ref() markers before execution.
 			if r, ok := n.action.(refResolvable); ok {
-				if err := r.ResolveRefs(buildRefResolver(outputs)); err != nil {
+				if err := r.ResolveRefs(buildRefResolver(outputs, false)); err != nil {
 					emitActionDiagnostic(e.em, n.idx, n.action.Kind(), n.action.Desc(), err)
 					abortErr := AbortError{Causes: []error{err}}
 					mu.Lock()
