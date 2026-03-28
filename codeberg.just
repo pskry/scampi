@@ -1,6 +1,24 @@
 codeberg_api := "https://codeberg.org/api/v1"
 codeberg_repo := "scampi-dev/scampi"
 
+# Issues
+# ##############################################################################
+
+[doc("List open issues (optional: --label 'Kind/Bug')")]
+[positional-arguments]
+list-issues *args:
+  #!/usr/bin/env bash
+  exec ./scripts/codeberg-list-issues.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" "$@"
+
+[doc("Show full issue details (--refresh to bypass cache)")]
+[positional-arguments]
+show-issue number *args:
+  #!/usr/bin/env bash
+  shift  # number
+  exec ./scripts/codeberg-show-issue.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" "{{number}}" "$@"
+
 [doc("Create issues from file or dir (--dry-run to preview)")]
 [positional-arguments]
 create-issue path *flags:
@@ -9,7 +27,7 @@ create-issue path *flags:
   exec ./scripts/codeberg-create-issue.sh \
     "{{codeberg_api}}" "{{codeberg_repo}}" "{{path}}" "$@"
 
-[doc("Update an issue (--body, --state, --labels)")]
+[doc("Update an issue (--body, --state, --labels, --title)")]
 [positional-arguments]
 update-issue number *args:
   #!/usr/bin/env bash
@@ -24,13 +42,6 @@ close-issue number:
 [doc("Reopen an issue")]
 reopen-issue number:
   just cb update-issue {{number}} --state open
-
-[doc("List open issues (optional: --label 'Kind/Bug')")]
-[positional-arguments]
-list-issues *args:
-  #!/usr/bin/env bash
-  exec ./scripts/codeberg-list-issues.sh \
-    "{{codeberg_api}}" "{{codeberg_repo}}" "$@"
 
 [doc("Assign an issue to a user")]
 assign-issue number user:
@@ -49,6 +60,31 @@ comment-issue number body:
   ./scripts/codeberg-comment-issue.sh \
     "{{codeberg_api}}" "{{codeberg_repo}}" \
     "{{number}}" "{{body}}"
+
+# Milestones
+# ##############################################################################
+
+[doc("List milestones (--closed for closed ones)")]
+[positional-arguments]
+list-milestones *args:
+  #!/usr/bin/env bash
+  exec ./scripts/codeberg-list-milestones.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" "$@"
+
+[doc("Create a milestone")]
+create-milestone title description="":
+  ./scripts/codeberg-create-milestone.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" \
+    "{{title}}" "{{description}}"
+
+[doc("Set milestone on an issue")]
+set-milestone issue_number milestone_id:
+  ./scripts/codeberg-set-milestone.sh \
+    "{{codeberg_api}}" "{{codeberg_repo}}" \
+    "{{issue_number}}" "{{milestone_id}}"
+
+# Releases
+# ##############################################################################
 
 [doc("Generate release notes from issues since last tag")]
 [positional-arguments]
@@ -123,11 +159,3 @@ undo-release:
   git tag -d "$tag"
   git reset --hard HEAD~1
   echo "done — tag deleted, release commit removed"
-
-[doc("Show full issue details (--refresh to bypass cache)")]
-[positional-arguments]
-show-issue number *args:
-  #!/usr/bin/env bash
-  shift  # number
-  exec ./scripts/codeberg-show-issue.sh \
-    "{{codeberg_api}}" "{{codeberg_repo}}" "{{number}}" "$@"

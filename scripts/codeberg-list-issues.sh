@@ -4,6 +4,7 @@
 # List open Codeberg issues.
 # Usage: codeberg-list-issues.sh <api> <repo> [--label text] [--refresh]
 set -euo pipefail
+: "${CODEBERG_TOKEN:?Set CODEBERG_TOKEN to a Codeberg personal access token}"
 
 api="$1"; repo="$2"; shift 2
 dir="$(cd "$(dirname "$0")" && pwd)"

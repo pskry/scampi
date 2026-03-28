@@ -4,6 +4,7 @@
 # Show full details for a Codeberg issue.
 # Usage: codeberg-show-issue.sh <api> <repo> <number> [--refresh]
 set -euo pipefail
+: "${CODEBERG_TOKEN:?Set CODEBERG_TOKEN to a Codeberg personal access token}"
 
 api="$1"; repo="$2"; number="$3"; shift 3
 dir="$(cd "$(dirname "$0")" && pwd)"
