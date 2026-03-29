@@ -14,6 +14,7 @@ the convergence workflow.
 | [check](check)      | Inspect actual system state against the configuration  |
 | [plan](plan)        | Show the execution plan without touching targets       |
 | [inspect](inspect)  | Diff desired file content against current target state |
+| [gen](gen)          | Generate Starlark modules from external schemas        |
 | [index](step-index) | Browse built-in step documentation                     |
 | [legend](legend)    | Print the CLI visual language reference card           |
 | [secrets](secrets)  | Manage age-encrypted secrets                           |
