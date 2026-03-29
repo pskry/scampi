@@ -262,6 +262,49 @@ func (e *FetchError) EventTemplate() event.Template {
 	}
 }
 
+// AddError
+// -----------------------------------------------------------------------------
+
+// AddError is raised when scampi mod add fails.
+type AddError struct {
+	diagnostic.FatalError
+	Detail string
+	Hint   string
+}
+
+func (e *AddError) Error() string { return e.Detail }
+
+func (e *AddError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.AddError",
+		Text: "{{.Detail}}",
+		Hint: "{{.Hint}}",
+		Data: e,
+	}
+}
+
+// NoStableVersionError
+// -----------------------------------------------------------------------------
+
+// NoStableVersionError is raised when no stable semver tags are found for a module.
+type NoStableVersionError struct {
+	diagnostic.FatalError
+	ModPath string
+}
+
+func (e *NoStableVersionError) Error() string {
+	return "no stable version found for " + e.ModPath
+}
+
+func (e *NoStableVersionError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.NoStableVersion",
+		Text: "no stable version found for {{.ModPath}}",
+		Hint: "specify a version explicitly: scampi mod add {{.ModPath}}@v1.0.0-alpha.1",
+		Data: e,
+	}
+}
+
 // SumMismatchError
 // -----------------------------------------------------------------------------
 
