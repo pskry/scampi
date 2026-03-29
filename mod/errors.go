@@ -215,3 +215,49 @@ func (e *TidyError) EventTemplate() event.Template {
 		Data: e,
 	}
 }
+
+// SumError
+// -----------------------------------------------------------------------------
+
+// SumError is raised when I/O errors occur with hash computation or scampi.sum.
+type SumError struct {
+	diagnostic.FatalError
+	Detail string
+	Hint   string
+}
+
+func (e *SumError) Error() string { return e.Detail }
+
+func (e *SumError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.SumError",
+		Text: "{{.Detail}}",
+		Hint: "{{.Hint}}",
+		Data: e,
+	}
+}
+
+// SumMismatchError
+// -----------------------------------------------------------------------------
+
+// SumMismatchError is raised when a cached module hash doesn't match the recorded sum.
+type SumMismatchError struct {
+	diagnostic.FatalError
+	ModPath  string
+	Version  string
+	Expected string
+	Actual   string
+}
+
+func (e *SumMismatchError) Error() string {
+	return fmt.Sprintf("checksum mismatch for %s@%s", e.ModPath, e.Version)
+}
+
+func (e *SumMismatchError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.SumMismatch",
+		Text: "checksum mismatch for {{.ModPath}}@{{.Version}}",
+		Hint: "the cached module may have been tampered with — run: scampi mod clean && scampi mod download",
+		Data: e,
+	}
+}

@@ -270,6 +270,14 @@ func TestImportCapabilities(t *testing.T) {
 			pattern:        "cmd/scampi/mod.go",
 			allowedImports: "os",
 		},
+		{
+			pattern:        "mod/sum.go",
+			allowedImports: "os,crypto/sha256",
+		},
+		{
+			pattern:        "mod/sum_test.go",
+			allowedImports: "os",
+		},
 	}
 
 	splitList := func(s string) []string {
