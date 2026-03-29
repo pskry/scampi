@@ -4,6 +4,7 @@ package mod
 
 import (
 	"fmt"
+	"strings"
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
@@ -36,6 +37,80 @@ func (e ParseError) EventTemplate() event.Template {
 		ID:     "mod.ParseError",
 		Text:   "{{.Detail}}",
 		Hint:   e.Hint,
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+// ModuleNotFoundError
+// -----------------------------------------------------------------------------
+
+// ModuleNotFoundError is raised when a load path doesn't match any require entry.
+type ModuleNotFoundError struct {
+	diagnostic.FatalError
+	LoadPath string
+	Source   spec.SourceSpan
+}
+
+func (e *ModuleNotFoundError) Error() string {
+	return fmt.Sprintf("module not found: %s", e.LoadPath)
+}
+
+func (e *ModuleNotFoundError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "mod.NotFound",
+		Text:   "module not found: {{.LoadPath}}",
+		Hint:   "add the module to scampi.mod and run: scampi mod tidy",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+// ModuleNotCachedError
+// -----------------------------------------------------------------------------
+
+// ModuleNotCachedError is raised when a module is in the require table but not downloaded.
+type ModuleNotCachedError struct {
+	diagnostic.FatalError
+	ModPath string
+	Version string
+	Source  spec.SourceSpan
+}
+
+func (e *ModuleNotCachedError) Error() string {
+	return fmt.Sprintf("module not cached: %s@%s", e.ModPath, e.Version)
+}
+
+func (e *ModuleNotCachedError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "mod.NotCached",
+		Text:   "module not cached: {{.ModPath}}@{{.Version}}",
+		Hint:   "run: scampi mod download",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+// ModuleNoEntryPointError
+// -----------------------------------------------------------------------------
+
+// ModuleNoEntryPointError is raised when a cached module has no loadable entry point file.
+type ModuleNoEntryPointError struct {
+	diagnostic.FatalError
+	ModPath string
+	Tried   []string
+	Source  spec.SourceSpan
+}
+
+func (e *ModuleNoEntryPointError) Error() string {
+	return fmt.Sprintf("module %s has no entry point", e.ModPath)
+}
+
+func (e *ModuleNoEntryPointError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "mod.NoEntryPoint",
+		Text:   "module {{.ModPath}} has no entry point",
+		Hint:   "tried: " + strings.Join(e.Tried, ", "),
 		Data:   e,
 		Source: &e.Source,
 	}
