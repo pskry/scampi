@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.0-alpha.5 — 2026-03-29
+
+### Features
+- rest.resource: declarative REST resource management with query/found/missing (#100)
+- ref(): runtime value references between steps (#101)
+- scampi gen: code generation subcommand (#104)
+
+### Enhancements
+- Diagnostic source spans point to call site, not offending token (#102)
+
 ## v0.1.0-alpha.4 — 2026-03-25
 
 ### Features
