@@ -81,6 +81,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "runtime",
 		},
 		{
+			pattern:        "mod/write.go",
+			allowedImports: "os",
+		},
+		{
 			pattern:        "mod/resolve.go",
 			allowedImports: "os",
 		},

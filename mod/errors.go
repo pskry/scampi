@@ -153,6 +153,27 @@ func (e *ModInfo) EventTemplate() event.Template {
 	}
 }
 
+// WriteError
+// -----------------------------------------------------------------------------
+
+// WriteError is raised when writing scampi.mod fails.
+type WriteError struct {
+	diagnostic.FatalError
+	Detail string
+	Hint   string
+}
+
+func (e *WriteError) Error() string { return e.Detail }
+
+func (e *WriteError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.WriteError",
+		Text: "{{.Detail}}",
+		Hint: "{{.Hint}}",
+		Data: e,
+	}
+}
+
 // InitError
 // -----------------------------------------------------------------------------
 
