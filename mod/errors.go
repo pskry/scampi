@@ -135,3 +135,62 @@ func (e *ModuleNoEntryPointError) setSource(s spec.SourceSpan) {
 		e.Source = s
 	}
 }
+
+// ModInfo
+// -----------------------------------------------------------------------------
+
+// ModInfo is an informational diagnostic emitted by mod subcommands.
+type ModInfo struct {
+	diagnostic.Info
+	Detail string
+}
+
+func (e *ModInfo) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.Info",
+		Text: "{{.Detail}}",
+		Data: e,
+	}
+}
+
+// InitError
+// -----------------------------------------------------------------------------
+
+// InitError is raised when scampi mod init fails.
+type InitError struct {
+	diagnostic.FatalError
+	Detail string
+	Hint   string
+}
+
+func (e *InitError) Error() string { return e.Detail }
+
+func (e *InitError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.InitError",
+		Text: "{{.Detail}}",
+		Hint: "{{.Hint}}",
+		Data: e,
+	}
+}
+
+// TidyError
+// -----------------------------------------------------------------------------
+
+// TidyError is raised when scampi mod tidy encounters an I/O or parse problem.
+type TidyError struct {
+	diagnostic.FatalError
+	Detail string
+	Hint   string
+}
+
+func (e *TidyError) Error() string { return e.Detail }
+
+func (e *TidyError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.TidyError",
+		Text: "{{.Detail}}",
+		Hint: "{{.Hint}}",
+		Data: e,
+	}
+}

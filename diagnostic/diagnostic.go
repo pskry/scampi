@@ -81,6 +81,9 @@ type (
 	// that should be reported but don't stop execution.
 	Warning struct{}
 
+	// Info provides Severity=Info, Impact=None for informational diagnostics.
+	Info struct{}
+
 	Diagnostics     []Diagnostic
 	MultiDiagnostic interface {
 		Diagnostics() []Diagnostic
@@ -92,6 +95,9 @@ func (FatalError) Impact() Impact            { return ImpactAbort }
 
 func (Warning) Severity() signal.Severity { return signal.Warning }
 func (Warning) Impact() Impact            { return ImpactNone }
+
+func (Info) Severity() signal.Severity { return signal.Info }
+func (Info) Impact() Impact            { return ImpactNone }
 
 func (d Diagnostics) Diagnostics() []Diagnostic { return d }
 func (d Diagnostics) Error() string {

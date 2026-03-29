@@ -254,6 +254,18 @@ func TestImportCapabilities(t *testing.T) {
 			pattern:        "test/mod_test.go",
 			allowedImports: "os",
 		},
+		{
+			pattern:        "mod/init.go",
+			allowedImports: "os,os/exec",
+		},
+		{
+			pattern:        "mod/tidy.go",
+			allowedImports: "os",
+		},
+		{
+			pattern:        "cmd/scampi/mod.go",
+			allowedImports: "os",
+		},
 	}
 
 	splitList := func(s string) []string {

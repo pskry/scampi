@@ -1,0 +1,166 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+package mod
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+)
+
+var loadPathRe = regexp.MustCompile(`load\(\s*"([^"]+)"`)
+
+// Tidy scans *.star files in dir for load() calls and synchronises the
+// require block in scampi.mod to match. It returns a list of human-readable
+// change descriptions, or nil if nothing changed.
+func Tidy(dir string) ([]string, error) {
+	modPath := filepath.Join(dir, "scampi.mod")
+	data, err := os.ReadFile(modPath)
+	if err != nil {
+		return nil, &TidyError{
+			Detail: fmt.Sprintf("could not read scampi.mod: %v", err),
+			Hint:   "run: scampi mod init",
+		}
+	}
+
+	mod, err := Parse(modPath, data)
+	if err != nil {
+		return nil, err
+	}
+
+	refs, err := collectLoadPaths(dir, mod)
+	if err != nil {
+		return nil, err
+	}
+
+	existing := make(map[string]string, len(mod.Require))
+	for _, dep := range mod.Require {
+		existing[dep.Path] = dep.Version
+	}
+
+	var toAdd []string
+	for path := range refs {
+		if _, ok := existing[path]; !ok {
+			toAdd = append(toAdd, path)
+		}
+	}
+	slices.Sort(toAdd)
+
+	var toRemove []string
+	for path := range existing {
+		if !refs[path] {
+			toRemove = append(toRemove, path)
+		}
+	}
+	slices.Sort(toRemove)
+
+	if len(toAdd) == 0 && len(toRemove) == 0 {
+		return nil, nil
+	}
+
+	var newDeps []Dependency
+	for _, dep := range mod.Require {
+		if refs[dep.Path] {
+			newDeps = append(newDeps, Dependency{Path: dep.Path, Version: dep.Version})
+		}
+	}
+	for _, path := range toAdd {
+		newDeps = append(newDeps, Dependency{Path: path, Version: "v0.0.0"})
+	}
+	slices.SortFunc(newDeps, func(a, b Dependency) int {
+		return strings.Compare(a.Path, b.Path)
+	})
+
+	if err := writeModFile(modPath, mod.Module, newDeps); err != nil {
+		return nil, err
+	}
+
+	var changes []string
+	for _, path := range toAdd {
+		changes = append(changes, "added "+path+" v0.0.0")
+	}
+	for _, path := range toRemove {
+		changes = append(changes, "removed "+path)
+	}
+	return changes, nil
+}
+
+func collectLoadPaths(dir string, mod *Module) (map[string]bool, error) {
+	pattern := filepath.Join(dir, "*.star")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, &TidyError{
+			Detail: fmt.Sprintf("could not scan *.star files: %v", err),
+			Hint:   "check directory permissions",
+		}
+	}
+
+	refs := map[string]bool{}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			return nil, &TidyError{
+				Detail: fmt.Sprintf("could not read %s: %v", f, err),
+				Hint:   "check file permissions",
+			}
+		}
+
+		for _, match := range loadPathRe.FindAllSubmatch(data, -1) {
+			raw := string(match[1])
+			mp := extractModulePath(raw, mod)
+			if mp != "" {
+				refs[mp] = true
+			}
+		}
+	}
+	return refs, nil
+}
+
+func extractModulePath(raw string, mod *Module) string {
+	if !isModulePath(raw) {
+		return ""
+	}
+
+	if mod != nil {
+		dep, _ := splitModulePath(mod, raw)
+		if dep != nil {
+			return dep.Path
+		}
+	}
+
+	parts := strings.SplitN(raw, "/", 4)
+	if len(parts) >= 3 {
+		return strings.Join(parts[:3], "/")
+	}
+	return raw
+}
+
+func writeModFile(path, module string, deps []Dependency) error {
+	var sb strings.Builder
+	sb.WriteString("module ")
+	sb.WriteString(module)
+	sb.WriteString("\n")
+
+	if len(deps) > 0 {
+		sb.WriteString("\nrequire (\n")
+		for _, dep := range deps {
+			sb.WriteString("\t")
+			sb.WriteString(dep.Path)
+			sb.WriteString(" ")
+			sb.WriteString(dep.Version)
+			sb.WriteString("\n")
+		}
+		sb.WriteString(")\n")
+	}
+
+	if err := os.WriteFile(path, []byte(sb.String()), 0o644); err != nil {
+		return &TidyError{
+			Detail: fmt.Sprintf("could not write scampi.mod: %v", err),
+			Hint:   "check file permissions",
+		}
+	}
+	return nil
+}
