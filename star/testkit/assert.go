@@ -3,8 +3,12 @@
 package testkit
 
 import (
+	"fmt"
+	"strings"
+
 	"go.starlark.net/starlark"
 
+	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
 )
@@ -44,10 +48,21 @@ func (b *AssertionBuilder) Hash() (uint32, error) { return 0, nil }
 func (b *AssertionBuilder) AttrNames() []string { return assertionAttrs }
 
 func (b *AssertionBuilder) Attr(name string) (starlark.Value, error) {
-	for _, attr := range assertionAttrs {
-		if name == attr {
-			return starlark.NewBuiltin("assert_that."+name, stubBuiltin), nil
-		}
+	switch name {
+	case "file":
+		return starlark.NewBuiltin("assert_that.file", b.builtinFile), nil
+	case "dir":
+		return starlark.NewBuiltin("assert_that.dir", b.builtinDir), nil
+	case "service":
+		return starlark.NewBuiltin("assert_that.service", b.builtinService), nil
+	case "package":
+		return starlark.NewBuiltin("assert_that.package", b.builtinPackage), nil
+	case "symlink":
+		return starlark.NewBuiltin("assert_that.symlink", b.builtinSymlink), nil
+	case "container":
+		return starlark.NewBuiltin("assert_that.container", b.builtinContainer), nil
+	case "command_ran":
+		return starlark.NewBuiltin("assert_that.command_ran", b.builtinCommandRan), nil
 	}
 	return nil, nil
 }
@@ -59,11 +74,111 @@ func (b *AssertionBuilder) RegisterAssertion(desc string, source spec.SourceSpan
 	b.collector.Add(Assertion{Description: desc, Source: source, Check: check})
 }
 
-func stubBuiltin(
+func (b *AssertionBuilder) builtinFile(
 	_ *starlark.Thread,
 	_ *starlark.Builtin,
-	_ starlark.Tuple,
-	_ []starlark.Tuple,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
 ) (starlark.Value, error) {
+	var path string
+	if err := starlark.UnpackPositionalArgs("file", args, kwargs, 1, &path); err != nil {
+		return nil, err
+	}
+	return &FileAssertion{tgt: b.tgt, path: path, collector: b.collector}, nil
+}
+
+func (b *AssertionBuilder) builtinDir(
+	_ *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var path string
+	if err := starlark.UnpackPositionalArgs("dir", args, kwargs, 1, &path); err != nil {
+		return nil, err
+	}
+	return &DirAssertion{tgt: b.tgt, path: path, collector: b.collector}, nil
+}
+
+func (b *AssertionBuilder) builtinService(
+	_ *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var name string
+	if err := starlark.UnpackPositionalArgs("service", args, kwargs, 1, &name); err != nil {
+		return nil, err
+	}
+	return &ServiceAssertion{tgt: b.tgt, name: name, collector: b.collector}, nil
+}
+
+func (b *AssertionBuilder) builtinPackage(
+	_ *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var name string
+	if err := starlark.UnpackPositionalArgs("package", args, kwargs, 1, &name); err != nil {
+		return nil, err
+	}
+	return &PackageAssertion{tgt: b.tgt, name: name, collector: b.collector}, nil
+}
+
+func (b *AssertionBuilder) builtinSymlink(
+	_ *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var path string
+	if err := starlark.UnpackPositionalArgs("symlink", args, kwargs, 1, &path); err != nil {
+		return nil, err
+	}
+	return &SymlinkAssertion{tgt: b.tgt, path: path, collector: b.collector}, nil
+}
+
+func (b *AssertionBuilder) builtinContainer(
+	_ *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var name string
+	if err := starlark.UnpackPositionalArgs("container", args, kwargs, 1, &name); err != nil {
+		return nil, err
+	}
+	return &ContainerAssertion{tgt: b.tgt, name: name, collector: b.collector}, nil
+}
+
+func (b *AssertionBuilder) builtinCommandRan(
+	_ *starlark.Thread,
+	_ *starlark.Builtin,
+	args starlark.Tuple,
+	kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+	var substring string
+	if err := starlark.UnpackPositionalArgs("command_ran", args, kwargs, 1, &substring); err != nil {
+		return nil, err
+	}
+	tgt := b.tgt
+	// bare-error: assertion check result consumed by test runner
+	b.collector.Add(Assertion{
+		Description: fmt.Sprintf("command containing %q was executed", substring),
+		Check: func() error {
+			mt, ok := tgt.(*target.MemTarget)
+			if !ok {
+				return nil
+			}
+			for _, cmd := range mt.CommandStrings() {
+				if strings.Contains(cmd, substring) {
+					return nil
+				}
+			}
+			// bare-error: assertion result
+			return errs.Errorf("no command containing %q was executed", substring)
+		},
+	})
 	return starlark.None, nil
 }

@@ -577,6 +577,17 @@ func (m *MemTarget) RunPrivileged(ctx context.Context, cmd string) (CommandResul
 	return m.RunCommand(ctx, cmd)
 }
 
+// CommandStrings returns all commands that were executed, in order.
+func (m *MemTarget) CommandStrings() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]string, len(m.Commands))
+	for i, c := range m.Commands {
+		out[i] = c.Cmd
+	}
+	return out
+}
+
 // UserManager
 // -----------------------------------------------------------------------------
 
