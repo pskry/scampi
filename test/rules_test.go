@@ -81,11 +81,7 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "runtime",
 		},
 		{
-			pattern:        "mod/write.go",
-			allowedImports: "os",
-		},
-		{
-			pattern:        "mod/resolve.go",
+			pattern:        "mod/cache.go",
 			allowedImports: "os",
 		},
 		{
@@ -260,11 +256,7 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "mod/init.go",
-			allowedImports: "os,os/exec",
-		},
-		{
-			pattern:        "mod/tidy.go",
-			allowedImports: "os",
+			allowedImports: "os/exec",
 		},
 		{
 			pattern:        "cmd/scampi/mod.go",

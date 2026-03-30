@@ -3,12 +3,14 @@
 package mod_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"scampi.dev/scampi/mod"
+	"scampi.dev/scampi/source"
 )
 
 func TestComputeHash_Deterministic(t *testing.T) {
@@ -98,11 +100,11 @@ func TestWriteAndReadSum(t *testing.T) {
 		"codeberg.org/baz/qux v2.1.0": "h1:def456",
 	}
 
-	if err := mod.WriteSum(path, sums); err != nil {
+	if err := mod.WriteSum(context.Background(), source.LocalPosixSource{}, path, sums); err != nil {
 		t.Fatalf("WriteSum: %v", err)
 	}
 
-	got, err := mod.ReadSum(path)
+	got, err := mod.ReadSum(context.Background(), source.LocalPosixSource{}, path)
 	if err != nil {
 		t.Fatalf("ReadSum: %v", err)
 	}
@@ -119,7 +121,7 @@ func TestWriteAndReadSum(t *testing.T) {
 func TestReadSum_Missing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "scampi.sum")
 
-	got, err := mod.ReadSum(path)
+	got, err := mod.ReadSum(context.Background(), source.LocalPosixSource{}, path)
 	if err != nil {
 		t.Fatalf("ReadSum on missing file: %v", err)
 	}
@@ -136,7 +138,7 @@ func TestWriteSum_Sorted(t *testing.T) {
 		"codeberg.org/mmm/mod v1.0.0": "h1:mmm",
 	}
 
-	if err := mod.WriteSum(path, sums); err != nil {
+	if err := mod.WriteSum(context.Background(), source.LocalPosixSource{}, path, sums); err != nil {
 		t.Fatalf("WriteSum: %v", err)
 	}
 

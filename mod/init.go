@@ -3,16 +3,18 @@
 package mod
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"scampi.dev/scampi/source"
 )
 
 // Init creates a scampi.mod file in dir with the given module path.
 // If modulePath is empty, it is inferred from the git remote origin URL.
-func Init(dir string, modulePath string) error {
+func Init(ctx context.Context, src source.Source, dir string, modulePath string) error {
 	if modulePath == "" {
 		inferred, err := inferModulePath(dir)
 		if err != nil {
@@ -29,7 +31,7 @@ func Init(dir string, modulePath string) error {
 	}
 
 	dest := filepath.Join(dir, "scampi.mod")
-	if _, err := os.Stat(dest); err == nil {
+	if _, err := src.Stat(ctx, dest); err == nil {
 		return &InitError{
 			Detail: "scampi.mod already exists",
 			Hint:   "delete it first or edit it directly",
@@ -37,7 +39,7 @@ func Init(dir string, modulePath string) error {
 	}
 
 	content := "module " + modulePath + "\n"
-	if err := os.WriteFile(dest, []byte(content), 0o644); err != nil {
+	if err := src.WriteFile(ctx, dest, []byte(content)); err != nil {
 		return &InitError{
 			Detail: fmt.Sprintf("could not write scampi.mod: %v", err),
 			Hint:   "check directory permissions",

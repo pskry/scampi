@@ -3,12 +3,14 @@
 package mod
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+
+	"scampi.dev/scampi/source"
 )
 
 var loadPathRe = regexp.MustCompile(`load\(\s*"([^"]+)"`)
@@ -16,9 +18,9 @@ var loadPathRe = regexp.MustCompile(`load\(\s*"([^"]+)"`)
 // Tidy scans *.star files in dir for load() calls and synchronises the
 // require block in scampi.mod to match. It returns a list of human-readable
 // change descriptions, or nil if nothing changed.
-func Tidy(dir string) ([]string, error) {
+func Tidy(ctx context.Context, src source.Source, dir string) ([]string, error) {
 	modPath := filepath.Join(dir, "scampi.mod")
-	data, err := os.ReadFile(modPath)
+	data, err := src.ReadFile(ctx, modPath)
 	if err != nil {
 		return nil, &TidyError{
 			Detail: fmt.Sprintf("could not read scampi.mod: %v", err),
@@ -31,7 +33,7 @@ func Tidy(dir string) ([]string, error) {
 		return nil, err
 	}
 
-	refs, err := collectLoadPaths(dir, mod)
+	refs, err := collectLoadPaths(ctx, src, dir, mod)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +76,7 @@ func Tidy(dir string) ([]string, error) {
 		return strings.Compare(a.Path, b.Path)
 	})
 
-	if err := writeModFile(modPath, mod.Module, newDeps); err != nil {
+	if err := writeModFile(ctx, src, modPath, mod.Module, newDeps); err != nil {
 		return nil, err
 	}
 
@@ -88,7 +90,9 @@ func Tidy(dir string) ([]string, error) {
 	return changes, nil
 }
 
-func collectLoadPaths(dir string, mod *Module) (map[string]bool, error) {
+func collectLoadPaths(ctx context.Context, src source.Source, dir string, mod *Module) (map[string]bool, error) {
+	// filepath.Glob lists filenames (metadata only). source.Source doesn't
+	// have a directory-listing method, so we keep this for now.
 	pattern := filepath.Join(dir, "*.star")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -100,7 +104,7 @@ func collectLoadPaths(dir string, mod *Module) (map[string]bool, error) {
 
 	refs := map[string]bool{}
 	for _, f := range files {
-		data, err := os.ReadFile(f)
+		data, err := src.ReadFile(ctx, f)
 		if err != nil {
 			return nil, &TidyError{
 				Detail: fmt.Sprintf("could not read %s: %v", f, err),

@@ -3,9 +3,17 @@
 package mod
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"scampi.dev/scampi/source"
+)
+
+var (
+	testCtx = context.Background()
+	testSrc = source.LocalPosixSource{}
 )
 
 func makeModule(t *testing.T, deps ...Dependency) *Module {
@@ -37,7 +45,7 @@ func TestResolve_IndexEntry(t *testing.T) {
 	writeFile(t, filepath.Join(modDir, "_index.star"))
 
 	m := makeModule(t, dep("codeberg.org/user/npm", "v1.0.0", 2))
-	got, err := Resolve(m, "codeberg.org/user/npm", cache)
+	got, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm", cache)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -53,7 +61,7 @@ func TestResolve_NameEntry(t *testing.T) {
 	writeFile(t, filepath.Join(modDir, "npm.star"))
 
 	m := makeModule(t, dep("codeberg.org/user/npm", "v1.0.0", 2))
-	got, err := Resolve(m, "codeberg.org/user/npm", cache)
+	got, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm", cache)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -70,7 +78,7 @@ func TestResolve_IndexTakesPrecedenceOverName(t *testing.T) {
 	writeFile(t, filepath.Join(modDir, "npm.star"))
 
 	m := makeModule(t, dep("codeberg.org/user/npm", "v1.0.0", 2))
-	got, err := Resolve(m, "codeberg.org/user/npm", cache)
+	got, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm", cache)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,7 +94,7 @@ func TestResolve_Subpath(t *testing.T) {
 	writeFile(t, filepath.Join(modDir, "internal", "helpers.star"))
 
 	m := makeModule(t, dep("codeberg.org/user/npm", "v1.0.0", 2))
-	got, err := Resolve(m, "codeberg.org/user/npm/internal/helpers", cache)
+	got, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm/internal/helpers", cache)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,7 +110,7 @@ func TestResolve_SubpathIndex(t *testing.T) {
 	writeFile(t, filepath.Join(modDir, "internal", "_index.star"))
 
 	m := makeModule(t, dep("codeberg.org/user/npm", "v1.0.0", 2))
-	got, err := Resolve(m, "codeberg.org/user/npm/internal", cache)
+	got, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm/internal", cache)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -115,7 +123,7 @@ func TestResolve_SubpathIndex(t *testing.T) {
 func TestResolve_NotInRequireTable(t *testing.T) {
 	cache := t.TempDir()
 	m := makeModule(t)
-	_, err := Resolve(m, "codeberg.org/user/npm", cache)
+	_, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm", cache)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -131,7 +139,7 @@ func TestResolve_NotInRequireTable(t *testing.T) {
 func TestResolve_NotCached(t *testing.T) {
 	cache := t.TempDir()
 	m := makeModule(t, dep("codeberg.org/user/npm", "v1.0.0", 3))
-	_, err := Resolve(m, "codeberg.org/user/npm", cache)
+	_, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm", cache)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -158,7 +166,7 @@ func TestResolve_NoEntryPoint(t *testing.T) {
 	}
 
 	m := makeModule(t, dep("codeberg.org/user/npm", "v1.0.0", 2))
-	_, err := Resolve(m, "codeberg.org/user/npm", cache)
+	_, err := Resolve(testCtx, testSrc, m, "codeberg.org/user/npm", cache)
 	if err == nil {
 		t.Fatal("expected error")
 	}

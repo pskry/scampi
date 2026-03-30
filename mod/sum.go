@@ -3,7 +3,7 @@
 package mod
 
 import (
-	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"io/fs"
@@ -11,12 +11,16 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"scampi.dev/scampi/source"
 )
 
 // ComputeHash computes a deterministic SHA-256 hash of the directory tree at dir.
 // It skips .git/ directories, sorts paths lexicographically, and encodes each
 // file as "<forward-slash-path>\0<content>" before hashing.
 // Returns "h1:" + hex(sha256).
+//
+// This operates on the module cache (real filesystem), not project source files.
 func ComputeHash(dir string) (string, error) {
 	var paths []string
 
@@ -56,8 +60,7 @@ func ComputeHash(dir string) (string, error) {
 				Hint:   "ensure all files in the directory are readable",
 			}
 		}
-		// sha256.Hash.Write never returns an error per the hash.Hash contract.
-		//nolint:errcheck,revive
+		//nolint:errcheck,revive // sha256.Hash.Write never returns an error
 		h.Write([]byte(slashPath))
 		//nolint:errcheck,revive
 		h.Write([]byte{0})
@@ -68,26 +71,27 @@ func ComputeHash(dir string) (string, error) {
 	return "h1:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// ReadSum parses a scampi.sum file at path.
+// ReadSum parses a scampi.sum file via the source interface.
 // Format per line: "<module> <version> <hash>".
 // Key in the returned map is "<module> <version>".
 // A missing file returns an empty map, not an error.
-func ReadSum(path string) (map[string]string, error) {
-	f, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return map[string]string{}, nil
-	}
+func ReadSum(ctx context.Context, src source.Source, path string) (map[string]string, error) {
+	data, err := src.ReadFile(ctx, path)
 	if err != nil {
+		// Treat missing file as empty — no sums yet
+		meta, statErr := src.Stat(ctx, path)
+		if statErr == nil && !meta.Exists {
+			return map[string]string{}, nil
+		}
 		return nil, &SumError{
-			Detail: "failed to open scampi.sum: " + err.Error(),
+			Detail: "failed to read scampi.sum: " + err.Error(),
 			Hint:   "ensure the file is readable",
 		}
 	}
 
 	sums := map[string]string{}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
@@ -98,25 +102,12 @@ func ReadSum(path string) (map[string]string, error) {
 		key := fields[0] + " " + fields[1]
 		sums[key] = fields[2]
 	}
-	closeErr := f.Close()
-	if scanErr := scanner.Err(); scanErr != nil {
-		return nil, &SumError{
-			Detail: "failed to read scampi.sum: " + scanErr.Error(),
-			Hint:   "ensure the file is not corrupted",
-		}
-	}
-	if closeErr != nil {
-		return nil, &SumError{
-			Detail: "failed to close scampi.sum: " + closeErr.Error(),
-			Hint:   "ensure the file is not corrupted",
-		}
-	}
 	return sums, nil
 }
 
-// WriteSum writes sums to a scampi.sum file at path.
-// Lines are sorted alphabetically by key and formatted as "<key> <hash>\n".
-func WriteSum(path string, sums map[string]string) error {
+// WriteSum writes sums to a scampi.sum file via the source interface.
+// Lines are sorted alphabetically by key.
+func WriteSum(ctx context.Context, src source.Source, path string, sums map[string]string) error {
 	keys := make([]string, 0, len(sums))
 	for k := range sums {
 		keys = append(keys, k)
@@ -131,8 +122,7 @@ func WriteSum(path string, sums map[string]string) error {
 		sb.WriteByte('\n')
 	}
 
-	err := os.WriteFile(path, []byte(sb.String()), 0o644)
-	if err != nil {
+	if err := src.WriteFile(ctx, path, []byte(sb.String())); err != nil {
 		return &SumError{
 			Detail: "failed to write scampi.sum: " + err.Error(),
 			Hint:   "ensure the directory is writable",
@@ -143,7 +133,6 @@ func WriteSum(path string, sums map[string]string) error {
 
 // VerifyModule checks whether dep's hash in modDir matches what's recorded in sums.
 // If dep is not yet in sums, nil is returned (new module, not yet recorded).
-// If the hash mismatches, a SumMismatchError is returned.
 func VerifyModule(dep Dependency, modDir string, sums map[string]string) error {
 	key := dep.Path + " " + dep.Version
 	expected, ok := sums[key]

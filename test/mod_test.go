@@ -513,7 +513,14 @@ def greet(name):
 		t.Fatal(err)
 	}
 
-	resolvedVersion, err := mod.Add(modPath, version, projDir, cacheDir)
+	resolvedVersion, err := mod.Add(
+		context.Background(),
+		source.LocalPosixSource{},
+		modPath,
+		version,
+		projDir,
+		cacheDir,
+	)
 	if err != nil {
 		t.Fatalf("mod.Add: %v", err)
 	}
@@ -575,7 +582,9 @@ func TestModuleAdd_NotAModule(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := mod.Add(repoPath, "v1.0.0", projDir, mod.DefaultCacheDir())
+	ctx := context.Background()
+	src := source.LocalPosixSource{}
+	_, err := mod.Add(ctx, src, repoPath, "v1.0.0", projDir, mod.DefaultCacheDir())
 	if err == nil {
 		t.Fatal("expected NotAModuleError, got nil")
 	}
@@ -616,5 +625,117 @@ deploy(
 	}
 	if _, ok := cfg.Deploy["compat-test"]; !ok {
 		t.Fatal("expected deploy block 'compat-test'")
+	}
+}
+
+// TestModuleLoad_Local verifies that local modules (version is a relative
+// path) resolve directly from the filesystem without going through the cache.
+func TestModuleLoad_Local(t *testing.T) {
+	projDir := t.TempDir()
+
+	// Create a local module directory
+	localMod := filepath.Join(projDir, "modules", "helpers")
+	if err := os.MkdirAll(localMod, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(localMod, "_index.star"), []byte(`
+def greet(name):
+    return "hello, " + name
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	modFile := filepath.Join(projDir, "scampi.mod")
+	if err := os.WriteFile(modFile, []byte(`module codeberg.org/test/proj
+
+require (
+	my/helpers ./modules/helpers
+)
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfgFile := filepath.Join(projDir, "config.star")
+	if err := os.WriteFile(cfgFile, []byte(`load("my/helpers", "greet")
+
+msg = greet("world")
+
+target.local(name="host")
+
+deploy(
+    name="local-mod-test",
+    targets=["host"],
+    steps=[
+        dir(path="/tmp/local-mod-test"),
+    ],
+)
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	store := diagnostic.NewSourceStore()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+	src := source.LocalPosixSource{}
+	cfg, err := engine.LoadConfig(ctx, em, cfgFile, store, src)
+	if err != nil {
+		t.Fatalf("LoadConfig with local module: %v", err)
+	}
+	if _, ok := cfg.Deploy["local-mod-test"]; !ok {
+		t.Fatal("expected deploy block 'local-mod-test'")
+	}
+}
+
+// TestModuleLoad_LocalAbsPath verifies that absolute-path local modules work.
+func TestModuleLoad_LocalAbsPath(t *testing.T) {
+	projDir := t.TempDir()
+	localMod := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(localMod, "_index.star"), []byte(`
+def helper():
+    return 42
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	modFile := filepath.Join(projDir, "scampi.mod")
+	modContent := "module codeberg.org/test/proj\n\n" +
+		"require (\n\tmy/util " + localMod + "\n)\n"
+	if err := os.WriteFile(modFile, []byte(modContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfgFile := filepath.Join(projDir, "config.star")
+	if err := os.WriteFile(cfgFile, []byte(`load("my/util", "helper")
+
+val = helper()
+
+target.local(name="host")
+
+deploy(
+    name="abs-test",
+    targets=["host"],
+    steps=[
+        dir(path="/tmp/abs-test"),
+    ],
+)
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	store := diagnostic.NewSourceStore()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+	src := source.LocalPosixSource{}
+	cfg, err := engine.LoadConfig(ctx, em, cfgFile, store, src)
+	if err != nil {
+		t.Fatalf("LoadConfig with absolute local module: %v", err)
+	}
+	if _, ok := cfg.Deploy["abs-test"]; !ok {
+		t.Fatal("expected deploy block 'abs-test'")
 	}
 }

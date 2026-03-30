@@ -3,6 +3,7 @@
 package mod_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"scampi.dev/scampi/mod"
+	"scampi.dev/scampi/source"
 )
 
 // initTaggedRepo creates a bare git repo with multiple tagged commits in a temp dir.
@@ -105,7 +107,7 @@ func TestAdd_ExplicitVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	version, err := mod.Add(bare, "v1.2.3", dir, cacheDir)
+	version, err := mod.Add(context.Background(), source.LocalPosixSource{}, bare, "v1.2.3", dir, cacheDir)
 	if err != nil {
 		t.Fatalf("Add: %v", err)
 	}
@@ -145,7 +147,7 @@ func TestAdd_LatestStable(t *testing.T) {
 	}
 
 	// version="" triggers latest stable resolution
-	version, err := mod.Add(bare, "", dir, cacheDir)
+	version, err := mod.Add(context.Background(), source.LocalPosixSource{}, bare, "", dir, cacheDir)
 	if err != nil {
 		t.Fatalf("Add: %v", err)
 	}
@@ -172,7 +174,7 @@ func TestAdd_NoStableVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := mod.Add(bare, "", dir, cacheDir)
+	_, err := mod.Add(context.Background(), source.LocalPosixSource{}, bare, "", dir, cacheDir)
 	if err == nil {
 		t.Fatal("expected NoStableVersionError, got nil")
 	}

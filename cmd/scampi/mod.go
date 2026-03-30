@@ -15,6 +15,7 @@ import (
 	"scampi.dev/scampi/engine"
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/mod"
+	"scampi.dev/scampi/source"
 )
 
 // scampi mod
@@ -73,7 +74,8 @@ func modInitCmd() *cli.Command {
 			if err != nil {
 				panic(errs.BUG("os.Getwd failed: %w", err))
 			}
-			if err := mod.Init(dir, modulePath); err != nil {
+			src := source.LocalPosixSource{}
+			if err := mod.Init(ctx, src, dir, modulePath); err != nil {
 				emitModDiagnostic(em, err)
 				return handleEngineError("mod init", engine.AbortError{Causes: []error{err}})
 			}
@@ -104,7 +106,8 @@ func modTidyCmd() *cli.Command {
 			if err != nil {
 				panic(errs.BUG("os.Getwd failed: %w", err))
 			}
-			changes, err := mod.Tidy(dir)
+			src := source.LocalPosixSource{}
+			changes, err := mod.Tidy(ctx, src, dir)
 			if err != nil {
 				emitModDiagnostic(em, err)
 				return handleEngineError("mod tidy", engine.AbortError{Causes: []error{err}})
@@ -157,7 +160,8 @@ func modAddCmd() *cli.Command {
 			modPath, version := parseModArg(moduleArg)
 			cacheDir := mod.DefaultCacheDir()
 
-			resolved, err := mod.Add(modPath, version, dir, cacheDir)
+			src := source.LocalPosixSource{}
+			resolved, err := mod.Add(ctx, src, modPath, version, dir, cacheDir)
 			if err != nil {
 				emitModDiagnostic(em, err)
 				return handleEngineError("mod add", engine.AbortError{Causes: []error{err}})
@@ -190,6 +194,8 @@ func modDownloadCmd() *cli.Command {
 				panic(errs.BUG("os.Getwd failed: %w", err))
 			}
 
+			src := source.LocalPosixSource{}
+
 			modFile := filepath.Join(dir, "scampi.mod")
 			data, err := os.ReadFile(modFile)
 			if err != nil {
@@ -205,7 +211,7 @@ func modDownloadCmd() *cli.Command {
 			}
 
 			sumFile := filepath.Join(dir, "scampi.sum")
-			sums, err := mod.ReadSum(sumFile)
+			sums, err := mod.ReadSum(ctx, src, sumFile)
 			if err != nil {
 				emitModDiagnostic(em, err)
 				return handleEngineError("mod download", engine.AbortError{Causes: []error{err}})
@@ -221,7 +227,7 @@ func modDownloadCmd() *cli.Command {
 				}
 
 				dest := filepath.Join(cacheDir, dep.Path+"@"+dep.Version)
-				if err := mod.ValidateEntryPoint(dep, dest); err != nil {
+				if err := mod.ValidateEntryPoint(ctx, source.LocalPosixSource{}, dep, dest); err != nil {
 					emitModDiagnostic(em, err)
 					return handleEngineError("mod download", engine.AbortError{Causes: []error{err}})
 				}
@@ -242,7 +248,7 @@ func modDownloadCmd() *cli.Command {
 			}
 
 			if updated {
-				if err := mod.WriteSum(sumFile, sums); err != nil {
+				if err := mod.WriteSum(ctx, src, sumFile, sums); err != nil {
 					emitModDiagnostic(em, err)
 					return handleEngineError("mod download", engine.AbortError{Causes: []error{err}})
 				}
@@ -290,10 +296,11 @@ func modUpdateCmd() *cli.Command {
 				panic(errs.BUG("os.Getwd failed: %w", err))
 			}
 
+			src := source.LocalPosixSource{}
 			modPath, _ := parseModArg(moduleArg)
 			cacheDir := mod.DefaultCacheDir()
 
-			resolved, err := mod.Add(modPath, "", dir, cacheDir)
+			resolved, err := mod.Add(ctx, src, modPath, "", dir, cacheDir)
 			if err != nil {
 				emitModDiagnostic(em, err)
 				return handleEngineError("mod update", engine.AbortError{Causes: []error{err}})
@@ -326,6 +333,8 @@ func modVerifyCmd() *cli.Command {
 				panic(errs.BUG("os.Getwd failed: %w", err))
 			}
 
+			src := source.LocalPosixSource{}
+
 			modFile := filepath.Join(dir, "scampi.mod")
 			data, err := os.ReadFile(modFile)
 			if err != nil {
@@ -341,7 +350,7 @@ func modVerifyCmd() *cli.Command {
 			}
 
 			sumFile := filepath.Join(dir, "scampi.sum")
-			sums, err := mod.ReadSum(sumFile)
+			sums, err := mod.ReadSum(ctx, src, sumFile)
 			if err != nil {
 				emitModDiagnostic(em, err)
 				return handleEngineError("mod verify", engine.AbortError{Causes: []error{err}})
@@ -351,7 +360,7 @@ func modVerifyCmd() *cli.Command {
 
 			for _, dep := range m.Require {
 				modDir := filepath.Join(cacheDir, dep.Path+"@"+dep.Version)
-				if err := mod.ValidateEntryPoint(dep, modDir); err != nil {
+				if err := mod.ValidateEntryPoint(ctx, source.LocalPosixSource{}, dep, modDir); err != nil {
 					emitModDiagnostic(em, err)
 					return handleEngineError("mod verify", engine.AbortError{Causes: []error{err}})
 				}

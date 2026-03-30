@@ -3,12 +3,14 @@
 package mod
 
 import (
-	"os"
+	"context"
 	"path/filepath"
 	"strings"
+
+	"scampi.dev/scampi/source"
 )
 
-// Resolve maps a module load path to an absolute .star file path in the cache.
+// Resolve maps a module load path to an absolute .star file path.
 //
 // For bare module loads (e.g. codeberg.org/user/repo), the entry point is
 // resolved by trying _index.star then <last-segment>.star. If both exist,
@@ -16,29 +18,36 @@ import (
 //
 // For subpath loads (e.g. codeberg.org/user/repo/internal/helpers), the
 // subpath is resolved by trying <subpath>.star then <subpath>/_index.star.
-func Resolve(m *Module, loadPath string, cacheDir string) (string, error) {
+//
+// Remote deps resolve against cacheDir. Local deps resolve against the
+// filesystem path in the version field (relative to scampi.mod's directory).
+func Resolve(ctx context.Context, src source.Source, m *Module, loadPath string, cacheDir string) (string, error) {
 	dep, subPath := splitModulePath(m, loadPath)
 	if dep == nil {
 		return "", &ModuleNotFoundError{LoadPath: loadPath}
 	}
 
-	modDir := filepath.Join(cacheDir, dep.Path+"@"+dep.Version)
-	if _, err := os.Stat(modDir); os.IsNotExist(err) {
-		depCopy := dep
-		return "", &ModuleNotCachedError{
-			ModPath: dep.Path,
-			Version: dep.Version,
-			Source:  m.DepSpan(depCopy),
-		}
-	}
-
-	candidates, err := resolveCandidates(modDir, dep, subPath)
+	modDir := modDirFor(m, dep, cacheDir)
+	meta, err := src.Stat(ctx, modDir)
 	if err != nil {
 		return "", err
 	}
+	if !meta.Exists {
+		return "", &ModuleNotCachedError{
+			ModPath: dep.Path,
+			Version: dep.Version,
+			Source:  m.DepSpan(dep),
+		}
+	}
+
+	candidates := resolveCandidates(modDir, dep, subPath)
 
 	for _, candidate := range candidates {
-		if _, err := os.Stat(candidate); err == nil {
+		cmeta, err := src.Stat(ctx, candidate)
+		if err != nil {
+			return "", err
+		}
+		if cmeta.Exists && !cmeta.IsDir {
 			return candidate, nil
 		}
 	}
@@ -53,21 +62,42 @@ func Resolve(m *Module, loadPath string, cacheDir string) (string, error) {
 	}
 }
 
+// ValidateEntryPoint checks that a module directory contains a loadable
+// .star entry point. Returns NotAModuleError if not.
+func ValidateEntryPoint(ctx context.Context, src source.Source, dep Dependency, dir string) error {
+	if hasEntryPoint(ctx, src, dir, lastSegment(dep.Path)) {
+		return nil
+	}
+	return &NotAModuleError{ModPath: dep.Path, Version: dep.Version}
+}
+
+// modDirFor returns the directory where a dependency's files live.
+func modDirFor(m *Module, dep *Dependency, cacheDir string) string {
+	if dep.IsLocal() {
+		dir := dep.Version
+		if !filepath.IsAbs(dir) {
+			dir = filepath.Join(filepath.Dir(m.Filename), dir)
+		}
+		return dir
+	}
+	return filepath.Join(cacheDir, dep.Path+"@"+dep.Version)
+}
+
 // resolveCandidates returns the ordered list of candidate .star paths to try.
-func resolveCandidates(modDir string, dep *Dependency, subPath string) ([]string, error) {
+func resolveCandidates(modDir string, dep *Dependency, subPath string) []string {
 	if subPath == "" {
 		last := lastSegment(dep.Path)
 		return []string{
 			filepath.Join(modDir, "_index.star"),
 			filepath.Join(modDir, last+".star"),
-		}, nil
+		}
 	}
 
 	subNative := filepath.FromSlash(subPath)
 	return []string{
 		filepath.Join(modDir, subNative+".star"),
 		filepath.Join(modDir, subNative, "_index.star"),
-	}, nil
+	}
 }
 
 // splitModulePath finds the longest require-table prefix of loadPath and
@@ -100,22 +130,11 @@ func lastSegment(p string) string {
 	return p
 }
 
-// ValidateEntryPoint checks that a cached module directory contains a loadable
-// .star entry point. Returns NotAModuleError if not.
-func ValidateEntryPoint(dep Dependency, dir string) error {
-	if hasEntryPoint(dir, lastSegment(dep.Path)) {
-		return nil
-	}
-	return &NotAModuleError{ModPath: dep.Path, Version: dep.Version}
-}
-
-// hasEntryPoint reports whether dir contains a loadable .star entry point
-// (_index.star or <name>.star).
-func hasEntryPoint(dir, name string) bool {
-	if _, err := os.Stat(filepath.Join(dir, "_index.star")); err == nil {
+func hasEntryPoint(ctx context.Context, src source.Source, dir, name string) bool {
+	if meta, err := src.Stat(ctx, filepath.Join(dir, "_index.star")); err == nil && meta.Exists {
 		return true
 	}
-	if _, err := os.Stat(filepath.Join(dir, name+".star")); err == nil {
+	if meta, err := src.Stat(ctx, filepath.Join(dir, name+".star")); err == nil && meta.Exists {
 		return true
 	}
 	return false
@@ -124,12 +143,5 @@ func hasEntryPoint(dir, name string) bool {
 // DefaultCacheDir returns the default module cache directory.
 // Uses $XDG_CACHE_HOME/scampi/mod if set, else ~/.cache/scampi/mod.
 func DefaultCacheDir() string {
-	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
-		return filepath.Join(xdg, "scampi", "mod")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(".cache", "scampi", "mod")
-	}
-	return filepath.Join(home, ".cache", "scampi", "mod")
+	return defaultCacheDir()
 }

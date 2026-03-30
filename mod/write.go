@@ -3,13 +3,15 @@
 package mod
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"strings"
+
+	"scampi.dev/scampi/source"
 )
 
 // writeModFile serialises module and deps to path in canonical scampi.mod format.
-func writeModFile(path, module string, deps []Dependency) error {
+func writeModFile(ctx context.Context, src source.Source, path, module string, deps []Dependency) error {
 	var sb strings.Builder
 	sb.WriteString("module ")
 	sb.WriteString(module)
@@ -27,7 +29,7 @@ func writeModFile(path, module string, deps []Dependency) error {
 		sb.WriteString(")\n")
 	}
 
-	if err := os.WriteFile(path, []byte(sb.String()), 0o644); err != nil {
+	if err := src.WriteFile(ctx, path, []byte(sb.String())); err != nil {
 		return &WriteError{
 			Detail: fmt.Sprintf("could not write scampi.mod: %v", err),
 			Hint:   "check file permissions",

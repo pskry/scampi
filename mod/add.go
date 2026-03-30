@@ -3,18 +3,21 @@
 package mod
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+
+	"scampi.dev/scampi/source"
 )
 
 // Add adds or updates a dependency in the scampi.mod and scampi.sum files at dir.
 // If version is empty, the latest stable semver tag is resolved from the remote.
 // Returns the resolved version.
-func Add(modPath, version, dir, cacheDir string) (string, error) {
+func Add(ctx context.Context, src source.Source, modPath, version, dir, cacheDir string) (string, error) {
 	if version == "" {
 		resolved, err := resolveLatestStable(modPath)
 		if err != nil {
@@ -31,7 +34,7 @@ func Add(modPath, version, dir, cacheDir string) (string, error) {
 
 	dest := filepath.Join(cacheDir, dep.Path+"@"+dep.Version)
 
-	if err := ValidateEntryPoint(dep, dest); err != nil {
+	if err := ValidateEntryPoint(ctx, src, dep, dest); err != nil {
 		_ = os.RemoveAll(dest)
 		return "", err
 	}
@@ -42,7 +45,7 @@ func Add(modPath, version, dir, cacheDir string) (string, error) {
 	}
 
 	modFile := filepath.Join(dir, "scampi.mod")
-	data, err := os.ReadFile(modFile)
+	data, err := src.ReadFile(ctx, modFile)
 	if err != nil {
 		return "", &AddError{
 			Detail: "could not read scampi.mod: " + err.Error(),
@@ -73,12 +76,12 @@ func Add(modPath, version, dir, cacheDir string) (string, error) {
 		return strings.Compare(a.Path, b.Path)
 	})
 
-	if err := writeModFile(modFile, m.Module, deps); err != nil {
+	if err := writeModFile(ctx, src, modFile, m.Module, deps); err != nil {
 		return "", err
 	}
 
 	sumFile := filepath.Join(dir, "scampi.sum")
-	sums, err := ReadSum(sumFile)
+	sums, err := ReadSum(ctx, src, sumFile)
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +89,7 @@ func Add(modPath, version, dir, cacheDir string) (string, error) {
 	key := modPath + " " + version
 	sums[key] = hash
 
-	if err := WriteSum(sumFile, sums); err != nil {
+	if err := WriteSum(ctx, src, sumFile, sums); err != nil {
 		return "", err
 	}
 
