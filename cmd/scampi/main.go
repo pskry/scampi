@@ -102,6 +102,7 @@ func main() {
 			inspectCmd(),
 			genCmd(),
 			modCmd(),
+			testCmd(),
 			indexCmd(),
 			secretsCmd(),
 			legendCmd(),

@@ -5,6 +5,7 @@ package testkit
 import (
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
+	"scampi.dev/scampi/spec"
 )
 
 // TestPass is emitted when an assertion passes.
@@ -27,14 +28,16 @@ type TestFail struct {
 	Description string
 	Expected    string
 	Actual      string
+	Source      spec.SourceSpan
 }
 
 func (e TestFail) EventTemplate() event.Template {
 	return event.Template{
-		ID:   "test.Fail",
-		Text: "{{.Description}}",
-		Hint: "expected: {{.Expected}}\nactual:   {{.Actual}}",
-		Data: e,
+		ID:     "test.Fail",
+		Text:   "{{.Description}}",
+		Hint:   "expected: {{.Expected}}\nactual:   {{.Actual}}",
+		Data:   e,
+		Source: &e.Source,
 	}
 }
 
