@@ -256,7 +256,7 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "test/mod_test.go",
-			allowedImports: "os",
+			allowedImports: "os,os/exec",
 		},
 		{
 			pattern:        "mod/init.go",

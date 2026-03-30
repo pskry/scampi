@@ -4,7 +4,9 @@ package test
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -399,6 +401,191 @@ deploy(
 	}
 	if !found {
 		t.Errorf("expected a ModuleNotCachedError in causes, got: %v", ae.Causes)
+	}
+}
+
+// createModuleRepo creates a bare git repo tagged at v1.0.0 containing an
+// _index.star that exports a simple function.  Returns the bare repo path.
+func createModuleRepo(t *testing.T) string {
+	t.Helper()
+	work := t.TempDir()
+	bare := filepath.Join(t.TempDir(), "mod.git")
+
+	runGit := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=test",
+			"GIT_AUTHOR_EMAIL=test@test",
+			"GIT_COMMITTER_NAME=test",
+			"GIT_COMMITTER_EMAIL=test@test",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %s: %v", args, out, err)
+		}
+	}
+
+	runGit(work, "init")
+	runGit(work, "checkout", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "_index.star"), []byte(`
+def greet(name):
+    return "hello, " + name
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(work, "add", ".")
+	runGit(work, "commit", "-m", "initial")
+	runGit(work, "tag", "v1.0.0")
+	runGit(work, "clone", "--bare", work, bare)
+	return bare
+}
+
+// createEmptyRepo creates a bare git repo tagged at v1.0.0 with no .star files.
+func createEmptyRepo(t *testing.T) string {
+	t.Helper()
+	work := t.TempDir()
+	bare := filepath.Join(t.TempDir(), "empty.git")
+
+	runGit := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=test",
+			"GIT_AUTHOR_EMAIL=test@test",
+			"GIT_COMMITTER_NAME=test",
+			"GIT_COMMITTER_EMAIL=test@test",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %s: %v", args, out, err)
+		}
+	}
+
+	runGit(work, "init")
+	runGit(work, "checkout", "-b", "main")
+	if err := os.WriteFile(filepath.Join(work, "README.md"), []byte("not a module\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(work, "add", ".")
+	runGit(work, "commit", "-m", "initial")
+	runGit(work, "tag", "v1.0.0")
+	runGit(work, "clone", "--bare", work, bare)
+	return bare
+}
+
+// TestModuleAdd_ThenLoad exercises the full add+load pipeline: create a git
+// repo as a module, pre-populate the cache (skipping the real network fetch),
+// use mod.Add to register it in scampi.mod and scampi.sum, then verify
+// engine.LoadConfig can load a config that imports from it.
+//
+// The cache is pre-populated so the test doesn't require internet access;
+// the actual git-clone path is covered by TestFetch_* in mod/fetch_test.go.
+func TestModuleAdd_ThenLoad(t *testing.T) {
+	const modPath = "codeberg.org/test/greetings"
+	const version = "v1.0.0"
+
+	repoPath := createModuleRepo(t)
+	_ = repoPath // bare repo created; cache pre-seeded below
+
+	projDir := t.TempDir()
+	cacheParent := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cacheParent)
+
+	// Pre-seed the cache so mod.Add skips the git clone and goes straight to
+	// validation + hash + writing scampi.mod/scampi.sum.
+	cacheDir := mod.DefaultCacheDir()
+	cachedModDir := filepath.Join(cacheDir, modPath+"@"+version)
+	if err := os.MkdirAll(cachedModDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cachedModDir, "_index.star"), []byte(`
+def greet(name):
+    return "hello, " + name
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	modContent := "module codeberg.org/test/addload\n"
+	if err := os.WriteFile(filepath.Join(projDir, "scampi.mod"), []byte(modContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	resolvedVersion, err := mod.Add(modPath, version, projDir, cacheDir)
+	if err != nil {
+		t.Fatalf("mod.Add: %v", err)
+	}
+	if resolvedVersion != version {
+		t.Errorf("mod.Add returned version %q, want %q", resolvedVersion, version)
+	}
+
+	if _, err := os.Stat(filepath.Join(projDir, "scampi.sum")); err != nil {
+		t.Fatalf("scampi.sum not created after mod.Add: %v", err)
+	}
+
+	updatedMod, err := os.ReadFile(filepath.Join(projDir, "scampi.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	configStar := `load("codeberg.org/test/greetings", "greet")
+
+msg = greet("world")
+
+target.local(name="localhost")
+
+deploy(
+    name="add-load-test",
+    targets=["localhost"],
+    steps=[
+        dir(path="/tmp/add-load-test"),
+    ],
+)
+`
+
+	src := modMemSrc(string(updatedMod), configStar)
+
+	ctx := context.Background()
+	store := diagnostic.NewSourceStore()
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+	cfg, err := engine.LoadConfig(ctx, em, "/config.star", store, src)
+	if err != nil {
+		t.Fatalf("engine.LoadConfig: %v", err)
+	}
+	if _, ok := cfg.Deploy["add-load-test"]; !ok {
+		t.Fatal("expected deploy block 'add-load-test'")
+	}
+}
+
+// TestModuleAdd_NotAModule verifies that adding a repo with no .star files
+// fails with NotAModuleError.
+func TestModuleAdd_NotAModule(t *testing.T) {
+	repoPath := createEmptyRepo(t)
+
+	projDir := t.TempDir()
+	cacheParent := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cacheParent)
+
+	modContent := "module codeberg.org/test/notamod\n"
+	if err := os.WriteFile(filepath.Join(projDir, "scampi.mod"), []byte(modContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := mod.Add(repoPath, "v1.0.0", projDir, mod.DefaultCacheDir())
+	if err == nil {
+		t.Fatal("expected NotAModuleError, got nil")
+	}
+
+	var nme *mod.NotAModuleError
+	if !errors.As(err, &nme) {
+		t.Fatalf("expected *mod.NotAModuleError, got %T: %v", err, err)
+	}
+	if nme.ModPath != repoPath {
+		t.Errorf("NotAModuleError.ModPath = %q, want %q", nme.ModPath, repoPath)
 	}
 }
 
