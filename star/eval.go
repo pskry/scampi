@@ -14,14 +14,16 @@ import (
 	"scampi.dev/scampi/mod"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/star/testkit"
 )
 
 // EvalOption configures optional behavior for Eval.
 type EvalOption func(*evalConfig)
 
 type evalConfig struct {
-	module   *mod.Module
-	cacheDir string
+	module        *mod.Module
+	cacheDir      string
+	testCollector *testkit.Collector
 }
 
 // WithModule enables module-aware load() resolution using the parsed
@@ -30,6 +32,14 @@ func WithModule(m *mod.Module, cacheDir string) EvalOption {
 	return func(c *evalConfig) {
 		c.module = m
 		c.cacheDir = cacheDir
+	}
+}
+
+// WithTestBuiltins adds test.* builtins to the Starlark environment.
+// The collector receives assertion registrations during eval.
+func WithTestBuiltins(tc *testkit.Collector) EvalOption {
+	return func(c *evalConfig) {
+		c.testCollector = tc
 	}
 }
 
@@ -67,6 +77,11 @@ func Eval(
 
 	collector := newCollector(ctx, cfgPath, src)
 
+	pd := predeclared()
+	if ecfg.testCollector != nil {
+		pd["test"] = testModule(ecfg.testCollector)
+	}
+
 	thread := &starlark.Thread{
 		Name: cfgPath,
 		Load: makeLoad(ctx, cfgPath, src, store, &ecfg),
@@ -80,13 +95,13 @@ func Eval(
 		thread.Cancel(ctx.Err().Error())
 	}()
 
-	f, prog, err := starlark.SourceProgramOptions(fileOptions, cfgPath, data, predeclared().Has)
+	f, prog, err := starlark.SourceProgramOptions(fileOptions, cfgPath, data, pd.Has)
 	if err != nil {
 		return spec.Config{}, wrapStarlarkError(err, collector)
 	}
 	collector.AddAST(cfgPath, f)
 
-	_, err = prog.Init(thread, predeclared())
+	_, err = prog.Init(thread, pd)
 	if err != nil {
 		return spec.Config{}, wrapStarlarkError(err, collector)
 	}
