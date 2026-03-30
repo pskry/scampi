@@ -30,6 +30,12 @@ func Add(modPath, version, dir, cacheDir string) (string, error) {
 	}
 
 	dest := filepath.Join(cacheDir, dep.Path+"@"+dep.Version)
+
+	if err := ValidateEntryPoint(dep, dest); err != nil {
+		_ = os.RemoveAll(dest)
+		return "", err
+	}
+
 	hash, err := ComputeHash(dest)
 	if err != nil {
 		return "", err

@@ -100,6 +100,27 @@ func lastSegment(p string) string {
 	return p
 }
 
+// ValidateEntryPoint checks that a cached module directory contains a loadable
+// .star entry point. Returns NotAModuleError if not.
+func ValidateEntryPoint(dep Dependency, dir string) error {
+	if hasEntryPoint(dir, lastSegment(dep.Path)) {
+		return nil
+	}
+	return &NotAModuleError{ModPath: dep.Path, Version: dep.Version}
+}
+
+// hasEntryPoint reports whether dir contains a loadable .star entry point
+// (_index.star or <name>.star).
+func hasEntryPoint(dir, name string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "_index.star")); err == nil {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(dir, name+".star")); err == nil {
+		return true
+	}
+	return false
+}
+
 // DefaultCacheDir returns the default module cache directory.
 // Uses $XDG_CACHE_HOME/scampi/mod if set, else ~/.cache/scampi/mod.
 func DefaultCacheDir() string {

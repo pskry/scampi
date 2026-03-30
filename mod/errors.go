@@ -262,6 +262,29 @@ func (e *FetchError) EventTemplate() event.Template {
 	}
 }
 
+// NotAModuleError
+// -----------------------------------------------------------------------------
+
+// NotAModuleError is raised when a fetched repo has no .star entry point.
+type NotAModuleError struct {
+	diagnostic.FatalError
+	ModPath string
+	Version string
+}
+
+func (e *NotAModuleError) Error() string {
+	return fmt.Sprintf("%s@%s is not a scampi module", e.ModPath, e.Version)
+}
+
+func (e *NotAModuleError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "mod.NotAModule",
+		Text: "{{.ModPath}}@{{.Version}} is not a scampi module",
+		Hint: "a module must contain _index.star or <name>.star at its root",
+		Data: e,
+	}
+}
+
 // AddError
 // -----------------------------------------------------------------------------
 
