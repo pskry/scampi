@@ -61,11 +61,11 @@ the path to the real repository:
 
 The `content` attribute has three space-separated fields:
 
-| Field    | Description                                          |
-| -------- | ---------------------------------------------------- |
-| `prefix` | Module path prefix (must match the requested path)   |
-| `vcs`    | Version control system (must be `git`)               |
-| `url`    | Clone URL for the actual repository                  |
+| Field    | Description                                        |
+| -------- | -------------------------------------------------- |
+| `prefix` | Module path prefix (must match the requested path) |
+| `vcs`    | Version control system (must be `git`)             |
+| `url`    | Clone URL for the actual repository                |
 
 When the module path extends beyond the prefix (e.g.
 `scampi.dev/modules/npm` with prefix `scampi.dev/modules`), the
