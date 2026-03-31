@@ -12,6 +12,8 @@ import (
 
 // Fetch clones dep into <cacheDir>/<dep.Path>@<dep.Version>/.
 // If the destination already exists, Fetch is a no-op.
+// When vanity import resolution maps the module to a subdirectory
+// within a repo, only that subdirectory is kept in the cache.
 // On success the .git directory is removed.
 func Fetch(dep Dependency, cacheDir string) error {
 	dest := filepath.Join(cacheDir, dep.Path+"@"+dep.Version)
@@ -29,7 +31,22 @@ func Fetch(dep Dependency, cacheDir string) error {
 		}
 	}
 
-	url := gitURL(dep.Path)
+	rm := resolveModule(dep.Path)
+
+	cloneDest := dest
+	if rm.Subdir != "" {
+		var err error
+		cloneDest, err = os.MkdirTemp("", "scampi-fetch-*")
+		if err != nil {
+			return &FetchError{
+				ModPath: dep.Path,
+				Version: dep.Version,
+				Detail:  fmt.Sprintf("could not create temp dir: %v", err),
+			}
+		}
+		defer func() { _ = os.RemoveAll(cloneDest) }()
+	}
+
 	//nolint:gosec // args are derived from the parsed module manifest, not user input
 	cmd := exec.Command(
 		"git",
@@ -38,40 +55,54 @@ func Fetch(dep Dependency, cacheDir string) error {
 		"--branch",
 		dep.Version,
 		"--single-branch",
-		url,
-		dest,
+		rm.URL,
+		cloneDest,
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		_ = os.RemoveAll(dest)
+		_ = os.RemoveAll(cloneDest)
 		return &FetchError{
 			ModPath: dep.Path,
 			Version: dep.Version,
 			Detail:  firstLine(out),
-			Hint:    "check that version " + dep.Version + " exists in " + url,
+			Hint:    "check that version " + dep.Version + " exists in " + rm.URL,
 		}
 	}
 
-	if err := os.RemoveAll(filepath.Join(dest, ".git")); err != nil {
-		_ = os.RemoveAll(dest)
-		return &FetchError{
-			ModPath: dep.Path,
-			Version: dep.Version,
-			Detail:  fmt.Sprintf("could not remove .git directory: %v", err),
-			Hint:    "check permissions on " + dest,
+	if rm.Subdir != "" {
+		subdirPath := filepath.Join(cloneDest, rm.Subdir)
+		info, err := os.Stat(subdirPath)
+		if err != nil || !info.IsDir() {
+			return &FetchError{
+				ModPath: dep.Path,
+				Version: dep.Version,
+				Detail: fmt.Sprintf(
+					"subdirectory %s not found in repository",
+					rm.Subdir,
+				),
+				Hint: "check that the module path matches a directory in " + rm.URL,
+			}
+		}
+		if err := os.Rename(subdirPath, dest); err != nil {
+			return &FetchError{
+				ModPath: dep.Path,
+				Version: dep.Version,
+				Detail:  fmt.Sprintf("could not extract subdirectory: %v", err),
+			}
+		}
+	} else {
+		if err := os.RemoveAll(filepath.Join(dest, ".git")); err != nil {
+			_ = os.RemoveAll(dest)
+			return &FetchError{
+				ModPath: dep.Path,
+				Version: dep.Version,
+				Detail:  fmt.Sprintf("could not remove .git directory: %v", err),
+				Hint:    "check permissions on " + dest,
+			}
 		}
 	}
 
 	return nil
-}
-
-// gitURL returns the clone URL for a module path.
-// Absolute paths (used in tests) are returned as-is.
-func gitURL(modPath string) string {
-	if filepath.IsAbs(modPath) {
-		return modPath
-	}
-	return "https://" + modPath + ".git"
 }
 
 // firstLine returns the first non-empty line of b, trimmed of whitespace.

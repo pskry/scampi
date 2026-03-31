@@ -212,19 +212,19 @@ func updateModFile(ctx context.Context, src source.Source, dep Dependency, dir s
 // resolveLatestStable runs git ls-remote --tags on the module URL and returns
 // the highest stable semver tag. Returns NoStableVersionError if none found.
 func resolveLatestStable(modPath string) (string, error) {
-	url := gitURL(modPath)
+	rm := resolveModule(modPath)
 	//nolint:gosec // modPath is from the parsed module manifest, not raw user input
 	cmd := exec.Command(
 		"git",
 		"ls-remote",
 		"--tags",
-		url,
+		rm.URL,
 	)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", &AddError{
 			Detail: "could not list tags for " + modPath + ": " + firstLine(out),
-			Hint:   "check that " + url + " is accessible",
+			Hint:   "check that " + rm.URL + " is accessible",
 		}
 	}
 

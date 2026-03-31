@@ -30,6 +30,55 @@ github.com/yourname/scampi-webserver
 Choose a path that's stable — consumers reference it in their `scampi.mod`
 and `load()` calls.
 
+### Monorepo modules
+
+Multiple modules can live in subdirectories of a single git repository.
+The module path extends beyond the repo path:
+
+```text
+codeberg.org/yourname/scampi-modules/npm       → repo/npm/
+codeberg.org/yourname/scampi-modules/authelia   → repo/authelia/
+```
+
+scampi resolves this automatically — it probes progressively shorter
+paths until it finds a valid git repo, then treats the remaining
+segments as a subdirectory. Each subdirectory has its own entry point
+(`_index.star` or `<name>.star`) and optional `scampi.mod`.
+
+### Vanity import paths
+
+You can host modules under a custom domain, even if the git repository
+lives elsewhere. This works the same way as Go's `go-import` meta tag.
+
+When scampi can't find a git repo at any path prefix, it fetches
+`https://<module-path>?scampi-get=1` and looks for a meta tag that maps
+the path to the real repository:
+
+```html
+<meta name="scampi-import"
+      content="scampi.dev/modules git https://codeberg.org/scampi-dev/scampi-modules.git">
+```
+
+The `content` attribute has three space-separated fields:
+
+| Field    | Description                                          |
+| -------- | ---------------------------------------------------- |
+| `prefix` | Module path prefix (must match the requested path)   |
+| `vcs`    | Version control system (must be `git`)               |
+| `url`    | Clone URL for the actual repository                  |
+
+When the module path extends beyond the prefix (e.g.
+`scampi.dev/modules/npm` with prefix `scampi.dev/modules`), the
+remainder is treated as a subdirectory within the repo — just like
+monorepo modules.
+
+The `scampi.mod` always uses the vanity path — consumers never see the
+underlying repository URL. This lets you move between forges without
+breaking downstream modules.
+
+If no meta tag is found, scampi falls back to cloning
+`https://<module-path>.git` directly.
+
 ## Versioning
 
 Tag releases with semver: `v1.0.0`, `v0.3.2`, `v2.0.0-alpha.1`.

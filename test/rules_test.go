@@ -287,6 +287,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
+			pattern:        "mod/vanity.go",
+			allowedImports: "os/exec,net/http",
+		},
+		{
 			pattern:        "mod/add.go",
 			allowedImports: "os,os/exec",
 		},
