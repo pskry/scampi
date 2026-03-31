@@ -1,6 +1,5 @@
 build_dir       := "./build"
 bin_dir         := f"{{build_dir}}/bin"
-bin_path        := f"{{bin_dir}}/scampi"
 spdx_header     := "// SPDX-License-Identifier: GPL-3.0-only"
 required_tools  := "shellcheck jq curl"
 cross_targets   := "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 freebsd/amd64 freebsd/arm64"
@@ -17,10 +16,11 @@ cross_targets   := "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 freebsd/am
 version  := `git describe --tags --always --dirty 2>/dev/null || echo dev`
 ldflags  := "-s -w -X main.version=" + version
 
-[doc("Build the scampi CLI binary")]
+[doc("Build scampi and scampls binaries")]
 build:
   mkdir -p {{bin_dir}}
-  go build -ldflags '{{ldflags}}' -o {{bin_path}} ./cmd/scampi
+  go build -ldflags '{{ldflags}}' -o {{bin_dir}}/scampi  ./cmd/scampi
+  go build -ldflags '{{ldflags}}' -o {{bin_dir}}/scampls ./cmd/scampls
 
 [doc("Cross-compile for all supported platforms (outdir=DIR prefix=NAME)")]
 cross outdir=bin_dir prefix="scampi":
@@ -38,6 +38,10 @@ cross outdir=bin_dir prefix="scampi":
 [doc("Build and run scampi locally")]
 scampi *args:
   go run ./cmd/scampi {{args}}
+
+[doc("Run scampls (LSP server) locally")]
+scampls *args:
+  go run ./cmd/scampls {{args}}
 
 [doc("Run tests (just test --list for subcommands)")]
 mod test
