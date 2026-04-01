@@ -35,7 +35,7 @@ func TestGenAPI(t *testing.T) {
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
 			var buf bytes.Buffer
-			err := gen.API(specPath, "test", &buf, em)
+			err := gen.API(specPath, "test", &buf, em, gen.APIOptions{})
 
 			if expect.Abort {
 				var abort engine.AbortError

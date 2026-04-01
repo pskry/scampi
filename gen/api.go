@@ -25,10 +25,15 @@ import (
 	"scampi.dev/scampi/errs"
 )
 
+// APIOptions configures code generation behavior.
+type APIOptions struct {
+	PathPrefix string // prepended to all generated route paths
+}
+
 // API generates a .api.scampi module from an OpenAPI specification file.
 // Supports both OpenAPI 3.x and Swagger 2.0 specs. Diagnostics are
 // emitted through em; on failure an AbortError is returned.
-func API(specPath string, scampiVersion string, w io.Writer, em diagnostic.Emitter) error {
+func API(specPath string, scampiVersion string, w io.Writer, em diagnostic.Emitter, opts APIOptions) error {
 	doc, err := loadSpec(specPath)
 	if err != nil {
 		return emitAndAbort(em, err)
@@ -45,7 +50,12 @@ func API(specPath string, scampiVersion string, w io.Writer, em diagnostic.Emitt
 		return emitAndAbort(em, errs.WrapErrf(errBadSpec, "spec has no paths"))
 	}
 
-	g := &apiGenerator{w: w, doc: doc, specPath: specPath, scampiVersion: scampiVersion}
+	prefix := cleanPathPrefix(opts.PathPrefix)
+
+	g := &apiGenerator{
+		w: w, doc: doc, specPath: specPath,
+		scampiVersion: scampiVersion, pathPrefix: prefix,
+	}
 	return g.generate()
 }
 
@@ -163,6 +173,7 @@ type apiGenerator struct {
 	doc           *openapi3.T
 	specPath      string
 	scampiVersion string
+	pathPrefix    string
 }
 
 func (g *apiGenerator) generate() error {
@@ -239,9 +250,10 @@ func (g *apiGenerator) writeOperation(path, method string, op *openapi3.Operatio
 		}
 	}
 
+	fullPath := g.pathPrefix + path
 	g.line("    return rest.request(")
 	g.line("        method = %q,", method)
-	g.line("        path = %q,", path)
+	g.line("        path = %q,", fullPath)
 	if params.hasBody() {
 		g.line("        body = rest.body.json(body),")
 	}
@@ -441,6 +453,34 @@ func titleFromPrefix(prefix string) string {
 func sanitizePath(path string) string {
 	r := strings.NewReplacer("/", "_", "{", "", "}", "", "-", "_")
 	return strings.Trim(r.Replace(path), "_")
+}
+
+// cleanPathPrefix normalises a user-supplied prefix: strips redundant
+// slashes and ensures the result starts with "/" (or is empty).
+func cleanPathPrefix(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	// Collapse runs of slashes, trim trailing slash.
+	var b strings.Builder
+	prev := byte(0)
+	for i := range len(raw) {
+		ch := raw[i]
+		if ch == '/' && prev == '/' {
+			continue
+		}
+		b.WriteByte(ch)
+		prev = ch
+	}
+	result := strings.TrimRight(b.String(), "/")
+	if result == "" {
+		return ""
+	}
+	if result[0] != '/' {
+		result = "/" + result
+	}
+	return result
 }
 
 func toSnakeCase(s string) string {

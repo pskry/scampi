@@ -35,7 +35,7 @@ func genCmd() *cli.Command {
 // -----------------------------------------------------------------------------
 
 func genAPICmd() *cli.Command {
-	var specPath, output string
+	var specPath, output, prefix string
 
 	return &cli.Command{
 		Name:                   "api",
@@ -52,6 +52,12 @@ func genAPICmd() *cli.Command {
 				Aliases:     []string{"o"},
 				Usage:       "output file path (derives from spec name by default)",
 				Destination: &output,
+			},
+			&cli.StringFlag{
+				Name:        "prefix",
+				Aliases:     []string{"p"},
+				Usage:       "path prefix prepended to all generated routes (e.g. /integration)",
+				Destination: &prefix,
 			},
 		},
 		Arguments: []cli.Argument{
@@ -78,10 +84,12 @@ func genAPICmd() *cli.Command {
 				outPath = base + ".api.scampi"
 			}
 
+			genOpts := scampigen.APIOptions{PathPrefix: prefix}
+
 			if outPath == "-" {
 				return handleEngineError(
 					"gen api",
-					scampigen.API(specPath, version, os.Stdout, em),
+					scampigen.API(specPath, version, os.Stdout, em, genOpts),
 				)
 			}
 
@@ -91,7 +99,7 @@ func genAPICmd() *cli.Command {
 			}
 			defer func() { _ = f.Close() }()
 
-			if err := scampigen.API(specPath, version, f, em); err != nil {
+			if err := scampigen.API(specPath, version, f, em, genOpts); err != nil {
 				_ = os.Remove(outPath)
 				return handleEngineError("gen api", err)
 			}
