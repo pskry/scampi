@@ -6,10 +6,15 @@ import (
 	"context"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 	"go.uber.org/zap"
+
+	"scampi.dev/scampi/mod"
 )
 
 // Server implements the LSP protocol for scampi configuration files.
@@ -19,6 +24,10 @@ type Server struct {
 	client  protocol.Client
 	conn    jsonrpc2.Conn
 	log     *log.Logger
+
+	rootDir  string
+	module   *mod.Module
+	cacheDir string
 }
 
 // Version is set at build time via ldflags.
@@ -91,8 +100,10 @@ func (s *Server) Initialize(
 	rootURI := ""
 	if len(params.WorkspaceFolders) > 0 {
 		rootURI = string(params.WorkspaceFolders[0].URI)
+		s.rootDir = uri.URI(protocol.DocumentURI(rootURI)).Filename()
 	}
 	s.log.Printf("initialize: client=%q root=%q", clientName, rootURI)
+	s.loadModule()
 	return &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
 			TextDocumentSync: &protocol.TextDocumentSyncOptions{
@@ -117,6 +128,26 @@ func (s *Server) Initialize(
 			Version: Version,
 		},
 	}, nil
+}
+
+func (s *Server) loadModule() {
+	if s.rootDir == "" {
+		return
+	}
+	modPath := filepath.Join(s.rootDir, "scampi.mod")
+	data, err := os.ReadFile(modPath)
+	if err != nil {
+		s.log.Printf("no scampi.mod at %s: %v", modPath, err)
+		return
+	}
+	m, err := mod.Parse(modPath, data)
+	if err != nil {
+		s.log.Printf("scampi.mod parse error: %v", err)
+		return
+	}
+	s.module = m
+	s.cacheDir = mod.DefaultCacheDir()
+	s.log.Printf("loaded module %s (%d deps)", m.Module, len(m.Require))
 }
 
 func (s *Server) Initialized(context.Context, *protocol.InitializedParams) error {
@@ -172,7 +203,7 @@ func (s *Server) DidClose(_ context.Context, params *protocol.DidCloseTextDocume
 }
 
 func (s *Server) publishDiagnostics(ctx context.Context, uri protocol.DocumentURI, text string) error {
-	diags := Evaluate(ctx, uri, text)
+	diags := s.evaluate(ctx, uri, text)
 	if diags == nil {
 		diags = []protocol.Diagnostic{}
 	}

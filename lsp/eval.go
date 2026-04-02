@@ -5,6 +5,7 @@ package lsp
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"go.lsp.dev/uri"
 
 	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/mod"
 	rtmpl "scampi.dev/scampi/render/template"
 	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/source"
@@ -20,10 +22,10 @@ import (
 	"scampi.dev/scampi/star/testkit"
 )
 
-// Evaluate runs the full Starlark evaluation pipeline and returns LSP
+// evaluate runs the full Starlark evaluation pipeline and returns LSP
 // diagnostics. This catches everything the engine would catch: unknown
 // kwargs, missing required fields, type errors, invalid enum values, etc.
-func Evaluate(ctx context.Context, docURI protocol.DocumentURI, content string) []protocol.Diagnostic {
+func (s *Server) evaluate(ctx context.Context, docURI protocol.DocumentURI, content string) []protocol.Diagnostic {
 	filePath := uriToPath(docURI)
 	if filePath == "" {
 		return nil
@@ -42,6 +44,9 @@ func Evaluate(ctx context.Context, docURI protocol.DocumentURI, content string) 
 	if strings.HasSuffix(filePath, "_test.scampi") {
 		opts = append(opts, star.WithTestBuiltins(testkit.NewCollector()))
 	}
+	if m := s.moduleForFile(filePath); m != nil {
+		opts = append(opts, star.WithModule(m, s.cacheDir))
+	}
 
 	_, err := star.Eval(ctx, filePath, store, src, opts...)
 	if err == nil {
@@ -49,6 +54,36 @@ func Evaluate(ctx context.Context, docURI protocol.DocumentURI, content string) 
 	}
 
 	return evalErrors(err)
+}
+
+// moduleForFile returns the parsed scampi.mod for the given file, walking
+// up from the file's directory. Returns the server's cached module if the
+// file is under the workspace root, or attempts to find one on disk.
+func (s *Server) moduleForFile(filePath string) *mod.Module {
+	if s.module != nil {
+		modDir := filepath.Dir(s.module.Filename)
+		if strings.HasPrefix(filePath, modDir+string(filepath.Separator)) {
+			return s.module
+		}
+	}
+	// Walk up from file looking for scampi.mod.
+	dir := filepath.Dir(filePath)
+	for {
+		modPath := filepath.Join(dir, "scampi.mod")
+		data, err := os.ReadFile(modPath)
+		if err == nil {
+			m, err := mod.Parse(modPath, data)
+			if err == nil {
+				return m
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return nil
 }
 
 func evalErrors(err error) []protocol.Diagnostic {
@@ -72,17 +107,29 @@ func evalErrors(err error) []protocol.Diagnostic {
 	return syntaxErrors(err)
 }
 
+// secretErrorIDs are diagnostic IDs that should be downgraded to hints
+// in the LSP. Secret decryption is a runtime concern — a config is
+// structurally valid even if the editor can't decrypt secrets.
+var secretErrorIDs = map[string]bool{
+	"star.SecretBackendError": true,
+	"star.SecretsConfigError": true,
+}
+
 func diagnosticToLSP(d diagnostic.Diagnostic) protocol.Diagnostic {
 	tmpl := d.EventTemplate()
 
-	severity := protocol.DiagnosticSeverityError
-	switch d.Severity() {
-	case signal.Warning:
-		severity = protocol.DiagnosticSeverityWarning
-	case signal.Info, signal.Notice:
-		severity = protocol.DiagnosticSeverityInformation
-	case signal.Debug:
+	var severity protocol.DiagnosticSeverity
+	switch {
+	case secretErrorIDs[tmpl.ID]:
 		severity = protocol.DiagnosticSeverityHint
+	case d.Severity() == signal.Warning:
+		severity = protocol.DiagnosticSeverityWarning
+	case d.Severity() == signal.Info || d.Severity() == signal.Notice:
+		severity = protocol.DiagnosticSeverityInformation
+	case d.Severity() == signal.Debug:
+		severity = protocol.DiagnosticSeverityHint
+	default:
+		severity = protocol.DiagnosticSeverityError
 	}
 
 	msg, _ := rtmpl.Render(tmpl.TextField())

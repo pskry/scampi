@@ -48,7 +48,7 @@ func (s *Server) References(
 	locs = append(locs, findIdents(f, filePath, word)...)
 
 	// If the symbol comes from a load(), search the loaded file.
-	if resolved := loadSourceForName(f, filePath, word); resolved != "" {
+	if resolved := s.loadSourceForName(f, filePath, word); resolved != "" {
 		locs = append(locs, refsInFile(resolved, word)...)
 	}
 
@@ -77,7 +77,7 @@ func findIdents(f *syntax.File, filePath, name string) []protocol.Location {
 
 // loadSourceForName checks if name is imported via load() and returns the
 // resolved file path and original name in that file.
-func loadSourceForName(f *syntax.File, filePath, name string) string {
+func (s *Server) loadSourceForName(f *syntax.File, filePath, name string) string {
 	for _, stmt := range f.Stmts {
 		load, ok := stmt.(*syntax.LoadStmt)
 		if !ok {
@@ -92,22 +92,22 @@ func loadSourceForName(f *syntax.File, filePath, name string) string {
 				targetName = load.From[i].Name
 			}
 			_ = targetName // same name lookup in external file
-			return resolveLoadPath(filePath, load.ModuleName())
+			return s.resolveLoad(filePath, load.ModuleName())
 		}
 	}
 	return ""
 }
 
-// refsFromLoaders finds .scampi files in the same directory (and parent
-// directories up to the project root) that load the given file, and
-// searches them for references to name.
+// refsFromLoaders finds .scampi files that load the given file and
+// searches them for references to name. Checks both same-directory
+// relative loads and module-path loads via scampi.mod.
 func (s *Server) refsFromLoaders(filePath, name string) []protocol.Location {
 	var locs []protocol.Location
+
+	// Same-directory relative loads.
 	dir := filepath.Dir(filePath)
 	base := filepath.Base(filePath)
-
-	candidates := scampiFilesIn(dir)
-	for _, c := range candidates {
+	for _, c := range scampiFilesIn(dir) {
 		if c == filePath {
 			continue
 		}
@@ -115,6 +115,45 @@ func (s *Server) refsFromLoaders(filePath, name string) []protocol.Location {
 			locs = append(locs, refsInFile(c, name)...)
 		}
 	}
+
+	// Module-path loads: find workspace files that load this file via a
+	// module path resolved through scampi.mod.
+	if s.rootDir != "" {
+		locs = append(locs, s.refsFromModuleLoaders(filePath, name)...)
+	}
+
+	return locs
+}
+
+// refsFromModuleLoaders walks .scampi files under the workspace root and
+// checks if any of their load() module paths resolve to filePath.
+func (s *Server) refsFromModuleLoaders(filePath, name string) []protocol.Location {
+	var locs []protocol.Location
+	_ = filepath.WalkDir(s.rootDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".scampi" || path == filePath {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		f, _ := Parse(path, data)
+		if f == nil {
+			return nil
+		}
+		for _, stmt := range f.Stmts {
+			load, ok := stmt.(*syntax.LoadStmt)
+			if !ok {
+				continue
+			}
+			resolved := s.resolveLoad(path, load.ModuleName())
+			if resolved == filePath {
+				locs = append(locs, findIdents(f, path, name)...)
+				return nil
+			}
+		}
+		return nil
+	})
 	return locs
 }
 
@@ -147,7 +186,8 @@ func loadsFile(candidate, target string) bool {
 		if !ok {
 			continue
 		}
-		if resolveLoadPath(candidate, load.ModuleName()) == targetAbs {
+		resolved := filepath.Join(filepath.Dir(candidate), load.ModuleName())
+		if abs, err := filepath.Abs(resolved); err == nil && abs == targetAbs {
 			return true
 		}
 	}

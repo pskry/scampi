@@ -10,6 +10,9 @@ import (
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 	"go.starlark.net/syntax"
+
+	"scampi.dev/scampi/mod"
+	"scampi.dev/scampi/source"
 )
 
 func (s *Server) Definition(
@@ -91,7 +94,7 @@ func (s *Server) definitionFromLoad(
 		// Cursor on the module path string?
 		modStart, modEnd := load.Module.Span()
 		if posInSpan(line, col, modStart, modEnd) {
-			resolved := resolveLoadPath(filePath, load.ModuleName())
+			resolved := s.resolveLoad(filePath, load.ModuleName())
 			return fileLocation(resolved)
 		}
 
@@ -99,7 +102,7 @@ func (s *Server) definitionFromLoad(
 		for i, to := range load.To {
 			toStart, toEnd := to.Span()
 			if posInSpan(line, col, toStart, toEnd) {
-				resolved := resolveLoadPath(filePath, load.ModuleName())
+				resolved := s.resolveLoad(filePath, load.ModuleName())
 				targetName := to.Name
 				if i < len(load.From) {
 					targetName = load.From[i].Name
@@ -125,7 +128,7 @@ func (s *Server) definitionFromLoads(
 			if to.Name != name {
 				continue
 			}
-			resolved := resolveLoadPath(filePath, load.ModuleName())
+			resolved := s.resolveLoad(filePath, load.ModuleName())
 			targetName := to.Name
 			if i < len(load.From) {
 				targetName = load.From[i].Name
@@ -180,7 +183,24 @@ func definitionInExternalFile(path, name string) *protocol.Location {
 // Path resolution
 // -----------------------------------------------------------------------------
 
-func resolveLoadPath(currentFile, loadPath string) string {
+// resolveLoad resolves a load() path to an absolute file path. It tries
+// module resolution first (if scampi.mod is loaded), then falls back to
+// relative path resolution.
+func (s *Server) resolveLoad(currentFile, loadPath string) string {
+	if s.module != nil && (mod.IsModulePath(loadPath) || s.module.HasDep(loadPath)) {
+		resolved, err := mod.Resolve(
+			context.Background(),
+			source.LocalPosixSource{},
+			s.module,
+			loadPath,
+			s.cacheDir,
+		)
+		if err != nil {
+			s.log.Printf("module resolve %q: %v", loadPath, err)
+			return ""
+		}
+		return resolved
+	}
 	if filepath.IsAbs(loadPath) {
 		return loadPath
 	}
