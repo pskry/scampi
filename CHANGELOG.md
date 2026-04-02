@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.1.0-alpha.6 — 2026-04-02
+
+### Breaking Changes
+- Rename .star to .scampi file extension (#121)
+
+### Features
+- scampi.mod: module manifest format and parser (#105)
+- scampi.sum: integrity checksums for module dependencies (#106)
+- Module fetching: download modules from git repositories (#107)
+- load() resolver: resolve module paths from scampi.mod (#108)
+- scampi mod: CLI subcommands for module management (#109)
+- scampi test: Starlark-native testing framework for modules (#110)
+- Transitive dependency resolution (#111)
+- Vanity import paths for scampi modules (#116)
+- test.target.rest_mock: HTTP mock target for startest (#117)
+- Starlark LSP for scampi configs (#118)
+
+### Enhancements
+- Rename .star to .scampi file extension (#121)
+- gen api: add --prefix flag for path prefixing (#126)
+
+### Bug Fixes
+- secrets UX: first-use experience is broken (#115)
+- StarlarkError missing source span for pre-builtin errors (#124)
+- rest.resource cannot compose with generated API wrappers (#127)
+- gen api: interpolate path parameters into Starlark expressions (#128)
+- Deploy blocks stored in map — non-deterministic execution order (#129)
+
+### Other
+- Module structure conventions and documentation (#112)
+
 ## v0.1.0-alpha.5 — 2026-03-29
 
 ### Features
