@@ -238,7 +238,7 @@ deploy(
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if _, ok := cfg.Deploy["net-test"]; !ok {
+	if _, ok := cfg.DeployByName("net-test"); !ok {
 		t.Fatal("expected deploy block 'net-test'")
 	}
 }
@@ -296,7 +296,7 @@ deploy(
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if _, ok := cfg.Deploy["utils-test"]; !ok {
+	if _, ok := cfg.DeployByName("utils-test"); !ok {
 		t.Fatal("expected deploy block 'utils-test'")
 	}
 }
@@ -563,7 +563,7 @@ deploy(
 	if err != nil {
 		t.Fatalf("engine.LoadConfig: %v", err)
 	}
-	if _, ok := cfg.Deploy["add-load-test"]; !ok {
+	if _, ok := cfg.DeployByName("add-load-test"); !ok {
 		t.Fatal("expected deploy block 'add-load-test'")
 	}
 }
@@ -623,7 +623,7 @@ deploy(
 	if err != nil {
 		t.Fatalf("LoadConfig without scampi.mod failed: %v", err)
 	}
-	if _, ok := cfg.Deploy["compat-test"]; !ok {
+	if _, ok := cfg.DeployByName("compat-test"); !ok {
 		t.Fatal("expected deploy block 'compat-test'")
 	}
 }
@@ -683,7 +683,7 @@ deploy(
 	if err != nil {
 		t.Fatalf("LoadConfig with local module: %v", err)
 	}
-	if _, ok := cfg.Deploy["local-mod-test"]; !ok {
+	if _, ok := cfg.DeployByName("local-mod-test"); !ok {
 		t.Fatal("expected deploy block 'local-mod-test'")
 	}
 }
@@ -735,7 +735,7 @@ deploy(
 	if err != nil {
 		t.Fatalf("LoadConfig with absolute local module: %v", err)
 	}
-	if _, ok := cfg.Deploy["abs-test"]; !ok {
+	if _, ok := cfg.DeployByName("abs-test"); !ok {
 		t.Fatal("expected deploy block 'abs-test'")
 	}
 }

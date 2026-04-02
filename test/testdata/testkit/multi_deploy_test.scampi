@@ -1,5 +1,6 @@
 # Test multiple deploy blocks against the same target.
-# Each block converges a different part of the system.
+# The second deploy depends on state from the first, so it includes
+# its own prerequisite dir step to avoid ordering issues.
 
 t = test.target.in_memory(name = "mock")
 
@@ -17,6 +18,7 @@ deploy(
     name = "app",
     targets = ["mock"],
     steps = [
+        dir(path = "/etc/app"),
         copy(
             desc = "app config",
             dest = "/etc/app/config.yml",

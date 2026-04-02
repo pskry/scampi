@@ -62,28 +62,27 @@ func LoadConfig(
 // ResolveMultiple produces ResolvedConfigs for all matching (deploy, target)
 // combinations based on the provided options.
 func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.ResolvedConfig, error) {
-	var deployNames []string
+	var blocks []spec.DeployBlock
 	if len(opts.DeployNames) > 0 {
 		for _, name := range opts.DeployNames {
-			if _, ok := cfg.Deploy[name]; !ok {
+			b, ok := cfg.DeployByName(name)
+			if !ok {
 				return nil, UnknownDeployBlockError{Name: name}
 			}
+			blocks = append(blocks, b)
 		}
-		deployNames = opts.DeployNames
 	} else {
-		for name := range cfg.Deploy {
-			deployNames = append(deployNames, name)
-		}
+		blocks = cfg.Deploy
 	}
 
-	if len(deployNames) == 0 {
+	if len(blocks) == 0 {
 		return nil, NoDeployBlocksError{}
 	}
 
 	var results []spec.ResolvedConfig
 
-	for _, deployName := range deployNames {
-		block := cfg.Deploy[deployName]
+	for _, block := range blocks {
+		deployName := block.Name
 
 		var targetNames []string
 		if len(opts.TargetNames) > 0 {
@@ -137,21 +136,16 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 	var block spec.DeployBlock
 	if deployName != "" {
 		var ok bool
-		block, ok = cfg.Deploy[deployName]
+		block, ok = cfg.DeployByName(deployName)
 		if !ok {
 			return spec.ResolvedConfig{}, UnknownDeployBlockError{Name: deployName}
 		}
 	} else {
-		// Pick first deploy block (map iteration order is random, but for
-		// single-block configs this is fine)
-		for name, b := range cfg.Deploy {
-			block = b
-			deployName = name
-			break
-		}
-		if deployName == "" {
+		if len(cfg.Deploy) == 0 {
 			return spec.ResolvedConfig{}, NoDeployBlocksError{}
 		}
+		block = cfg.Deploy[0]
+		deployName = block.Name
 	}
 
 	if targetName == "" {

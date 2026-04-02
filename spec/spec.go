@@ -36,7 +36,7 @@ type (
 	Config struct {
 		Path    string
 		Targets map[string]TargetInstance // named targets
-		Deploy  map[string]DeployBlock    // deploy blocks
+		Deploy  []DeployBlock             // deploy blocks (declaration order)
 	}
 
 	DeployBlock struct {
@@ -220,3 +220,13 @@ const (
 	CheckSatisfied
 	CheckUnsatisfied
 )
+
+// DeployByName returns the deploy block with the given name, or false.
+func (c Config) DeployByName(name string) (DeployBlock, bool) {
+	for _, b := range c.Deploy {
+		if b.Name == name {
+			return b, true
+		}
+	}
+	return DeployBlock{}, false
+}

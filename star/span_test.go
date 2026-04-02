@@ -35,7 +35,8 @@ deploy(
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 
 	tests := []struct {
 		field        string
@@ -82,7 +83,8 @@ deploy(name="main", targets=["host"], steps=[
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 
 	// packages=["vim", "curl"] on line 3 — value starts at [
 	fs := step.Fields["packages"]
@@ -162,7 +164,8 @@ deploy(name="main", targets=["host"], steps=steps)
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 
 	// path="/tmp/loaded" is on line 3 of lib.scampi
 	fs := step.Fields["path"]
@@ -188,7 +191,8 @@ deploy(name="main", targets=["host"], steps=[
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 
 	// "perm" is not passed in the call, so kwargsFieldSpans should fall back
 	// to the call-site position (the Lparen of dir(...) on line 3)

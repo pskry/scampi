@@ -21,7 +21,8 @@ type Collector struct {
 	ctx               context.Context
 	path              string
 	targets           map[string]spec.TargetInstance
-	deploy            map[string]spec.DeployBlock
+	deploy            []spec.DeployBlock
+	deployIdx         map[string]int
 	src               source.Source
 	files             map[string]*syntax.File
 	secretsConfigured bool
@@ -29,12 +30,12 @@ type Collector struct {
 
 func newCollector(ctx context.Context, path string, src source.Source) *Collector {
 	return &Collector{
-		ctx:     ctx,
-		path:    path,
-		targets: make(map[string]spec.TargetInstance),
-		deploy:  make(map[string]spec.DeployBlock),
-		src:     src,
-		files:   make(map[string]*syntax.File),
+		ctx:       ctx,
+		path:      path,
+		targets:   make(map[string]spec.TargetInstance),
+		deployIdx: make(map[string]int),
+		src:       src,
+		files:     make(map[string]*syntax.File),
 	}
 }
 
@@ -68,10 +69,11 @@ func (c *Collector) AddTarget(name string, inst spec.TargetInstance, _ spec.Sour
 // AddDeploy registers a deploy block. Returns an error if the name
 // is already taken.
 func (c *Collector) AddDeploy(name string, block spec.DeployBlock, _ spec.SourceSpan) error {
-	if first, exists := c.deploy[name]; exists {
-		return &DuplicateDeployError{Name: name, FirstDecl: first.Source}
+	if idx, exists := c.deployIdx[name]; exists {
+		return &DuplicateDeployError{Name: name, FirstDecl: c.deploy[idx].Source}
 	}
-	c.deploy[name] = block
+	c.deployIdx[name] = len(c.deploy)
+	c.deploy = append(c.deploy, block)
 	return nil
 }
 

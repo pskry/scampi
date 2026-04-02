@@ -60,7 +60,7 @@ deploy(
 	if len(cfg.Deploy) != 1 {
 		t.Fatalf("got %d deploy blocks, want 1", len(cfg.Deploy))
 	}
-	block, ok := cfg.Deploy["main"]
+	block, ok := cfg.DeployByName("main")
 	if !ok {
 		t.Fatal("deploy 'main' not found")
 	}
@@ -109,7 +109,7 @@ deploy(name="main", targets=["host"], steps=steps)
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	block := cfg.Deploy["main"]
+	block, _ := cfg.DeployByName("main")
 	if len(block.Steps) != 5 {
 		t.Fatalf("got %d steps, want 5", len(block.Steps))
 	}
@@ -216,7 +216,8 @@ deploy(name="main", targets=["t"], steps=[
 		t.Errorf("port = %d, want 3000", sc.Port)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 	dc := step.Config.(*dir.DirConfig)
 	if dc.Path != "/tmp/fallback" {
 		t.Errorf("path = %q, want '/tmp/fallback'", dc.Path)
@@ -287,7 +288,7 @@ deploy(name="main", targets=["host"], steps=base + extra)
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	block := cfg.Deploy["main"]
+	block, _ := cfg.DeployByName("main")
 	if len(block.Steps) != 3 {
 		t.Fatalf("got %d steps, want 3", len(block.Steps))
 	}
@@ -327,7 +328,8 @@ deploy(name="main", targets=["host"], steps=[
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 	tc := step.Config.(*template.TemplateConfig)
 	if tc.Src.Content != "hello {{ .Name }}" {
 		t.Errorf("content = %q", tc.Src.Content)
@@ -360,7 +362,7 @@ deploy(name="main", targets=["host"], steps=common)
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	block := cfg.Deploy["main"]
+	block, _ := cfg.DeployByName("main")
 	if len(block.Steps) != 1 {
 		t.Fatalf("got %d steps, want 1", len(block.Steps))
 	}
@@ -384,7 +386,8 @@ deploy(name="main", targets=["host"], steps=[
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 	if step.Source.Filename != "/config.scampi" {
 		t.Errorf("source filename = %q, want '/config.scampi'", step.Source.Filename)
 	}
@@ -408,7 +411,8 @@ deploy(name="main", targets=["host"], steps=[
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	pc := cfg.Deploy["main"].Steps[0].Config.(*pkg.PkgConfig)
+	mainBlock, _ := cfg.DeployByName("main")
+	pc := mainBlock.Steps[0].Config.(*pkg.PkgConfig)
 	if pc.State != "absent" {
 		t.Errorf("state = %q, want 'absent'", pc.State)
 	}
@@ -429,7 +433,8 @@ deploy(name="main", targets=["host"], steps=[
 		t.Fatalf("Eval failed: %v", err)
 	}
 
-	step := cfg.Deploy["main"].Steps[0]
+	mainBlock, _ := cfg.DeployByName("main")
+	step := mainBlock.Steps[0]
 	sc := step.Config.(*symlink.SymlinkConfig)
 	if sc.Target != "/usr/bin/vim" {
 		t.Errorf("target = %q", sc.Target)
