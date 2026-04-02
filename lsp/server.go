@@ -108,7 +108,8 @@ func (s *Server) Initialize(
 			SignatureHelpProvider: &protocol.SignatureHelpOptions{
 				TriggerCharacters: []string{"(", ","},
 			},
-			HoverProvider: &protocol.HoverOptions{},
+			HoverProvider:      &protocol.HoverOptions{},
+			DefinitionProvider: &protocol.DefinitionOptions{},
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "scampls",
@@ -211,9 +212,6 @@ func (s *Server) CompletionResolve(
 	return item, nil
 }
 func (s *Server) Declaration(context.Context, *protocol.DeclarationParams) ([]protocol.Location, error) {
-	return nil, nil
-}
-func (s *Server) Definition(context.Context, *protocol.DefinitionParams) ([]protocol.Location, error) {
 	return nil, nil
 }
 func (s *Server) DidChangeConfiguration(context.Context, *protocol.DidChangeConfigurationParams) error {
