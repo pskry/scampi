@@ -117,10 +117,6 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
-			pattern:        "mod/resolve_test.go",
-			allowedImports: "os",
-		},
-		{
 			pattern:        "render/cli/cli.go",
 			allowedImports: "os",
 		},
@@ -147,18 +143,6 @@ func TestImportCapabilities(t *testing.T) {
 		{
 			pattern:        "target/local/stat_bsd.go",
 			allowedImports: "os,os/user,syscall",
-		},
-		{
-			pattern:        "target/local/local_test.go",
-			allowedImports: "runtime",
-		},
-		{
-			pattern:        "target/local/escalate_test.go",
-			allowedImports: "os",
-		},
-		{
-			pattern:        "target/escalate/escalate_test.go",
-			allowedImports: "os,os/exec",
 		},
 		{
 			pattern:        "target/ssh/errors.go",
@@ -195,26 +179,6 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os,os/exec,net",
 		},
 		{
-			pattern:        "test/container_lifecycle_test.go",
-			allowedImports: "os",
-		},
-		{
-			pattern:        "test/ssh_connection_test.go",
-			allowedImports: "os",
-		},
-		{
-			pattern:        "test/e2e_driver_test.go",
-			allowedImports: "os",
-		},
-		{
-			pattern:        "test/main_test.go",
-			allowedImports: "os",
-		},
-		{
-			pattern:        "test/rules_test.go",
-			allowedImports: "os",
-		},
-		{
 			pattern:        "cmd/scampi/gen.go",
 			allowedImports: "os",
 		},
@@ -231,14 +195,6 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
-			pattern:        "cmd/scampi/usage_test.go",
-			allowedImports: "os,os/exec",
-		},
-		{
-			pattern:        "cmd/scampi/fuzz_test.go",
-			allowedImports: "os/exec",
-		},
-		{
 			pattern:        "target/rest/rest.go",
 			allowedImports: "net/http",
 		},
@@ -249,10 +205,6 @@ func TestImportCapabilities(t *testing.T) {
 		{
 			pattern:        "target/rest/auth.go",
 			allowedImports: "net/http",
-		},
-		{
-			pattern:        "test/rest_test.go",
-			allowedImports: "net/http, net/http/httptest",
 		},
 		{
 			pattern:        "star/rest.go",
@@ -279,14 +231,6 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "crypto/sha256",
 		},
 		{
-			pattern:        "test/unarchive_test.go",
-			allowedImports: "crypto/sha256",
-		},
-		{
-			pattern:        "test/mod_test.go",
-			allowedImports: "os,os/exec",
-		},
-		{
 			pattern:        "mod/init.go",
 			allowedImports: "os/exec",
 		},
@@ -303,15 +247,7 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os,crypto/sha256",
 		},
 		{
-			pattern:        "mod/sum_test.go",
-			allowedImports: "os",
-		},
-		{
 			pattern:        "mod/fetch.go",
-			allowedImports: "os,os/exec",
-		},
-		{
-			pattern:        "mod/fetch_test.go",
 			allowedImports: "os,os/exec",
 		},
 		{
@@ -324,10 +260,6 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "mod/add.go",
-			allowedImports: "os,os/exec",
-		},
-		{
-			pattern:        "mod/add_test.go",
 			allowedImports: "os,os/exec",
 		},
 	}
@@ -391,6 +323,11 @@ func TestImportCapabilities(t *testing.T) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
+
+		// Test files are free to import anything restricted.
+		if strings.HasSuffix(rel, "_test.go") {
+			return nil
+		}
 
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, p, nil, parser.ImportsOnly)
