@@ -26,26 +26,41 @@ const (
 	FsCeph
 )
 
+const (
+	fsNFS       = "nfs"
+	fsNFS4      = "nfs4"
+	fsCIFS      = "cifs"
+	fsExt4      = "ext4"
+	fsXFS       = "xfs"
+	fsBtrfs     = "btrfs"
+	fsTmpfs     = "tmpfs"
+	fsGlusterfs = "glusterfs"
+	fsCeph      = "ceph"
+)
+
+// FsTypeValues is the exhaustive list of accepted filesystem type strings.
+var FsTypeValues = []string{fsNFS, fsNFS4, fsCIFS, fsExt4, fsXFS, fsBtrfs, fsTmpfs, fsGlusterfs, fsCeph}
+
 func (f FsType) String() string {
 	switch f {
 	case FsNFS:
-		return "nfs"
+		return fsNFS
 	case FsNFS4:
-		return "nfs4"
+		return fsNFS4
 	case FsCIFS:
-		return "cifs"
+		return fsCIFS
 	case FsExt4:
-		return "ext4"
+		return fsExt4
 	case FsXFS:
-		return "xfs"
+		return fsXFS
 	case FsBtrfs:
-		return "btrfs"
+		return fsBtrfs
 	case FsTmpfs:
-		return "tmpfs"
+		return fsTmpfs
 	case FsGlusterfs:
-		return "glusterfs"
+		return fsGlusterfs
 	case FsCeph:
-		return "ceph"
+		return fsCeph
 	default:
 		return "unknown"
 	}
@@ -53,23 +68,23 @@ func (f FsType) String() string {
 
 func parseFsType(s string) (FsType, bool) {
 	switch s {
-	case "nfs":
+	case fsNFS:
 		return FsNFS, true
-	case "nfs4":
+	case fsNFS4:
 		return FsNFS4, true
-	case "cifs":
+	case fsCIFS:
 		return FsCIFS, true
-	case "ext4":
+	case fsExt4:
 		return FsExt4, true
-	case "xfs":
+	case fsXFS:
 		return FsXFS, true
-	case "btrfs":
+	case fsBtrfs:
 		return FsBtrfs, true
-	case "tmpfs":
+	case fsTmpfs:
 		return FsTmpfs, true
-	case "glusterfs":
+	case fsGlusterfs:
 		return FsGlusterfs, true
-	case "ceph":
+	case fsCeph:
 		return FsCeph, true
 	default:
 		return 0, false
@@ -107,14 +122,23 @@ const (
 	StateAbsent
 )
 
+const (
+	stateMounted   = "mounted"
+	stateUnmounted = "unmounted"
+	stateAbsent    = "absent"
+)
+
+// StateValues is the exhaustive list of accepted mount state strings.
+var StateValues = []string{stateMounted, stateUnmounted, stateAbsent}
+
 func (s State) String() string {
 	switch s {
 	case StateMounted:
-		return "mounted"
+		return stateMounted
 	case StateUnmounted:
-		return "unmounted"
+		return stateUnmounted
 	case StateAbsent:
-		return "absent"
+		return stateAbsent
 	default:
 		return "unknown"
 	}
@@ -143,7 +167,14 @@ type (
 	}
 )
 
-func (Mount) Kind() string   { return "mount" }
+func (*MountConfig) FieldEnumValues() map[string][]string {
+	return map[string][]string{
+		"type":  FsTypeValues,
+		"state": StateValues,
+	}
+}
+
+func (Mount) Kind() string { return "mount" }
 func (Mount) NewConfig() any { return &MountConfig{} }
 
 func (Mount) Plan(step spec.StepInstance) (spec.Action, error) {
@@ -196,11 +227,11 @@ func (Mount) Plan(step spec.StepInstance) (spec.Action, error) {
 
 	var state State
 	switch cfg.State {
-	case "", "mounted":
+	case "", stateMounted:
 		state = StateMounted
-	case "unmounted":
+	case stateUnmounted:
 		state = StateUnmounted
-	case "absent":
+	case stateAbsent:
 		state = StateAbsent
 	default:
 		return nil, InvalidStateError{

@@ -21,9 +21,10 @@ import (
 type EvalOption func(*evalConfig)
 
 type evalConfig struct {
-	module        *mod.Module
-	cacheDir      string
-	testCollector *testkit.Collector
+	module         *mod.Module
+	cacheDir       string
+	testCollector  *testkit.Collector
+	lenientSecrets bool
 }
 
 // WithModule enables module-aware load() resolution using the parsed
@@ -40,6 +41,15 @@ func WithModule(m *mod.Module, cacheDir string) EvalOption {
 func WithTestBuiltins(tc *testkit.Collector) EvalOption {
 	return func(c *evalConfig) {
 		c.testCollector = tc
+	}
+}
+
+// WithLenientSecrets makes the secrets() builtin tolerate decryption
+// failures by returning placeholder values instead of erroring. This
+// allows the LSP to evaluate configs without access to age keys.
+func WithLenientSecrets() EvalOption {
+	return func(c *evalConfig) {
+		c.lenientSecrets = true
 	}
 }
 
@@ -76,6 +86,7 @@ func Eval(
 	}
 
 	collector := newCollector(ctx, cfgPath, src)
+	collector.lenientSecrets = ecfg.lenientSecrets
 
 	pd := predeclared()
 	if ecfg.testCollector != nil {

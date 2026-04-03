@@ -26,14 +26,23 @@ const (
 	StateLatest
 )
 
+const (
+	statePresent = "present"
+	stateAbsent  = "absent"
+	stateLatest  = "latest"
+)
+
+// StateValues is the exhaustive list of accepted state strings.
+var StateValues = []string{statePresent, stateAbsent, stateLatest}
+
 func (s State) String() string {
 	switch s {
 	case StatePresent:
-		return "present"
+		return statePresent
 	case StateAbsent:
-		return "absent"
+		return stateAbsent
 	case StateLatest:
-		return "latest"
+		return stateLatest
 	default:
 		return "unknown"
 	}
@@ -41,11 +50,11 @@ func (s State) String() string {
 
 func parseState(s string) State {
 	switch s {
-	case "present":
+	case statePresent:
 		return StatePresent
-	case "absent":
+	case stateAbsent:
 		return StateAbsent
-	case "latest":
+	case stateLatest:
 		return StateLatest
 	default:
 		panic(errs.BUG("invalid pkg state %q — should have been caught by Validate", s))
@@ -71,7 +80,13 @@ type (
 	}
 )
 
-func (Pkg) Kind() string   { return "pkg" }
+func (*PkgConfig) FieldEnumValues() map[string][]string {
+	return map[string][]string{
+		"state": StateValues,
+	}
+}
+
+func (Pkg) Kind() string { return "pkg" }
 func (Pkg) NewConfig() any { return &PkgConfig{} }
 
 func (c *PkgConfig) Validate(step spec.StepInstance) error {
@@ -81,11 +96,11 @@ func (c *PkgConfig) Validate(step spec.StepInstance) error {
 		}
 	}
 	switch c.State {
-	case "present", "absent", "latest":
+	case statePresent, stateAbsent, stateLatest:
 	default:
 		return InvalidStateError{
 			Got:     c.State,
-			Allowed: []string{"present", "absent", "latest"},
+			Allowed: StateValues,
 			Source:  step.Fields["state"].Value,
 		}
 	}

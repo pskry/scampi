@@ -26,6 +26,7 @@ type Collector struct {
 	src               source.Source
 	files             map[string]*syntax.File
 	secretsConfigured bool
+	lenientSecrets    bool
 }
 
 func newCollector(ctx context.Context, path string, src source.Source) *Collector {

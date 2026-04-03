@@ -4,6 +4,7 @@ package star
 
 import (
 	"fmt"
+	"strings"
 	"sync/atomic"
 
 	"go.starlark.net/starlark"
@@ -79,7 +80,7 @@ func builtinCopy(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("copy", args, kwargs,
+	if err := unpackArgs("copy", args, kwargs,
 		"src", &srcVal,
 		"dest", &dest,
 		"perm", &perm,
@@ -144,7 +145,7 @@ func builtinDir(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("dir", args, kwargs,
+	if err := unpackArgs("dir", args, kwargs,
 		"path", &path,
 		"perm?", &perm,
 		"owner?", &owner,
@@ -187,7 +188,7 @@ func builtinFirewall(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("firewall", args, kwargs,
+	if err := unpackArgs("firewall", args, kwargs,
 		"port", &port,
 		"action?", &action,
 		"desc?", &desc,
@@ -233,7 +234,7 @@ func builtinMount(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("mount", args, kwargs,
+	if err := unpackArgs("mount", args, kwargs,
 		"src", &src,
 		"dest", &dest,
 		"type", &fstype,
@@ -281,7 +282,7 @@ func builtinPkg(
 		sourceVal   starlark.Value
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("pkg", args, kwargs,
+	if err := unpackArgs("pkg", args, kwargs,
 		"packages", &packages,
 		"source", &sourceVal,
 		"desc?", &desc,
@@ -346,7 +347,7 @@ func builtinRun(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("run", args, kwargs,
+	if err := unpackArgs("run", args, kwargs,
 		"apply", &apply,
 		"check?", &check,
 		"always?", &always,
@@ -389,7 +390,7 @@ func builtinService(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("service", args, kwargs,
+	if err := unpackArgs("service", args, kwargs,
 		"name", &name,
 		"state?", &state,
 		"enabled?", &enabled,
@@ -432,7 +433,7 @@ func builtinSysctl(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("sysctl", args, kwargs,
+	if err := unpackArgs("sysctl", args, kwargs,
 		"key", &key,
 		"value", &value,
 		"persist?", &persist,
@@ -476,7 +477,7 @@ func builtinSymlink(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("symlink", args, kwargs,
+	if err := unpackArgs("symlink", args, kwargs,
 		"target", &target,
 		"link", &link,
 		"desc?", &desc,
@@ -522,7 +523,7 @@ func builtinTemplate(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("template", args, kwargs,
+	if err := unpackArgs("template", args, kwargs,
 		"src", &srcVal,
 		"dest", &dest,
 		"perm", &perm,
@@ -595,7 +596,7 @@ func builtinUnarchive(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("unarchive", args, kwargs,
+	if err := unpackArgs("unarchive", args, kwargs,
 		"src", &srcVal,
 		"dest", &dest,
 		"depth?", &depth,
@@ -663,7 +664,7 @@ func builtinUser(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("user", args, kwargs,
+	if err := unpackArgs("user", args, kwargs,
 		"name", &name,
 		"state?", &state,
 		"shell?", &shell,
@@ -730,7 +731,7 @@ func builtinGroup(
 		desc        string
 		onChangeVal starlark.Value
 	)
-	if err := starlark.UnpackArgs("group", args, kwargs,
+	if err := unpackArgs("group", args, kwargs,
 		"name", &name,
 		"state?", &state,
 		"gid?", &gid,
@@ -763,6 +764,66 @@ func builtinGroup(
 
 // Helpers
 // -----------------------------------------------------------------------------
+
+// unpackArgs wraps starlark.UnpackArgs with better "missing argument"
+// messages. When multiple required kwargs are missing, reports all of
+// them instead of just the first.
+func unpackArgs(fnName string, args starlark.Tuple, kwargs []starlark.Tuple, pairs ...any) error {
+	err := starlark.UnpackArgs(fnName, args, kwargs, pairs...)
+	if err == nil {
+		return nil
+	}
+
+	// Only enhance "missing argument" errors.
+	msg := err.Error()
+	if !strings.Contains(msg, "missing argument for") {
+		return err
+	}
+
+	// Collect all required param names (those without "?" suffix).
+	var required []string
+	for i := 0; i < len(pairs)-1; i += 2 {
+		name, ok := pairs[i].(string)
+		if !ok {
+			continue
+		}
+		if strings.HasSuffix(name, "?") {
+			continue
+		}
+		required = append(required, name)
+	}
+
+	// Find which required params are missing from kwargs.
+	provided := make(map[string]bool, len(kwargs))
+	for _, kv := range kwargs {
+		if name, ok := starlark.AsString(kv[0]); ok {
+			provided[name] = true
+		}
+	}
+	// Positional args cover the first N required params.
+	for i := range min(len(args), len(required)) {
+		provided[required[i]] = true
+	}
+
+	var missing []string
+	for _, name := range required {
+		if !provided[name] {
+			missing = append(missing, name)
+		}
+	}
+
+	if len(missing) <= 1 {
+		return err
+	}
+
+	shown := missing
+	suffix := ""
+	if len(shown) > 3 {
+		shown = shown[:3]
+		suffix = ", ..."
+	}
+	return fmt.Errorf("%s: missing argument for %s%s", fnName, strings.Join(shown, ", "), suffix)
+}
 
 func unpackSourceRef(val starlark.Value, fn string) (spec.SourceRef, error) {
 	src, ok := val.(*StarlarkSource)

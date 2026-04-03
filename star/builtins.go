@@ -3,6 +3,7 @@
 package star
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -555,6 +556,9 @@ func buildSecretBackend(
 			readFile,
 		)
 		if err != nil {
+			if c.lenientSecrets {
+				return lenientBackend(c, path, err)
+			}
 			return nil, &SecretsConfigError{
 				Detail: err.Error(),
 				Source: span,
@@ -563,6 +567,9 @@ func buildSecretBackend(
 
 		data, err := c.src.ReadFile(c.ctx, path)
 		if err != nil {
+			if c.lenientSecrets {
+				return lenientBackend(c, path, err)
+			}
 			return nil, &SecretsConfigError{
 				Detail: fmt.Sprintf("reading secrets file %q: %s", path, err),
 				Source: span,
@@ -571,6 +578,9 @@ func buildSecretBackend(
 
 		b, err := secret.NewAgeBackend(data, identities)
 		if err != nil {
+			if c.lenientSecrets {
+				return lenientBackend(c, path, err)
+			}
 			return nil, &SecretsConfigError{
 				Detail: fmt.Sprintf("decrypting secrets file %q: %s", path, err),
 				Source: span,
@@ -581,6 +591,27 @@ func buildSecretBackend(
 	}
 
 	panic(errs.BUG("unreachable: backend validated before buildSecretBackend"))
+}
+
+// lenientBackend reads the secrets JSON file and returns a stub backend
+// that maps every key to a placeholder value. Used by the LSP to
+// continue evaluation without age keys.
+func lenientBackend(c *Collector, path string, cause error) (secret.Backend, error) {
+	pb := &secret.PlaceholderBackend{Cause: cause}
+	data, err := c.src.ReadFile(c.ctx, path)
+	if err != nil {
+		return pb, nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return pb, nil
+	}
+	keys := make(map[string]string, len(raw))
+	for k := range raw {
+		keys[k] = "<secret:" + k + ">"
+	}
+	pb.Keys = keys
+	return pb, nil
 }
 
 // parseRecipientStrings extracts age recipient public keys from a Starlark list value.

@@ -40,20 +40,42 @@ func (s *Server) evaluate(ctx context.Context, docURI protocol.DocumentURI, cont
 	})
 	store := diagnostic.NewSourceStore()
 
-	var opts []star.EvalOption
+	var baseOpts []star.EvalOption
 	if strings.HasSuffix(filePath, "_test.scampi") {
-		opts = append(opts, star.WithTestBuiltins(testkit.NewCollector()))
+		baseOpts = append(baseOpts, star.WithTestBuiltins(testkit.NewCollector()))
 	}
 	if m := s.moduleForFile(filePath); m != nil {
-		opts = append(opts, star.WithModule(m, s.cacheDir))
+		baseOpts = append(baseOpts, star.WithModule(m, s.cacheDir))
 	}
 
-	_, err := star.Eval(ctx, filePath, store, src, opts...)
+	// First pass: strict eval. If it succeeds, no diagnostics.
+	_, err := star.Eval(ctx, filePath, store, src, baseOpts...)
 	if err == nil {
 		return nil
 	}
 
-	return evalErrors(err)
+	diags := evalErrors(err)
+
+	// If the only errors are secret-related, re-eval with lenient
+	// secrets to find structural errors beyond the secret failure.
+	if allSecretErrors(diags) {
+		lenientOpts := append(baseOpts, star.WithLenientSecrets())
+		_, err = star.Eval(ctx, filePath, store, src, lenientOpts...)
+		if err != nil {
+			diags = append(diags, evalErrors(err)...)
+		}
+	}
+
+	return diags
+}
+
+func allSecretErrors(diags []protocol.Diagnostic) bool {
+	for _, d := range diags {
+		if d.Severity != protocol.DiagnosticSeverityHint {
+			return false
+		}
+	}
+	return len(diags) > 0
 }
 
 // moduleForFile returns the parsed scampi.mod for the given file, walking
@@ -210,5 +232,12 @@ func (o *overlaySource) LookupEnv(key string) (string, bool) {
 }
 
 func (o *overlaySource) LookupSecret(key string) (string, bool, error) {
-	return o.base.LookupSecret(key)
+	// Try real decryption first; if it fails, return a placeholder so
+	// evaluation can continue past secret() calls. The LSP cares about
+	// structural validity, not runtime secret access.
+	val, ok, err := o.base.LookupSecret(key)
+	if err == nil {
+		return val, ok, nil
+	}
+	return "<secret:" + key + ">", true, nil
 }

@@ -11,12 +11,13 @@ import (
 
 // BuiltinParam describes one parameter of a builtin function.
 type BuiltinParam struct {
-	Name     string
-	Type     string
-	Desc     string
-	Default  string
-	Required bool
-	Examples []string
+	Name       string
+	Type       string
+	Desc       string
+	Default    string
+	Required   bool
+	Examples   []string
+	EnumValues []string
 }
 
 // BuiltinFunc describes a predeclared Starlark builtin available in
@@ -89,12 +90,13 @@ func stepDocToBuiltin(doc spec.StepDoc) BuiltinFunc {
 	params := make([]BuiltinParam, len(doc.Fields))
 	for i, f := range doc.Fields {
 		params[i] = BuiltinParam{
-			Name:     f.Name,
-			Type:     f.Type,
-			Desc:     f.Desc,
-			Default:  f.Default,
-			Required: f.Required,
-			Examples: f.Examples,
+			Name:       f.Name,
+			Type:       f.Type,
+			Desc:       f.Desc,
+			Default:    f.Default,
+			Required:   f.Required,
+			Examples:   f.Examples,
+			EnumValues: f.EnumValues,
 		}
 	}
 

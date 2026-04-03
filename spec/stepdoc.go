@@ -7,6 +7,13 @@ import (
 	"strings"
 )
 
+// FieldEnums is an optional interface that step configs can implement to
+// declare the valid enum values for their fields. The returned map keys
+// are lowercase field names, values are the exhaustive list of valid strings.
+type FieldEnums interface {
+	FieldEnumValues() map[string][]string
+}
+
 // StepDoc contains documentation for a step type.
 type StepDoc struct {
 	Kind    string
@@ -16,13 +23,14 @@ type StepDoc struct {
 
 // FieldDoc contains documentation for a single field in a step.
 type FieldDoc struct {
-	Name      string
-	Type      string // "string", "int", "bool", "list", "struct"
-	Required  bool
-	Desc      string
-	Default   string   // display string, empty if none
-	Examples  []string // example values (from pipe-delimited example tag)
-	Exclusive string   // mutual exclusion group name, empty if none
+	Name       string
+	Type       string   // "string", "int", "bool", "list", "struct"
+	Required   bool
+	Desc       string
+	Default    string   // display string, empty if none
+	Examples   []string // example values (from pipe-delimited example tag)
+	EnumValues []string // exhaustive valid values, from Go enum constants
+	Exclusive  string   // mutual exclusion group name, empty if none
 }
 
 // Examples builds code snippets from field metadata (example/default tags).

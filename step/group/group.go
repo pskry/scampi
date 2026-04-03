@@ -16,12 +16,20 @@ const (
 	StateAbsent
 )
 
+const (
+	statePresent = "present"
+	stateAbsent  = "absent"
+)
+
+// StateValues is the exhaustive list of accepted state strings.
+var StateValues = []string{statePresent, stateAbsent}
+
 func (s State) String() string {
 	switch s {
 	case StatePresent:
-		return "present"
+		return statePresent
 	case StateAbsent:
-		return "absent"
+		return stateAbsent
 	default:
 		return "unknown"
 	}
@@ -29,9 +37,9 @@ func (s State) String() string {
 
 func parseState(s string) State {
 	switch s {
-	case "present":
+	case statePresent:
 		return StatePresent
-	case "absent":
+	case stateAbsent:
 		return StateAbsent
 	default:
 		panic(errs.BUG("invalid group state %q — should have been caught by Validate", s))
@@ -59,7 +67,13 @@ type (
 	}
 )
 
-func (Group) Kind() string   { return "group" }
+func (*GroupConfig) FieldEnumValues() map[string][]string {
+	return map[string][]string{
+		"state": StateValues,
+	}
+}
+
+func (Group) Kind() string { return "group" }
 func (Group) NewConfig() any { return &GroupConfig{} }
 
 func (g Group) Plan(step spec.StepInstance) (spec.Action, error) {
@@ -84,11 +98,11 @@ func (g Group) Plan(step spec.StepInstance) (spec.Action, error) {
 
 func (c *GroupConfig) Validate(step spec.StepInstance) error {
 	switch c.State {
-	case "present", "absent":
+	case statePresent, stateAbsent:
 	default:
 		return InvalidStateError{
 			Got:     c.State,
-			Allowed: []string{"present", "absent"},
+			Allowed: StateValues,
 			Source:  step.Fields["state"].Value,
 		}
 	}

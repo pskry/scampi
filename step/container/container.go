@@ -19,14 +19,33 @@ const (
 	StateAbsent
 )
 
+const (
+	stateRunning = "running"
+	stateStopped = "stopped"
+	stateAbsent  = "absent"
+)
+
+// StateValues is the exhaustive list of accepted state strings.
+var StateValues = []string{stateRunning, stateStopped, stateAbsent}
+
+const (
+	restartAlways        = "always"
+	restartOnFailure     = "on-failure"
+	restartUnlessStopped = "unless-stopped"
+	restartNo            = "no"
+)
+
+// RestartValues is the exhaustive list of accepted restart policy strings.
+var RestartValues = []string{restartAlways, restartOnFailure, restartUnlessStopped, restartNo}
+
 func (s State) String() string {
 	switch s {
 	case StateRunning:
-		return "running"
+		return stateRunning
 	case StateStopped:
-		return "stopped"
+		return stateStopped
 	case StateAbsent:
-		return "absent"
+		return stateAbsent
 	default:
 		return "unknown"
 	}
@@ -34,11 +53,11 @@ func (s State) String() string {
 
 func parseState(s string) State {
 	switch s {
-	case "running":
+	case stateRunning:
 		return StateRunning
-	case "stopped":
+	case stateStopped:
 		return StateStopped
-	case "absent":
+	case stateAbsent:
 		return StateAbsent
 	default:
 		panic(errs.BUG("invalid container state %q — should have been caught by validate", s))
@@ -79,7 +98,14 @@ type (
 	}
 )
 
-func (Instance) Kind() string   { return "container.instance" }
+func (*InstanceConfig) FieldEnumValues() map[string][]string {
+	return map[string][]string{
+		"state":   StateValues,
+		"restart": RestartValues,
+	}
+}
+
+func (Instance) Kind() string { return "container.instance" }
 func (Instance) NewConfig() any { return &InstanceConfig{} }
 
 func (Instance) Plan(step spec.StepInstance) (spec.Action, error) {
@@ -110,26 +136,26 @@ func (Instance) Plan(step spec.StepInstance) (spec.Action, error) {
 
 func (c *InstanceConfig) validate(step spec.StepInstance) error {
 	switch c.State {
-	case "running", "stopped", "absent":
+	case stateRunning, stateStopped, stateAbsent:
 	default:
 		return InvalidStateError{
 			Got:     c.State,
-			Allowed: []string{"running", "stopped", "absent"},
+			Allowed: StateValues,
 			Source:  step.Fields["state"].Value,
 		}
 	}
 
 	switch c.Restart {
-	case "always", "on-failure", "unless-stopped", "no":
+	case restartAlways, restartOnFailure, restartUnlessStopped, restartNo:
 	default:
 		return InvalidRestartError{
 			Got:     c.Restart,
-			Allowed: []string{"always", "on-failure", "unless-stopped", "no"},
+			Allowed: RestartValues,
 			Source:  step.Fields["restart"].Value,
 		}
 	}
 
-	if c.State != "absent" && c.Image == "" {
+	if c.State != stateAbsent && c.Image == "" {
 		return EmptyImageError{
 			Source: step.Source,
 		}

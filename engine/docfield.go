@@ -29,10 +29,21 @@ import (
 //	exclusive:"group-name"         — mutual exclusion group (fields sharing a name are alternatives)
 func docFromConfig(kind string, cfg any) spec.StepDoc {
 	rt := reflectStruct(cfg)
+	fields := extractFields(rt)
+
+	if fe, ok := cfg.(spec.FieldEnums); ok {
+		enums := fe.FieldEnumValues()
+		for i := range fields {
+			if vals, has := enums[fields[i].Name]; has {
+				fields[i].EnumValues = vals
+			}
+		}
+	}
+
 	return spec.StepDoc{
 		Kind:    kind,
 		Summary: extractSummary(rt),
-		Fields:  extractFields(rt),
+		Fields:  fields,
 	}
 }
 

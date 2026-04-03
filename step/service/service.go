@@ -17,16 +17,26 @@ const (
 	StateReloaded
 )
 
+const (
+	stateRunning   = "running"
+	stateStopped   = "stopped"
+	stateRestarted = "restarted"
+	stateReloaded  = "reloaded"
+)
+
+// StateValues is the exhaustive list of accepted state strings.
+var StateValues = []string{stateRunning, stateStopped, stateRestarted, stateReloaded}
+
 func (s State) String() string {
 	switch s {
 	case StateRunning:
-		return "running"
+		return stateRunning
 	case StateStopped:
-		return "stopped"
+		return stateStopped
 	case StateRestarted:
-		return "restarted"
+		return stateRestarted
 	case StateReloaded:
-		return "reloaded"
+		return stateReloaded
 	default:
 		return "unknown"
 	}
@@ -34,13 +44,13 @@ func (s State) String() string {
 
 func parseState(s string) State {
 	switch s {
-	case "running":
+	case stateRunning:
 		return StateRunning
-	case "stopped":
+	case stateStopped:
 		return StateStopped
-	case "restarted":
+	case stateRestarted:
 		return StateRestarted
-	case "reloaded":
+	case stateReloaded:
 		return StateReloaded
 	default:
 		panic(errs.BUG("invalid service state %q — should have been caught by Validate", s))
@@ -66,7 +76,13 @@ type (
 	}
 )
 
-func (Service) Kind() string   { return "service" }
+func (*ServiceConfig) FieldEnumValues() map[string][]string {
+	return map[string][]string{
+		"state": StateValues,
+	}
+}
+
+func (Service) Kind() string { return "service" }
 func (Service) NewConfig() any { return &ServiceConfig{} }
 
 func (s Service) Plan(step spec.StepInstance) (spec.Action, error) {
@@ -90,11 +106,11 @@ func (s Service) Plan(step spec.StepInstance) (spec.Action, error) {
 
 func (c *ServiceConfig) Validate(step spec.StepInstance) error {
 	switch c.State {
-	case "running", "stopped", "restarted", "reloaded":
+	case stateRunning, stateStopped, stateRestarted, stateReloaded:
 	default:
 		return InvalidStateError{
 			Got:     c.State,
-			Allowed: []string{"running", "stopped", "restarted", "reloaded"},
+			Allowed: StateValues,
 			Source:  step.Fields["state"].Value,
 		}
 	}

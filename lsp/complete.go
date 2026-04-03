@@ -172,7 +172,7 @@ func (s *Server) completeKwargs(cur CursorContext) []protocol.CompletionItem {
 	return items
 }
 
-// completeEnumValues offers example/enum values for a kwarg being typed.
+// completeEnumValues offers valid enum values for a kwarg being typed.
 func (s *Server) completeEnumValues(cur CursorContext) []protocol.CompletionItem {
 	f, ok := s.catalog.Lookup(cur.FuncName)
 	if !ok {
@@ -180,19 +180,19 @@ func (s *Server) completeEnumValues(cur CursorContext) []protocol.CompletionItem
 	}
 
 	for _, p := range f.Params {
-		if p.Name != cur.ActiveKwarg || len(p.Examples) == 0 {
+		if p.Name != cur.ActiveKwarg || len(p.EnumValues) == 0 {
 			continue
 		}
 
 		var items []protocol.CompletionItem
-		for _, ex := range p.Examples {
-			if cur.WordUnderCursor != "" && !strings.HasPrefix(ex, cur.WordUnderCursor) {
+		for _, v := range p.EnumValues {
+			if cur.WordUnderCursor != "" && !strings.HasPrefix(v, cur.WordUnderCursor) {
 				continue
 			}
 			items = append(items, protocol.CompletionItem{
-				Label:      ex,
+				Label:      v,
 				Kind:       protocol.CompletionItemKindEnumMember,
-				InsertText: ex,
+				InsertText: v,
 			})
 		}
 		return items
