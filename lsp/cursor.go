@@ -30,6 +30,13 @@ type CursorContext struct {
 	// estimated by counting commas before the cursor.
 	ActiveParam int
 
+	// ActiveKwarg is the kwarg name whose value is currently being typed.
+	// Set when the cursor is after "name = " or "name = \"" inside a call.
+	ActiveKwarg string
+
+	// InString is true when the cursor is inside a string literal.
+	InString bool
+
 	// WordUnderCursor is the identifier (or dotted identifier) the cursor
 	// is on or immediately after.
 	WordUnderCursor string
@@ -45,6 +52,18 @@ func AnalyzeCursor(text string, line, col uint32) CursorContext {
 
 	ctx := CursorContext{
 		WordUnderCursor: wordAtOffset(text, offset),
+		InString:        inStringLiteral(text, offset),
+	}
+
+	// If cursor is inside a string, skip backward past the opening quote
+	// before starting the bracket search. Without this, the backward walk
+	// treats the opening quote as entering a string and skips everything.
+	start := offset - 1
+	if ctx.InString {
+		for start >= 0 && text[start] != '"' && text[start] != '\'' {
+			start--
+		}
+		start-- // skip past the opening quote
 	}
 
 	// Walk backward to find the innermost enclosing bracket. Track
@@ -56,7 +75,7 @@ func AnalyzeCursor(text string, line, col uint32) CursorContext {
 	var stack []bracket
 
 	inStr := byte(0)
-	for i := offset - 1; i >= 0; i-- {
+	for i := start; i >= 0; i-- {
 		ch := text[i]
 
 		// Simple string tracking (not escape-aware, good enough).
@@ -108,8 +127,77 @@ func analyzeCallContext(text string, parenPos, offset int, ctx CursorContext) Cu
 	inside := text[parenPos+1 : offset]
 	ctx.PresentKwargs = extractKwargNames(inside)
 	ctx.ActiveParam = countTopLevelCommas(inside)
+	ctx.ActiveKwarg = activeKwarg(inside)
 
 	return ctx
+}
+
+// activeKwarg returns the kwarg name whose value is being typed.
+// Given inside = `name = "foo", state = "run`, returns "state".
+func activeKwarg(inside string) string {
+	// Find the last top-level comma to isolate the current argument.
+	last := lastTopLevelComma(inside)
+	segment := inside[last:]
+	segment = strings.TrimSpace(segment)
+
+	eq := strings.IndexByte(segment, '=')
+	if eq < 0 {
+		return ""
+	}
+	// Check it's not ==
+	if eq+1 < len(segment) && segment[eq+1] == '=' {
+		return ""
+	}
+	name := strings.TrimSpace(segment[:eq])
+	if name == "" || strings.ContainsAny(name, " \t\n") {
+		return ""
+	}
+	return name
+}
+
+// lastTopLevelComma returns the index just after the last top-level comma,
+// or 0 if there is none.
+func lastTopLevelComma(s string) int {
+	depth := 0
+	inStr := rune(0)
+	last := 0
+	for i, r := range s {
+		switch {
+		case inStr != 0:
+			if r == inStr {
+				inStr = 0
+			}
+		case r == '"' || r == '\'':
+			inStr = r
+		case r == '(' || r == '[' || r == '{':
+			depth++
+		case r == ')' || r == ']' || r == '}':
+			if depth > 0 {
+				depth--
+			}
+		case r == ',' && depth == 0:
+			last = i + 1
+		}
+	}
+	return last
+}
+
+// inStringLiteral checks if the cursor at offset is inside a string.
+func inStringLiteral(text string, offset int) bool {
+	inStr := byte(0)
+	for i := 0; i < offset && i < len(text); i++ {
+		ch := text[i]
+		if inStr != 0 {
+			if ch == inStr {
+				inStr = 0
+			}
+			continue
+		}
+		if ch == '"' || ch == '\'' {
+			inStr = ch
+		}
+	}
+	return inStr != 0
 }
 
 func analyzeListContext(text string, bracketPos, _ int, ctx CursorContext) CursorContext {

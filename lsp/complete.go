@@ -4,10 +4,14 @@ package lsp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"go.lsp.dev/protocol"
+	"go.starlark.net/syntax"
 )
 
 func (s *Server) Completion(
@@ -34,6 +38,10 @@ func (s *Server) Completion(
 	var items []protocol.CompletionItem
 
 	switch {
+	case cur.InCall && cur.FuncName == "secret" && cur.InString:
+		items = s.completeSecretKeys(params.TextDocument.URI, cur)
+	case cur.InCall && cur.ActiveKwarg != "" && cur.InString:
+		items = s.completeEnumValues(cur)
 	case cur.InList:
 		items = s.completeTopLevel(cur.WordUnderCursor)
 	case cur.InCall:
@@ -162,6 +170,121 @@ func (s *Server) completeKwargs(cur CursorContext) []protocol.CompletionItem {
 		})
 	}
 	return items
+}
+
+// completeEnumValues offers example/enum values for a kwarg being typed.
+func (s *Server) completeEnumValues(cur CursorContext) []protocol.CompletionItem {
+	f, ok := s.catalog.Lookup(cur.FuncName)
+	if !ok {
+		return nil
+	}
+
+	for _, p := range f.Params {
+		if p.Name != cur.ActiveKwarg || len(p.Examples) == 0 {
+			continue
+		}
+
+		var items []protocol.CompletionItem
+		for _, ex := range p.Examples {
+			if cur.WordUnderCursor != "" && !strings.HasPrefix(ex, cur.WordUnderCursor) {
+				continue
+			}
+			items = append(items, protocol.CompletionItem{
+				Label:      ex,
+				Kind:       protocol.CompletionItemKindEnumMember,
+				InsertText: ex,
+			})
+		}
+		return items
+	}
+	return nil
+}
+
+// completeSecretKeys offers secret key names from the configured secrets file.
+func (s *Server) completeSecretKeys(docURI protocol.DocumentURI, cur CursorContext) []protocol.CompletionItem {
+	doc, ok := s.docs.Get(docURI)
+	if !ok {
+		return nil
+	}
+
+	filePath := uriToPath(docURI)
+	secretsPath := findSecretsPath(filePath, doc.Content)
+	if secretsPath == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(secretsPath)
+	if err != nil {
+		return nil
+	}
+
+	var secrets map[string]any
+	if err := json.Unmarshal(data, &secrets); err != nil {
+		return nil
+	}
+
+	var items []protocol.CompletionItem
+	for key := range secrets {
+		if cur.WordUnderCursor != "" && !strings.HasPrefix(key, cur.WordUnderCursor) {
+			continue
+		}
+		items = append(items, protocol.CompletionItem{
+			Label:      key,
+			Kind:       protocol.CompletionItemKindValue,
+			InsertText: key,
+		})
+	}
+	return items
+}
+
+// findSecretsPath extracts the path argument from a secrets() call in the
+// document and resolves it relative to the file's directory.
+func findSecretsPath(filePath, content string) string {
+	f, _ := Parse(filePath, []byte(content))
+	if f == nil {
+		return ""
+	}
+
+	var secretsPath string
+	syntax.Walk(f, func(n syntax.Node) bool {
+		if n == nil || secretsPath != "" {
+			return false
+		}
+		call, ok := n.(*syntax.CallExpr)
+		if !ok {
+			return true
+		}
+		fn, ok := call.Fn.(*syntax.Ident)
+		if !ok || fn.Name != "secrets" {
+			return true
+		}
+		for _, arg := range call.Args {
+			binOp, ok := arg.(*syntax.BinaryExpr)
+			if !ok || binOp.Op != syntax.EQ {
+				continue
+			}
+			lhs, ok := binOp.X.(*syntax.Ident)
+			if !ok || lhs.Name != "path" {
+				continue
+			}
+			rhs, ok := binOp.Y.(*syntax.Literal)
+			if !ok {
+				continue
+			}
+			if s, ok := rhs.Value.(string); ok {
+				secretsPath = s
+			}
+		}
+		return true
+	})
+
+	if secretsPath == "" {
+		return ""
+	}
+	if filepath.IsAbs(secretsPath) {
+		return secretsPath
+	}
+	return filepath.Join(filepath.Dir(filePath), secretsPath)
 }
 
 func isDotPrefix(word string) bool {

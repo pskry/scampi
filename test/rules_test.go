@@ -73,6 +73,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
+			pattern:        "lsp/complete.go",
+			allowedImports: "os",
+		},
+		{
 			pattern:        "lsp/eval.go",
 			allowedImports: "os",
 		},

@@ -114,7 +114,7 @@ func (s *Server) Initialize(
 				},
 			},
 			CompletionProvider: &protocol.CompletionOptions{
-				TriggerCharacters: []string{"(", ".", ","},
+				TriggerCharacters: []string{"(", ".", ",", "\""},
 			},
 			SignatureHelpProvider: &protocol.SignatureHelpOptions{
 				TriggerCharacters: []string{"(", ","},

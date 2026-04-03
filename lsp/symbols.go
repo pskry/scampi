@@ -49,14 +49,6 @@ func (s *Server) DocumentSymbol(
 					SelectionRange: posToLSPRange(ident.NamePos),
 				})
 			}
-		case *syntax.LoadStmt:
-			start, end := st.Span()
-			symbols = append(symbols, protocol.DocumentSymbol{
-				Name:           st.ModuleName(),
-				Kind:           protocol.SymbolKindModule,
-				Range:          spanToSymbolRange(start, end),
-				SelectionRange: spanToSymbolRange(start, end),
-			})
 		}
 	}
 
@@ -74,7 +66,28 @@ func (s *Server) Symbols(
 	query := strings.ToLower(params.Query)
 	var symbols []protocol.SymbolInformation
 
-	_ = filepath.WalkDir(s.rootDir, func(path string, d os.DirEntry, err error) error {
+	// Scan workspace root.
+	symbols = appendSymbolsFromDir(symbols, s.rootDir, query)
+
+	// Scan local dependency directories from scampi.mod.
+	if s.module != nil {
+		for _, dep := range s.module.Require {
+			if !dep.IsLocal() {
+				continue
+			}
+			depDir := dep.Version
+			if !filepath.IsAbs(depDir) {
+				depDir = filepath.Join(filepath.Dir(s.module.Filename), depDir)
+			}
+			symbols = appendSymbolsFromDir(symbols, depDir, query)
+		}
+	}
+
+	return symbols, nil
+}
+
+func appendSymbolsFromDir(symbols []protocol.SymbolInformation, dir, query string) []protocol.SymbolInformation {
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".scampi" {
 			return nil
 		}
@@ -123,8 +136,7 @@ func (s *Server) Symbols(
 		}
 		return nil
 	})
-
-	return symbols, nil
+	return symbols
 }
 
 func spanToSymbolRange(start, end syntax.Position) protocol.Range {
