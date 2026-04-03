@@ -121,7 +121,9 @@ func (s *Server) Initialize(
 			},
 			HoverProvider:      &protocol.HoverOptions{},
 			DefinitionProvider: &protocol.DefinitionOptions{},
-			ReferencesProvider: &protocol.ReferenceOptions{},
+			ReferencesProvider:      &protocol.ReferenceOptions{},
+			DocumentSymbolProvider: &protocol.DocumentSymbolOptions{},
+			WorkspaceSymbolProvider: &protocol.WorkspaceSymbolOptions{},
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "scampls",
@@ -150,9 +152,37 @@ func (s *Server) loadModule() {
 	s.log.Printf("loaded module %s (%d deps)", m.Module, len(m.Require))
 }
 
-func (s *Server) Initialized(context.Context, *protocol.InitializedParams) error {
+func (s *Server) Initialized(ctx context.Context, _ *protocol.InitializedParams) error {
 	s.log.Printf("initialized")
+	go s.diagnoseWorkspace(ctx)
 	return nil
+}
+
+func (s *Server) diagnoseWorkspace(ctx context.Context) {
+	if s.rootDir == "" {
+		return
+	}
+	s.log.Printf("diagnosing workspace: %s", s.rootDir)
+	_ = filepath.WalkDir(s.rootDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".scampi" {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil
+		}
+		docURI := protocol.DocumentURI(uri.File(path))
+		diags := s.evaluate(ctx, docURI, string(data))
+		if diags == nil {
+			diags = []protocol.Diagnostic{}
+		}
+		s.log.Printf("workspace diag: %s → %d", path, len(diags))
+		_ = s.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
+			URI:         docURI,
+			Diagnostics: diags,
+		})
+		return nil
+	})
 }
 func (s *Server) Shutdown(context.Context) error {
 	s.log.Printf("shutdown")
@@ -282,9 +312,6 @@ func (s *Server) DocumentLink(context.Context, *protocol.DocumentLinkParams) ([]
 func (s *Server) DocumentLinkResolve(context.Context, *protocol.DocumentLink) (*protocol.DocumentLink, error) {
 	return nil, nil
 }
-func (s *Server) DocumentSymbol(context.Context, *protocol.DocumentSymbolParams) ([]any, error) {
-	return nil, nil
-}
 func (s *Server) ExecuteCommand(context.Context, *protocol.ExecuteCommandParams) (any, error) {
 	return nil, nil
 }
@@ -319,12 +346,6 @@ func (s *Server) RangeFormatting(
 	return nil, nil
 }
 func (s *Server) Rename(context.Context, *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
-	return nil, nil
-}
-func (s *Server) Symbols(
-	context.Context,
-	*protocol.WorkspaceSymbolParams,
-) ([]protocol.SymbolInformation, error) {
 	return nil, nil
 }
 func (s *Server) TypeDefinition(
