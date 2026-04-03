@@ -269,10 +269,9 @@ func nonStepBuiltins() []BuiltinFunc {
 			Name:    "rest.bearer",
 			Summary: "Bearer token authentication",
 			Params: []BuiltinParam{
-				{Name: "token", Type: "string", Desc: "Bearer token"},
-				{Name: "token_endpoint", Type: "string", Desc: "OAuth2 token endpoint"},
-				{Name: "client_id", Type: "string", Desc: "OAuth2 client ID"},
-				{Name: "client_secret", Type: "string", Desc: "OAuth2 client secret"},
+				{Name: "token_endpoint", Type: "string", Desc: "OAuth2 token endpoint", Required: true},
+				{Name: "identity", Type: "string", Desc: "OAuth2 identity (username)", Required: true},
+				{Name: "secret", Type: "string", Desc: "OAuth2 secret (password)", Required: true},
 			},
 		},
 		{

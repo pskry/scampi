@@ -42,6 +42,8 @@ func (s *Server) Completion(
 		items = s.completeSecretKeys(params.TextDocument.URI, cur)
 	case cur.InCall && cur.ActiveKwarg != "" && cur.InString:
 		items = s.completeEnumValues(cur)
+	case cur.InCall && cur.ActiveKwarg != "":
+		items = s.completeKwargValue(cur)
 	case cur.InList:
 		items = s.completeTopLevel(cur.WordUnderCursor)
 	case cur.InCall:
@@ -172,6 +174,47 @@ func (s *Server) completeKwargs(cur CursorContext) []protocol.CompletionItem {
 	return items
 }
 
+// Type-based kwarg value completions
+// -----------------------------------------------------------------------------
+
+var typeCompletions = map[string][]protocol.CompletionItem{
+	"source": {
+		{Label: "local", Kind: protocol.CompletionItemKindFunction, Detail: "Reference a local file", InsertText: "local("},
+		{Label: "inline", Kind: protocol.CompletionItemKindFunction, Detail: "Use an inline string", InsertText: "inline("},
+		{Label: "remote", Kind: protocol.CompletionItemKindFunction, Detail: "Download a remote file", InsertText: "remote("},
+	},
+	"pkg_source": {
+		{Label: "system", Kind: protocol.CompletionItemKindFunction, Detail: "Use the system package manager", InsertText: "system()"},
+		{Label: "apt_repo", Kind: protocol.CompletionItemKindFunction, Detail: "Add an APT repository", InsertText: "apt_repo("},
+		{Label: "dnf_repo", Kind: protocol.CompletionItemKindFunction, Detail: "Add a DNF repository", InsertText: "dnf_repo("},
+	},
+}
+
+// completeKwargValue offers type-appropriate values for a kwarg being typed.
+func (s *Server) completeKwargValue(cur CursorContext) []protocol.CompletionItem {
+	f, ok := s.catalog.Lookup(cur.FuncName)
+	if !ok {
+		return nil
+	}
+
+	for _, p := range f.Params {
+		if p.Name != cur.ActiveKwarg {
+			continue
+		}
+		if items, ok := typeCompletions[p.Type]; ok {
+			return items
+		}
+		// For string params, offer secret() and env() as common value producers.
+		if p.Type == "string" {
+			return []protocol.CompletionItem{
+				{Label: "secret", Kind: protocol.CompletionItemKindFunction, Detail: "Read a secret value", InsertText: "secret("},
+				{Label: "env", Kind: protocol.CompletionItemKindFunction, Detail: "Read an environment variable", InsertText: "env("},
+			}
+		}
+	}
+	return nil
+}
+
 // completeEnumValues offers valid enum values for a kwarg being typed.
 func (s *Server) completeEnumValues(cur CursorContext) []protocol.CompletionItem {
 	f, ok := s.catalog.Lookup(cur.FuncName)
@@ -230,7 +273,7 @@ func (s *Server) completeSecretKeys(docURI protocol.DocumentURI, cur CursorConte
 		}
 		items = append(items, protocol.CompletionItem{
 			Label:      key,
-			Kind:       protocol.CompletionItemKindValue,
+			Kind:       protocol.CompletionItemKindProperty,
 			InsertText: key,
 		})
 	}
@@ -238,8 +281,18 @@ func (s *Server) completeSecretKeys(docURI protocol.DocumentURI, cur CursorConte
 }
 
 // findSecretsPath extracts the path argument from a secrets() call in the
-// document and resolves it relative to the file's directory.
+// document and resolves it relative to the file's directory. Falls back to
+// regex scanning when the AST can't be parsed (common while editing).
 func findSecretsPath(filePath, content string) string {
+	// Try AST-based extraction first.
+	if p := findSecretsPathAST(filePath, content); p != "" {
+		return p
+	}
+	// Fallback: scan raw text for secrets(... path="..." ...).
+	return findSecretsPathText(filePath, content)
+}
+
+func findSecretsPathAST(filePath, content string) string {
 	f, _ := Parse(filePath, []byte(content))
 	if f == nil {
 		return ""
@@ -281,6 +334,34 @@ func findSecretsPath(filePath, content string) string {
 	if secretsPath == "" {
 		return ""
 	}
+	return resolveSecretsPath(filePath, secretsPath)
+}
+
+func findSecretsPathText(filePath, content string) string {
+	// Look for: path="something.json" near a secrets( call.
+	idx := strings.Index(content, "secrets(")
+	if idx < 0 {
+		return ""
+	}
+	rest := content[idx:]
+	// Find path="..." within the next ~200 chars.
+	if len(rest) > 200 {
+		rest = rest[:200]
+	}
+	const marker = `path="`
+	pIdx := strings.Index(rest, marker)
+	if pIdx < 0 {
+		return ""
+	}
+	start := pIdx + len(marker)
+	end := strings.IndexByte(rest[start:], '"')
+	if end < 0 {
+		return ""
+	}
+	return resolveSecretsPath(filePath, rest[start:start+end])
+}
+
+func resolveSecretsPath(filePath, secretsPath string) string {
 	if filepath.IsAbs(secretsPath) {
 		return secretsPath
 	}
