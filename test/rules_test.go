@@ -852,3 +852,64 @@ func hasRationaleAboveBlock(file *ast.File, fset *token.FileSet, callLine int) b
 	}
 	return false
 }
+
+// TestLangPackageIsolation enforces that scampi-lang (under lang/) is
+// standalone: it may import only Go stdlib and other lang/ packages.
+// This keeps the language frontend free of engine internals so it can
+// be consumed from tools (LSP, alternate frontends) without pulling in
+// the rest of scampi, and so it could later be extracted cleanly.
+func TestLangPackageIsolation(t *testing.T) {
+	root := ".."
+	const modulePrefix = "scampi.dev/scampi/"
+	const langPrefix = modulePrefix + "lang/"
+
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(filepath.Join(root, "lang"), func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		// Test files may use stdlib-only test helpers; subject them to
+		// the same rule (no cheating).
+		file, perr := parser.ParseFile(fset, p, nil, parser.ImportsOnly)
+		if perr != nil {
+			return perr
+		}
+		for _, imp := range file.Imports {
+			importPath, err := strconv.Unquote(imp.Path.Value)
+			if err != nil {
+				continue
+			}
+			// Allow Go stdlib. Stdlib packages never contain a dot in
+			// their first path segment.
+			first := importPath
+			if slash := strings.Index(importPath, "/"); slash >= 0 {
+				first = importPath[:slash]
+			}
+			if !strings.Contains(first, ".") {
+				continue // stdlib
+			}
+			// Allow other lang/* packages.
+			if strings.HasPrefix(importPath, langPrefix) {
+				continue
+			}
+			// Anything else in the scampi module is forbidden.
+			if strings.HasPrefix(importPath, modulePrefix) {
+				rel := strings.TrimPrefix(p, root+"/")
+				t.Errorf("%s: forbidden import %q — lang/ must not depend on engine internals",
+					rel, importPath)
+				continue
+			}
+			// Third-party imports are forbidden in v0 (stdlib only).
+			rel := strings.TrimPrefix(p, root+"/")
+			t.Errorf("%s: forbidden third-party import %q — lang/ is stdlib-only",
+				rel, importPath)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -60,7 +60,7 @@ genapi:
 
 [doc("Run code style rule tests")]
 rules:
-  go test -v ./test -run 'TestImportCapabilities|TestFuncSignatureStyle|TestMarkdownTableAlignment|TestBareErrorBan|Test_StepType'
+  go test -v ./test -run 'TestImportCapabilities|TestFuncSignatureStyle|TestMarkdownTableAlignment|TestBareErrorBan|TestLangPackageIsolation|Test_StepType'
 
 # Fuzz and benchmarks
 # ##############################################################################
