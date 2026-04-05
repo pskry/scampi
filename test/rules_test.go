@@ -589,6 +589,16 @@ func TestMarkdownTableAlignment(t *testing.T) {
 		return true
 	}
 
+	countPipes := func(s string) int {
+		n := 0
+		for i := 0; i < len(s); i++ {
+			if s[i] == '|' && (i == 0 || s[i-1] != '\\') {
+				n++
+			}
+		}
+		return n
+	}
+
 	checkTable := func(t *testing.T, rel string, rows []string, startLine int) {
 		t.Helper()
 		if len(rows) < 2 {
@@ -598,13 +608,13 @@ func TestMarkdownTableAlignment(t *testing.T) {
 			return
 		}
 
-		wantCols := strings.Count(rows[0], "|") - 1
+		wantCols := countPipes(rows[0]) - 1
 		wantLen := utf8.RuneCountInString(rows[0])
 
 		for i, row := range rows {
 			lineNum := startLine + i
 
-			gotCols := strings.Count(row, "|") - 1
+			gotCols := countPipes(row) - 1
 			if gotCols != wantCols {
 				t.Errorf(
 					"%s:%d: table row has %d columns, want %d (same as header at line %d)",
