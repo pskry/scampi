@@ -86,7 +86,7 @@ func (*PkgConfig) FieldEnumValues() map[string][]string {
 	}
 }
 
-func (Pkg) Kind() string { return "pkg" }
+func (Pkg) Kind() string   { return "pkg" }
 func (Pkg) NewConfig() any { return &PkgConfig{} }
 
 func (c *PkgConfig) Validate(step spec.StepInstance) error {

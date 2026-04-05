@@ -12,13 +12,17 @@ from pathlib import Path
 
 TABLE_ROW = re.compile(r"^\|.*\|$")
 
+# Split a row on unescaped pipes only — `\|` inside a cell is content,
+# not a column separator.
+UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
+
 
 def is_table_row(line: str) -> bool:
     return bool(TABLE_ROW.match(line.rstrip()))
 
 
 def split_cells(row: str) -> list[str]:
-    return [c.strip() for c in row.strip().strip("|").split("|")]
+    return [c.strip() for c in UNESCAPED_PIPE.split(row.strip().strip("|"))]
 
 
 def is_separator_row(cells: list[str]) -> bool:

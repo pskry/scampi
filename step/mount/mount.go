@@ -174,7 +174,7 @@ func (*MountConfig) FieldEnumValues() map[string][]string {
 	}
 }
 
-func (Mount) Kind() string { return "mount" }
+func (Mount) Kind() string   { return "mount" }
 func (Mount) NewConfig() any { return &MountConfig{} }
 
 func (Mount) Plan(step spec.StepInstance) (spec.Action, error) {

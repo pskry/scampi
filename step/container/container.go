@@ -105,7 +105,7 @@ func (*InstanceConfig) FieldEnumValues() map[string][]string {
 	}
 }
 
-func (Instance) Kind() string { return "container.instance" }
+func (Instance) Kind() string   { return "container.instance" }
 func (Instance) NewConfig() any { return &InstanceConfig{} }
 
 func (Instance) Plan(step spec.StepInstance) (spec.Action, error) {

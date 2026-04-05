@@ -24,7 +24,7 @@ type StepDoc struct {
 // FieldDoc contains documentation for a single field in a step.
 type FieldDoc struct {
 	Name       string
-	Type       string   // "string", "int", "bool", "list", "struct"
+	Type       string // "string", "int", "bool", "list", "struct"
 	Required   bool
 	Desc       string
 	Default    string   // display string, empty if none

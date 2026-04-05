@@ -119,10 +119,10 @@ func (s *Server) Initialize(
 			SignatureHelpProvider: &protocol.SignatureHelpOptions{
 				TriggerCharacters: []string{"(", ","},
 			},
-			HoverProvider:      &protocol.HoverOptions{},
-			DefinitionProvider: &protocol.DefinitionOptions{},
+			HoverProvider:           &protocol.HoverOptions{},
+			DefinitionProvider:      &protocol.DefinitionOptions{},
 			ReferencesProvider:      &protocol.ReferenceOptions{},
-			DocumentSymbolProvider: &protocol.DocumentSymbolOptions{},
+			DocumentSymbolProvider:  &protocol.DocumentSymbolOptions{},
 			WorkspaceSymbolProvider: &protocol.WorkspaceSymbolOptions{},
 		},
 		ServerInfo: &protocol.ServerInfo{

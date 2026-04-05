@@ -82,7 +82,7 @@ func (*ServiceConfig) FieldEnumValues() map[string][]string {
 	}
 }
 
-func (Service) Kind() string { return "service" }
+func (Service) Kind() string   { return "service" }
 func (Service) NewConfig() any { return &ServiceConfig{} }
 
 func (s Service) Plan(step spec.StepInstance) (spec.Action, error) {

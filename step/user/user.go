@@ -79,7 +79,7 @@ func (*UserConfig) FieldEnumValues() map[string][]string {
 	}
 }
 
-func (User) Kind() string { return "user" }
+func (User) Kind() string   { return "user" }
 func (User) NewConfig() any { return &UserConfig{} }
 
 func (u User) Plan(step spec.StepInstance) (spec.Action, error) {

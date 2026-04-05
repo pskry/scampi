@@ -73,7 +73,7 @@ func (*GroupConfig) FieldEnumValues() map[string][]string {
 	}
 }
 
-func (Group) Kind() string { return "group" }
+func (Group) Kind() string   { return "group" }
 func (Group) NewConfig() any { return &GroupConfig{} }
 
 func (g Group) Plan(step spec.StepInstance) (spec.Action, error) {
