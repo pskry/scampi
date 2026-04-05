@@ -137,7 +137,7 @@ func TestInvalidHex(t *testing.T) {
 // --- Operators and delimiters ---
 
 func TestOperators(t *testing.T) {
-	assertTokens(t, "+ - * / % == != < > <= >= && || ! = : . -> ---", []want{
+	assertTokens(t, "+ - * / % == != < > <= >= && || ! = : .", []want{
 		{token.Plus, "+"},
 		{token.Minus, "-"},
 		{token.Star, "*"},
@@ -155,8 +155,6 @@ func TestOperators(t *testing.T) {
 		{token.Assign, "="},
 		{token.Colon, ":"},
 		{token.Dot, "."},
-		{token.Arrow, "->"},
-		{token.Sep, "---"},
 	})
 }
 

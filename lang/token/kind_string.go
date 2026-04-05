@@ -53,20 +53,19 @@ func _() {
 	_ = x[Assign-40]
 	_ = x[Colon-41]
 	_ = x[Dot-42]
-	_ = x[Arrow-43]
-	_ = x[Sep-44]
-	_ = x[LBrace-45]
-	_ = x[RBrace-46]
-	_ = x[LBrack-47]
-	_ = x[RBrack-48]
-	_ = x[LParen-49]
-	_ = x[RParen-50]
-	_ = x[Comma-51]
+	_ = x[Question-43]
+	_ = x[LBrace-44]
+	_ = x[RBrace-45]
+	_ = x[LBrack-46]
+	_ = x[RBrack-47]
+	_ = x[LParen-48]
+	_ = x[RParen-49]
+	_ = x[Comma-50]
 }
 
-const _Kind_name = "IllegalEOFSemiIdentIntStringStringBegStringContStringEndLInterpRInterpImportLetFuncStepStructEnumForInIfElseReturnTrueFalseNoneSelfPlusMinusStarSlashPercentEqNeqLtGtLeqGeqAndOrNotAssignColonDotArrowSepLBraceRBraceLBrackRBrackLParenRParenComma"
+const _Kind_name = "IllegalEOFSemiIdentIntStringStringBegStringContStringEndLInterpRInterpImportLetFuncStepStructEnumForInIfElseReturnTrueFalseNoneSelfPlusMinusStarSlashPercentEqNeqLtGtLeqGeqAndOrNotAssignColonDotQuestionLBraceRBraceLBrackRBrackLParenRParenComma"
 
-var _Kind_index = [...]uint8{0, 7, 10, 14, 19, 22, 28, 37, 47, 56, 63, 70, 76, 79, 83, 87, 93, 97, 100, 102, 104, 108, 114, 118, 123, 127, 131, 135, 140, 144, 149, 156, 158, 161, 163, 165, 168, 171, 174, 176, 179, 185, 190, 193, 198, 201, 207, 213, 219, 225, 231, 237, 242}
+var _Kind_index = [...]uint8{0, 7, 10, 14, 19, 22, 28, 37, 47, 56, 63, 70, 76, 79, 83, 87, 93, 97, 100, 102, 104, 108, 114, 118, 123, 127, 131, 135, 140, 144, 149, 156, 158, 161, 163, 165, 168, 171, 174, 176, 179, 185, 190, 193, 201, 207, 213, 219, 225, 231, 237, 242}
 
 func (i Kind) String() string {
 	if i >= Kind(len(_Kind_index)-1) {

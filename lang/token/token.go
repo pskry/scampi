@@ -45,25 +45,24 @@ const (
 	Self
 
 	// Operators
-	Plus    // +
-	Minus   // -
-	Star    // *
-	Slash   // /
-	Percent // %
-	Eq      // ==
-	Neq     // !=
-	Lt      // <
-	Gt      // >
-	Leq     // <=
-	Geq     // >=
-	And     // &&
-	Or      // ||
-	Not     // !
-	Assign  // =
-	Colon   // :
-	Dot     // .
-	Arrow   // ->
-	Sep     // ---
+	Plus     // +
+	Minus    // -
+	Star     // *
+	Slash    // /
+	Percent  // %
+	Eq       // ==
+	Neq      // !=
+	Lt       // <
+	Gt       // >
+	Leq      // <=
+	Geq      // >=
+	And      // &&
+	Or       // ||
+	Not      // !
+	Assign   // =
+	Colon    // :
+	Dot      // .
+	Question // ?
 
 	// Delimiters
 	LBrace // {

@@ -250,14 +250,6 @@ func (l *Lexer) scanPunct(start uint32) (token.Token, bool) {
 		l.pos++
 		return l.emit(token.Plus, start, uint32(l.pos)), true
 	case '-':
-		if peek == '>' {
-			l.pos += 2
-			return l.emit(token.Arrow, start, uint32(l.pos)), true
-		}
-		if peek == '-' && l.pos+2 < len(l.src) && l.src[l.pos+2] == '-' {
-			l.pos += 3
-			return l.emit(token.Sep, start, uint32(l.pos)), true
-		}
 		l.pos++
 		return l.emit(token.Minus, start, uint32(l.pos)), true
 	case '*':
@@ -315,6 +307,9 @@ func (l *Lexer) scanPunct(start uint32) (token.Token, bool) {
 	case '.':
 		l.pos++
 		return l.emit(token.Dot, start, uint32(l.pos)), true
+	case '?':
+		l.pos++
+		return l.emit(token.Question, start, uint32(l.pos)), true
 	case ',':
 		l.pos++
 		return l.emit(token.Comma, start, uint32(l.pos)), true

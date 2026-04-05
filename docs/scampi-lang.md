@@ -17,7 +17,7 @@ The language has three conceptual layers:
    that exist solely to produce declarations
 
 **The language core is minimal.** ~16 keywords: declarations (`type`,
-`enum`, `step`, `fn`), bindings (`let`), modules (`import`), control
+`enum`, `step`, `func`), bindings (`let`), modules (`import`), control
 flow (`for`, `in`, `if`, `else`, `return`), values (`true`, `false`,
 `none`, `self`). Logic via operators (`&&`, `||`, `!`). No special
 syntax for hooks, targets, deploys, or any other scampi concept —
@@ -64,7 +64,7 @@ Source files are UTF-8. No BOM.
 ### 1.3 Keywords
 
 ```
-import  let     fn      step    type    enum
+import  let     func    step    struct  enum
 for     in      if      else    true    false
 none    self    return
 ```
@@ -214,7 +214,7 @@ requires qualification.
 ### 2.5 Struct types
 
 ```
-type User {
+struct User {
     name:   string
     groups: list[string] = []
     shell:  string = "/bin/bash"
@@ -255,7 +255,8 @@ map_lit    = { "name": "alice", "age": 30 }    # map[string, any]
 
 ### 2.6 Type aliases
 
-Not in v1. If needed later, syntax would be `type Name = OtherType`.
+Not in v1. If needed later, syntax would be `struct Name = OtherType`
+or similar.
 
 ---
 
@@ -420,24 +421,33 @@ Inside the `using std { ... }` block, `pkg`, `copy`, `dir`, `system`,
 is still required. The boundary is explicit and scope-local — no
 file-wide pollution like Go's `import . "pkg"`. Deferred to post-v1.
 
-### 4.3 Step declarations
+### 4.3 Step and function declarations
 
-Every `step` declaration has an optional output type annotation and
-either a body (user-defined expansion) or no body (builtin stub).
-Output type defaults to `StepInstance` when omitted.
+`step` and `func` declarations share the same shape:
+
+```
+keyword NAME(field: type, ...) ReturnType { body }
+```
+
+Only the keyword differs. Both take typed parameters, both declare a
+return/output type, both have a body.
+
+**Functions:**
+
+```
+func build_url(host: string, path: string = "/") string {
+    return "https://${host}${path}"
+}
+```
 
 **User-defined step with body:**
 
 ```
-step create_user {
-    # inputs — the step's interface
-    name:   string
-    groups: list[string] = []
-    shell:  string = "/bin/bash"
-
-    # body — the declarations this step expands to
-    ---
-
+step create_user(
+    name:   string,
+    groups: list[string] = [],
+    shell:  string = "/bin/bash",
+) StepInstance {
     std.pkg { packages = ["shadow-utils"], source = std.system {} }
 
     std.user {
@@ -449,60 +459,66 @@ step create_user {
 }
 ```
 
-The `---` separator divides input fields (above) from the expansion
-body (below). `self` refers to the step's own field values. The body
-produces a sequence of `StepInstance` values when the step is invoked.
+`self` refers to the step's own field values inside the body. The body
+produces a sequence of `StepInstance` values through bare step
+invocations (see §4.7).
 
-Consumer syntax is identical to a builtin step invocation:
+**Builtin stub (no body):**
 
-```
-create_user {
-    name   = "alice"
-    groups = ["wheel", "dev"]
-}
-```
-
-**Builtin stub (no body, declared output type):**
-
-Steps in `std` are declarations with no body — just the type signature
-and an output type:
+Steps in `std` are declarations with no body — just the signature:
 
 ```
-step pkg -> StepInstance {
-    name:     string
-    packages: list[string]
-    state:    PkgState = PkgState.present
-    source:   PkgSource
-    desc:     string?
-}
+step pkg(
+    packages: list[string],
+    source:   PkgSource,
+    state:    PkgState = PkgState.present,
+    desc:     string?,
+) StepInstance
 
-step ssh -> Target {
-    name: string
-    host: string
-    user: string
-    port: int = 22
-}
+step ssh(
+    name:     string,
+    host:     string,
+    user:     string,
+    port:     int = 22,
+    key:      string?,
+    insecure: bool = false,
+    timeout:  string = "5s",
+) Target
 
-step deploy -> Deploy {
-    name:    string
-    targets: list[Target]
-    ---
-    # builtin with body — body accepts StepInstance invocations + hooks
-}
+step deploy(
+    name:    string,
+    targets: list[Target],
+) Deploy { /* body accepts step invocations */ }
 
-step secrets -> SecretsConfig {
-    backend: string
-    path:    string
-}
+step secrets(
+    backend: string,
+    path:    string,
+) SecretsConfig
 ```
 
 No body means the Go engine provides the implementation. The stub
 gives the LSP everything it needs: field names, types, defaults,
 documentation, and output type.
 
+**Call-site syntax differs from declaration:**
+
+Step declarations use parens with colons (matching func declarations).
+Step **invocations** use braces with equals (matching struct literals):
+
+```
+// declaration: parens, colons
+step pkg(packages: list[string], source: PkgSource) StepInstance
+
+// invocation: braces, equals
+std.pkg { packages = ["nginx"], source = std.system {} }
+```
+
+This reflects steps' dual nature — parameterized declarations (like
+funcs) that produce typed records (constructed like struct literals).
+
 **Output type rules (v0):**
 
-- If omitted, output type is `StepInstance`
+- If omitted from a user-defined step, output type is `StepInstance`
 - User-defined steps must produce `StepInstance` (no custom output
   types in v0)
 - Builtin steps in std can produce any value type defined in std
@@ -689,7 +705,7 @@ Shadowing is allowed in inner scopes.
 
 **Mutability rules depend on context:**
 
-- **Inside `fn` bodies**: `let` names are immutable, but collection
+- **Inside `func` bodies**: `let` names are immutable, but collection
   *contents* are mutable. You can do `my_map["key"] = value` and
   `my_list.append(item)`. This is where imperative data-building logic
   lives.
@@ -702,8 +718,8 @@ This creates a clean boundary: functions are where you *compute*, step
 blocks are where you *declare*. No side effects leak into declarations.
 
 ```
-fn build_state(name: string, extras: map[string, any]) -> map[string, any] {
-    # inside fn — mutation allowed on collection contents
+func build_state(name: string, extras: map[string, any]) map[string, any] {
+    # inside func — mutation allowed on collection contents
     let state = {"name": name, "enabled": true}
     for k, v in extras {
         state[k] = v
@@ -761,16 +777,16 @@ Functions are for data transformation, string manipulation, and any logic
 that builds up values for use in declarations:
 
 ```
-fn base_packages(extra: list[string] = []) -> list[string] {
+func base_packages(extra: list[string] = []) list[string] {
     let base = ["curl", "htop", "vim", "tmux"]
     return base + extra
 }
 
-fn build_dhcp_config(
+func build_dhcp_config(
     dhcp: map[string, string],
     dns: list[string]? = none,
     domain: string? = none,
-) -> map[string, any] {
+) map[string, any] {
     let cfg = {
         "mode": "SERVER",
         "ipAddressRange": {"start": dhcp["start"], "end": dhcp["end"]},
@@ -958,10 +974,10 @@ enum HttpMethod  { GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS }
 Defined in `std`, consumed by the engine from top-level scope:
 
 ```
-type Target        { ... }   # opaque, produced by target.* steps
-type Deploy        { ... }   # opaque, produced by std.deploy
-type SecretsConfig { ... }   # opaque, produced by std.secrets
-type StepInstance  { ... }   # opaque, produced by desired-state steps
+struct Target        { ... }   # opaque, produced by target.* steps
+struct Deploy        { ... }   # opaque, produced by std.deploy
+struct SecretsConfig { ... }   # opaque, produced by std.secrets
+struct StepInstance  { ... }   # opaque, produced by desired-state steps
 ```
 
 ### 7.3 Target, deploy, secrets stubs
@@ -969,35 +985,33 @@ type StepInstance  { ... }   # opaque, produced by desired-state steps
 ```
 # std/target.scampi
 
-step ssh -> Target {
-    name:     string
-    host:     string
-    user:     string
-    port:     int = 22
-    key:      string?
-    insecure: bool = false
-    timeout:  string = "5s"
-}
+step ssh(
+    name:     string,
+    host:     string,
+    user:     string,
+    port:     int = 22,
+    key:      string?,
+    insecure: bool = false,
+    timeout:  string = "5s",
+) Target
 
-step local -> Target {
-    name: string
-}
+step local(name: string) Target
 
-step rest -> Target {
-    name:     string
-    base_url: string
-    auth:     Auth = rest.no_auth {}
-    tls:      TLS  = rest.tls.secure {}
-}
+step rest(
+    name:     string,
+    base_url: string,
+    auth:     Auth = rest.no_auth {},
+    tls:      TLS  = rest.tls.secure {},
+) Target
 ```
 
 ```
-# std/deploy.scampi (stub with body)
+# std/deploy.scampi
 
-step deploy -> Deploy {
-    name:    string
-    targets: list[Target]
-    ---
+step deploy(
+    name:    string,
+    targets: list[Target],
+) Deploy {
     # body: let bindings + bare step invocations
     # bare step invocations produce desired state
 }
@@ -1006,10 +1020,10 @@ step deploy -> Deploy {
 ```
 # std/secrets.scampi
 
-step secrets -> SecretsConfig {
-    backend: string
-    path:    string
-}
+step secrets(
+    backend: string,
+    path:    string,
+) SecretsConfig
 ```
 
 ### 7.4 Desired-state step stubs
@@ -1023,170 +1037,170 @@ shown on each stub.
 # File operations
 # ---------------------------------------------------------------------------
 
-step copy {
-    src:    Source
-    dest:   string
-    perm:   string
-    owner:  string
-    group:  string
-    verify: string?
-    desc:   string?
-}
+step copy(
+    src:    Source,
+    dest:   string,
+    perm:   string,
+    owner:  string,
+    group:  string,
+    verify: string?,
+    desc:   string?,
+) StepInstance
 
-step dir {
-    path:  string
-    perm:  string?
-    owner: string?
-    group: string?
-    desc:  string?
-}
+step dir(
+    path:  string,
+    perm:  string?,
+    owner: string?,
+    group: string?,
+    desc:  string?,
+) StepInstance
 
-step symlink {
-    target: string
-    link:   string
-    desc:   string?
-}
+step symlink(
+    target: string,
+    link:   string,
+    desc:   string?,
+) StepInstance
 
-type TemplateData {
+struct TemplateData {
     values: map[string, any] = {}
     env:    map[string, string] = {}
 }
 
-step template {
-    src:    Source
-    dest:   string
-    data:   TemplateData?
-    perm:   string
-    owner:  string
-    group:  string
-    verify: string?
-    desc:   string?
-}
+step template(
+    src:    Source,
+    dest:   string,
+    data:   TemplateData?,
+    perm:   string,
+    owner:  string,
+    group:  string,
+    verify: string?,
+    desc:   string?,
+) StepInstance
 
-step unarchive {
-    src:   Source
-    dest:  string
-    depth: int = 0
-    owner: string?
-    group: string?
-    perm:  string?
-    desc:  string?
-}
+step unarchive(
+    src:   Source,
+    dest:  string,
+    depth: int = 0,
+    owner: string?,
+    group: string?,
+    perm:  string?,
+    desc:  string?,
+) StepInstance
 
 # Package management
 # ---------------------------------------------------------------------------
 
-step pkg {
-    packages: list[string]
-    source:   PkgSource
-    state:    PkgState = PkgState.present
-    desc:     string?
-}
+step pkg(
+    packages: list[string],
+    source:   PkgSource,
+    state:    PkgState = PkgState.present,
+    desc:     string?,
+) StepInstance
 
 # Service management
 # ---------------------------------------------------------------------------
 
-step service {
-    name:    string
-    state:   SvcState = SvcState.running
-    enabled: bool = true
-    desc:    string?
-}
+step service(
+    name:    string,
+    state:   SvcState = SvcState.running,
+    enabled: bool = true,
+    desc:    string?,
+) StepInstance
 
 # User and group management
 # ---------------------------------------------------------------------------
 
-step user {
-    name:     string
-    state:    UserState = UserState.present
-    shell:    string?
-    home:     string?
-    system:   bool = false
-    password: string?
-    groups:   list[string] = []
-    desc:     string?
-}
+step user(
+    name:     string,
+    state:    UserState = UserState.present,
+    shell:    string?,
+    home:     string?,
+    system:   bool = false,
+    password: string?,
+    groups:   list[string] = [],
+    desc:     string?,
+) StepInstance
 
-step group {
-    name:   string
-    state:  GroupState = GroupState.present
-    gid:    int?
-    system: bool = false
-    desc:   string?
-}
+step group(
+    name:   string,
+    state:  GroupState = GroupState.present,
+    gid:    int?,
+    system: bool = false,
+    desc:   string?,
+) StepInstance
 
 # System configuration
 # ---------------------------------------------------------------------------
 
-step sysctl {
-    key:     string
-    value:   string
-    persist: bool = true
-    desc:    string?
-}
+step sysctl(
+    key:     string,
+    value:   string,
+    persist: bool = true,
+    desc:    string?,
+) StepInstance
 
-step mount {
-    src:   string
-    dest:  string
-    type:  FsType
-    opts:  string = "defaults"
-    state: MountState = MountState.mounted
-    desc:  string?
-}
+step mount(
+    src:   string,
+    dest:  string,
+    type:  FsType,
+    opts:  string = "defaults",
+    state: MountState = MountState.mounted,
+    desc:  string?,
+) StepInstance
 
-step firewall {
-    port:   string
-    action: FwAction = FwAction.allow
-    desc:   string?
-}
+step firewall(
+    port:   string,
+    action: FwAction = FwAction.allow,
+    desc:   string?,
+) StepInstance
 
 # Command execution
 # ---------------------------------------------------------------------------
 
-step run {
-    apply:  string
-    check:  string?       # mutually exclusive with always
-    always: bool = false  # mutually exclusive with check
-    desc:   string?
-}
+step run(
+    apply:  string,
+    check:  string?,       # mutually exclusive with always
+    always: bool = false,  # mutually exclusive with check
+    desc:   string?,
+) StepInstance
 
 # Container management (in std/container)
 # ---------------------------------------------------------------------------
 
-step container.instance {
-    name:        string
-    image:       string
-    state:       CtrState = CtrState.running
-    restart:     CtrRestart = CtrRestart.unless_stopped
-    ports:       list[string]?
-    env:         map[string, string]?
-    mounts:      list[string]?
-    args:        list[string]?
-    labels:      map[string, string]?
-    healthcheck: Healthcheck?
-    desc:        string?
-}
+step container.instance(
+    name:        string,
+    image:       string,
+    state:       CtrState = CtrState.running,
+    restart:     CtrRestart = CtrRestart.unless_stopped,
+    ports:       list[string]?,
+    env:         map[string, string]?,
+    mounts:      list[string]?,
+    args:        list[string]?,
+    labels:      map[string, string]?,
+    healthcheck: Healthcheck?,
+    desc:        string?,
+) StepInstance
 
 # REST (in std/rest)
 # ---------------------------------------------------------------------------
 
-step rest.request {
-    method:  HttpMethod
-    path:    string
-    headers: map[string, string]?
-    body:    Body?
-    check:   Check?
-    desc:    string?
-}
+step rest.request(
+    method:  HttpMethod,
+    path:    string,
+    headers: map[string, string]?,
+    body:    Body?,
+    check:   Check?,
+    desc:    string?,
+) StepInstance
 
-step rest.resource {
-    query:    rest.request
-    missing:  rest.request?
-    found:    rest.request?
-    bindings: map[string, Check]?
-    state:    map[string, any]?
-    desc:     string?
-}
+step rest.resource(
+    query:    rest.request,
+    missing:  rest.request?,
+    found:    rest.request?,
+    bindings: map[string, Check]?,
+    state:    map[string, any]?,
+    desc:     string?,
+) StepInstance
 ```
 
 ---
@@ -1512,18 +1526,14 @@ std.deploy {
 import "std"
 import "codeberg.org/scampi-dev/infra/targets"
 
-type TeamMember {
+struct TeamMember {
     name:   string
     groups: list[string]
     shell:  string = "/bin/bash"
     admin:  bool = false
 }
 
-step create_user {
-    member: TeamMember
-
-    ---
-
+step create_user(member: TeamMember) StepInstance {
     std.user {
         name   = self.member.name
         groups = self.member.groups
@@ -1569,13 +1579,13 @@ std.deploy {
 
 ### 8.7 UniFi module — network management
 
-This example shows `fn` with mutable collection contents — the imperative
+This example shows `func` with mutable collection contents — the imperative
 data-building pattern that is only allowed inside function bodies.
 
 ```
 import "codeberg.org/scampi-dev/modules/unifi/api"
 
-fn network(
+func network(
     site_id:   string,
     name:      string,
     vlan_id:   int,
@@ -1589,7 +1599,7 @@ fn network(
     mdns:      bool = false,
     enabled:   bool = true,
     desc:      string? = none,
-) -> map[string, any] {
+) map[string, any] {
     let parts = subnet.split("/")
     let prefix = if parts.len() > 1 { int(parts[1]) } else { 24 }
 
@@ -1632,7 +1642,7 @@ fn network(
     }
 }
 
-# Consumer uses the fn result in a frozen deploy context
+# Consumer uses the func result in a frozen deploy context
 import "std"
 import "std/rest"
 import "std/target"
@@ -1727,18 +1737,18 @@ suggesting the fix.
 
 Explicitly excluded:
 
-| Feature                  | Why                                                                 |
-| ------------------------ | ------------------------------------------------------------------- |
-| Exceptions / try-catch   | Steps converge or fail — the engine handles failure                 |
-| Concurrency              | The DAG scheduler handles parallelism                               |
-| Classes / inheritance    | Structs + step compositions cover all use cases                     |
-| Dynamic attribute access | Prevents sound rename/refactor in LSP                               |
-| Eval / exec / reflection | Breaks static analysis                                              |
-| Null (general purpose)   | `none` only exists for optional types                               |
-| Generics                 | Not needed — collection types are built-in                          |
-| Pattern matching         | `if`/`else` chains are sufficient for v1                            |
-| Operator overloading     | Complexity without benefit for config language                      |
-| Mutable bindings         | `let` names are immutable. Collection mutation only in `fn` bodies. |
+| Feature                  | Why                                                                   |
+| ------------------------ | --------------------------------------------------------------------- |
+| Exceptions / try-catch   | Steps converge or fail — the engine handles failure                   |
+| Concurrency              | The DAG scheduler handles parallelism                                 |
+| Classes / inheritance    | Structs + step compositions cover all use cases                       |
+| Dynamic attribute access | Prevents sound rename/refactor in LSP                                 |
+| Eval / exec / reflection | Breaks static analysis                                                |
+| Null (general purpose)   | `none` only exists for optional types                                 |
+| Generics                 | Not needed — collection types are built-in                            |
+| Pattern matching         | `if`/`else` chains are sufficient for v1                              |
+| Operator overloading     | Complexity without benefit for config language                        |
+| Mutable bindings         | `let` names are immutable. Collection mutation only in `func` bodies. |
 
 ---
 
@@ -1751,11 +1761,11 @@ use_decl       = 'use' use_path ('as' IDENT)? ;
 use_path       = (IDENT '.')* (IDENT | '*')
                | STRING ('.' (IDENT | '*'))? ;
 
-declaration    = step_decl | type_decl | enum_decl | fn_decl ;
+declaration    = step_decl | struct_decl | enum_decl | fn_decl ;
 
-step_decl      = 'step' dotted_name ('->' type_expr)?
-                 '{' field_defs ('---' block_body)? '}' ;
-type_decl      = 'type' IDENT '{' field_defs '}' ;
+step_decl      = 'step' dotted_name '(' params ')' type_expr?
+                 ('{' block_body '}')? ;
+struct_decl    = 'struct' IDENT '{' field_defs '}' ;
 enum_decl      = 'enum' IDENT '{' (IDENT ',')* '}' ;
 
 field_defs     = (IDENT ':' type_expr ('=' expr)?)* ;
@@ -1774,7 +1784,7 @@ if_stmt        = 'if' expr '{' block_body '}' ('else' (if_stmt | '{' block_body 
 
 block_body     = (statement | step_inst)* ;
 
-fn_decl        = 'fn' IDENT '(' params ')' ('->' type_expr)? '{' fn_body '}' ;
+fn_decl        = 'func' IDENT '(' params ')' type_expr? '{' fn_body '}' ;
 params         = (IDENT ':' type_expr ('=' expr)? ',')* ;
 fn_body        = (let_stmt | for_stmt | if_stmt | return_stmt | expr)* ;
 return_stmt    = 'return' expr ;
