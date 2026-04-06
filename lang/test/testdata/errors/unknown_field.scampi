@@ -1,0 +1,3 @@
+import "std"
+
+std.pkg { packages = ["nginx"], source = std.system {}, bogus = "oops" }

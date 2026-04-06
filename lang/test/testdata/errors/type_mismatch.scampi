@@ -1,0 +1,3 @@
+import "std"
+
+std.pkg { packages = 42, source = std.system {} }
