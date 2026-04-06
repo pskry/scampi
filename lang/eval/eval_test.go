@@ -37,17 +37,24 @@ func evalSrc(t *testing.T, src string) *Result {
 // -----------------------------------------------------------------------------
 
 func TestEvalLetString(t *testing.T) {
-	r := evalSrc(t, `let x = "hello"`)
+	r := evalSrc(t, `
+module main
+let x = "hello"
+`)
 	_ = r
 }
 
 func TestEvalLetInt(t *testing.T) {
-	r := evalSrc(t, `let x = 42`)
+	r := evalSrc(t, `
+module main
+let x = 42
+`)
 	_ = r
 }
 
 func TestEvalLetArithmetic(t *testing.T) {
 	src := `
+module main
 let a = 10
 let b = 3
 let sum = a + b
@@ -62,6 +69,7 @@ let prod = a * b
 
 func TestEvalStringInterp(t *testing.T) {
 	src := `
+module main
 let name = "world"
 let greeting = "hello ${name}!"
 `
@@ -73,13 +81,19 @@ let greeting = "hello ${name}!"
 // -----------------------------------------------------------------------------
 
 func TestEvalList(t *testing.T) {
-	src := `let xs = [1, 2, 3]`
+	src := `
+module main
+let xs = [1, 2, 3]
+`
 	r := evalSrc(t, src)
 	_ = r
 }
 
 func TestEvalMap(t *testing.T) {
-	src := `let m = {"a": 1, "b": 2}`
+	src := `
+module main
+let m = {"a": 1, "b": 2}
+`
 	r := evalSrc(t, src)
 	_ = r
 }
@@ -89,6 +103,7 @@ func TestEvalMap(t *testing.T) {
 
 func TestEvalStructLit(t *testing.T) {
 	src := `
+module main
 struct User {
   name: string
   admin: bool = false
@@ -104,6 +119,7 @@ let u = User { name = "alice" }
 
 func TestEvalFuncCall(t *testing.T) {
 	src := `
+module main
 func add(a: int, b: int) int {
   return a + b
 }
@@ -118,6 +134,7 @@ let result = add(1, 2)
 
 func TestEvalSecrets(t *testing.T) {
 	src := `
+module main
 import "std"
 std.secrets { backend = "file", path = "secrets.json" }
 `
@@ -138,6 +155,7 @@ std.secrets { backend = "file", path = "secrets.json" }
 
 func TestEvalTarget(t *testing.T) {
 	src := `
+module main
 import "std"
 import "std/target"
 let vps = target.ssh { name = "vps", host = "10.0.0.1", user = "root" }
@@ -159,6 +177,7 @@ let vps = target.ssh { name = "vps", host = "10.0.0.1", user = "root" }
 
 func TestEvalForLoop(t *testing.T) {
 	src := `
+module main
 let xs = [1, 2, 3]
 let doubled = [x * 2 for x in xs]
 `
@@ -171,6 +190,7 @@ let doubled = [x * 2 for x in xs]
 
 func TestEvalIfExpr(t *testing.T) {
 	src := `
+module main
 let x = 10
 let label = if x > 5 { "big" } else { "small" }
 `
@@ -183,6 +203,7 @@ let label = if x > 5 { "big" } else { "small" }
 
 func TestEvalBoolOps(t *testing.T) {
 	src := `
+module main
 let a = true && false
 let b = true || false
 let c = !true
@@ -196,6 +217,7 @@ let c = !true
 
 func TestEvalInOperator(t *testing.T) {
 	src := `
+module main
 let xs = ["a", "b", "c"]
 let found = "b" in xs
 `

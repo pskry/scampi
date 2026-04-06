@@ -1,3 +1,5 @@
+module main
+
 func build(name: string, flag: bool) map[string, any] {
   let state = {
     "name": name,

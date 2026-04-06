@@ -1,3 +1,5 @@
+module main
+
 import "std"
 
 step create_user(name: string, shell: string = "/bin/bash") StepInstance {

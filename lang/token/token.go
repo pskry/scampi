@@ -28,6 +28,7 @@ const (
 	RInterp // matching } that closes an interpolation
 
 	// Keywords
+	Module
 	Import
 	Let
 	Func
@@ -110,6 +111,7 @@ func (k Kind) EndsStatement() bool {
 // Keywords maps source text to keyword kinds. Identifiers that do not
 // match an entry here are returned as Ident.
 var Keywords = map[string]Kind{
+	"module": Module,
 	"import": Import,
 	"let":    Let,
 	"func":   Func,

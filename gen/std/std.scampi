@@ -1,17 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
-enum ContainerInstanceState { running, stopped, absent }
-enum ContainerInstanceRestart { always, on-failure, unless-stopped, no }
+module std
+
 enum FirewallAction { allow, deny, reject }
+enum UserState { present, absent }
+enum ContainerInstanceRestart { always, on-failure, unless-stopped, no }
+enum ContainerInstanceState { running, stopped, absent }
+enum PkgState { present, absent, latest }
 enum GroupState { present, absent }
 enum MountType { nfs, nfs4, cifs, ext4, xfs, btrfs, tmpfs, glusterfs, ceph }
 enum MountState { mounted, unmounted, absent }
-enum PkgState { present, absent, latest }
-enum UserState { present, absent }
 enum ServiceState { running, stopped, restarted, reloaded }
-
-# Manage container lifecycle: running, stopped, or absent
-step container.instance(name: string, image: string, state: ContainerInstanceState = ContainerInstanceState.running, restart: ContainerInstanceRestart = ContainerInstanceRestart.unless-stopped, ports: list[any]?, env: map[string, string]?, mounts: list[any]?, args: list[string]?, labels: map[string, string]?, healthcheck: Healthcheck?, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
 # Copy files with owner and permission management
 step copy(src: Source, dest: string, perm: string, owner: string, group: string, verify: string?, desc: string?, on_change: list[StepInstance] = []) StepInstance
@@ -19,32 +18,29 @@ step copy(src: Source, dest: string, perm: string, owner: string, group: string,
 # Ensure a directory exists with optional permissions and ownership
 step dir(path: string, perm: string?, owner: string?, group: string?, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
+# Manage firewall rules via UFW or firewalld
+step firewall(port: string, action: FirewallAction = FirewallAction.allow, desc: string?, on_change: list[StepInstance] = []) StepInstance
+
 # Manage kernel parameters via sysctl with optional persistence
 step sysctl(key: string, value: string, persist: bool = true, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
-# Render templates with data substitution and owner/permission management
-step template(src: Source, dest: string, data: any?, perm: string, owner: string, group: string, verify: string?, desc: string?, on_change: list[StepInstance] = []) StepInstance
+# Ensure a user account exists or is absent on the target
+step user(name: string, state: UserState = UserState.present, shell: string?, home: string?, system: bool?, password: string?, groups: list[string]?, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
-# Extract an archive to a target directory with optional recursive unpacking
-step unarchive(src: Source, dest: string, depth: int? = 0, owner: string?, group: string?, perm: string?, desc: string?, on_change: list[StepInstance] = []) StepInstance
+# Manage container lifecycle: running, stopped, or absent
+step container.instance(name: string, image: string, state: ContainerInstanceState = ContainerInstanceState.running, restart: ContainerInstanceRestart = ContainerInstanceRestart.unless-stopped, ports: list[any]?, env: map[string, string]?, mounts: list[any]?, args: list[string]?, labels: map[string, string]?, healthcheck: Healthcheck?, desc: string?, on_change: list[StepInstance] = []) StepInstance
+
+# Make an HTTP request against a REST target
+step rest.request(method: string, path: string, headers: map[string, string]?, body: any?, check: any?, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
 # Run an arbitrary shell command with optional check for idempotency
 step run(apply: string, check: string?, always: bool? = false, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
-# Manage firewall rules via UFW or firewalld
-step firewall(port: string, action: FirewallAction = FirewallAction.allow, desc: string?, on_change: list[StepInstance] = []) StepInstance
-
-# Ensure a group exists or is absent on the target
-step group(name: string, state: GroupState = GroupState.present, gid: int?, system: bool?, desc: string?, on_change: list[StepInstance] = []) StepInstance
-
-# Manage filesystem mounts and fstab entries
-step mount(src: string, dest: string, type: MountType, opts: string? = "defaults", state: MountState? = MountState.mounted, desc: string?, on_change: list[StepInstance] = []) StepInstance
+# Render templates with data substitution and owner/permission management
+step template(src: Source, dest: string, data: any?, perm: string, owner: string, group: string, verify: string?, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
 # Ensure packages are present, absent, or at the latest version on the target
 step pkg(packages: list[string], state: PkgState = PkgState.present, source: PkgSource, desc: string?, on_change: list[StepInstance] = []) StepInstance
-
-# Make an HTTP request against a REST target
-step rest.request(method: string, path: string, headers: map[string, string]?, body: any?, check: any?, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
 # Declarative REST resource management with query/found/missing
 step rest.resource(query: any?, missing: any?, found: any?, bindings: map[string, any?]?, state: map[string, any]?, desc: string?, on_change: list[StepInstance] = []) StepInstance
@@ -52,11 +48,17 @@ step rest.resource(query: any?, missing: any?, found: any?, bindings: map[string
 # Create and manage symbolic links
 step symlink(target: string, link: string, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
-# Ensure a user account exists or is absent on the target
-step user(name: string, state: UserState = UserState.present, shell: string?, home: string?, system: bool?, password: string?, groups: list[string]?, desc: string?, on_change: list[StepInstance] = []) StepInstance
+# Ensure a group exists or is absent on the target
+step group(name: string, state: GroupState = GroupState.present, gid: int?, system: bool?, desc: string?, on_change: list[StepInstance] = []) StepInstance
+
+# Manage filesystem mounts and fstab entries
+step mount(src: string, dest: string, type: MountType, opts: string? = "defaults", state: MountState? = MountState.mounted, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
 # Manage service state: running, stopped, restarted, or reloaded
 step service(name: string, state: ServiceState = ServiceState.running, enabled: bool = true, desc: string?, on_change: list[StepInstance] = []) StepInstance
+
+# Extract an archive to a target directory with optional recursive unpacking
+step unarchive(src: Source, dest: string, depth: int? = 0, owner: string?, group: string?, perm: string?, desc: string?, on_change: list[StepInstance] = []) StepInstance
 
 step local(desc: string?, on_change: list[StepInstance] = []) Target
 

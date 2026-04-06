@@ -9,6 +9,25 @@ import (
 	"scampi.dev/scampi/lang/token"
 )
 
+// parseModule parses `module <name>` at the top of a file.
+func (p *Parser) parseModule() *ast.ModuleDecl {
+	start := p.cur.Pos
+	p.advance() // 'module'
+	name := p.parseIdent("module name")
+	if name == nil {
+		p.synchronize()
+		return nil
+	}
+	end := name.SrcSpan.End
+	if p.cur.Kind == token.Semi {
+		p.advance()
+	}
+	return &ast.ModuleDecl{
+		Name:    name,
+		SrcSpan: token.Span{Start: start, End: end},
+	}
+}
+
 // parseImport parses an import declaration:
 //
 //	import "path"

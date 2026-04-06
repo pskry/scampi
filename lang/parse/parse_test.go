@@ -29,7 +29,7 @@ func parseFile(t *testing.T, src string) *ast.File {
 // let-binding to make the grammar happy, then extracts the value).
 func parseExprOnly(t *testing.T, src string) ast.Expr {
 	t.Helper()
-	f := parseFile(t, "let x = "+src)
+	f := parseFile(t, "module main\nlet x = "+src)
 	if len(f.Decls) != 1 {
 		t.Fatalf("expected 1 decl, got %d", len(f.Decls))
 	}
@@ -44,7 +44,10 @@ func parseExprOnly(t *testing.T, src string) ast.Expr {
 // -----------------------------------------------------------------------------
 
 func TestParseImport(t *testing.T) {
-	f := parseFile(t, `import "std"`)
+	f := parseFile(t, `
+module main
+import "std"
+`)
 	if len(f.Imports) != 1 {
 		t.Fatalf("expected 1 import, got %d", len(f.Imports))
 	}
@@ -55,6 +58,7 @@ func TestParseImport(t *testing.T) {
 
 func TestParseMultipleImports(t *testing.T) {
 	f := parseFile(t, `
+module main
 import "std"
 import "std/rest"
 import "codeberg.org/scampi-dev/modules/unifi"
@@ -75,6 +79,7 @@ import "codeberg.org/scampi-dev/modules/unifi"
 
 func TestParseStruct(t *testing.T) {
 	f := parseFile(t, `
+module main
 struct User {
     name: string
     groups: list[string] = []
@@ -106,7 +111,10 @@ struct User {
 // -----------------------------------------------------------------------------
 
 func TestParseEnum(t *testing.T) {
-	f := parseFile(t, `enum PkgState { present, absent, latest }`)
+	f := parseFile(t, `
+module main
+enum PkgState { present, absent, latest }
+`)
 	e := f.Decls[0].(*ast.EnumDecl)
 	if e.Name.Name != "PkgState" {
 		t.Errorf("enum name: got %q", e.Name.Name)
@@ -127,6 +135,7 @@ func TestParseEnum(t *testing.T) {
 
 func TestParseFunc(t *testing.T) {
 	f := parseFile(t, `
+module main
 func build_url(host: string, path: string = "/") string {
     return "done"
 }
@@ -160,6 +169,7 @@ func build_url(host: string, path: string = "/") string {
 
 func TestParseStepWithBody(t *testing.T) {
 	f := parseFile(t, `
+module main
 step create_user(name: string, shell: string = "/bin/bash") StepInstance {
     std.user { name = self.name, shell = self.shell }
 }
@@ -178,6 +188,7 @@ step create_user(name: string, shell: string = "/bin/bash") StepInstance {
 
 func TestParseStepStub(t *testing.T) {
 	f := parseFile(t, `
+module main
 step pkg(packages: list[string], state: PkgState = PkgState.present) StepInstance
 `)
 	s := f.Decls[0].(*ast.StepDecl)
@@ -190,7 +201,10 @@ step pkg(packages: list[string], state: PkgState = PkgState.present) StepInstanc
 }
 
 func TestParseStepDottedName(t *testing.T) {
-	f := parseFile(t, `step container.instance(name: string) StepInstance`)
+	f := parseFile(t, `
+module main
+step container.instance(name: string) StepInstance
+`)
 	s := f.Decls[0].(*ast.StepDecl)
 	if len(s.Name.Parts) != 2 {
 		t.Fatalf("expected dotted name with 2 parts, got %d", len(s.Name.Parts))
@@ -204,7 +218,10 @@ func TestParseStepDottedName(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestParseLet(t *testing.T) {
-	f := parseFile(t, `let version = "1.2.3"`)
+	f := parseFile(t, `
+module main
+let version = "1.2.3"
+`)
 	d := f.Decls[0].(*ast.LetDecl)
 	if d.Name.Name != "version" {
 		t.Errorf("let name: %q", d.Name.Name)
@@ -215,7 +232,10 @@ func TestParseLet(t *testing.T) {
 }
 
 func TestParseLetWithType(t *testing.T) {
-	f := parseFile(t, `let n: int = 42`)
+	f := parseFile(t, `
+module main
+let n: int = 42
+`)
 	d := f.Decls[0].(*ast.LetDecl)
 	if d.Type == nil {
 		t.Error("let should have type annotation")
@@ -358,6 +378,7 @@ func TestParseListComp(t *testing.T) {
 
 func TestParseForStmt(t *testing.T) {
 	f := parseFile(t, `
+module main
 func f() list[int] {
     for x in xs {
         x + 1
@@ -373,6 +394,7 @@ func f() list[int] {
 
 func TestParseIfStmt(t *testing.T) {
 	f := parseFile(t, `
+module main
 func f() int {
     if x > 0 {
         return 1
@@ -395,7 +417,10 @@ func f() int {
 // -----------------------------------------------------------------------------
 
 func TestParseOptionalType(t *testing.T) {
-	f := parseFile(t, `struct X { name: string? }`)
+	f := parseFile(t, `
+module main
+struct X { name: string? }
+`)
 	s := f.Decls[0].(*ast.StructDecl)
 	if _, ok := s.Fields[0].Type.(*ast.OptionalType); !ok {
 		t.Errorf("expected OptionalType, got %T", s.Fields[0].Type)
@@ -403,7 +428,10 @@ func TestParseOptionalType(t *testing.T) {
 }
 
 func TestParseGenericType(t *testing.T) {
-	f := parseFile(t, `struct X { xs: list[string] }`)
+	f := parseFile(t, `
+module main
+struct X { xs: list[string] }
+`)
 	s := f.Decls[0].(*ast.StructDecl)
 	if _, ok := s.Fields[0].Type.(*ast.GenericType); !ok {
 		t.Errorf("expected GenericType, got %T", s.Fields[0].Type)
@@ -411,7 +439,10 @@ func TestParseGenericType(t *testing.T) {
 }
 
 func TestParseMapType(t *testing.T) {
-	f := parseFile(t, `struct X { m: map[string, int] }`)
+	f := parseFile(t, `
+module main
+struct X { m: map[string, int] }
+`)
 	s := f.Decls[0].(*ast.StructDecl)
 	gt, ok := s.Fields[0].Type.(*ast.GenericType)
 	if !ok {
@@ -427,6 +458,7 @@ func TestParseMapType(t *testing.T) {
 
 func TestParseRealSnippet(t *testing.T) {
 	src := `
+module main
 import "std"
 
 let vps_host = std.secret("vps.host")

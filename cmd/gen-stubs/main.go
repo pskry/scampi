@@ -48,7 +48,7 @@ func main() {
 	}
 	defer func() { _ = f.Close() }()
 
-	if err := langstubs.Generate(inputs, langstubs.Options{}, f); err != nil {
+	if err := langstubs.Generate("std", inputs, langstubs.Options{}, f); err != nil {
 		panic(err)
 	}
 }

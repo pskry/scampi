@@ -16,11 +16,11 @@ The language has three conceptual layers:
 3. **Generation logic** — loops, conditionals, functions, and data transforms
    that exist solely to produce declarations
 
-**The language core is minimal.** ~16 keywords: declarations (`type`,
-`enum`, `step`, `func`), bindings (`let`), modules (`import`), control
-flow (`for`, `in`, `if`, `else`, `return`), values (`true`, `false`,
-`none`, `self`). Logic via operators (`&&`, `||`, `!`). No special
-syntax for hooks, targets, deploys, or any other scampi concept —
+**The language core is minimal.** ~17 keywords: declarations (`struct`,
+`enum`, `step`, `func`), bindings (`let`), modules (`module`, `import`),
+control flow (`for`, `in`, `if`, `else`, `return`), values (`true`,
+`false`, `none`, `self`). Logic via operators (`&&`, `||`, `!`). No
+special syntax for hooks, targets, deploys, or any other scampi concept —
 everything domain-specific lives in `std`.
 
 ## Design principles
@@ -64,9 +64,10 @@ Source files are UTF-8. No BOM.
 ### 1.3 Keywords
 
 ```
-import  let     func    step    struct  enum
-for     in      if      else    true    false
-none    self    return
+module  import  let     return
+func    step    struct  enum
+for     in      if      else
+true    false   none    self
 ```
 
 ### 1.4 Identifiers
@@ -262,7 +263,23 @@ or similar.
 
 ## 3. Module system
 
-### 3.1 Imports
+### 3.1 Module declaration
+
+Every `.scampi` file must start with a `module` declaration:
+
+```
+module main
+```
+
+The module name declares what this file belongs to:
+
+- `module main` — entry-point file. Can be passed to `scampi apply`.
+- Any other name — library module. Importable but not directly runnable.
+
+All files in the same directory must declare the same module name
+(like Go's `package` statement). A mismatch is a compile error.
+
+### 3.2 Imports
 
 ```
 import "std"

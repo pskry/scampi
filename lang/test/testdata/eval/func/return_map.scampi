@@ -1,3 +1,5 @@
+module main
+
 func build(name: string, value: int) map[string, any] {
   return {"name": name, "value": value, "nested": {"inner": true}}
 }

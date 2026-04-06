@@ -1,3 +1,5 @@
+module main
+
 # Translated from .infra/site.scampi (inlined)
 
 import "std"

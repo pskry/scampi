@@ -19,6 +19,7 @@ type Node interface {
 // the order they appear in source.
 type File struct {
 	Name    string // filename (for diagnostics)
+	Module  *ModuleDecl
 	Imports []*ImportDecl
 	Decls   []Decl // top-level declarations
 	Stmts   []Stmt // top-level statements (step invocations)
@@ -37,6 +38,17 @@ type Decl interface {
 	Node
 	declNode()
 }
+
+// ModuleDecl is a `module <name>` declaration at the top of a file.
+// All files in a directory must agree on the module name.
+// `module main` marks an entry-point file for `scampi apply`.
+type ModuleDecl struct {
+	Name    *Ident
+	SrcSpan token.Span
+}
+
+func (d *ModuleDecl) Span() token.Span { return d.SrcSpan }
+func (*ModuleDecl) astNode()           {}
 
 // ImportDecl is an `import "path"` statement.
 type ImportDecl struct {

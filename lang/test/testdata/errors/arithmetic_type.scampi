@@ -1,1 +1,3 @@
+module main
+
 let x = "hello" - 1

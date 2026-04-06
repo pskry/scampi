@@ -1,3 +1,5 @@
+module main
+
 let fruits = ["apple", "banana", "cherry"]
 let has_banana = "banana" in fruits
 let has_grape = "grape" in fruits

@@ -1,3 +1,5 @@
+module main
+
 # Translated from .modules/unifi/client.scampi
 # Exercises: func with mutable maps, conditional key insertion,
 # string concatenation, REST resource composition.

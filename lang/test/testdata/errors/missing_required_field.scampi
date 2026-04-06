@@ -1,3 +1,5 @@
+module main
+
 import "std"
 
 std.copy { dest = "/tmp/foo" }

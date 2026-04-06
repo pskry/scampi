@@ -123,43 +123,67 @@ func (r *Resolver) Resolve(importPath string) *Module {
 		return m
 	}
 
-	// Find the source bytes.
-	src, err := r.readModule(importPath)
+	// Collect source files (one for single-file module, multiple for directory).
+	sources, err := r.readModule(importPath)
 	if err != nil {
 		r.errs = append(r.errs, Error{ImportPath: importPath, Msg: err.Error()})
 		return nil
 	}
 
-	// Parse.
-	l := lex.New(importPath, src)
-	p := parse.New(l)
-	f := p.Parse()
-	if errs := l.Errors(); len(errs) > 0 {
-		r.errs = append(r.errs, Error{ImportPath: importPath, Msg: errs[0].Error()})
-		return nil
-	}
-	if errs := p.Errors(); len(errs) > 0 {
-		r.errs = append(r.errs, Error{ImportPath: importPath, Msg: errs[0].Error()})
-		return nil
+	// Parse each file independently, merge scopes.
+	scope := check.NewScope(nil, check.ScopeFile)
+	var firstFile *ast.File
+	for _, src := range sources {
+		l := lex.New(importPath, src.data)
+		p := parse.New(l)
+		f := p.Parse()
+		if errs := l.Errors(); len(errs) > 0 {
+			r.errs = append(r.errs, Error{ImportPath: importPath, Msg: errs[0].Error()})
+			return nil
+		}
+		if errs := p.Errors(); len(errs) > 0 {
+			r.errs = append(r.errs, Error{ImportPath: importPath, Msg: errs[0].Error()})
+			return nil
+		}
+		c := check.New()
+		c.Check(f)
+		if errs := c.Errors(); len(errs) > 0 {
+			r.errs = append(r.errs, Error{ImportPath: importPath, Msg: errs[0].Error()})
+		}
+		r.mergeScope(scope, f)
+		if firstFile == nil {
+			firstFile = f
+		}
 	}
 
-	// Type-check (with this resolver for transitive imports).
-	c := check.New()
-	c.Check(f)
-	if errs := c.Errors(); len(errs) > 0 {
-		r.errs = append(r.errs, Error{ImportPath: importPath, Msg: errs[0].Error()})
-	}
-
-	// Build exported scope from the file's top-level declarations.
-	scope := r.buildScope(f)
-
-	m := &Module{Path: importPath, File: f, Scope: scope}
+	m := &Module{Path: importPath, File: firstFile, Scope: scope}
 	r.loaded[importPath] = m
 	return m
 }
 
-// readModule finds and reads the source file for an import path.
-func (r *Resolver) readModule(importPath string) ([]byte, error) {
+func (r *Resolver) mergeScope(into *check.Scope, f *ast.File) {
+	for _, d := range f.Decls {
+		switch d := d.(type) {
+		case *ast.StructDecl:
+			into.Define(&check.Symbol{Name: d.Name.Name, Kind: check.SymStruct, Span: d.SrcSpan})
+		case *ast.EnumDecl:
+			into.Define(&check.Symbol{Name: d.Name.Name, Kind: check.SymEnum, Span: d.SrcSpan})
+		case *ast.FuncDecl:
+			into.Define(&check.Symbol{Name: d.Name.Name, Kind: check.SymFunc, Span: d.SrcSpan})
+		case *ast.StepDecl:
+			into.Define(&check.Symbol{Name: d.Name.Parts[0].Name, Kind: check.SymStep, Span: d.SrcSpan})
+		case *ast.LetDecl:
+			into.Define(&check.Symbol{Name: d.Name.Name, Kind: check.SymLet, Span: d.SrcSpan})
+		}
+	}
+}
+
+type sourceFile struct {
+	name string
+	data []byte
+}
+
+func (r *Resolver) readModule(importPath string) ([]sourceFile, error) {
 	// Intra-project: import starts with this project's module path.
 	if strings.HasPrefix(importPath, r.cfg.ModulePath+"/") {
 		subpath := strings.TrimPrefix(importPath, r.cfg.ModulePath+"/")
@@ -215,12 +239,9 @@ func (r *Resolver) findDep(importPath string) *Dependency {
 	return best
 }
 
-// readFromFS tries to read a module from an fs.FS. Tries in order:
-//  1. <path>/ as a directory — reads all .scampi files, concatenated
-//  2. <path>.scampi as a single file
-//
-// Directory takes precedence (matches "directory = module" model).
-func (r *Resolver) readFromFS(fsys fs.FS, path string) ([]byte, error) {
+// readFromFS reads module source files. Directory takes precedence
+// over single file (matches "directory = module" model).
+func (r *Resolver) readFromFS(fsys fs.FS, path string) ([]sourceFile, error) {
 	if fsys == nil {
 		return nil, &ResolveError{Path: path, Err: ErrNoFS}
 	}
@@ -229,27 +250,23 @@ func (r *Resolver) readFromFS(fsys fs.FS, path string) ([]byte, error) {
 	if path == "" {
 		dirPath = "."
 	}
-	if data, err := r.readDir(fsys, dirPath); err == nil {
-		return data, nil
+	if files, err := r.readDir(fsys, dirPath); err == nil {
+		return files, nil
 	}
 
 	if data, err := fs.ReadFile(fsys, path+".scampi"); err == nil {
-		return data, nil
+		return []sourceFile{{name: path + ".scampi", data: data}}, nil
 	}
 
 	return nil, &ResolveError{Path: path, Err: ErrModuleNotFound}
 }
 
-// readDir reads all .scampi files in a directory and concatenates
-// them into a single source buffer. All files in the directory form
-// one module scope (like Go packages).
-func (r *Resolver) readDir(fsys fs.FS, dirPath string) ([]byte, error) {
+func (r *Resolver) readDir(fsys fs.FS, dirPath string) ([]sourceFile, error) {
 	entries, err := fs.ReadDir(fsys, dirPath)
 	if err != nil {
 		return nil, err
 	}
-	var combined []byte
-	found := false
+	var files []sourceFile
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".scampi") {
 			continue
@@ -262,16 +279,12 @@ func (r *Resolver) readDir(fsys fs.FS, dirPath string) ([]byte, error) {
 		if err != nil {
 			continue
 		}
-		if found {
-			combined = append(combined, '\n')
-		}
-		combined = append(combined, data...)
-		found = true
+		files = append(files, sourceFile{name: filePath, data: data})
 	}
-	if !found {
+	if len(files) == 0 {
 		return nil, &ResolveError{Path: dirPath, Err: ErrNoFiles}
 	}
-	return combined, nil
+	return files, nil
 }
 
 // buildScope creates a scope containing the file's top-level exported

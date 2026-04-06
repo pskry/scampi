@@ -12,7 +12,10 @@ import (
 func TestResolveIntraProject(t *testing.T) {
 	root := fstest.MapFS{
 		"targets.scampi": &fstest.MapFile{
-			Data: []byte(`let host = "10.0.0.1"`),
+			Data: []byte(`
+module targets
+let host = "10.0.0.1"
+`),
 		},
 	}
 	r := New(Config{
@@ -53,11 +56,12 @@ func TestResolveStdModule(t *testing.T) {
 }
 
 func TestResolveLocalDep(t *testing.T) {
-	// RootFS is rooted at the workspace level. LocalPath is
-	// pre-resolved by the caller (mod2/) to be relative to RootFS.
 	root := fstest.MapFS{
 		"modules/utils.scampi": &fstest.MapFile{
-			Data: []byte(`func helper() string { return "ok" }`),
+			Data: []byte(`
+module modules
+func helper() string { return "ok" }
+`),
 		},
 	}
 	r := New(Config{
@@ -86,7 +90,10 @@ func TestResolveLocalDep(t *testing.T) {
 func TestResolveRemoteDep(t *testing.T) {
 	cache := fstest.MapFS{
 		"example.com/lib@v2.0.0/core.scampi": &fstest.MapFile{
-			Data: []byte(`struct Config { name: string }`),
+			Data: []byte(`
+module lib
+struct Config { name: string }
+`),
 		},
 	}
 	r := New(Config{
@@ -126,7 +133,10 @@ func TestResolveNotFound(t *testing.T) {
 func TestResolveCached(t *testing.T) {
 	root := fstest.MapFS{
 		"utils.scampi": &fstest.MapFile{
-			Data: []byte(`let x = 1`),
+			Data: []byte(`
+module utils
+let x = 1
+`),
 		},
 	}
 	r := New(Config{
@@ -146,10 +156,16 @@ func TestResolveCached(t *testing.T) {
 func TestResolveDirectory(t *testing.T) {
 	root := fstest.MapFS{
 		"targets/ssh.scampi": &fstest.MapFile{
-			Data: []byte(`let vps_host = "10.0.0.1"`),
+			Data: []byte(`
+module targets
+let vps_host = "10.0.0.1"
+`),
 		},
 		"targets/rest.scampi": &fstest.MapFile{
-			Data: []byte(`let api_url = "https://api.example.com"`),
+			Data: []byte(`
+module targets
+let api_url = "https://api.example.com"
+`),
 		},
 	}
 	r := New(Config{
@@ -174,10 +190,16 @@ func TestResolveDirectory(t *testing.T) {
 func TestResolveDirPrecedence(t *testing.T) {
 	root := fstest.MapFS{
 		"targets/main.scampi": &fstest.MapFile{
-			Data: []byte(`let from_dir = true`),
+			Data: []byte(`
+module targets
+let from_dir = true
+`),
 		},
 		"targets.scampi": &fstest.MapFile{
-			Data: []byte(`let from_file = true`),
+			Data: []byte(`
+module targets
+let from_file = true
+`),
 		},
 	}
 	r := New(Config{

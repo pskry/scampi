@@ -43,13 +43,22 @@ func (p *Parser) Parse() *ast.File {
 	start := p.cur.Pos
 	f := &ast.File{Name: p.lex.Name()}
 
+	// Module declaration must be first.
+	p.skipSemis()
+	if p.cur.Kind == token.Module {
+		f.Module = p.parseModule()
+	} else {
+		p.errAt(
+			token.Span{Start: p.cur.Pos, End: p.cur.End},
+			"every file must start with a module declaration (e.g. module main)",
+		)
+	}
+
 	for p.cur.Kind != token.EOF {
-		// Skip stray semicolons between declarations.
 		if p.cur.Kind == token.Semi {
 			p.advance()
 			continue
 		}
-		// Imports must come before any other declaration/statement.
 		if p.cur.Kind == token.Import {
 			d := p.parseImport()
 			if d != nil {

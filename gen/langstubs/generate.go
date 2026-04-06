@@ -6,6 +6,7 @@
 package langstubs
 
 import (
+	"errors"
 	"io"
 	"reflect"
 	"strings"
@@ -19,15 +20,20 @@ type StubInput struct {
 	Enums      map[string][]string
 }
 
-// Options controls generator behavior.
+// Options controls optional generator behavior.
 type Options struct {
-	AutoGenNotice bool // prepend "Auto-generated" comment
+	AutoGenNotice bool
 }
 
-// Generate writes scampi-lang stub declarations for all inputs to w.
-func Generate(inputs []StubInput, opts Options, w io.Writer) error {
+// Generate writes scampi-lang stub declarations for the named module.
+func Generate(moduleName string, inputs []StubInput, opts Options, w io.Writer) error {
+	if moduleName == "" {
+		return errors.New("moduleName is required")
+	}
 	bw := &builder{w: w}
 
+	bw.line("module " + moduleName)
+	bw.line("")
 	if opts.AutoGenNotice {
 		bw.line("# Auto-generated from Go struct tags. Do not edit.")
 		bw.line("")

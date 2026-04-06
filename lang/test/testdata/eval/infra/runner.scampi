@@ -1,3 +1,5 @@
+module main
+
 # Translated from .infra/runner.scampi (inlined)
 
 import "std"

@@ -1,3 +1,5 @@
+module main
+
 struct User {
   name: string
   groups: list[string] = []

@@ -65,11 +65,17 @@ func searchStr(s, sub string) bool {
 // -----------------------------------------------------------------------------
 
 func TestCheckImportStd(t *testing.T) {
-	expectNoErrors(t, `import "std"`)
+	expectNoErrors(t, `
+module main
+import "std"
+`)
 }
 
 func TestCheckImportUnknown(t *testing.T) {
-	expectError(t, `import "nonexistent"`, "unknown module")
+	expectError(t, `
+module main
+import "nonexistent"
+`, "unknown module")
 }
 
 // Struct declarations
@@ -77,6 +83,7 @@ func TestCheckImportUnknown(t *testing.T) {
 
 func TestCheckStructWithPrimitiveFields(t *testing.T) {
 	expectNoErrors(t, `
+module main
 struct User {
     name: string
     age: int
@@ -87,6 +94,7 @@ struct User {
 
 func TestCheckStructWithOptionalField(t *testing.T) {
 	expectNoErrors(t, `
+module main
 struct Config {
     host: string
     port: int?
@@ -96,6 +104,7 @@ struct Config {
 
 func TestCheckStructWithGenericField(t *testing.T) {
 	expectNoErrors(t, `
+module main
 struct Team {
     members: list[string]
     meta: map[string, any]
@@ -105,6 +114,7 @@ struct Team {
 
 func TestCheckStructWithUnknownFieldType(t *testing.T) {
 	expectError(t, `
+module main
 struct Bad {
     x: NonExistentType
 }
@@ -115,11 +125,15 @@ struct Bad {
 // -----------------------------------------------------------------------------
 
 func TestCheckEnum(t *testing.T) {
-	expectNoErrors(t, `enum Color { red, green, blue }`)
+	expectNoErrors(t, `
+module main
+enum Color { red, green, blue }
+`)
 }
 
 func TestCheckEnumUsedAsFieldType(t *testing.T) {
 	expectNoErrors(t, `
+module main
 enum State { on, off }
 struct Switch {
     state: State
@@ -132,6 +146,7 @@ struct Switch {
 
 func TestCheckFuncDecl(t *testing.T) {
 	expectNoErrors(t, `
+module main
 func greet(name: string) string {
     return "hello"
 }
@@ -140,6 +155,7 @@ func greet(name: string) string {
 
 func TestCheckFuncWithOptionalParam(t *testing.T) {
 	expectNoErrors(t, `
+module main
 func f(x: string, y: int?) int {
     return 42
 }
@@ -151,6 +167,7 @@ func f(x: string, y: int?) int {
 
 func TestCheckStepDecl(t *testing.T) {
 	expectNoErrors(t, `
+module main
 import "std"
 
 step create_user(name: string, groups: list[string]) StepInstance {
@@ -161,6 +178,7 @@ step create_user(name: string, groups: list[string]) StepInstance {
 
 func TestCheckStepStub(t *testing.T) {
 	expectNoErrors(t, `
+module main
 step my_step(x: string, y: int) StepInstance
 `)
 }
@@ -169,7 +187,10 @@ step my_step(x: string, y: int) StepInstance
 // -----------------------------------------------------------------------------
 
 func TestCheckLetBinding(t *testing.T) {
-	expectNoErrors(t, `let x = 42`)
+	expectNoErrors(t, `
+module main
+let x = 42
+`)
 }
 
 // Type resolution

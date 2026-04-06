@@ -1,3 +1,5 @@
+module main
+
 # Translated from .infra/bootstrap.scampi (inlined)
 
 import "std"

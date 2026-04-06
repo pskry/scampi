@@ -1,2 +1,4 @@
+module main
+
 enum PkgState { present, absent, latest }
 enum Color { red, green, blue }

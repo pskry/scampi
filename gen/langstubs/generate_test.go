@@ -41,7 +41,7 @@ type testSSHConfig struct {
 
 func TestGenerateBasic(t *testing.T) {
 	var buf bytes.Buffer
-	err := Generate([]StubInput{
+	err := Generate("test", []StubInput{
 		{
 			Kind:       "pkg",
 			Config:     &testPkgConfig{},
@@ -64,7 +64,7 @@ func TestGenerateBasic(t *testing.T) {
 
 func TestGenerateNoEnums(t *testing.T) {
 	var buf bytes.Buffer
-	err := Generate([]StubInput{
+	err := Generate("test", []StubInput{
 		{
 			Kind:       "copy",
 			Config:     &testCopyConfig{},
@@ -84,7 +84,7 @@ func TestGenerateNoEnums(t *testing.T) {
 
 func TestGenerateTargetOutputType(t *testing.T) {
 	var buf bytes.Buffer
-	err := Generate([]StubInput{
+	err := Generate("test", []StubInput{
 		{
 			Kind:       "ssh",
 			Config:     &testSSHConfig{},
@@ -101,7 +101,7 @@ func TestGenerateTargetOutputType(t *testing.T) {
 
 func TestGenerateSummaryComment(t *testing.T) {
 	var buf bytes.Buffer
-	err := Generate([]StubInput{
+	err := Generate("test", []StubInput{
 		{Kind: "pkg", Config: &testPkgConfig{}, OutputType: "StepInstance"},
 	}, Options{}, &buf)
 	if err != nil {
@@ -112,7 +112,7 @@ func TestGenerateSummaryComment(t *testing.T) {
 
 func TestGenerateMultipleSteps(t *testing.T) {
 	var buf bytes.Buffer
-	err := Generate([]StubInput{
+	err := Generate("test", []StubInput{
 		{Kind: "pkg", Config: &testPkgConfig{}, OutputType: "StepInstance",
 			Enums: map[string][]string{"State": {"present", "absent"}}},
 		{Kind: "copy", Config: &testCopyConfig{}, OutputType: "StepInstance"},
@@ -129,7 +129,7 @@ func TestGenerateMultipleSteps(t *testing.T) {
 
 func TestGenerateImplicitFields(t *testing.T) {
 	var buf bytes.Buffer
-	err := Generate([]StubInput{
+	err := Generate("test", []StubInput{
 		{Kind: "pkg", Config: &testPkgConfig{}, OutputType: "StepInstance"},
 	}, Options{}, &buf)
 	if err != nil {

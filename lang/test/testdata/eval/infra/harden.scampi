@@ -1,3 +1,5 @@
+module main
+
 # Translated from .infra/harden.scampi (inlined)
 
 import "std"

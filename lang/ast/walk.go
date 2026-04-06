@@ -29,9 +29,15 @@ func walkChildren(node Node, pre func(Node) bool, post func(Node)) {
 
 	// Top-level
 	case *File:
+		if n.Module != nil {
+			Walk(n.Module, pre, post)
+		}
 		walkList(n.Imports, pre, post)
 		walkDeclList(n.Decls, pre, post)
 		walkStmtList(n.Stmts, pre, post)
+
+	case *ModuleDecl:
+		Walk(n.Name, pre, post)
 
 	case *ImportDecl:
 		// no children
