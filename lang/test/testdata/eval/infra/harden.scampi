@@ -1,0 +1,44 @@
+# Translated from .infra/harden.scampi (inlined)
+
+import "std"
+import "std/target"
+
+std.secrets { backend = "age", path = "secrets.age.json" }
+
+let vps = target.ssh {
+  name = "vps"
+  host = "203.0.113.10"
+  user = "hal9000"
+}
+
+std.deploy {
+  name = "harden"
+  targets = [vps]
+
+  let restart_fail2ban = std.service {
+    name = "fail2ban"
+    state = std.SvcState.restarted
+  }
+
+  std.pkg {
+    packages = ["fail2ban", "ufw", "unattended-upgrades"]
+    source = std.system {}
+  }
+
+  std.copy {
+    src = std.local { path = "./files/fail2ban-sshd.conf" }
+    dest = "/etc/fail2ban/jail.d/sshd.conf"
+    perm = "0644"
+    owner = "root"
+    group = "root"
+    on_change = [restart_fail2ban]
+  }
+
+  std.service { name = "fail2ban", state = std.SvcState.running, enabled = true }
+
+  std.firewall { port = "22/tcp" }
+  std.firewall { port = "80/tcp" }
+  std.firewall { port = "443/tcp" }
+
+  std.service { name = "ufw", state = std.SvcState.running, enabled = true }
+}

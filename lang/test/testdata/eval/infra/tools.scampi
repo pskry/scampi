@@ -1,0 +1,22 @@
+# Translated from .infra/tools.scampi (inlined, no multi-file imports)
+
+import "std"
+import "std/target"
+
+std.secrets { backend = "age", path = "secrets.age.json" }
+
+let vps = target.ssh {
+  name = "vps"
+  host = "203.0.113.10"
+  user = "hal9000"
+}
+
+std.deploy {
+  name = "tools"
+  targets = [vps]
+
+  std.pkg {
+    packages = ["neovim", "htop", "btop"]
+    source = std.system {}
+  }
+}

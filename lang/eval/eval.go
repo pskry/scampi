@@ -60,9 +60,37 @@ func Eval(f *ast.File, source []byte, opts ...Option) (*Result, []Error) {
 	for _, o := range opts {
 		o(ev)
 	}
+	ev.registerStdEnums()
 	ev.evalFile(f)
 	ev.result.Bindings = ev.env.vars
 	return &ev.result, ev.errs
+}
+
+// registerStdEnums populates the eval env with std module enums so
+// FQN access like std.SvcState.restarted resolves at runtime. This
+// mirrors check/std.go and will be replaced by stub-driven registration.
+func (ev *Evaluator) registerStdEnums() {
+	enums := map[string][]string{
+		"PkgState":   {"present", "absent", "latest"},
+		"SvcState":   {"running", "stopped", "restarted", "reloaded"},
+		"UserState":  {"present", "absent"},
+		"GroupState": {"present", "absent"},
+		"CtrState":   {"running", "stopped", "absent"},
+		"CtrRestart": {"always", "on_failure", "unless_stopped", "no"},
+		"MountState": {"mounted", "unmounted", "absent"},
+		"FsType":     {"nfs", "nfs4", "cifs", "ext4", "xfs", "btrfs", "tmpfs", "glusterfs", "ceph"},
+		"FwAction":   {"allow", "deny", "reject"},
+		"HttpMethod": {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+	}
+	stdMap := &MapVal{}
+	for enumName, variants := range enums {
+		variantMap := &MapVal{}
+		for _, v := range variants {
+			variantMap.Set(v, &StringVal{V: v})
+		}
+		stdMap.Set(enumName, variantMap)
+	}
+	ev.env.set("std", stdMap)
 }
 
 func (ev *Evaluator) errAt(span token.Span, msg string) {
