@@ -85,6 +85,9 @@ const (
 	ActionReject
 )
 
+// ActionValues is the exhaustive list of accepted action strings.
+var ActionValues = []string{"allow", "deny", "reject"}
+
 func (a Action) String() string {
 	switch a {
 	case ActionAllow:
@@ -130,6 +133,12 @@ type (
 
 func (Firewall) Kind() string   { return "firewall" }
 func (Firewall) NewConfig() any { return &FirewallConfig{} }
+
+func (*FirewallConfig) FieldEnumValues() map[string][]string {
+	return map[string][]string{
+		"action": ActionValues,
+	}
+}
 
 func (Firewall) Plan(step spec.StepInstance) (spec.Action, error) {
 	cfg, ok := step.Config.(*FirewallConfig)

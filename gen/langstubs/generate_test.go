@@ -50,7 +50,7 @@ func TestGenerateBasic(t *testing.T) {
 				"State": {"present", "absent", "latest"},
 			},
 		},
-	}, &buf)
+	}, Options{}, &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestGenerateNoEnums(t *testing.T) {
 			Config:     &testCopyConfig{},
 			OutputType: "StepInstance",
 		},
-	}, &buf)
+	}, Options{}, &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestGenerateTargetOutputType(t *testing.T) {
 			Config:     &testSSHConfig{},
 			OutputType: "Target",
 		},
-	}, &buf)
+	}, Options{}, &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestGenerateSummaryComment(t *testing.T) {
 	var buf bytes.Buffer
 	err := Generate([]StubInput{
 		{Kind: "pkg", Config: &testPkgConfig{}, OutputType: "StepInstance"},
-	}, &buf)
+	}, Options{}, &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestGenerateMultipleSteps(t *testing.T) {
 			Enums: map[string][]string{"State": {"present", "absent"}}},
 		{Kind: "copy", Config: &testCopyConfig{}, OutputType: "StepInstance"},
 		{Kind: "ssh", Config: &testSSHConfig{}, OutputType: "Target"},
-	}, &buf)
+	}, Options{}, &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestGenerateImplicitFields(t *testing.T) {
 	var buf bytes.Buffer
 	err := Generate([]StubInput{
 		{Kind: "pkg", Config: &testPkgConfig{}, OutputType: "StepInstance"},
-	}, &buf)
+	}, Options{}, &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,8 +144,9 @@ func TestToSnake(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"Packages", "packages"},
 		{"State", "state"},
-		{"KeyURL", "key_u_r_l"},
-		{"BaseURL", "base_u_r_l"},
+		{"KeyURL", "key_url"},
+		{"BaseURL", "base_url"},
+		{"GID", "gid"},
 		{"Src", "src"},
 	}
 	for _, tc := range cases {

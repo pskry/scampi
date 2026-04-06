@@ -86,3 +86,11 @@ func (r *Registry) TargetType(kind string) (spec.TargetType, bool) {
 	tgt, ok := r.targetTypes[kind]
 	return tgt, ok
 }
+
+func (r *Registry) TargetTypes() []spec.TargetType {
+	types := make([]spec.TargetType, 0, len(r.targetTypes))
+	for _, t := range r.targetTypes {
+		types = append(types, t)
+	}
+	return types
+}

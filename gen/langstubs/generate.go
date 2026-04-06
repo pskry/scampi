@@ -19,12 +19,19 @@ type StubInput struct {
 	Enums      map[string][]string
 }
 
+// Options controls generator behavior.
+type Options struct {
+	AutoGenNotice bool // prepend "Auto-generated" comment
+}
+
 // Generate writes scampi-lang stub declarations for all inputs to w.
-func Generate(inputs []StubInput, w io.Writer) error {
+func Generate(inputs []StubInput, opts Options, w io.Writer) error {
 	bw := &builder{w: w}
 
-	bw.line("# Auto-generated from Go struct tags. Do not edit.")
-	bw.line("")
+	if opts.AutoGenNotice {
+		bw.line("# Auto-generated from Go struct tags. Do not edit.")
+		bw.line("")
+	}
 
 	emitted := map[string]bool{}
 	for _, in := range inputs {
@@ -83,15 +90,15 @@ func emitStep(bw *builder, in StubInput) {
 			optional: f.Tag.Get("optional") == "true",
 			defVal:   f.Tag.Get("default"),
 		}
-		if _, ok := in.Enums[f.Name]; ok {
-			fi.enumName = enumTypeName(in.Kind, f.Name)
+		if enumKey := findEnumKey(in.Enums, f.Name); enumKey != "" {
+			fi.enumName = enumTypeName(in.Kind, enumKey)
 		}
 		fields = append(fields, fi)
 	}
 
 	fields = append(fields,
 		fieldInfo{name: "desc", scampiType: "string?", optional: true},
-		fieldInfo{name: "on_change", scampiType: "list[StepInstance]", optional: true, defVal: "[]"},
+		fieldInfo{name: "on_change", scampiType: "list[StepInstance]", defVal: "[]", rawDefault: true},
 	)
 
 	bw.write("step " + in.Kind + "(")
@@ -105,7 +112,11 @@ func emitStep(bw *builder, in StubInput) {
 		}
 		entry := f.name + ": " + typStr
 		if f.defVal != "" {
-			entry += " = " + formatDefault(f.defVal, f.enumName)
+			if f.rawDefault {
+				entry += " = " + f.defVal
+			} else {
+				entry += " = " + formatDefault(f.defVal, f.enumName)
+			}
 		}
 		bw.write(entry)
 	}
@@ -119,6 +130,7 @@ type fieldInfo struct {
 	defVal     string
 	enumName   string
 	scampiType string
+	rawDefault bool // defVal is already formatted, don't quote
 }
 
 func (f fieldInfo) resolveType() string {
@@ -173,8 +185,27 @@ func mapStructType(t reflect.Type) string {
 // Naming
 // -----------------------------------------------------------------------------
 
+func findEnumKey(enums map[string][]string, fieldName string) string {
+	if enums == nil {
+		return ""
+	}
+	lower := strings.ToLower(fieldName)
+	for k := range enums {
+		if strings.ToLower(k) == lower {
+			return k
+		}
+	}
+	return ""
+}
+
 func enumTypeName(stepKind, fieldName string) string {
-	return capitalize(stepKind) + fieldName
+	// "container.instance" + "State" → "ContainerInstanceState"
+	parts := strings.Split(stepKind, ".")
+	var name string
+	for _, p := range parts {
+		name += capitalize(p)
+	}
+	return name + capitalize(fieldName)
 }
 
 func capitalize(s string) string {
@@ -185,11 +216,20 @@ func capitalize(s string) string {
 }
 
 func toSnake(s string) string {
+	runes := []rune(s)
 	var b strings.Builder
-	for i, r := range s {
+	for i, r := range runes {
 		if r >= 'A' && r <= 'Z' {
+			// Insert underscore before uppercase if preceded by lowercase
+			// or if this is the start of an acronym ending (e.g. GID → gid).
 			if i > 0 {
-				b.WriteByte('_')
+				prev := runes[i-1]
+				nextIsLower := i+1 < len(runes) && runes[i+1] >= 'a' && runes[i+1] <= 'z'
+				if prev >= 'a' && prev <= 'z' {
+					b.WriteByte('_')
+				} else if prev >= 'A' && prev <= 'Z' && nextIsLower {
+					b.WriteByte('_')
+				}
 			}
 			b.WriteRune(r + ('a' - 'A'))
 		} else {

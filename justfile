@@ -114,20 +114,29 @@ generate:
   go generate ./...
   just _patch-license-headers
 
-# Prepend SPDX header to generated files that stringer overwrites.
+# Prepend SPDX header to generated files that go generate overwrites.
+# The find commands here MUST match scripts/license-check.sh.
 [private]
 _patch-license-headers:
   #!/usr/bin/env bash
   set -euo pipefail
-  header="{{spdx_header}}"
-  while IFS= read -r f; do
+  go_header="{{spdx_header}}"
+  scampi_header="# SPDX-License-Identifier: GPL-3.0-only"
+  patch() {
+    local f="$1" header="$2"
     first=$(head -1 "$f")
     if [[ "$first" != "$header" ]]; then
       tmp=$(mktemp)
       { echo "$header"; echo; cat "$f"; } > "$tmp"
       mv "$tmp" "$f"
     fi
-  done < <(find . -name '*_string.go' -not -path './vendor/*')
+  }
+  while IFS= read -r f; do patch "$f" "$go_header"; done \
+    < <(find . -name '*_string.go' -not -path './vendor/*')
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    patch "$f" "$scampi_header"
+  done < <(find . -name '*.scampi' -not -path './.sandbox/*' -not -path '*/testdata/*')
 
 [doc("Check SPDX license headers")]
 license-check:
