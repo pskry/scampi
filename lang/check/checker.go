@@ -390,7 +390,7 @@ func (c *Checker) resolveNamedType(t *ast.NamedType) Type {
 			return bt
 		}
 		sym := c.scope.Lookup(name)
-		if sym != nil && (sym.Kind == SymStruct || sym.Kind == SymEnum) {
+		if sym != nil && (sym.Kind == SymStruct || sym.Kind == SymEnum || sym.Kind == SymStep) {
 			return sym.Type
 		}
 		c.errAt(t.SrcSpan, "unknown type: "+name)

@@ -425,8 +425,51 @@ func (ev *Evaluator) evalStructLit(lit *ast.StructLit) Value {
 		if isStdStep(typeName) {
 			return &StepInstanceVal{StepName: typeName, Fields: fields}
 		}
+		// User-defined step: look up in env, expand body with self bound.
+		if fv, ok := ev.lookupStep(typeName); ok {
+			return ev.expandUserStep(fv, fields)
+		}
 		return &StructVal{TypeName: typeName, Fields: fields}
 	}
+}
+
+func (ev *Evaluator) lookupStep(name string) (*FuncVal, bool) {
+	v, ok := ev.env.get(name)
+	if !ok {
+		return nil, false
+	}
+	fv, ok := v.(*FuncVal)
+	if !ok {
+		return nil, false
+	}
+	return fv, true
+}
+
+// expandUserStep evaluates a user-defined step body with self bound to
+// the provided fields. All StepInstanceVals emitted by the body are
+// collected and returned. If inside a deploy, they're also appended to
+// the current deploy's steps.
+func (ev *Evaluator) expandUserStep(fv *FuncVal, fields map[string]Value) Value {
+	stepDecl, ok := fv.body.(*ast.StepDecl)
+	if !ok || stepDecl.Body == nil {
+		return &StructVal{TypeName: fv.Name, Fields: fields}
+	}
+	selfVal := &StructVal{TypeName: "self", Fields: fields}
+	child := newEnv(ev.env)
+	child.set("self", selfVal)
+	// Also bind param names so self.member works AND member works.
+	for _, p := range stepDecl.Params {
+		if v, exists := fields[p.Name.Name]; exists {
+			child.set(p.Name.Name, v)
+		}
+	}
+	prevEnv := ev.env
+	ev.env = child
+	ev.evalBlock(stepDecl.Body)
+	ev.env = prevEnv
+	// The body's step invocations were already collected by the deploy
+	// (if we're inside one) via the currentDeploy mechanism.
+	return &NoneVal{}
 }
 
 func (ev *Evaluator) evalDeploy(

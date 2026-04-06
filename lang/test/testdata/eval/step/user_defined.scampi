@@ -1,0 +1,28 @@
+import "std"
+import "std/target"
+
+struct TeamMember {
+  name: string
+  groups: list[string] = []
+}
+
+step create_user(member: TeamMember) StepInstance {
+  std.user { name = self.member.name, groups = self.member.groups }
+  std.dir { path = "/home/${self.member.name}/.ssh" }
+}
+
+let vps = target.ssh { name = "vps", host = "10.0.0.1", user = "root" }
+
+let team = [
+  TeamMember { name = "alice", groups = ["wheel", "dev"] },
+  TeamMember { name = "bob", groups = ["dev"] },
+]
+
+std.deploy {
+  name = "users"
+  targets = [vps]
+
+  for m in team {
+    create_user { member = m }
+  }
+}
