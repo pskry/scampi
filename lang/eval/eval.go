@@ -186,7 +186,7 @@ func (ev *Evaluator) evalFor(f *ast.ForStmt) {
 
 func (ev *Evaluator) evalIf(s *ast.IfStmt) {
 	cond := ev.evalExpr(s.Cond)
-	if isTruthy(cond) {
+	if asBool(cond) {
 		child := newEnv(ev.env)
 		prev := ev.env
 		ev.env = child
@@ -282,7 +282,7 @@ func (ev *Evaluator) evalExpr(e ast.Expr) Value {
 		return ev.evalUnary(e)
 	case *ast.IfExpr:
 		cond := ev.evalExpr(e.Cond)
-		if isTruthy(cond) {
+		if asBool(cond) {
 			return ev.evalExpr(e.Then)
 		}
 		return ev.evalExpr(e.Else)
@@ -509,11 +509,21 @@ func (ev *Evaluator) evalBinary(bin *ast.BinaryExpr) Value {
 	switch bin.Op {
 	case token.Plus:
 		if ls, ok := lv.(*StringVal); ok {
-			return &StringVal{V: ls.V + valueToString(rv)}
+			if rs, ok := rv.(*StringVal); ok {
+				return &StringVal{V: ls.V + rs.V}
+			}
 		}
 		if li, ok := lv.(*IntVal); ok {
 			if ri, ok := rv.(*IntVal); ok {
 				return &IntVal{V: li.V + ri.V}
+			}
+		}
+		if ll, ok := lv.(*ListVal); ok {
+			if rl, ok := rv.(*ListVal); ok {
+				items := make([]Value, 0, len(ll.Items)+len(rl.Items))
+				items = append(items, ll.Items...)
+				items = append(items, rl.Items...)
+				return &ListVal{Items: items}
 			}
 		}
 	case token.Minus:
@@ -547,9 +557,9 @@ func (ev *Evaluator) evalBinary(bin *ast.BinaryExpr) Value {
 	case token.Geq:
 		return &BoolVal{V: compareInts(lv, rv) >= 0}
 	case token.And:
-		return &BoolVal{V: isTruthy(lv) && isTruthy(rv)}
+		return &BoolVal{V: lv.(*BoolVal).V && rv.(*BoolVal).V}
 	case token.Or:
-		return &BoolVal{V: isTruthy(lv) || isTruthy(rv)}
+		return &BoolVal{V: lv.(*BoolVal).V || rv.(*BoolVal).V}
 	case token.In:
 		return &BoolVal{V: valueIn(lv, rv)}
 	}
@@ -560,7 +570,7 @@ func (ev *Evaluator) evalUnary(un *ast.UnaryExpr) Value {
 	xv := ev.evalExpr(un.X)
 	switch un.Op {
 	case token.Not:
-		return &BoolVal{V: !isTruthy(xv)}
+		return &BoolVal{V: !xv.(*BoolVal).V}
 	case token.Minus:
 		if iv, ok := xv.(*IntVal); ok {
 			return &IntVal{V: -iv.V}
@@ -583,7 +593,7 @@ func (ev *Evaluator) evalListComp(comp *ast.ListComp) Value {
 		ev.env = child
 		if comp.Cond != nil {
 			cond := ev.evalExpr(comp.Cond)
-			if !isTruthy(cond) {
+			if !asBool(cond) {
 				ev.env = prev
 				continue
 			}
@@ -597,20 +607,10 @@ func (ev *Evaluator) evalListComp(comp *ast.ListComp) Value {
 // Helpers
 // -----------------------------------------------------------------------------
 
-func isTruthy(v Value) bool {
-	switch v := v.(type) {
-	case *BoolVal:
-		return v.V
-	case *NoneVal:
-		return false
-	case *StringVal:
-		return v.V != ""
-	case *IntVal:
-		return v.V != 0
-	case *ListVal:
-		return len(v.Items) > 0
-	}
-	return true
+// asBool unwraps a BoolVal. The type checker guarantees only bool
+// values reach here; a non-bool panics (compiler bug).
+func asBool(v Value) bool {
+	return v.(*BoolVal).V
 }
 
 func valueToString(v Value) string {

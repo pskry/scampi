@@ -136,7 +136,10 @@ func (c *Checker) enter(n ast.Node) bool {
 		return false
 
 	case *ast.IfStmt:
-		c.typeOf(n.Cond)
+		ct := c.typeOf(n.Cond)
+		if ct != nil && ct != BoolType {
+			c.errAt(n.Cond.Span(), "if condition must be bool, got "+ct.String())
+		}
 		c.pushScope(ScopeBlock)
 		if n.Then != nil {
 			ast.Walk(n.Then, c.enter, c.leave)

@@ -1,0 +1,55 @@
+import "std"
+import "std/target"
+
+std.secrets { backend = "age", path = "secrets.age.json" }
+
+let host = "203.0.113.10"
+
+let vps = target.ssh {
+  name = "vps"
+  host = host
+  user = "hal9000"
+}
+
+let runner_version = "12.7.2"
+let runner_url = "https://example.com/runner/v${runner_version}/runner-linux-amd64"
+
+struct TeamMember {
+  name: string
+  groups: list[string] = []
+  admin: bool = false
+}
+
+let team = [
+  TeamMember { name = "alice", groups = ["wheel", "dev"], admin = true },
+  TeamMember { name = "bob", groups = ["dev"] },
+]
+
+func base_packages(extra: list[string] = []) list[string] {
+  let base = ["curl", "htop", "vim"]
+  return base + extra
+}
+
+std.deploy {
+  name = "bootstrap"
+  targets = [vps]
+
+  let packages = base_packages(["nginx", "certbot"])
+  std.pkg { packages = packages, source = std.system {} }
+
+  std.firewall { port = "22/tcp" }
+  std.firewall { port = "80/tcp" }
+  std.firewall { port = "443/tcp" }
+
+  std.dir { path = "/var/www/html" }
+
+  std.copy {
+    src = std.remote { url = runner_url }
+    dest = "/usr/local/bin/runner"
+    perm = "0755"
+    owner = "root"
+    group = "root"
+  }
+
+  std.service { name = "nginx" }
+}

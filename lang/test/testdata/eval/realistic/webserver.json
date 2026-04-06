@@ -1,0 +1,17 @@
+{
+  "secrets": {
+    "backend": "age",
+    "path": "secrets.age.json"
+  },
+  "targets": [
+    {"name": "vps", "kind": "ssh"}
+  ],
+  "deploys": [
+    {"name": "bootstrap", "steps": 7}
+  ],
+  "lets": {
+    "host": "203.0.113.10",
+    "runner_version": "12.7.2",
+    "runner_url": "https://example.com/runner/v12.7.2/runner-linux-amd64"
+  }
+}

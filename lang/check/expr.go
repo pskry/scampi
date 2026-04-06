@@ -367,9 +367,10 @@ func (c *Checker) checkBinary(bin *ast.BinaryExpr) Type {
 		if lt == IntType && rt == IntType {
 			return IntType
 		}
-		if lt == StringType || rt == StringType {
-			// String concatenation with non-string — let evaluator coerce.
-			return StringType
+		if ll, ok := lt.(*List); ok {
+			if _, ok := rt.(*List); ok {
+				return ll
+			}
 		}
 		if lt != nil && rt != nil {
 			c.errAt(bin.SrcSpan, "cannot add "+lt.String()+" and "+rt.String())
@@ -386,6 +387,12 @@ func (c *Checker) checkBinary(bin *ast.BinaryExpr) Type {
 	case token.Eq, token.Neq, token.Lt, token.Gt, token.Leq, token.Geq:
 		return BoolType
 	case token.And, token.Or:
+		if lt != nil && lt != BoolType {
+			c.errAt(bin.Left.Span(), "&& and || require bool operands, got "+lt.String())
+		}
+		if rt != nil && rt != BoolType {
+			c.errAt(bin.Right.Span(), "&& and || require bool operands, got "+rt.String())
+		}
 		return BoolType
 	case token.In:
 		return BoolType
@@ -397,14 +404,15 @@ func (c *Checker) checkUnary(un *ast.UnaryExpr) Type {
 	xt := c.typeOf(un.X)
 	switch un.Op {
 	case token.Not:
+		if xt != nil && xt != BoolType {
+			c.errAt(un.SrcSpan, "! requires bool operand, got "+xt.String())
+		}
 		return BoolType
 	case token.Minus:
-		if xt == IntType {
-			return IntType
+		if xt != nil && xt != IntType {
+			c.errAt(un.SrcSpan, "unary minus requires int operand, got "+xt.String())
 		}
-		if xt != nil {
-			c.errAt(un.SrcSpan, "unary minus requires int operand")
-		}
+		return IntType
 	}
 	return nil
 }
@@ -413,10 +421,12 @@ func (c *Checker) checkUnary(un *ast.UnaryExpr) Type {
 // -----------------------------------------------------------------------------
 
 func (c *Checker) checkIfExpr(ife *ast.IfExpr) Type {
-	c.typeOf(ife.Cond)
+	ct := c.typeOf(ife.Cond)
+	if ct != nil && ct != BoolType {
+		c.errAt(ife.Cond.Span(), "if condition must be bool, got "+ct.String())
+	}
 	tt := c.typeOf(ife.Then)
 	c.typeOf(ife.Else)
-	// Result type is the then-branch type (or any if branches disagree).
 	return tt
 }
 
