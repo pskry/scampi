@@ -86,7 +86,8 @@ func (p *Parser) parseDecl() ast.Decl {
 
 // parseTypeDecl:
 //
-//	type Name { field: type = default, ... }
+//	type Name { field: type = default, ... }   // with fields
+//	type Name                                  // opaque (no body)
 func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	start := p.cur.Pos
 	p.advance() // 'type'
@@ -95,6 +96,18 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	if name == nil {
 		p.synchronize()
 		return nil
+	}
+
+	// Opaque type: no braces.
+	if p.cur.Kind != token.LBrace {
+		end := name.SrcSpan.End
+		if p.cur.Kind == token.Semi {
+			p.advance()
+		}
+		return &ast.TypeDecl{
+			Name:    name,
+			SrcSpan: token.Span{Start: start, End: end},
+		}
 	}
 
 	p.expect(token.LBrace, "type body")

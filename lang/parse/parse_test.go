@@ -107,6 +107,24 @@ type User {
 	}
 }
 
+func TestParseOpaqueType(t *testing.T) {
+	f := parseFile(t, `
+module main
+type Step
+type Target
+`)
+	if len(f.Decls) != 2 {
+		t.Fatalf("expected 2 decls, got %d", len(f.Decls))
+	}
+	s := f.Decls[0].(*ast.TypeDecl)
+	if s.Name.Name != "Step" {
+		t.Errorf("type name: got %q, want %q", s.Name.Name, "Step")
+	}
+	if s.Fields != nil {
+		t.Error("opaque type should have nil fields")
+	}
+}
+
 // enum decl
 // -----------------------------------------------------------------------------
 

@@ -216,9 +216,14 @@ func importLeaf(path string) string {
 func (c *Checker) registerDecl(d ast.Decl) {
 	switch d := d.(type) {
 	case *ast.TypeDecl:
-		st := &StructType{Name: d.Name.Name}
+		var t Type
+		if d.Fields == nil {
+			t = &OpaqueType{Name: d.Name.Name}
+		} else {
+			t = &StructType{Name: d.Name.Name}
+		}
 		c.scope.Define(&Symbol{
-			Name: d.Name.Name, Type: st, Kind: SymType, Span: d.SrcSpan,
+			Name: d.Name.Name, Type: t, Kind: SymType, Span: d.SrcSpan,
 		})
 	case *ast.EnumDecl:
 		var variants []string
@@ -249,6 +254,9 @@ func (c *Checker) registerDecl(d ast.Decl) {
 // -----------------------------------------------------------------------------
 
 func (c *Checker) checkTypeDecl(d *ast.TypeDecl) {
+	if d.Fields == nil {
+		return // opaque type — nothing to check
+	}
 	sym := c.scope.Lookup(d.Name.Name)
 	if sym == nil {
 		return

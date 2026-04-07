@@ -251,6 +251,9 @@ func (c *Checker) checkStructLit(lit *ast.StructLit) Type {
 		return nil
 	}
 	switch tt := t.(type) {
+	case *OpaqueType:
+		c.errAt(lit.SrcSpan, "cannot construct opaque type "+tt.Name)
+		return nil
 	case *StructType:
 		c.checkFieldInits(tt.Fields, lit.Fields, tt.Name, lit.SrcSpan)
 		return tt

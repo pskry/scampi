@@ -68,7 +68,7 @@ type Map struct {
 func (*Map) typeTag()         {}
 func (m *Map) String() string { return "map[" + m.Key.String() + ", " + m.Value.String() + "]" }
 
-// StructType is a user-defined struct (resolved from a TypeDecl).
+// StructType is a user-defined struct (resolved from a TypeDecl with fields).
 type StructType struct {
 	Name   string
 	Fields []*FieldDef
@@ -76,6 +76,16 @@ type StructType struct {
 
 func (*StructType) typeTag()         {}
 func (s *StructType) String() string { return s.Name }
+
+// OpaqueType is a forward-declared type with no visible fields.
+// Declared as `type Foo` (no braces). Values of this type can be
+// passed around but never constructed or field-accessed in user code.
+type OpaqueType struct {
+	Name string
+}
+
+func (*OpaqueType) typeTag()         {}
+func (o *OpaqueType) String() string { return o.Name }
 
 // FieldDef is a field in a struct or step declaration.
 type FieldDef struct {
@@ -161,6 +171,11 @@ func IsAssignableTo(src, dst Type) bool {
 	if se, ok := src.(*EnumType); ok {
 		if de, ok := dst.(*EnumType); ok {
 			return se.Name == de.Name
+		}
+	}
+	if so, ok := src.(*OpaqueType); ok {
+		if do, ok := dst.(*OpaqueType); ok {
+			return so.Name == do.Name
 		}
 	}
 	return false

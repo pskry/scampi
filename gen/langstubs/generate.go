@@ -23,6 +23,7 @@ type StubInput struct {
 // Options controls optional generator behavior.
 type Options struct {
 	AutoGenNotice bool
+	OpaqueTypes   []string // opaque type declarations to emit (e.g. "Step", "Target")
 }
 
 // Generate writes scampi-lang stub declarations for the named module.
@@ -36,6 +37,13 @@ func Generate(moduleName string, inputs []StubInput, opts Options, w io.Writer) 
 	bw.line("")
 	if opts.AutoGenNotice {
 		bw.line("# Auto-generated from Go struct tags. Do not edit.")
+		bw.line("")
+	}
+
+	for _, t := range opts.OpaqueTypes {
+		bw.line("type " + t)
+	}
+	if len(opts.OpaqueTypes) > 0 {
 		bw.line("")
 	}
 

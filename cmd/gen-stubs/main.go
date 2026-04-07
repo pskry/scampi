@@ -7,6 +7,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"scampi.dev/scampi/engine"
@@ -68,11 +69,22 @@ func main() {
 			filePath = filepath.Join(dir, mod+".scampi")
 		}
 
+		seen := map[string]bool{}
+		var opaqueTypes []string
+		for _, in := range inputs {
+			if in.OutputType != "" && !seen[in.OutputType] {
+				seen[in.OutputType] = true
+				opaqueTypes = append(opaqueTypes, in.OutputType)
+			}
+		}
+		sort.Strings(opaqueTypes)
+
 		f, err := os.Create(filePath)
 		if err != nil {
 			panic(err)
 		}
-		err = langstubs.Generate(moduleName, inputs, langstubs.Options{}, f)
+		opts := langstubs.Options{OpaqueTypes: opaqueTypes}
+		err = langstubs.Generate(moduleName, inputs, opts, f)
 		_ = f.Close()
 		if err != nil {
 			panic(err)

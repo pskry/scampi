@@ -60,10 +60,11 @@ func (d *ImportDecl) Span() token.Span { return d.SrcSpan }
 func (*ImportDecl) astNode()           {}
 func (*ImportDecl) declNode()          {}
 
-// TypeDecl is a `struct Name { field: type = default, ... }` declaration.
+// TypeDecl is a type declaration. With fields: `type Name { field: type, ... }`.
+// Without fields (nil): `type Name` — an opaque forward declaration.
 type TypeDecl struct {
 	Name    *Ident
-	Fields  []*Field
+	Fields  []*Field // nil for opaque types
 	SrcSpan token.Span
 }
 

@@ -124,6 +124,35 @@ type Bad {
 // Enum declarations
 // -----------------------------------------------------------------------------
 
+func TestCheckOpaqueType(t *testing.T) {
+	expectNoErrors(t, `
+module main
+type Step
+decl copy(src: string) Step
+`)
+}
+
+func TestCheckOpaqueTypeCannotConstruct(t *testing.T) {
+	expectError(t, `
+module main
+type Opaque
+let s = Opaque {}
+`, "cannot construct opaque type")
+}
+
+func TestCheckOpaqueTypeUsedInSignature(t *testing.T) {
+	expectNoErrors(t, `
+module main
+type Step
+func takes_step(s: Step) int {
+    return 42
+}
+`)
+}
+
+// Enum declarations
+// -----------------------------------------------------------------------------
+
 func TestCheckEnum(t *testing.T) {
 	expectNoErrors(t, `
 module main

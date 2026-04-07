@@ -2,6 +2,8 @@
 
 module rest
 
+type Step
+
 # Make an HTTP request against a REST target
 decl request(
   method:    string,               # HTTP method

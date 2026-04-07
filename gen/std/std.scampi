@@ -2,10 +2,13 @@
 
 module std
 
+type Step
+type Target
+
 enum FirewallAction { allow, deny, reject }
 enum GroupState { present, absent }
-enum MountType { nfs, nfs4, cifs, ext4, xfs, btrfs, tmpfs, glusterfs, ceph }
 enum MountState { mounted, unmounted, absent }
+enum MountType { nfs, nfs4, cifs, ext4, xfs, btrfs, tmpfs, glusterfs, ceph }
 enum PkgState { present, absent, latest }
 enum ServiceState { running, stopped, restarted, reloaded }
 enum UserState { present, absent }

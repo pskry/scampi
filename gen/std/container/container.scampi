@@ -2,6 +2,8 @@
 
 module container
 
+type Step
+
 enum InstanceState { running, stopped, absent }
 enum InstanceRestart { always, on_failure, unless_stopped, no }
 
