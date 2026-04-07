@@ -1,0 +1,194 @@
+# SPDX-License-Identifier: GPL-3.0-only
+
+module posix
+
+import "std"
+
+# Opaque types
+# -----------------------------------------------------------------------------
+
+type Source
+type PkgSource
+
+# Enums
+# -----------------------------------------------------------------------------
+
+enum PkgState { present, absent, latest }
+enum ServiceState { running, stopped, restarted, reloaded }
+enum UserState { present, absent }
+enum GroupState { present, absent }
+enum MountType { nfs, nfs4, cifs, ext4, xfs, btrfs, tmpfs, glusterfs, ceph }
+enum MountState { mounted, unmounted, absent }
+enum FirewallAction { allow, deny, reject }
+
+# Targets
+# -----------------------------------------------------------------------------
+
+decl ssh(
+  name:     string,
+  host:     string,
+  user:     string,
+  port:     int = 22,
+  key:      string?,
+  insecure: bool?,
+  timeout:  string = "5s",
+) std.Target
+
+decl local(name: string) std.Target
+
+# Source composables
+# -----------------------------------------------------------------------------
+
+decl source_local(path: string) Source
+decl source_inline(content: string) Source
+decl source_remote(url: string, checksum: string?) Source
+
+decl pkg_system() PkgSource
+decl pkg_apt_repo(
+  url:        string,
+  key_url:    string,
+  components: list[string]?,
+  suite:      string?,
+) PkgSource
+decl pkg_dnf_repo(
+  url:     string,
+  key_url: string?,
+) PkgSource
+
+# File operations
+# -----------------------------------------------------------------------------
+
+decl copy(
+  src:       Source,
+  dest:      string,
+  perm:      string,
+  owner:     string,
+  group:     string,
+  verify:    string?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl dir(
+  path:      string,
+  perm:      string?,
+  owner:     string?,
+  group:     string?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl symlink(
+  target:    string,
+  link:      string,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl template(
+  src:       Source,
+  dest:      string,
+  data:      any?,
+  perm:      string,
+  owner:     string,
+  group:     string,
+  verify:    string?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl unarchive(
+  src:       Source,
+  dest:      string,
+  depth:     int? = 0,
+  owner:     string?,
+  group:     string?,
+  perm:      string?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+# Package management
+# -----------------------------------------------------------------------------
+
+decl pkg(
+  packages:  list[string],
+  source:    PkgSource,
+  state:     PkgState = PkgState.present,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+# Service management
+# -----------------------------------------------------------------------------
+
+decl service(
+  name:      string,
+  state:     ServiceState = ServiceState.running,
+  enabled:   bool = true,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+# User and group management
+# -----------------------------------------------------------------------------
+
+decl user(
+  name:      string,
+  state:     UserState = UserState.present,
+  shell:     string?,
+  home:      string?,
+  system:    bool?,
+  password:  string?,
+  groups:    list[string]?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl group(
+  name:      string,
+  state:     GroupState = GroupState.present,
+  gid:       int?,
+  system:    bool?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+# System configuration
+# -----------------------------------------------------------------------------
+
+decl sysctl(
+  key:       string,
+  value:     string,
+  persist:   bool = true,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl mount(
+  src:       string,
+  dest:      string,
+  fs_type:   MountType,
+  opts:      string? = "defaults",
+  state:     MountState? = MountState.mounted,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl firewall(
+  port:      string,
+  action:    FirewallAction = FirewallAction.allow,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+# Command execution
+# -----------------------------------------------------------------------------
+
+decl run(
+  apply:     string,
+  check:     string?,
+  always:    bool? = false,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-3.0-only
+
+module std
+
+type Step
+type Target
+type Deploy
+type SecretsConfig
+
+enum SecretsBackend { age, file }
+
+func env(name: string, default: string?) string
+func secret(name: string) string
+
+decl deploy(
+  name:    string,
+  targets: list[Target],
+  steps:   list[Step],
+) Deploy
+
+decl secrets(
+  backend: SecretsBackend,
+  path:    string,
+) SecretsConfig

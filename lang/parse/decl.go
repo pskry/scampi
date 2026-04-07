@@ -172,7 +172,8 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 
 // parseFuncDecl:
 //
-//	func Name(params) ReturnType { body }
+//	func Name(params) ReturnType { body }   // with body
+//	func Name(params) ReturnType            // stub, no body
 func (p *Parser) parseFuncDecl() *ast.FuncDecl {
 	start := p.cur.Pos
 	p.advance() // 'func'
@@ -190,9 +191,17 @@ func (p *Parser) parseFuncDecl() *ast.FuncDecl {
 	// Return type is required in v0 (no implicit unit return).
 	ret := p.parseTypeExpr()
 
-	p.expect(token.LBrace, "function body")
-	body := p.parseBlock()
-	endTok := p.expect(token.RBrace, "function body")
+	var body *ast.Block
+	end := p.cur.End
+	if ret != nil {
+		end = ret.Span().End
+	}
+	if p.cur.Kind == token.LBrace {
+		p.advance()
+		body = p.parseBlock()
+		endTok := p.expect(token.RBrace, "function body")
+		end = endTok.End
+	}
 
 	if p.cur.Kind == token.Semi {
 		p.advance()
@@ -203,7 +212,7 @@ func (p *Parser) parseFuncDecl() *ast.FuncDecl {
 		Params:  params,
 		Ret:     ret,
 		Body:    body,
-		SrcSpan: token.Span{Start: start, End: endTok.End},
+		SrcSpan: token.Span{Start: start, End: end},
 	}
 }
 

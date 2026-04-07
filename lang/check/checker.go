@@ -42,8 +42,18 @@ func New() *Checker {
 	}
 }
 
+// NewWithModules creates a checker with the given modules available
+// for import resolution.
+func NewWithModules(modules map[string]*Scope) *Checker {
+	return &Checker{modules: modules}
+}
+
 // Errors returns accumulated checker errors.
 func (c *Checker) Errors() []Error { return c.errs }
+
+// FileScope returns the top-level scope after checking. Useful for
+// extracting a module's exported symbols.
+func (c *Checker) FileScope() *Scope { return c.scope }
 
 // Check type-checks a parsed file using ast.Walk for traversal.
 func (c *Checker) Check(f *ast.File) {

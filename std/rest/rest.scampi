@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: GPL-3.0-only
+
+module rest
+
+import "std"
+
+# Composable types
+# -----------------------------------------------------------------------------
+
+type Auth
+type TLS
+type Body
+type Check
+
+# Target
+# -----------------------------------------------------------------------------
+
+decl target(
+  name:     string,
+  base_url: string,
+  auth:     Auth?,
+  tls:      TLS?,
+) std.Target
+
+# Auth composables
+# -----------------------------------------------------------------------------
+
+decl no_auth() Auth
+decl basic(user: string, password: string) Auth
+decl bearer(
+  token_endpoint: string,
+  identity:       string,
+  secret:         string,
+) Auth
+decl header(name: string, value: string) Auth
+
+# TLS composables
+# -----------------------------------------------------------------------------
+
+decl tls_secure() TLS
+decl tls_insecure() TLS
+decl tls_ca_cert(path: string) TLS
+
+# Body composables
+# -----------------------------------------------------------------------------
+
+decl body_json(data: any) Body
+decl body_string(content: string) Body
+
+# Check composables
+# -----------------------------------------------------------------------------
+
+decl status(code: int) Check
+decl jq(expr: string) Check
+
+# Steps
+# -----------------------------------------------------------------------------
+
+decl request(
+  method:    string,
+  path:      string,
+  headers:   map[string, string]?,
+  body:      Body?,
+  check:     Check?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
+
+decl resource(
+  query:     request?,
+  missing:   request?,
+  found:     request?,
+  bindings:  map[string, Check]?,
+  state:     map[string, any]?,
+  desc:      string?,
+  on_change: list[std.Step] = [],
+) std.Step
