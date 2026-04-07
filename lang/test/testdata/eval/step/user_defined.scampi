@@ -20,10 +20,7 @@ let team = [
   TeamMember { name = "bob", groups = ["dev"] },
 ]
 
-std.deploy {
-  name = "users"
-  targets = [vps]
-
+std.deploy(name = "users", targets = [vps]) {
   for m in team {
     create_user { member = m }
   }

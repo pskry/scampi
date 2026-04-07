@@ -7,10 +7,6 @@ let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
 
 let packages = ["nginx", "certbot"]
 
-std.deploy {
-  name = "web"
-  targets = [vps]
-  steps = [
-    posix.pkg { packages = packages, source = posix.pkg_system {} },
-  ]
+std.deploy(name = "web", targets = [vps]) {
+  posix.pkg { packages = packages, source = posix.pkg_system {} }
 }

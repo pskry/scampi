@@ -34,26 +34,22 @@ func base_packages(extra: list[string] = []) list[string] {
 
 let packages = base_packages(["nginx", "certbot"])
 
-std.deploy {
-  name = "bootstrap"
-  targets = [vps]
-  steps = [
-    posix.pkg { packages = packages, source = posix.pkg_system {} },
+std.deploy(name = "bootstrap", targets = [vps]) {
+  posix.pkg { packages = packages, source = posix.pkg_system {} }
 
-    posix.firewall { port = "22/tcp" },
-    posix.firewall { port = "80/tcp" },
-    posix.firewall { port = "443/tcp" },
+  posix.firewall { port = "22/tcp" }
+  posix.firewall { port = "80/tcp" }
+  posix.firewall { port = "443/tcp" }
 
-    posix.dir { path = "/var/www/html" },
+  posix.dir { path = "/var/www/html" }
 
-    posix.copy {
-      src = posix.source_remote { url = runner_url }
-      dest = "/usr/local/bin/runner"
-      perm = "0755"
-      owner = "root"
-      group = "root"
-    },
+  posix.copy {
+    src = posix.source_remote { url = runner_url }
+    dest = "/usr/local/bin/runner"
+    perm = "0755"
+    owner = "root"
+    group = "root"
+  }
 
-    posix.service { name = "nginx" },
-  ]
+  posix.service { name = "nginx" }
 }

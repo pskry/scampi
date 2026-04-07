@@ -13,56 +13,52 @@ let vps_root = posix.ssh {
   user = "root"
 }
 
-let restart_sshd = posix.service {
-  name = "sshd"
-  state = posix.ServiceState.restarted
-}
+std.deploy(name = "bootstrap", targets = [vps_root]) {
+  let restart_sshd = posix.service {
+    name = "sshd"
+    state = posix.ServiceState.restarted
+  }
 
-std.deploy {
-  name = "bootstrap"
-  targets = [vps_root]
-  steps = [
-    posix.user {
-      name = "hal9000"
-      shell = "/bin/bash"
-      home = "/home/hal9000"
-      groups = ["sudo"]
-    },
+  posix.user {
+    name = "hal9000"
+    shell = "/bin/bash"
+    home = "/home/hal9000"
+    groups = ["sudo"]
+  }
 
-    posix.pkg { packages = ["sudo"], source = posix.pkg_system {} },
+  posix.pkg { packages = ["sudo"], source = posix.pkg_system {} }
 
-    posix.copy {
-      src = posix.source_inline { content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n" }
-      dest = "/etc/sudoers.d/hal9000"
-      perm = "0440"
-      owner = "root"
-      group = "root"
-      verify = "visudo -cf %s"
-    },
+  posix.copy {
+    src = posix.source_inline { content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n" }
+    dest = "/etc/sudoers.d/hal9000"
+    perm = "0440"
+    owner = "root"
+    group = "root"
+    verify = "visudo -cf %s"
+  }
 
-    posix.dir {
-      path = "/home/hal9000/.ssh"
-      perm = "0700"
-      owner = "hal9000"
-      group = "hal9000"
-    },
+  posix.dir {
+    path = "/home/hal9000/.ssh"
+    perm = "0700"
+    owner = "hal9000"
+    group = "hal9000"
+  }
 
-    posix.copy {
-      src = posix.source_local { path = "./files/hal9000_authorized_keys" }
-      dest = "/home/hal9000/.ssh/authorized_keys"
-      perm = "0600"
-      owner = "hal9000"
-      group = "hal9000"
-    },
+  posix.copy {
+    src = posix.source_local { path = "./files/hal9000_authorized_keys" }
+    dest = "/home/hal9000/.ssh/authorized_keys"
+    perm = "0600"
+    owner = "hal9000"
+    group = "hal9000"
+  }
 
-    posix.copy {
-      src = posix.source_local { path = "./files/sshd_hardened.conf" }
-      dest = "/etc/ssh/sshd_config.d/hardened.conf"
-      perm = "0644"
-      owner = "root"
-      group = "root"
-      verify = "sshd -t -f %s"
-      on_change = [restart_sshd]
-    },
-  ]
+  posix.copy {
+    src = posix.source_local { path = "./files/sshd_hardened.conf" }
+    dest = "/etc/ssh/sshd_config.d/hardened.conf"
+    perm = "0644"
+    owner = "root"
+    group = "root"
+    verify = "sshd -t -f %s"
+    on_change = [restart_sshd]
+  }
 }

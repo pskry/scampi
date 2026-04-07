@@ -13,35 +13,31 @@ let vps = posix.ssh {
   user = "hal9000"
 }
 
-let restart_fail2ban = posix.service {
-  name = "fail2ban"
-  state = posix.ServiceState.restarted
-}
+std.deploy(name = "harden", targets = [vps]) {
+  let restart_fail2ban = posix.service {
+    name = "fail2ban"
+    state = posix.ServiceState.restarted
+  }
 
-std.deploy {
-  name = "harden"
-  targets = [vps]
-  steps = [
-    posix.pkg {
-      packages = ["fail2ban", "ufw", "unattended-upgrades"]
-      source = posix.pkg_system {}
-    },
+  posix.pkg {
+    packages = ["fail2ban", "ufw", "unattended-upgrades"]
+    source = posix.pkg_system {}
+  }
 
-    posix.copy {
-      src = posix.source_local { path = "./files/fail2ban-sshd.conf" }
-      dest = "/etc/fail2ban/jail.d/sshd.conf"
-      perm = "0644"
-      owner = "root"
-      group = "root"
-      on_change = [restart_fail2ban]
-    },
+  posix.copy {
+    src = posix.source_local { path = "./files/fail2ban-sshd.conf" }
+    dest = "/etc/fail2ban/jail.d/sshd.conf"
+    perm = "0644"
+    owner = "root"
+    group = "root"
+    on_change = [restart_fail2ban]
+  }
 
-    posix.service { name = "fail2ban", state = posix.ServiceState.running, enabled = true },
+  posix.service { name = "fail2ban", state = posix.ServiceState.running, enabled = true }
 
-    posix.firewall { port = "22/tcp" },
-    posix.firewall { port = "80/tcp" },
-    posix.firewall { port = "443/tcp" },
+  posix.firewall { port = "22/tcp" }
+  posix.firewall { port = "80/tcp" }
+  posix.firewall { port = "443/tcp" }
 
-    posix.service { name = "ufw", state = posix.ServiceState.running, enabled = true },
-  ]
+  posix.service { name = "ufw", state = posix.ServiceState.running, enabled = true }
 }

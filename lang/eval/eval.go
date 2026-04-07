@@ -94,23 +94,46 @@ func (ev *Evaluator) registerStubInfo() {
 	}
 	info := extractStubInfo(ev.stubFS)
 	ev.declReturns = info.declReturns
-	for modName, enums := range info.enums {
+	// Collect all module names from enums and funcs.
+	allMods := map[string]bool{}
+	for m := range info.enums {
+		allMods[m] = true
+	}
+	for m := range info.funcs {
+		allMods[m] = true
+	}
+	for modName := range allMods {
 		modMap := &MapVal{}
-		for enumName, variants := range enums {
+		for enumName, variants := range info.enums[modName] {
 			variantMap := &MapVal{}
 			for _, v := range variants {
 				variantMap.Set(v, &StringVal{V: v})
 			}
 			modMap.Set(enumName, variantMap)
 		}
+		for _, sf := range info.funcs[modName] {
+			modMap.Set(sf.Name, &FuncVal{
+				Name:    sf.Name,
+				Params:  sf.Params,
+				RetType: sf.RetType,
+			})
+		}
 		ev.env.set(modName, modMap)
 	}
 }
 
+// stubFunc describes a stub function extracted from a .scampi file.
+type stubFunc struct {
+	Name    string
+	Params  []string
+	RetType string
+}
+
 // stubInfo holds extracted metadata from parsed stub files.
 type stubInfo struct {
-	enums       map[string]map[string][]string // module → enum → variants
+	enums       map[string]map[string][]string // module → enum �� variants
 	declReturns map[string]string              // "module.decl" → return type name
+	funcs       map[string][]stubFunc          // module → func stubs
 }
 
 // extractStubInfo parses all .scampi files in the FS and returns enum
@@ -119,6 +142,7 @@ func extractStubInfo(fsys fs.FS) stubInfo {
 	info := stubInfo{
 		enums:       map[string]map[string][]string{},
 		declReturns: map[string]string{},
+		funcs:       map[string][]stubFunc{},
 	}
 	_ = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".scampi") {
@@ -154,14 +178,50 @@ func extractStubInfo(fsys fs.FS) stubInfo {
 					info.declReturns[modName+"."+declName] = typeExprName(d.Ret)
 				}
 			case *ast.FuncDecl:
+				retName := ""
 				if d.Ret != nil {
+					retName = typeExprString(d.Ret)
 					info.declReturns[modName+"."+d.Name.Name] = typeExprName(d.Ret)
+				}
+				if d.Body == nil {
+					var params []string
+					for _, p := range d.Params {
+						params = append(params, p.Name.Name)
+					}
+					info.funcs[modName] = append(info.funcs[modName], stubFunc{
+						Name:    d.Name.Name,
+						Params:  params,
+						RetType: retName,
+					})
 				}
 			}
 		}
 		return nil
 	})
 	return info
+}
+
+// typeExprString returns the full string representation of a type
+// expression (e.g. "block[Deploy]", "string", "list[Step]").
+func typeExprString(t ast.TypeExpr) string {
+	switch t := t.(type) {
+	case *ast.NamedType:
+		parts := t.Name.Parts
+		var names []string
+		for _, p := range parts {
+			names = append(names, p.Name)
+		}
+		return strings.Join(names, ".")
+	case *ast.GenericType:
+		var args []string
+		for _, a := range t.Args {
+			args = append(args, typeExprString(a))
+		}
+		return t.Name.Name + "[" + strings.Join(args, ", ") + "]"
+	case *ast.OptionalType:
+		return typeExprString(t.Inner) + "?"
+	}
+	return ""
 }
 
 // typeExprName extracts the leaf type name from a type expression.
@@ -539,6 +599,22 @@ func (ev *Evaluator) fillDeploy(fields map[string]Value, body *ast.Block) Value 
 }
 
 func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string]Value) Value {
+	// Stub func (no body) — produce value based on return type.
+	if fv.body == nil && fv.RetType != "" {
+		fields := make(map[string]Value, len(fv.Params))
+		for i, name := range fv.Params {
+			if v, ok := kwargs[name]; ok {
+				fields[name] = v
+			} else if i < len(positional) {
+				fields[name] = positional[i]
+			}
+		}
+		if strings.HasPrefix(fv.RetType, "block[") {
+			return &BlockVal{Kind: fv.Name, Fields: fields}
+		}
+		return &StepVal{StepName: fv.Name, Fields: fields}
+	}
+
 	body, ok := fv.body.(*ast.Block)
 	if !ok {
 		return &NoneVal{}

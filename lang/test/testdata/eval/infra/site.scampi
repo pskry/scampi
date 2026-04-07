@@ -13,37 +13,33 @@ let vps = posix.ssh {
   user = "hal9000"
 }
 
-let reload_caddy = posix.service {
-  name = "caddy"
-  state = posix.ServiceState.reloaded
-}
+std.deploy(name = "site", targets = [vps]) {
+  let reload_caddy = posix.service {
+    name = "caddy"
+    state = posix.ServiceState.reloaded
+  }
 
-std.deploy {
-  name = "site"
-  targets = [vps]
-  steps = [
-    posix.pkg { packages = ["caddy"], source = posix.pkg_system {} },
+  posix.pkg { packages = ["caddy"], source = posix.pkg_system {} }
 
-    posix.dir { path = "/var/www/scampi.dev", perm = "0755" },
-    posix.dir { path = "/etc/caddy", perm = "0755", owner = "root", group = "root" },
+  posix.dir { path = "/var/www/scampi.dev", perm = "0755" }
+  posix.dir { path = "/etc/caddy", perm = "0755", owner = "root", group = "root" }
 
-    posix.copy {
-      src = posix.source_local { path = "./files/Caddyfile" }
-      dest = "/etc/caddy/Caddyfile"
-      perm = "0644"
-      owner = "root"
-      group = "root"
-      verify = "caddy validate --config %s"
-      on_change = [reload_caddy]
-    },
+  posix.copy {
+    src = posix.source_local { path = "./files/Caddyfile" }
+    dest = "/etc/caddy/Caddyfile"
+    perm = "0644"
+    owner = "root"
+    group = "root"
+    verify = "caddy validate --config %s"
+    on_change = [reload_caddy]
+  }
 
-    posix.unarchive {
-      src = posix.source_local { path = "./files/site.tar.gz" }
-      dest = "/var/www/scampi.dev"
-      owner = "hal9000"
-      group = "hal9000"
-    },
+  posix.unarchive {
+    src = posix.source_local { path = "./files/site.tar.gz" }
+    dest = "/var/www/scampi.dev"
+    owner = "hal9000"
+    group = "hal9000"
+  }
 
-    posix.service { name = "caddy", state = posix.ServiceState.running, enabled = true },
-  ]
+  posix.service { name = "caddy", state = posix.ServiceState.running, enabled = true }
 }

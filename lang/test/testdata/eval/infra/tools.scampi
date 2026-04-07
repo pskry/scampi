@@ -13,13 +13,9 @@ let vps = posix.ssh {
   user = "hal9000"
 }
 
-std.deploy {
-  name = "tools"
-  targets = [vps]
-  steps = [
-    posix.pkg {
-      packages = ["neovim", "htop", "btop"]
-      source = posix.pkg_system {}
-    },
-  ]
+std.deploy(name = "tools", targets = [vps]) {
+  posix.pkg {
+    packages = ["neovim", "htop", "btop"]
+    source = posix.pkg_system {}
+  }
 }

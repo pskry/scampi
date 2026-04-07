@@ -154,12 +154,15 @@ func (*SecretsVal) valueTag()      {}
 func (*SecretsVal) String() string { return "SecretsConfig" }
 
 // FuncVal is a callable function (carries its AST + closure scope).
+// For stub funcs (no body), RetType indicates the return type name
+// so the eval can produce the appropriate value.
 type FuncVal struct {
 	Name     string
 	Params   []string
-	Defaults []any // parallel to Params: *ast.Expr or nil per param
-	body     any   // *ast.Block
-	scope    any   // *envScope
+	Defaults []any  // parallel to Params: *ast.Expr or nil per param
+	RetType  string // return type name for stubs (e.g. "block[Deploy]")
+	body     any    // *ast.Block (nil for stubs)
+	scope    any    // *envScope
 }
 
 func (*FuncVal) valueTag()        {}

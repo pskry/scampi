@@ -7,13 +7,9 @@ std.secrets { backend = std.SecretsBackend.file, path = "secrets.json" }
 
 let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
 
-std.deploy {
-  name = "web"
-  targets = [vps]
-  steps = [
-    posix.pkg { packages = ["nginx", "certbot"], source = posix.pkg_system {} },
-    posix.firewall { port = "80/tcp" },
-    posix.firewall { port = "443/tcp" },
-    posix.service { name = "nginx" },
-  ]
+std.deploy(name = "web", targets = [vps]) {
+  posix.pkg { packages = ["nginx", "certbot"], source = posix.pkg_system {} }
+  posix.firewall { port = "80/tcp" }
+  posix.firewall { port = "443/tcp" }
+  posix.service { name = "nginx" }
 }
