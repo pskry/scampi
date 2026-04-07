@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: GPL-3.0-only
+
+module rest
+
+# Make an HTTP request against a REST target
+decl request(
+  method:    string,               # HTTP method
+  path:      string,               # Request path
+  headers:   map[string, string]?, # HTTP headers
+  body:      rest.body?,           # Request body
+  check:     Check?,               # Check matcher for idempotency
+  desc:      string?,
+  on_change: list[Step] = [],
+) Step
+
+# Declarative REST resource management with query/found/missing
+decl resource(
+  query:     rest.request,        # Query request to check resource existence
+  missing:   rest.request?,       # Request to execute when resource is not found
+  found:     rest.request?,       # Request to execute when resource is found
+  bindings:  map[string, Check]?, # Named jq bindings resolved from query result
+  state:     map[string, any]?,   # Desired resource state
+  desc:      string?,
+  on_change: list[Step] = [],
+) Step

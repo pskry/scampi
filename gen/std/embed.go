@@ -8,5 +8,5 @@ import "embed"
 // library. Embedded at build time, extracted to the global module
 // cache on first use.
 //
-//go:embed *.scampi
+//go:embed *.scampi */*.scampi
 var FS embed.FS

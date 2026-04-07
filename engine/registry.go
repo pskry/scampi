@@ -3,6 +3,8 @@
 package engine
 
 import (
+	"slices"
+
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/container"
 	"scampi.dev/scampi/step/copy"
@@ -79,6 +81,15 @@ func (r *Registry) StepTypes() []spec.StepType {
 	for _, stepType := range r.stepTypes {
 		stepTypes = append(stepTypes, stepType)
 	}
+	slices.SortFunc(stepTypes, func(a, b spec.StepType) int {
+		if a.Kind() < b.Kind() {
+			return -1
+		}
+		if a.Kind() > b.Kind() {
+			return 1
+		}
+		return 0
+	})
 	return stepTypes
 }
 
@@ -92,5 +103,14 @@ func (r *Registry) TargetTypes() []spec.TargetType {
 	for _, t := range r.targetTypes {
 		types = append(types, t)
 	}
+	slices.SortFunc(types, func(a, b spec.TargetType) int {
+		if a.Kind() < b.Kind() {
+			return -1
+		}
+		if a.Kind() > b.Kind() {
+			return 1
+		}
+		return 0
+	})
 	return types
 }

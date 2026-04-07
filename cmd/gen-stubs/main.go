@@ -7,6 +7,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"scampi.dev/scampi/engine"
 	"scampi.dev/scampi/gen/langstubs"
@@ -15,7 +16,8 @@ import (
 func main() {
 	reg := engine.NewRegistry()
 
-	var inputs []langstubs.StubInput
+	// Collect all inputs with their full dotted kind.
+	var all []langstubs.StubInput
 	for _, st := range reg.StepTypes() {
 		cfg := st.NewConfig()
 		in := langstubs.StubInput{
@@ -26,15 +28,27 @@ func main() {
 		if ep, ok := cfg.(enumProvider); ok {
 			in.Enums = ep.FieldEnumValues()
 		}
-		inputs = append(inputs, in)
+		all = append(all, in)
 	}
 	for _, tt := range reg.TargetTypes() {
 		cfg := tt.NewConfig()
-		inputs = append(inputs, langstubs.StubInput{
+		all = append(all, langstubs.StubInput{
 			Kind:       tt.Kind(),
 			Config:     cfg,
 			OutputType: "Target",
 		})
+	}
+
+	// Group by module: dotted kinds like "rest.request" go to
+	// submodule "rest", undotted stay in root "std".
+	modules := map[string][]langstubs.StubInput{}
+	for _, in := range all {
+		mod := ""
+		if i := strings.IndexByte(in.Kind, '.'); i >= 0 {
+			mod = in.Kind[:i]
+			in.Kind = in.Kind[i+1:]
+		}
+		modules[mod] = append(modules[mod], in)
 	}
 
 	outDir := "."
@@ -42,14 +56,27 @@ func main() {
 		outDir = env
 	}
 
-	f, err := os.Create(filepath.Join(outDir, "std.scampi"))
-	if err != nil {
-		panic(err)
-	}
-	defer func() { _ = f.Close() }()
+	for mod, inputs := range modules {
+		moduleName := "std"
+		filePath := filepath.Join(outDir, "std.scampi")
+		if mod != "" {
+			moduleName = mod
+			dir := filepath.Join(outDir, mod)
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				panic(err)
+			}
+			filePath = filepath.Join(dir, mod+".scampi")
+		}
 
-	if err := langstubs.Generate("std", inputs, langstubs.Options{}, f); err != nil {
-		panic(err)
+		f, err := os.Create(filePath)
+		if err != nil {
+			panic(err)
+		}
+		err = langstubs.Generate(moduleName, inputs, langstubs.Options{}, f)
+		_ = f.Close()
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 

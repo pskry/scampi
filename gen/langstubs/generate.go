@@ -47,7 +47,11 @@ func Generate(moduleName string, inputs []StubInput, opts Options, w io.Writer) 
 				continue
 			}
 			emitted[name] = true
-			bw.line("enum " + name + " { " + strings.Join(variants, ", ") + " }")
+			sanitized := make([]string, len(variants))
+			for i, v := range variants {
+				sanitized[i] = strings.ReplaceAll(v, "-", "_")
+			}
+			bw.line("enum " + name + " { " + strings.Join(sanitized, ", ") + " }")
 		}
 	}
 	if len(emitted) > 0 {
@@ -307,7 +311,7 @@ func toSnake(s string) string {
 
 func formatDefault(val, enumName string) string {
 	if enumName != "" {
-		return enumName + "." + val
+		return enumName + "." + strings.ReplaceAll(val, "-", "_")
 	}
 	if val == "true" || val == "false" {
 		return val
