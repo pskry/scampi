@@ -4,7 +4,9 @@ package linker
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -54,6 +56,11 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 	if src == nil {
 		return nil
 	}
+	// Interface fields (any): convert to Go native types.
+	if dst.Kind() == reflect.Interface {
+		dst.Set(reflect.ValueOf(evalToGo(src)))
+		return nil
+	}
 	switch sv := src.(type) {
 	case *eval.StringVal:
 		if dst.Kind() == reflect.String {
@@ -79,7 +86,8 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 			dst.Set(slice)
 		}
 	case *eval.MapVal:
-		if dst.Kind() == reflect.Map {
+		switch dst.Kind() {
+		case reflect.Map:
 			m := reflect.MakeMap(dst.Type())
 			for i, k := range sv.Keys {
 				kv := reflect.New(dst.Type().Key()).Elem()
@@ -93,6 +101,20 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 				m.SetMapIndex(kv, vv)
 			}
 			dst.Set(m)
+		case reflect.Struct:
+			// Map with string keys → struct fields by snake_case match.
+			fields := make(map[string]eval.Value)
+			for i, k := range sv.Keys {
+				if sk, ok := k.(*eval.StringVal); ok {
+					fields[sk.V] = sv.Values[i]
+				}
+			}
+			if err := mapFields(fields, dst.Addr().Interface(), lc); err != nil {
+				return err
+			}
+		case reflect.Interface:
+			// Convert to Go map[string]any for interface{} fields.
+			dst.Set(reflect.ValueOf(evalMapToGo(sv)))
 		}
 	case *eval.NoneVal:
 		// Leave as zero value.
@@ -157,6 +179,7 @@ func convertPkgSourceRef(sv *eval.StructVal) spec.PkgSourceRef {
 		ref.Kind = spec.PkgSourceApt
 		if u, ok := sv.Fields["url"].(*eval.StringVal); ok {
 			ref.URL = u.V
+			ref.Name = repoSlug(u.V)
 		}
 		if k, ok := sv.Fields["key_url"].(*eval.StringVal); ok {
 			ref.KeyURL = k.V
@@ -175,6 +198,7 @@ func convertPkgSourceRef(sv *eval.StructVal) spec.PkgSourceRef {
 		ref.Kind = spec.PkgSourceDnf
 		if u, ok := sv.Fields["url"].(*eval.StringVal); ok {
 			ref.URL = u.V
+			ref.Name = repoSlug(u.V)
 		}
 		if k, ok := sv.Fields["key_url"].(*eval.StringVal); ok {
 			ref.KeyURL = k.V
@@ -195,6 +219,53 @@ func applyDefault(dst reflect.Value, def string) {
 			dst.SetInt(v)
 		}
 	}
+}
+
+// evalToGo converts an eval.Value to a Go native type (for any/interface fields).
+func evalToGo(v eval.Value) any {
+	switch sv := v.(type) {
+	case *eval.StringVal:
+		return sv.V
+	case *eval.IntVal:
+		return sv.V
+	case *eval.BoolVal:
+		return sv.V
+	case *eval.NoneVal:
+		return nil
+	case *eval.ListVal:
+		r := make([]any, len(sv.Items))
+		for i, item := range sv.Items {
+			r[i] = evalToGo(item)
+		}
+		return r
+	case *eval.MapVal:
+		return evalMapToGo(sv)
+	}
+	return nil
+}
+
+func evalMapToGo(mv *eval.MapVal) map[string]any {
+	m := make(map[string]any, len(mv.Keys))
+	for i, k := range mv.Keys {
+		if sk, ok := k.(*eval.StringVal); ok {
+			m[sk.V] = evalToGo(mv.Values[i])
+		}
+	}
+	return m
+}
+
+func repoSlug(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		h := sha256.Sum256([]byte(rawURL))
+		return hex.EncodeToString(h[:8])
+	}
+	host := strings.ReplaceAll(u.Hostname(), ".", "-")
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) > 0 && parts[0] != "" {
+		return host + "-" + parts[0]
+	}
+	return host
 }
 
 // toSnake converts GoFieldName to snake_case.

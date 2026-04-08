@@ -614,6 +614,62 @@ func (ev *Evaluator) fillBlockFromStmts(bv *BlockVal, stmts []ast.Stmt) Value {
 	}
 }
 
+func (ev *Evaluator) callEnv(positional []Value, kwargs map[string]Value) Value {
+	name := ""
+	if len(positional) > 0 {
+		if s, ok := positional[0].(*StringVal); ok {
+			name = s.V
+		}
+	}
+	if n, ok := kwargs["name"]; ok {
+		if s, ok := n.(*StringVal); ok {
+			name = s.V
+		}
+	}
+	if ev.envLookup != nil {
+		if v, ok := ev.envLookup(name); ok {
+			return &StringVal{V: v}
+		}
+	}
+	// Check for default.
+	def := ""
+	if len(positional) > 1 {
+		if s, ok := positional[1].(*StringVal); ok {
+			def = s.V
+		}
+	}
+	if d, ok := kwargs["default"]; ok {
+		if s, ok := d.(*StringVal); ok {
+			def = s.V
+		}
+	}
+	if def != "" {
+		return &StringVal{V: def}
+	}
+	return &StringVal{V: ""}
+}
+
+func (ev *Evaluator) callSecret(positional []Value, kwargs map[string]Value) Value {
+	name := ""
+	if len(positional) > 0 {
+		if s, ok := positional[0].(*StringVal); ok {
+			name = s.V
+		}
+	}
+	if n, ok := kwargs["name"]; ok {
+		if s, ok := n.(*StringVal); ok {
+			name = s.V
+		}
+	}
+	if ev.secretLookup != nil {
+		v, err := ev.secretLookup(name)
+		if err == nil {
+			return &StringVal{V: v}
+		}
+	}
+	return &StringVal{V: ""}
+}
+
 func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string]Value) Value {
 	// Stub func (no body) — produce value based on return type.
 	if fv.body == nil && fv.RetType != "" {
@@ -625,6 +681,15 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 				fields[name] = positional[i]
 			}
 		}
+
+		// Scalar builtins with runtime callbacks.
+		switch fv.Name {
+		case "env":
+			return ev.callEnv(positional, kwargs)
+		case "secret":
+			return ev.callSecret(positional, kwargs)
+		}
+
 		if strings.HasPrefix(fv.RetType, "block[") && strings.HasSuffix(fv.RetType, "]") {
 			innerType := fv.RetType[6 : len(fv.RetType)-1]
 			return &BlockVal{FuncName: fv.Name, InnerType: innerType, Fields: fields}

@@ -3,6 +3,5 @@
     "files": {}
   },
   "changed": 0,
-  "error": true,
-  "diagnostics": ["star.EvalError"]
+  "error": true
 }
