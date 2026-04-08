@@ -1,14 +1,15 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        user(
-            desc="create system user",
-            name="appd",
-            system=True,
-            shell="/usr/sbin/nologin",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.user {
+    desc = "create system user"
+    name = "appd"
+    system = true
+    shell = "/usr/sbin/nologin"
+  }
+}

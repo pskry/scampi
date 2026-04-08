@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        run(
-            desc="refresh something",
-            apply="do-the-thing",
-            always=True,
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.run {
+    desc = "refresh something"
+    apply = "do-the-thing"
+    always = true
+  }
+}

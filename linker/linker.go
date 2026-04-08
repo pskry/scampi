@@ -6,7 +6,10 @@
 package linker
 
 import (
+	"context"
+
 	"scampi.dev/scampi/lang/eval"
+	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 )
 
@@ -17,10 +20,33 @@ type Registry interface {
 	TargetType(kind string) (spec.TargetType, bool)
 }
 
+// LinkOption configures the linker.
+type LinkOption func(*linkConfig)
+
+type linkConfig struct {
+	ctx     context.Context
+	cfgPath string
+	src     source.Source
+}
+
+// WithSourceResolver enables source resolution (inline caching,
+// local path resolution) during linking.
+func WithSourceResolver(ctx context.Context, cfgPath string, src source.Source) LinkOption {
+	return func(lc *linkConfig) {
+		lc.ctx = ctx
+		lc.cfgPath = cfgPath
+		lc.src = src
+	}
+}
+
 // Link converts a lang eval result into a spec.Config by walking all
 // values, interpreting them based on RetType/TypeName, and resolving
 // step and target names against the engine registry.
-func Link(result *eval.Result, reg Registry, path string) (spec.Config, error) {
+func Link(result *eval.Result, reg Registry, path string, opts ...LinkOption) (spec.Config, error) {
+	var lc linkConfig
+	for _, o := range opts {
+		o(&lc)
+	}
 	cfg := spec.Config{
 		Path:    path,
 		Targets: make(map[string]spec.TargetInstance),
@@ -33,10 +59,10 @@ func Link(result *eval.Result, reg Registry, path string) (spec.Config, error) {
 		}
 		switch sv := v.(type) {
 		case *eval.StructVal:
-			linkErr = linkStructVal(sv, result, reg, &cfg)
+			linkErr = linkStructVal(sv, result, reg, &cfg, &lc)
 			return false // don't descend into fields
 		case *eval.BlockResultVal:
-			linkErr = linkBlockResult(sv, reg, &cfg)
+			linkErr = linkBlockResult(sv, reg, &cfg, &lc)
 			return false
 		}
 		return true
@@ -45,10 +71,10 @@ func Link(result *eval.Result, reg Registry, path string) (spec.Config, error) {
 	return cfg, linkErr
 }
 
-func linkStructVal(sv *eval.StructVal, r *eval.Result, reg Registry, cfg *spec.Config) error {
+func linkStructVal(sv *eval.StructVal, r *eval.Result, reg Registry, cfg *spec.Config, lc *linkConfig) error {
 	switch sv.RetType {
 	case "Target":
-		ti, err := linkTarget(sv, reg)
+		ti, err := linkTarget(sv, reg, lc)
 		if err != nil {
 			return err
 		}
@@ -72,10 +98,10 @@ func bindingName(r *eval.Result, v eval.Value) string {
 	return ""
 }
 
-func linkBlockResult(bv *eval.BlockResultVal, reg Registry, cfg *spec.Config) error {
+func linkBlockResult(bv *eval.BlockResultVal, reg Registry, cfg *spec.Config, lc *linkConfig) error {
 	switch bv.TypeName {
 	case "Deploy":
-		db, err := linkDeploy(bv, reg)
+		db, err := linkDeploy(bv, reg, lc)
 		if err != nil {
 			return err
 		}
@@ -84,13 +110,13 @@ func linkBlockResult(bv *eval.BlockResultVal, reg Registry, cfg *spec.Config) er
 	return nil
 }
 
-func linkTarget(sv *eval.StructVal, reg Registry) (spec.TargetInstance, error) {
+func linkTarget(sv *eval.StructVal, reg Registry, lc *linkConfig) (spec.TargetInstance, error) {
 	tt, ok := reg.TargetType(sv.TypeName)
 	if !ok {
 		return spec.TargetInstance{}, &UnresolvedError{Kind: "target", Name: sv.TypeName}
 	}
 	cfg := tt.NewConfig()
-	if err := mapFields(sv.Fields, cfg); err != nil {
+	if err := mapFields(sv.Fields, cfg, lc); err != nil {
 		return spec.TargetInstance{}, err
 	}
 	return spec.TargetInstance{
@@ -99,7 +125,7 @@ func linkTarget(sv *eval.StructVal, reg Registry) (spec.TargetInstance, error) {
 	}, nil
 }
 
-func linkDeploy(bv *eval.BlockResultVal, reg Registry) (spec.DeployBlock, error) {
+func linkDeploy(bv *eval.BlockResultVal, reg Registry, lc *linkConfig) (spec.DeployBlock, error) {
 	db := spec.DeployBlock{
 		Hooks: make(map[string][]spec.StepInstance),
 	}
@@ -122,7 +148,7 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry) (spec.DeployBlock, error)
 		if !ok {
 			continue
 		}
-		si, err := linkStep(sv, reg)
+		si, err := linkStep(sv, reg, lc)
 		if err != nil {
 			return db, err
 		}
@@ -132,13 +158,13 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry) (spec.DeployBlock, error)
 	return db, nil
 }
 
-func linkStep(sv *eval.StructVal, reg Registry) (spec.StepInstance, error) {
+func linkStep(sv *eval.StructVal, reg Registry, lc *linkConfig) (spec.StepInstance, error) {
 	st, ok := reg.StepType(sv.TypeName)
 	if !ok {
 		return spec.StepInstance{}, &UnresolvedError{Kind: "step", Name: sv.TypeName}
 	}
 	cfg := st.NewConfig()
-	if err := mapFields(sv.Fields, cfg); err != nil {
+	if err := mapFields(sv.Fields, cfg, lc); err != nil {
 		return spec.StepInstance{}, err
 	}
 

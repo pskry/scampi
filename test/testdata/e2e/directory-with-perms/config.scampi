@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        dir(
-            desc="create directory with permissions",
-            path="/tmp/mydir",
-            perm="0700",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.dir {
+    desc = "create directory with permissions"
+    path = "/tmp/mydir"
+    perm = "0700"
+  }
+}

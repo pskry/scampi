@@ -1,12 +1,13 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        group(
-            desc="group already exists",
-            name="appusers",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.group {
+    desc = "group already exists"
+    name = "appusers"
+  }
+}

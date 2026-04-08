@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        firewall(
-            desc="allow SSH",
-            port="22/tcp",
-            action="allow",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.firewall {
+    desc = "allow SSH"
+    port = "22/tcp"
+    action = posix.FirewallAction.allow
+  }
+}

@@ -1,12 +1,13 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        service(
-            desc="nginx already running",
-            name="nginx",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.service {
+    desc = "nginx already running"
+    name = "nginx"
+  }
+}

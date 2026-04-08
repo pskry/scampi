@@ -57,6 +57,6 @@ func LoadConfig(
 		return spec.Config{}, errs[0]
 	}
 
-	// Link.
-	return Link(result, reg, cfgPath)
+	// Link — resolve values against registry and resolve sources.
+	return Link(result, reg, cfgPath, WithSourceResolver(ctx, cfgPath, src))
 }

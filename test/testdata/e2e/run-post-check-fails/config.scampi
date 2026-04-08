@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        run(
-            desc="apply succeeds but check still fails",
-            check="check-thing",
-            apply="apply-thing",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.run {
+    desc = "apply succeeds but check still fails"
+    check = "check-thing"
+    apply = "apply-thing"
+  }
+}

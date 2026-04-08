@@ -1,15 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        pkg(
-            desc="install from dnf repo",
-            packages=["example-pkg"],
-            source=dnf_repo(
-                url="https://example.com/repo/el9",
-            ),
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.pkg {
+    desc = "install from dnf repo"
+    packages = ["example-pkg"]
+    source = posix.pkg_dnf_repo { url = "https://example.com/repo/el9" }
+  }
+}

@@ -3,7 +3,11 @@
 package linker
 
 import (
+	"crypto/sha256"
+	"fmt"
+	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"scampi.dev/scampi/lang/eval"
@@ -13,7 +17,7 @@ import (
 // mapFields maps eval.Value fields onto a Go config struct pointer
 // using reflection. Field names are matched by converting Go field
 // names to snake_case.
-func mapFields(fields map[string]eval.Value, cfg any) error {
+func mapFields(fields map[string]eval.Value, cfg any, lc *linkConfig) error {
 	v := reflect.ValueOf(cfg)
 	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
@@ -31,10 +35,14 @@ func mapFields(fields map[string]eval.Value, cfg any) error {
 		name := toSnake(f.Name)
 		val, ok := fields[name]
 		if !ok {
+			// Apply default from struct tag if present.
+			if def := f.Tag.Get("default"); def != "" {
+				applyDefault(v.Field(i), def)
+			}
 			continue
 		}
 		fv := v.Field(i)
-		if err := setValue(fv, val); err != nil {
+		if err := setValue(fv, val, lc); err != nil {
 			return err
 		}
 	}
@@ -42,7 +50,7 @@ func mapFields(fields map[string]eval.Value, cfg any) error {
 }
 
 // setValue assigns an eval.Value to a reflect.Value.
-func setValue(dst reflect.Value, src eval.Value) error {
+func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 	if src == nil {
 		return nil
 	}
@@ -64,7 +72,7 @@ func setValue(dst reflect.Value, src eval.Value) error {
 		if dst.Kind() == reflect.Slice {
 			slice := reflect.MakeSlice(dst.Type(), len(sv.Items), len(sv.Items))
 			for i, item := range sv.Items {
-				if err := setValue(slice.Index(i), item); err != nil {
+				if err := setValue(slice.Index(i), item, lc); err != nil {
 					return err
 				}
 			}
@@ -75,11 +83,11 @@ func setValue(dst reflect.Value, src eval.Value) error {
 			m := reflect.MakeMap(dst.Type())
 			for i, k := range sv.Keys {
 				kv := reflect.New(dst.Type().Key()).Elem()
-				if err := setValue(kv, k); err != nil {
+				if err := setValue(kv, k, lc); err != nil {
 					return err
 				}
 				vv := reflect.New(dst.Type().Elem()).Elem()
-				if err := setValue(vv, sv.Values[i]); err != nil {
+				if err := setValue(vv, sv.Values[i], lc); err != nil {
 					return err
 				}
 				m.SetMapIndex(kv, vv)
@@ -94,13 +102,13 @@ func setValue(dst reflect.Value, src eval.Value) error {
 		dstType := dst.Type()
 		switch {
 		case dstType == reflect.TypeOf(spec.SourceRef{}):
-			dst.Set(reflect.ValueOf(convertSourceRef(sv)))
+			dst.Set(reflect.ValueOf(convertSourceRef(sv, lc)))
 		case dstType == reflect.TypeOf(spec.PkgSourceRef{}):
 			dst.Set(reflect.ValueOf(convertPkgSourceRef(sv)))
 		case dst.Kind() == reflect.Interface:
 			dst.Set(reflect.ValueOf(sv))
 		case dst.Kind() == reflect.Struct:
-			if err := mapFields(sv.Fields, dst.Addr().Interface()); err != nil {
+			if err := mapFields(sv.Fields, dst.Addr().Interface(), lc); err != nil {
 				return err
 			}
 		}
@@ -111,7 +119,7 @@ func setValue(dst reflect.Value, src eval.Value) error {
 // Composable type converters
 // -----------------------------------------------------------------------------
 
-func convertSourceRef(sv *eval.StructVal) spec.SourceRef {
+func convertSourceRef(sv *eval.StructVal, lc *linkConfig) spec.SourceRef {
 	ref := spec.SourceRef{}
 	switch sv.TypeName {
 	case "source_local":
@@ -123,6 +131,13 @@ func convertSourceRef(sv *eval.StructVal) spec.SourceRef {
 		ref.Kind = spec.SourceInline
 		if c, ok := sv.Fields["content"].(*eval.StringVal); ok {
 			ref.Content = c.V
+			// Write to cache so the engine can read the file.
+			if lc != nil && lc.src != nil {
+				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(c.V)))[:12]
+				cachePath := filepath.Join(filepath.Dir(lc.cfgPath), ".scampi-cache", "inline-"+hash)
+				_ = lc.src.WriteFile(lc.ctx, cachePath, []byte(c.V))
+				ref.Path = cachePath
+			}
 		}
 	case "source_remote":
 		ref.Kind = spec.SourceRemote
@@ -166,6 +181,20 @@ func convertPkgSourceRef(sv *eval.StructVal) spec.PkgSourceRef {
 		}
 	}
 	return ref
+}
+
+// applyDefault sets a struct field to its default value from the tag.
+func applyDefault(dst reflect.Value, def string) {
+	switch dst.Kind() {
+	case reflect.String:
+		dst.SetString(def)
+	case reflect.Bool:
+		dst.SetBool(def == "true")
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if v, err := strconv.ParseInt(def, 10, 64); err == nil {
+			dst.SetInt(v)
+		}
+	}
 }
 
 // toSnake converts GoFieldName to snake_case.

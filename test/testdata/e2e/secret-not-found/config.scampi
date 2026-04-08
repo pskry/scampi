@@ -1,23 +1,24 @@
-secrets(backend="file", path="/secrets.json")
+module main
 
-target.local(name="local")
+import "std"
+import "std/posix"
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        template(
-            desc="missing secret",
-            content="token={{.token}}",
-            dest="/tmp/out.txt",
-            data={
-                "values": {
-                    "token": secret("nonexistent_key"),
-                },
-            },
-            perm="0644",
-            owner="testuser",
-            group="testgroup",
-        ),
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.secrets { backend = std.SecretsBackend.file, path = "/secrets.json" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.template {
+    desc = "missing secret"
+    content = "token={{.token}}"
+    dest = "/tmp/out.txt"
+    data = {
+      "values": {
+        "token": std.secret("nonexistent_key"),
+      },
+    }
+    perm = "0644"
+    owner = "testuser"
+    group = "testgroup"
+  }
+}

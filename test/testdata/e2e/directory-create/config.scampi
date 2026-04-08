@@ -1,12 +1,13 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        dir(
-            desc="create new directory",
-            path="/tmp/mydir",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.dir {
+    desc = "create new directory"
+    path = "/tmp/mydir"
+  }
+}

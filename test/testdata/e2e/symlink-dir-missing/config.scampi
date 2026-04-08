@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        symlink(
-            desc="link in missing directory",
-            target="/tmp/target.txt",
-            link="/tmp/nonexistent/link.txt",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.symlink {
+    desc = "link in missing directory"
+    target = "/tmp/target.txt"
+    link = "/tmp/nonexistent/link.txt"
+  }
+}

@@ -1,16 +1,17 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        copy(
-            desc="copy to nonexistent dir",
-            src=local("/tmp/src.txt"),
-            dest="/tmp/subdir/dest.txt",
-            perm="0644",
-            owner="testuser",
-            group="testgroup",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "copy to nonexistent dir"
+    src = posix.source_local { path = "/tmp/src.txt" }
+    dest = "/tmp/subdir/dest.txt"
+    perm = "0644"
+    owner = "testuser"
+    group = "testgroup"
+  }
+}

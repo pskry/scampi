@@ -1,16 +1,17 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        copy(
-            desc="copy with bad permission",
-            src=local("/src.txt"),
-            dest="/dest.txt",
-            perm="invalid",
-            owner="testuser",
-            group="testgroup",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "copy with bad permission"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "invalid"
+    owner = "testuser"
+    group = "testgroup"
+  }
+}

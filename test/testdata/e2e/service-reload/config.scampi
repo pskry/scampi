@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        service(
-            desc="reload nginx",
-            name="nginx",
-            state="reloaded",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.service {
+    desc = "reload nginx"
+    name = "nginx"
+    state = posix.ServiceState.reloaded
+  }
+}

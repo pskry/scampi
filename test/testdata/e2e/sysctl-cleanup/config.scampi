@@ -1,14 +1,15 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        sysctl(
-            desc="live only, remove stale drop-in",
-            key="net.ipv4.ip_forward",
-            value="1",
-            persist=False,
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.sysctl {
+    desc = "live only, remove stale drop-in"
+    key = "net.ipv4.ip_forward"
+    value = "1"
+    persist = false
+  }
+}

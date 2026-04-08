@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        pkg(
-            desc="packages already installed",
-            packages=["nginx", "curl"],
-            source=system(),
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.pkg {
+    desc = "packages already installed"
+    packages = ["nginx", "curl"]
+    source = posix.pkg_system {}
+  }
+}

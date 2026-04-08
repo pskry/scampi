@@ -1,14 +1,15 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        service(
-            desc="stop nginx",
-            name="nginx",
-            state="stopped",
-            enabled=False,
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.service {
+    desc = "stop nginx"
+    name = "nginx"
+    state = posix.ServiceState.stopped
+    enabled = false
+  }
+}

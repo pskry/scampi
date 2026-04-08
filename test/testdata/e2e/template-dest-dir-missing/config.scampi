@@ -1,16 +1,17 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        template(
-            desc="missing parent dir",
-            src=inline("hello"),
-            dest="/no/such/dir/out.txt",
-            perm="0644",
-            owner="testuser",
-            group="testgroup",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.template {
+    desc = "missing parent dir"
+    src = posix.source_inline { content = "hello" }
+    dest = "/no/such/dir/out.txt"
+    perm = "0644"
+    owner = "testuser"
+    group = "testgroup"
+  }
+}

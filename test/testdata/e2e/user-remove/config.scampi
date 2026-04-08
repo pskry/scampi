@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        user(
-            desc="remove user hal9000",
-            name="hal9000",
-            state="absent",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.user {
+    desc = "remove user hal9000"
+    name = "hal9000"
+    state = posix.UserState.absent
+  }
+}

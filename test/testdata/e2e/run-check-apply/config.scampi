@@ -1,13 +1,14 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        run(
-            desc="enable ip forwarding",
-            check="check-ip-forward",
-            apply="apply-ip-forward",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.run {
+    desc = "enable ip forwarding"
+    check = "check-ip-forward"
+    apply = "apply-ip-forward"
+  }
+}

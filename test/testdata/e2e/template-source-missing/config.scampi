@@ -1,16 +1,17 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        template(
-            desc="missing source",
-            src=local("/does/not/exist.tmpl"),
-            dest="/tmp/out.txt",
-            perm="0644",
-            owner="testuser",
-            group="testgroup",
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.template {
+    desc = "missing source"
+    src = posix.source_local { path = "/does/not/exist.tmpl" }
+    dest = "/tmp/out.txt"
+    perm = "0644"
+    owner = "testuser"
+    group = "testgroup"
+  }
+}

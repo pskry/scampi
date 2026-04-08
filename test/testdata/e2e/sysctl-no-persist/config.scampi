@@ -1,14 +1,15 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        sysctl(
-            desc="set live only",
-            key="net.ipv4.tcp_keepalive_time",
-            value="300",
-            persist=False,
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.sysctl {
+    desc = "set live only"
+    key = "net.ipv4.tcp_keepalive_time"
+    value = "300"
+    persist = false
+  }
+}

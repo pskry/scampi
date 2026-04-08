@@ -1,15 +1,16 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        user(
-            desc="create user hal9000",
-            name="hal9000",
-            shell="/bin/bash",
-            home="/home/hal9000",
-            groups=["sudo", "docker"],
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.user {
+    desc = "create user hal9000"
+    name = "hal9000"
+    shell = "/bin/bash"
+    home = "/home/hal9000"
+    groups = ["sudo", "docker"]
+  }
+}

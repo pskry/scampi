@@ -1,14 +1,15 @@
-target.local(name="local")
+module main
 
-deploy(
-    name="test",
-    targets=["local"],
-    steps=[
-        pkg(
-            desc="remove packages",
-            packages=["tree"],
-            state="absent",
-            source=system(),
-        ),
-    ],
-)
+import "std"
+import "std/posix"
+
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.pkg {
+    desc = "remove packages"
+    packages = ["tree"]
+    state = posix.PkgState.absent
+    source = posix.pkg_system {}
+  }
+}
