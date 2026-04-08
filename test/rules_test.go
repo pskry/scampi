@@ -69,6 +69,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os,os/signal",
 		},
 		{
+			pattern:        "cmd/gen-stubs/main.go",
+			allowedImports: "os",
+		},
+		{
 			pattern:        "lsp/server.go",
 			allowedImports: "os",
 		},

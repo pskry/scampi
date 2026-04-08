@@ -6,10 +6,11 @@
 package langstubs
 
 import (
-	"errors"
 	"io"
 	"reflect"
 	"strings"
+
+	"scampi.dev/scampi/errs"
 )
 
 // StubInput describes one step to generate a stub for.
@@ -29,7 +30,7 @@ type Options struct {
 // Generate writes scampi-lang stub declarations for the named module.
 func Generate(moduleName string, inputs []StubInput, opts Options, w io.Writer) error {
 	if moduleName == "" {
-		return errors.New("moduleName is required")
+		return errs.BUG("moduleName is required")
 	}
 	bw := &builder{w: w}
 
