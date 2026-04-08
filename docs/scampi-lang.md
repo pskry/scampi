@@ -204,8 +204,8 @@ type is unambiguous, bare variants are allowed:
 
 ```
 # both valid:
-std.pkg { name = "nginx", state = PkgState.present }
-std.pkg { name = "nginx", state = present }
+posix.pkg { packages = ["nginx"], source = posix.pkg_system {}, state = PkgState.present }
+posix.pkg { packages = ["nginx"], source = posix.pkg_system {}, state = present }
 ```
 
 The LSP resolves bare variants by checking the expected type of the field.
@@ -294,6 +294,7 @@ module in under its **leaf name** as a namespace:
 
 ```
 import "std"                   # available as `std`
+import "std/posix"             # available as `posix`
 import "std/container"         # available as `container`
 import "std/rest"              # available as `rest`
 import "codeberg.org/scampi-dev/modules/unifi"  # available as `unifi`
@@ -302,8 +303,8 @@ import "codeberg.org/scampi-dev/modules/unifi"  # available as `unifi`
 Call sites use the leaf namespace:
 
 ```
-std.pkg { ... }
-std.copy { ... }
+posix.pkg { ... }
+posix.copy { ... }
 container.instance { ... }
 rest.request { ... }
 unifi.Network(...)
@@ -336,15 +337,17 @@ the user restructures their imports (or we revisit aliasing).
 ### 3.2 Standard library layout
 
 ```
-std                            # core steps: copy, dir, symlink, template,
-                               # unarchive, pkg, service, user, group, run,
-                               # sysctl, mount, firewall
-std/container                  # container.instance, container.healthcheck
-std/rest                       # rest.request, rest.resource, rest.body.*,
-                               # rest.status, rest.jq, rest.bearer, etc.
+std                            # core types (Step, Target, Deploy, SecretsConfig),
+                               # SecretsBackend enum, deploy, secrets, env(), secret()
+std/posix                      # all POSIX steps, targets (ssh, local), sources,
+                               # enums (PkgState, ServiceState, etc.)
+std/rest                       # REST target, request, resource, Auth, TLS, Body,
+                               # Check composables
+std/container                  # container.instance, Healthcheck, State, Restart
 ```
 
-A typical config imports `"std"` for the core steps and adds `"std/rest"`
+A typical config imports `"std"` for deploy/secrets/env/secret, adds
+`"std/posix"` for system-level steps and targets, and adds `"std/rest"`
 or `"std/container"` when needed.
 
 All standard library steps are defined as scampi-lang stubs (generated
@@ -352,7 +355,7 @@ from Go struct tags). See §7.
 
 There is no auto-import. Every file that uses builtins must
 `import "std"` explicitly. Call sites are always namespaced:
-`std.pkg {}`, `std.copy {}`, `std.dir {}`.
+`posix.pkg {}`, `posix.copy {}`, `posix.dir {}`.
 
 ### 3.3 Exports
 
@@ -373,14 +376,15 @@ else). Deliberately unsolved for v1.
 The core construct. A decl block declares desired state:
 
 ```
-std.pkg {
-    name  = "nginx"
-    state = present
+posix.pkg {
+    packages = ["nginx"]
+    source   = posix.pkg_system {}
+    state    = present
 }
 ```
 
-Step names are resolved from imports. Builtins live in `std` and must
-be imported and namespaced. User-defined steps declared in the current
+Step names are resolved from imports. Builtin POSIX steps live in
+`std/posix` and must be imported and namespaced. User-defined steps declared in the current
 file can be called unqualified; user-defined steps from another module
 are called through that module's namespace (e.g. `myteam.create_user`).
 
@@ -395,19 +399,19 @@ These shorthands are planned but not in the initial implementation.
 
 ```
 # sugar
-std.pkg.present "nginx"
+posix.pkg.present "nginx"
 
 # desugars to
-std.pkg { name = "nginx", state = PkgState.present }
+posix.pkg { packages = ["nginx"], source = posix.pkg_system {}, state = PkgState.present }
 ```
 
 **Bulk form:**
 
 ```
 # sugar
-std.pkg.present ["nginx", "certbot", "curl", "htop"]
+posix.pkg.present ["nginx", "certbot", "curl", "htop"]
 
-# desugars to one std.pkg block per item
+# desugars to one posix.pkg block per item
 ```
 
 **Single-arg composable shorthand** — see §6.3.
@@ -417,14 +421,11 @@ For blocks dominated by calls to a single module, a scoped `using` block
 allows dropping the namespace prefix:
 
 ```
-std.deploy {
-    name    = "bootstrap"
-    targets = [vps_root]
-
-    using std {
-        pkg { packages = ["sudo"], source = system {} }
+std.deploy(name = "bootstrap", targets = [vps_root]) {
+    using posix {
+        pkg { packages = ["sudo"], source = pkg_system {} }
         copy {
-            src  = local { path = "./files/sudoers" }
+            src  = source_local { path = "./files/sudoers" }
             dest = "/etc/sudoers.d/hal9000"
             perm = "0440"
         }
@@ -433,18 +434,21 @@ std.deploy {
 }
 ```
 
-Inside the `using std { ... }` block, `pkg`, `copy`, `dir`, `system`,
-`local`, etc. are resolved against `std`. Outside the block, namespacing
-is still required. The boundary is explicit and scope-local — no
-file-wide pollution like Go's `import . "pkg"`. Deferred to post-v1.
+Inside the `using posix { ... }` block, `pkg`, `copy`, `dir`,
+`pkg_system`, `source_local`, etc. are resolved against `posix`. Outside
+the block, namespacing is still required. The boundary is explicit and
+scope-local — no file-wide pollution like Go's `import . "pkg"`.
+Deferred to post-v1.
 
-### 4.3 Decl and function declarations
+### 4.3 Declarations, functions, and blocks
 
-`decl` and `func` are the two declaration keywords. They share the
-same shape but differ in calling convention:
+`decl`, `func`, and `block[T]` form the declaration system. They share
+the same parameter syntax but differ in calling convention and purpose:
 
 - `func` — called with `()`, pure computation, returns a value
 - `decl` — called with `{}`, declarative, produces typed values
+- `block[T]` — a builtin generic type representing a value that needs a
+  statement block to produce a `T`
 
 ```
 func NAME(field: type, ...) ReturnType { body }
@@ -452,7 +456,13 @@ decl NAME(field: type, ...) ReturnType { body }
 ```
 
 Both take typed parameters, both declare a return/output type, both
-can have a body.
+can have a body. **Stub declarations** (no body) are also valid — the
+Go engine provides the implementation:
+
+```
+func NAME(params) ReturnType       # stub function
+decl NAME(params) ReturnType       # stub decl
+```
 
 **Functions:**
 
@@ -470,9 +480,9 @@ decl create_user(
     groups: list[string] = [],
     shell:  string = "/bin/bash",
 ) Step {
-    std.pkg { packages = ["shadow-utils"], source = std.system {} }
+    posix.pkg { packages = ["shadow-utils"], source = posix.pkg_system {} }
 
-    std.user {
+    posix.user {
         name   = self.name
         groups = self.groups
         shell  = self.shell
@@ -485,42 +495,77 @@ decl create_user(
 produces a sequence of `Step` values through bare decl
 invocations (see §4.7).
 
-**Builtin stub (no body):**
+**Builtin stubs (no body):**
 
-Decls in `std` are declarations with no body — just the signature:
+Stubs in the standard library are declarations with no body — just the
+signature. Both `decl` and `func` can be stubs:
 
 ```
-decl pkg(
-    packages: list[string],
-    source:   PkgSource,
-    state:    PkgState = PkgState.present,
-    desc:     string?,
-) Step
+# std.scampi — func stub returning block[Deploy]
+func deploy(name: string, targets: list[Target]) block[Deploy]
 
+# std.scampi — decl stub
+decl secrets(
+    backend: SecretsBackend,
+    path:    string,
+) SecretsConfig
+
+# std/posix.scampi — decl stubs
 decl ssh(
     name:     string,
     host:     string,
     user:     string,
     port:     int = 22,
     key:      string?,
-    insecure: bool = false,
+    insecure: bool?,
     timeout:  string = "5s",
-) Target
+) std.Target
 
-decl deploy(
-    name:    string,
-    targets: list[Target],
-) Deploy { /* body accepts decl invocations */ }
-
-decl secrets(
-    backend: string,
-    path:    string,
-) SecretsConfig
+decl pkg(
+    packages:  list[string],
+    source:    PkgSource,
+    state:     PkgState = PkgState.present,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 ```
 
 No body means the Go engine provides the implementation. The stub
 gives the LSP everything it needs: field names, types, defaults,
 documentation, and output type.
+
+**The `block[T]` type and block invocation:**
+
+`block[T]` is a builtin generic type (like `list[T]` and `map[K,V]`).
+A value of type `block[T]` is produced by a function call and then
+*filled* with a statement block to produce a `T`. Each fill produces
+an independent `T` value.
+
+Block invocation has two forms:
+
+1. **Inline** — call expression immediately followed by a brace block:
+
+```
+std.deploy(name = "site", targets = [vps]) {
+    posix.pkg { packages = ["caddy"], source = posix.pkg_system {} }
+    posix.copy { ... }
+}
+```
+
+2. **Two-step** — bind the block value, then fill it separately:
+
+```
+let site = std.deploy(name = "site", targets = [vps])
+site {
+    posix.pkg { packages = ["caddy"], source = posix.pkg_system {} }
+    posix.copy { ... }
+}
+```
+
+In both cases, the call must return `block[T]`. The brace block
+contains the same statement forms as a decl body (let bindings, bare
+decl invocations, for loops, conditionals). The result is a value of
+type `T`.
 
 **Call-site syntax differs from declaration:**
 
@@ -529,10 +574,10 @@ Decl **invocations** use braces with equals (matching type literals):
 
 ```
 // declaration: parens, colons
-decl pkg(packages: list[string], source: PkgSource) Step
+decl pkg(packages: list[string], source: PkgSource) std.Step
 
 // invocation: braces, equals
-std.pkg { packages = ["nginx"], source = std.system {} }
+posix.pkg { packages = ["nginx"], source = posix.pkg_system {} }
 ```
 
 This reflects decls' dual nature — parameterized declarations (like
@@ -543,10 +588,11 @@ funcs) that produce typed records (constructed like type literals).
 - If omitted from a user-defined decl, output type is `Step`
 - User-defined decls must produce `Step` (no custom output
   types in v0)
-- Builtin decls in std can produce any value type defined in std
-  (`Target`, `Deploy`, `SecretsConfig`, or `Step`)
+- Builtin decls can produce any value type defined in std
+  (`Target`, `SecretsConfig`, or `Step`)
+- `deploy` is a `func` returning `block[Deploy]`, not a `decl`
 - A decl invocation's expression has the decl's output type: e.g.
-  `let v = std.target.ssh { ... }` gives `v` the type `Target`
+  `let v = posix.ssh { ... }` gives `v` the type `Target`
 
 ### 4.4 Top-level scope and the engine
 
@@ -562,28 +608,29 @@ The engine consumes specific value types from the top-level scope:
 
 A compile-time error is raised when a `Step` expression
 appears at top-level. The compiler traces this back to a typed
-expression (e.g. `std.pkg { ... }`) and suggests wrapping it in a
-`std.deploy` body.
+expression (e.g. `posix.pkg { ... }`) and suggests wrapping it in a
+`std.deploy(...)` block.
 
 An engine-level error is raised post-evaluation when the program
 produces no `Deploy` values.
 
-### 4.5 Targets (from `std/target`)
+### 4.5 Targets (from `std/posix`, `std/rest`)
 
 Targets are `let`-bound decl invocations that produce `Target` values:
 
 ```
-import "std/target"
+import "std/posix"
+import "std/rest"
 
-let vps = target.ssh {
+let vps = posix.ssh {
     name = "vps"
     host = std.secret("vps.host")
     user = "hal9000"
 }
 
-let dev = target.local { name = "dev" }
+let dev = posix.local { name = "dev" }
 
-let api = target.rest {
+let api = rest.target {
     name     = "api"
     base_url = "https://api.example.com"
     auth     = rest.bearer {
@@ -591,7 +638,7 @@ let api = target.rest {
         identity       = std.secret("api.id")
         secret         = std.secret("api.secret")
     }
-    tls = rest.tls.secure {}
+    tls = rest.tls_secure {}
 }
 ```
 
@@ -600,23 +647,22 @@ string-name registry. Type-checked end to end.
 
 ### 4.6 Deploy (from `std`)
 
-A deploy is a decl invocation that produces a `Deploy` value. Its body
-accepts decl invocations (as statements for desired state, or as
-let-bound values for reuse) and arbitrary `let` bindings:
+`std.deploy` is a `func` returning `block[Deploy]`. Calling it with
+arguments produces a block value, and filling that block with a
+statement block produces a `Deploy` value. The block body accepts decl
+invocations (as statements for desired state, or as let-bound values
+for reuse) and arbitrary `let` bindings:
 
 ```
-std.deploy {
-    name    = "site"
-    targets = [vps]
+std.deploy(name = "site", targets = [vps]) {
+    let reload_caddy = posix.service { name = "caddy", state = reloaded }
 
-    let reload_caddy = std.service { name = "caddy", state = reloaded }
+    posix.pkg { packages = ["caddy"], source = posix.pkg_system {} }
+    posix.dir { path = "/var/www/scampi.dev", perm = "0755" }
 
-    std.pkg { packages = ["caddy"], source = std.system {} }
-    std.dir { path = "/var/www/scampi.dev", perm = "0755" }
-
-    std.copy {
+    posix.copy {
         desc      = "install Caddyfile"
-        src       = std.local { path = "./files/Caddyfile" }
+        src       = posix.source_local { path = "./files/Caddyfile" }
         dest      = "/etc/caddy/Caddyfile"
         perm      = "0644"
         owner     = "root"
@@ -625,14 +671,23 @@ std.deploy {
         on_change = [reload_caddy]
     }
 
-    std.service { name = "caddy", state = running, enabled = true }
+    posix.service { name = "caddy", state = running, enabled = true }
 }
 ```
 
-The deploy body is just a block scope — it contains `let` bindings
-and decl invocations. Bare decl invocations become desired state;
-let-bound ones are values you can reference from `on_change` lists
-(see §4.7).
+The deploy block body is just a block scope — it contains `let`
+bindings and decl invocations. Bare decl invocations become desired
+state; let-bound ones are values you can reference from `on_change`
+lists (see §4.7).
+
+The deploy can also be split into two steps (see §4.3 on `block[T]`):
+
+```
+let site = std.deploy(name = "site", targets = [vps])
+site {
+    posix.pkg { packages = ["caddy"], source = posix.pkg_system {} }
+}
+```
 
 ### 4.7 Statements vs values in body scopes
 
@@ -651,25 +706,28 @@ This positional semantics is what lets reactive hooks work without
 any special language machinery:
 
 ```
-std.deploy {
-    name    = "bootstrap"
-    targets = [vps_root]
-
+std.deploy(name = "bootstrap", targets = [vps_root]) {
     # let-bound — these are values, not desired state
-    let restart_sshd = std.service { name = "sshd", state = restarted }
-    let reload_caddy = std.service { name = "caddy", state = reloaded }
+    let restart_sshd = posix.service { name = "sshd", state = restarted }
+    let reload_caddy = posix.service { name = "caddy", state = reloaded }
 
     # statement — this IS desired state
-    std.copy {
-        src       = std.local { path = "./files/sshd_hardened.conf" }
+    posix.copy {
+        src       = posix.source_local { path = "./files/sshd_hardened.conf" }
         dest      = "/etc/ssh/sshd_config.d/hardened.conf"
+        perm      = "0644"
+        owner     = "root"
+        group     = "root"
         verify    = "sshd -t -f %s"
         on_change = [restart_sshd]       # reactive reference (value reuse)
     }
 
-    std.copy {
-        src       = std.local { path = "./files/Caddyfile" }
+    posix.copy {
+        src       = posix.source_local { path = "./files/Caddyfile" }
         dest      = "/etc/caddy/Caddyfile"
+        perm      = "0644"
+        owner     = "root"
+        group     = "root"
         on_change = [reload_caddy]
     }
 }
@@ -677,7 +735,7 @@ std.deploy {
 
 Types:
 
-- `restart_sshd: Step` (from `std.service`)
+- `restart_sshd: Step` (from `posix.service`)
 - `on_change: list[Step]`
 
 The same `Step` value can be emitted as desired state AND
@@ -688,7 +746,7 @@ the unification at runtime.
 
 Extracting a field from another step's runtime output — e.g. "use
 the `id` field of the resource we just created" — is a separate
-concern. For v0, use `std.rest.jq` and related composables (same as
+concern. For v0, use `rest.jq` and related composables (same as
 current scampi), which bind runtime outputs via JQ expressions. A
 dedicated cross-step output reference construct will be designed
 when we have more examples of the pattern.
@@ -697,7 +755,7 @@ when we have more examples of the pattern.
 
 ```
 std.secrets {
-    backend = "age"
+    backend = std.SecretsBackend.age
     path    = "secrets.age.json"
 }
 
@@ -705,6 +763,7 @@ let host = std.secret("vps.host")
 ```
 
 `std.secrets` is a decl invocation producing a `SecretsConfig` value.
+The `backend` field is an `std.SecretsBackend` enum (not a bare string).
 At most one may appear at top-level across the project. `std.secret(key)`
 is a scalar function that returns a string resolved at evaluation time.
 
@@ -749,9 +808,7 @@ func build_state(name: string, extras: map[string, any]) map[string, any] {
     return state
 }
 
-std.deploy {
-    name    = "example"
-    targets = [vps]
+std.deploy(name = "example", targets = [vps]) {
     let s = build_state("web", {"port": 8080})
     # s is frozen here — s["port"] = 9090 would be a compile error
     rest.request { state = s }
@@ -880,24 +937,24 @@ computations:
 Composable types are small typed values that plug into decl fields. They
 use block syntax (like steps and types), not function-call syntax.
 
-**Source resolvers:**
+**Source resolvers (from `std/posix`):**
 
 ```
-src = std.local { path = "./files/config.yaml" }
-src = std.inline { content = "hello world\n" }
-src = std.remote { url = "https://example.com/file.tar.gz", checksum = "sha256:abc123" }
+src = posix.source_local { path = "./files/config.yaml" }
+src = posix.source_inline { content = "hello world\n" }
+src = posix.source_remote { url = "https://example.com/file.tar.gz", checksum = "sha256:abc123" }
 ```
 
-**Package sources:**
+**Package sources (from `std/posix`):**
 
 ```
-source = std.system {}
-source = std.apt_repo {
+source = posix.pkg_system {}
+source = posix.pkg_apt_repo {
     url        = "https://download.docker.com/linux/debian"
     key_url    = "https://download.docker.com/linux/debian/gpg"
     components = ["stable"]
 }
-source = std.dnf_repo { url = "https://example.com/repo/el9" }
+source = posix.pkg_dnf_repo { url = "https://example.com/repo/el9" }
 ```
 
 **REST authentication:**
@@ -916,16 +973,16 @@ auth = rest.header { name = "X-API-Key", value = std.secret("api.key") }
 **REST TLS:**
 
 ```
-tls = rest.tls.secure {}
-tls = rest.tls.insecure {}
-tls = rest.tls.ca_cert { path = "/etc/ssl/custom-ca.pem" }
+tls = rest.tls_secure {}
+tls = rest.tls_insecure {}
+tls = rest.tls_ca_cert { path = "/etc/ssl/custom-ca.pem" }
 ```
 
 **REST body:**
 
 ```
-body = rest.body.json { data = {"name": "example", "count": 42} }
-body = rest.body.string { content = "plain text payload" }
+body = rest.body_json { data = {"name": "example", "count": 42} }
+body = rest.body_string { content = "plain text payload" }
 ```
 
 **REST checks:**
@@ -942,14 +999,14 @@ may allow omitting the field name when there is exactly one argument:
 
 ```
 # sugar (not in v1)
-src = local "./files/config.yaml"
-src = inline "hello world\n"
+src = source_local "./files/config.yaml"
+src = source_inline "hello world\n"
 check = rest.jq ".data[]"
 check = rest.status 200
 
 # desugars to
-src = std.local { path = "./files/config.yaml" }
-src = std.inline { content = "hello world\n" }
+src = posix.source_local { path = "./files/config.yaml" }
+src = posix.source_inline { content = "hello world\n" }
 check = rest.jq { expr = ".data[]" }
 check = rest.status { code = 200 }
 ```
@@ -966,234 +1023,310 @@ through normal scoping rules:
 - Targets, variables, functions, types: use their bare name
 - Reactive steps (hooks): let-bind them and use the binding name in
   `on_change` lists (see §4.7)
-- Cross-step runtime output extraction: use `std.rest.jq` and similar
+- Cross-step runtime output extraction: use `rest.jq` and similar
   composables (deferred post-v0)
 
 ---
 
 ## 7. Standard library stubs
 
-These are generated from Go struct tags. They define every builtin decl's
+These are generated from Go struct tags. They define every builtin's
 type signature. The LSP reads these as the authoritative source.
 
-### 7.1 Enums
+The authoritative stub files live at:
+- `std/std.scampi` — core types, enums, deploy, secrets, env, secret
+- `std/posix/posix.scampi` — POSIX steps, targets, sources, enums
+- `std/rest/rest.scampi` — REST target, composables, steps
+- `std/container/container.scampi` — container step, types, enums
+
+### 7.1 `std` module
 
 ```
-enum PkgState    { present, absent, latest }
-enum SvcState    { running, stopped, restarted, reloaded }
-enum UserState   { present, absent }
-enum GroupState  { present, absent }
-enum CtrState    { running, stopped, absent }
-enum CtrRestart  { always, on_failure, unless_stopped, no }
-enum MountState  { mounted, unmounted, absent }
-enum FsType      { nfs, nfs4, cifs, ext4, xfs, btrfs, tmpfs, glusterfs, ceph }
-enum FwAction    { allow, deny, reject }
-enum HttpMethod  { GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS }
+module std
+
+type Step
+type Target
+type Deploy
+type SecretsConfig
+
+enum SecretsBackend { age, file }
+
+func env(name: string, default: string?) string
+func secret(name: string) string
+
+func deploy(name: string, targets: list[Target]) block[Deploy]
+
+decl secrets(
+    backend: SecretsBackend,
+    path:    string,
+) SecretsConfig
 ```
 
-### 7.2 Top-level value types
-
-Defined in `std`, consumed by the engine from top-level scope:
+### 7.2 `std/posix` module
 
 ```
-type Target              # opaque, produced by target.* steps
-type Deploy              # opaque, produced by std.deploy
-type SecretsConfig       # opaque, produced by std.secrets
-type Step                # opaque, produced by desired-state decls
-```
+module posix
 
-### 7.3 Target, deploy, secrets stubs
+import "std"
 
-```
-# std/target.scampi
+# Opaque types
+type Source
+type PkgSource
 
+# Enums
+enum PkgState      { present, absent, latest }
+enum ServiceState  { running, stopped, restarted, reloaded }
+enum UserState     { present, absent }
+enum GroupState    { present, absent }
+enum MountType     { nfs, nfs4, cifs, ext4, xfs, btrfs, tmpfs, glusterfs, ceph }
+enum MountState    { mounted, unmounted, absent }
+enum FirewallAction { allow, deny, reject }
+
+# Targets
 decl ssh(
     name:     string,
     host:     string,
     user:     string,
     port:     int = 22,
     key:      string?,
-    insecure: bool = false,
+    insecure: bool?,
     timeout:  string = "5s",
-) Target
+) std.Target
 
-decl local(name: string) Target
+decl local(name: string) std.Target
 
-decl rest(
-    name:     string,
-    base_url: string,
-    auth:     Auth = rest.no_auth {},
-    tls:      TLS  = rest.tls.secure {},
-) Target
-```
+# Source composables
+decl source_local(path: string) Source
+decl source_inline(content: string) Source
+decl source_remote(url: string, checksum: string?) Source
 
-```
-# std/deploy.scampi
+decl pkg_system() PkgSource
+decl pkg_apt_repo(
+    url:        string,
+    key_url:    string,
+    components: list[string]?,
+    suite:      string?,
+) PkgSource
+decl pkg_dnf_repo(
+    url:     string,
+    key_url: string?,
+) PkgSource
 
-decl deploy(
-    name:    string,
-    targets: list[Target],
-) Deploy {
-    # body: let bindings + bare decl invocations
-    # bare decl invocations produce desired state
-}
-```
-
-```
-# std/secrets.scampi
-
-decl secrets(
-    backend: string,
-    path:    string,
-) SecretsConfig
-```
-
-### 7.4 Desired-state decl stubs
-
-All produce `Step` (the default output type). Every desired-
-state decl implicitly has `on_change: list[Step] = []` —
-reactive decls to fire when this step changes. `desc: string?` is
-shown on each stub.
-
-```
 # File operations
-# ---------------------------------------------------------------------------
-
 decl copy(
-    src:    Source,
-    dest:   string,
-    perm:   string,
-    owner:  string,
-    group:  string,
-    verify: string?,
-    desc:   string?,
-) Step
+    src:       Source,
+    dest:      string,
+    perm:      string,
+    owner:     string,
+    group:     string,
+    verify:    string?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 decl dir(
-    path:  string,
-    perm:  string?,
-    owner: string?,
-    group: string?,
-    desc:  string?,
-) Step
+    path:      string,
+    perm:      string?,
+    owner:     string?,
+    group:     string?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 decl symlink(
-    target: string,
-    link:   string,
-    desc:   string?,
-) Step
-
-type TemplateData {
-    values: map[string, any] = {}
-    env:    map[string, string] = {}
-}
+    target:    string,
+    link:      string,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 decl template(
-    src:    Source,
-    dest:   string,
-    data:   TemplateData?,
-    perm:   string,
-    owner:  string,
-    group:  string,
-    verify: string?,
-    desc:   string?,
-) Step
+    src:       Source,
+    dest:      string,
+    data:      any?,
+    perm:      string,
+    owner:     string,
+    group:     string,
+    verify:    string?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 decl unarchive(
-    src:   Source,
-    dest:  string,
-    depth: int = 0,
-    owner: string?,
-    group: string?,
-    perm:  string?,
-    desc:  string?,
-) Step
+    src:       Source,
+    dest:      string,
+    depth:     int? = 0,
+    owner:     string?,
+    group:     string?,
+    perm:      string?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 # Package management
-# ---------------------------------------------------------------------------
-
 decl pkg(
-    packages: list[string],
-    source:   PkgSource,
-    state:    PkgState = PkgState.present,
-    desc:     string?,
-) Step
+    packages:  list[string],
+    source:    PkgSource,
+    state:     PkgState = PkgState.present,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 # Service management
-# ---------------------------------------------------------------------------
-
 decl service(
-    name:    string,
-    state:   SvcState = SvcState.running,
-    enabled: bool = true,
-    desc:    string?,
-) Step
+    name:      string,
+    state:     ServiceState = ServiceState.running,
+    enabled:   bool = true,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 # User and group management
-# ---------------------------------------------------------------------------
-
 decl user(
-    name:     string,
-    state:    UserState = UserState.present,
-    shell:    string?,
-    home:     string?,
-    system:   bool = false,
-    password: string?,
-    groups:   list[string] = [],
-    desc:     string?,
-) Step
+    name:      string,
+    state:     UserState = UserState.present,
+    shell:     string?,
+    home:      string?,
+    system:    bool?,
+    password:  string?,
+    groups:    list[string]?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 decl group(
-    name:   string,
-    state:  GroupState = GroupState.present,
-    gid:    int?,
-    system: bool = false,
-    desc:   string?,
-) Step
+    name:      string,
+    state:     GroupState = GroupState.present,
+    gid:       int?,
+    system:    bool?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 # System configuration
-# ---------------------------------------------------------------------------
-
 decl sysctl(
-    key:     string,
-    value:   string,
-    persist: bool = true,
-    desc:    string?,
-) Step
+    key:       string,
+    value:     string,
+    persist:   bool = true,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 decl mount(
-    src:   string,
-    dest:  string,
-    type:  FsType,
-    opts:  string = "defaults",
-    state: MountState = MountState.mounted,
-    desc:  string?,
-) Step
+    src:       string,
+    dest:      string,
+    fs_type:   MountType,
+    opts:      string? = "defaults",
+    state:     MountState? = MountState.mounted,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 decl firewall(
-    port:   string,
-    action: FwAction = FwAction.allow,
-    desc:   string?,
-) Step
+    port:      string,
+    action:    FirewallAction = FirewallAction.allow,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
 
 # Command execution
-# ---------------------------------------------------------------------------
-
 decl run(
-    apply:  string,
-    check:  string?,       # mutually exclusive with always
-    always: bool = false,  # mutually exclusive with check
-    desc:   string?,
-) Step
+    apply:     string,
+    check:     string?,
+    always:    bool? = false,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
+```
 
-# Container management (in std/container)
-# ---------------------------------------------------------------------------
+### 7.3 `std/rest` module
 
-decl container.instance(
+```
+module rest
+
+import "std"
+
+# Composable types
+type Auth
+type TLS
+type Body
+type Check
+
+# Target
+decl target(
+    name:     string,
+    base_url: string,
+    auth:     Auth?,
+    tls:      TLS?,
+) std.Target
+
+# Auth composables
+decl no_auth() Auth
+decl basic(user: string, password: string) Auth
+decl bearer(
+    token_endpoint: string,
+    identity:       string,
+    secret:         string,
+) Auth
+decl header(name: string, value: string) Auth
+
+# TLS composables
+decl tls_secure() TLS
+decl tls_insecure() TLS
+decl tls_ca_cert(path: string) TLS
+
+# Body composables
+decl body_json(data: any) Body
+decl body_string(content: string) Body
+
+# Check composables
+decl status(code: int) Check
+decl jq(expr: string) Check
+
+# Steps
+decl request(
+    method:    string,
+    path:      string,
+    headers:   map[string, string]?,
+    body:      Body?,
+    check:     Check?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
+
+decl resource(
+    query:     request?,
+    missing:   request?,
+    found:     request?,
+    bindings:  map[string, Check]?,
+    state:     map[string, any]?,
+    desc:      string?,
+    on_change: list[std.Step] = [],
+) std.Step
+```
+
+### 7.4 `std/container` module
+
+```
+module container
+
+import "std"
+
+type Healthcheck {
+    cmd:      string
+    interval: string?
+    timeout:  string?
+    retries:  int?
+}
+
+enum State   { running, stopped, absent }
+enum Restart { always, on_failure, unless_stopped, no }
+
+decl instance(
     name:        string,
     image:       string,
-    state:       CtrState = CtrState.running,
-    restart:     CtrRestart = CtrRestart.unless_stopped,
+    state:       State = State.running,
+    restart:     Restart = Restart.unless_stopped,
     ports:       list[string]?,
     env:         map[string, string]?,
     mounts:      list[string]?,
@@ -1201,28 +1334,8 @@ decl container.instance(
     labels:      map[string, string]?,
     healthcheck: Healthcheck?,
     desc:        string?,
-) Step
-
-# REST (in std/rest)
-# ---------------------------------------------------------------------------
-
-decl rest.request(
-    method:  HttpMethod,
-    path:    string,
-    headers: map[string, string]?,
-    body:    Body?,
-    check:   Check?,
-    desc:    string?,
-) Step
-
-decl rest.resource(
-    query:    rest.request,
-    missing:  rest.request?,
-    found:    rest.request?,
-    bindings: map[string, Check]?,
-    state:    map[string, any]?,
-    desc:     string?,
-) Step
+    on_change:   list[std.Step] = [],
+) std.Step
 ```
 
 ---
@@ -1247,22 +1360,22 @@ matching Go).
 
 ```
 import "std"
-import "std/target"
+import "std/posix"
 
 std.secrets {
-    backend = "age"
+    backend = std.SecretsBackend.age
     path    = "secrets.age.json"
 }
 
 let vps_host = std.secret("vps.host")
 
-let vps = target.ssh {
+let vps = posix.ssh {
     name = "vps"
     host = vps_host
     user = "hal9000"
 }
 
-let vps_root = target.ssh {
+let vps_root = posix.ssh {
     name = "vps-root"
     host = vps_host
     user = "root"
@@ -1273,15 +1386,13 @@ let vps_root = target.ssh {
 
 ```
 import "std"
+import "std/posix"
 import "codeberg.org/scampi-dev/infra/targets"
 
-std.deploy {
-    name    = "bootstrap"
-    targets = [targets.vps_root]
+std.deploy(name = "bootstrap", targets = [targets.vps_root]) {
+    let restart_sshd = posix.service { name = "sshd", state = restarted }
 
-    let restart_sshd = std.service { name = "sshd", state = restarted }
-
-    std.user {
+    posix.user {
         desc   = "automation user with sudo"
         name   = "hal9000"
         shell  = "/bin/bash"
@@ -1289,11 +1400,11 @@ std.deploy {
         groups = ["sudo"]
     }
 
-    std.pkg { packages = ["sudo"], source = std.system {} }
+    posix.pkg { packages = ["sudo"], source = posix.pkg_system {} }
 
-    std.copy {
+    posix.copy {
         desc   = "passwordless sudo for hal9000"
-        src    = std.inline { content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n" }
+        src    = posix.source_inline { content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n" }
         dest   = "/etc/sudoers.d/hal9000"
         perm   = "0440"
         owner  = "root"
@@ -1301,25 +1412,25 @@ std.deploy {
         verify = "visudo -cf %s"
     }
 
-    std.dir {
+    posix.dir {
         path  = "/home/hal9000/.ssh"
         perm  = "0700"
         owner = "hal9000"
         group = "hal9000"
     }
 
-    std.copy {
+    posix.copy {
         desc  = "authorize SSH key for hal9000"
-        src   = std.local { path = "./files/hal9000_authorized_keys" }
+        src   = posix.source_local { path = "./files/hal9000_authorized_keys" }
         dest  = "/home/hal9000/.ssh/authorized_keys"
         perm  = "0600"
         owner = "hal9000"
         group = "hal9000"
     }
 
-    std.copy {
+    posix.copy {
         desc      = "harden sshd config"
-        src       = std.local { path = "./files/sshd_hardened.conf" }
+        src       = posix.source_local { path = "./files/sshd_hardened.conf" }
         dest      = "/etc/ssh/sshd_config.d/hardened.conf"
         perm      = "0644"
         owner     = "root"
@@ -1334,60 +1445,58 @@ std.deploy {
 
 ```
 import "std"
+import "std/posix"
 import "codeberg.org/scampi-dev/infra/targets"
 
-std.deploy {
-    name    = "harden"
-    targets = [targets.vps]
-
-    let restart_fail2ban = std.service {
+std.deploy(name = "harden", targets = [targets.vps]) {
+    let restart_fail2ban = posix.service {
         name = "fail2ban", state = restarted
     }
-    let restart_unattended_upgrades = std.service {
+    let restart_unattended_upgrades = posix.service {
         name = "unattended-upgrades", state = restarted
     }
 
-    std.pkg {
+    posix.pkg {
         desc     = "install hardening packages"
         packages = ["fail2ban", "ufw", "unattended-upgrades"]
-        source   = std.system {}
+        source   = posix.pkg_system {}
     }
 
-    std.copy {
+    posix.copy {
         desc      = "fail2ban SSH jail config"
-        src       = std.local { path = "./files/fail2ban-sshd.conf" }
+        src       = posix.source_local { path = "./files/fail2ban-sshd.conf" }
         dest      = "/etc/fail2ban/jail.d/sshd.conf"
         perm      = "0644"
         owner     = "root"
         group     = "root"
         on_change = [restart_fail2ban]
     }
-    std.service { name = "fail2ban", state = running, enabled = true }
+    posix.service { name = "fail2ban", state = running, enabled = true }
 
-    std.firewall { port = "22/tcp",  desc = "allow SSH" }
-    std.firewall { port = "80/tcp",  desc = "allow HTTP" }
-    std.firewall { port = "443/tcp", desc = "allow HTTPS" }
-    std.service { name = "ufw", state = running, enabled = true }
+    posix.firewall { port = "22/tcp",  desc = "allow SSH" }
+    posix.firewall { port = "80/tcp",  desc = "allow HTTP" }
+    posix.firewall { port = "443/tcp", desc = "allow HTTPS" }
+    posix.service { name = "ufw", state = running, enabled = true }
 
-    std.copy {
+    posix.copy {
         desc      = "configure unattended-upgrades"
-        src       = std.local { path = "./files/50unattended-upgrades" }
+        src       = posix.source_local { path = "./files/50unattended-upgrades" }
         dest      = "/etc/apt/apt.conf.d/50unattended-upgrades"
         perm      = "0644"
         owner     = "root"
         group     = "root"
         on_change = [restart_unattended_upgrades]
     }
-    std.copy {
+    posix.copy {
         desc      = "enable auto-upgrades"
-        src       = std.local { path = "./files/20auto-upgrades" }
+        src       = posix.source_local { path = "./files/20auto-upgrades" }
         dest      = "/etc/apt/apt.conf.d/20auto-upgrades"
         perm      = "0644"
         owner     = "root"
         group     = "root"
         on_change = [restart_unattended_upgrades]
     }
-    std.service { name = "unattended-upgrades", state = running, enabled = true }
+    posix.service { name = "unattended-upgrades", state = running, enabled = true }
 }
 ```
 
@@ -1395,6 +1504,7 @@ std.deploy {
 
 ```
 import "std"
+import "std/posix"
 import "codeberg.org/scampi-dev/infra/targets"
 
 let runner_version = "12.7.2"
@@ -1406,68 +1516,65 @@ let go_url = "https://go.dev/dl/go${go_version}.linux-amd64.tar.gz"
 let just_version = "1.46.0"
 let just_url = "https://github.com/casey/just/releases/download/${just_version}/just-${just_version}-x86_64-unknown-linux-musl.tar.gz"
 
-std.deploy {
-    name    = "runner"
-    targets = [targets.vps]
+std.deploy(name = "runner", targets = [targets.vps]) {
+    let restart_runner = posix.service { name = "forgejo-runner", state = restarted }
+    let restart_docker = posix.service { name = "docker", state = restarted }
 
-    let restart_runner = std.service { name = "forgejo-runner", state = restarted }
-    let restart_docker = std.service { name = "docker", state = restarted }
-
-    std.pkg {
+    posix.pkg {
         desc     = "install build tools"
         packages = ["git", "shellcheck", "curl", "nodejs", "npm", "gcc", "libc6-dev", "jq"]
-        source   = std.system {}
+        source   = posix.pkg_system {}
     }
 
     # Go
-    std.unarchive {
+    posix.unarchive {
         desc = "install Go ${go_version}"
-        src  = std.remote { url = go_url }
+        src  = posix.source_remote { url = go_url }
         dest = "/usr/local"
     }
-    std.copy {
+    posix.copy {
         desc  = "Go PATH profile"
-        src   = std.inline { content = "export PATH=\"/usr/local/go/bin:\$PATH\"\n" }
+        src   = posix.source_inline { content = "export PATH=\"/usr/local/go/bin:\$PATH\"\n" }
         dest  = "/etc/profile.d/go.sh"
         perm  = "0644"
         owner = "root"
         group = "root"
     }
-    std.symlink { target = "/usr/local/go/bin/go", link = "/usr/local/bin/go" }
+    posix.symlink { target = "/usr/local/go/bin/go", link = "/usr/local/bin/go" }
 
     # just
-    std.unarchive {
+    posix.unarchive {
         desc = "install just ${just_version}"
-        src  = std.remote { url = just_url }
+        src  = posix.source_remote { url = just_url }
         dest = "/usr/local/bin"
     }
 
     # Docker
-    std.pkg {
+    posix.pkg {
         desc     = "install Docker Engine"
         packages = [
             "docker-ce", "docker-ce-cli", "containerd.io",
             "docker-buildx-plugin", "docker-compose-plugin",
         ]
-        source = std.apt_repo {
+        source = posix.pkg_apt_repo {
             url        = "https://download.docker.com/linux/debian"
             key_url    = "https://download.docker.com/linux/debian/gpg"
             components = ["stable"]
         }
     }
-    std.copy {
+    posix.copy {
         desc      = "enable Docker BuildKit"
-        src       = std.inline { content = "{\"features\":{\"buildkit\":true}}\n" }
+        src       = posix.source_inline { content = "{\"features\":{\"buildkit\":true}}\n" }
         dest      = "/etc/docker/daemon.json"
         perm      = "0644"
         owner     = "root"
         group     = "root"
         on_change = [restart_docker]
     }
-    std.service { name = "docker", state = running, enabled = true }
+    posix.service { name = "docker", state = running, enabled = true }
 
     # Runner user
-    std.user {
+    posix.user {
         desc   = "forgejo-runner service account"
         name   = "forgejo-runner"
         shell  = "/bin/bash"
@@ -1477,25 +1584,25 @@ std.deploy {
     }
 
     # Runner binary
-    std.copy {
+    posix.copy {
         desc  = "install forgejo-runner ${runner_version}"
-        src   = std.remote { url = runner_url }
+        src   = posix.source_remote { url = runner_url }
         dest  = "/usr/local/bin/forgejo-runner"
         perm  = "0755"
         owner = "root"
         group = "root"
     }
 
-    std.dir {
+    posix.dir {
         path  = "/var/lib/forgejo-runner"
         perm  = "0755"
         owner = "forgejo-runner"
         group = "forgejo-runner"
     }
 
-    std.copy {
+    posix.copy {
         desc      = "forgejo-runner config"
-        src       = std.local { path = "./files/forgejo-runner-config.yml" }
+        src       = posix.source_local { path = "./files/forgejo-runner-config.yml" }
         dest      = "/var/lib/forgejo-runner/config.yml"
         perm      = "0640"
         owner     = "forgejo-runner"
@@ -1503,9 +1610,9 @@ std.deploy {
         on_change = [restart_runner]
     }
 
-    std.copy {
+    posix.copy {
         desc      = "forgejo-runner systemd unit"
-        src       = std.local { path = "./files/forgejo-runner.service" }
+        src       = posix.source_local { path = "./files/forgejo-runner.service" }
         dest      = "/etc/systemd/system/forgejo-runner.service"
         perm      = "0644"
         owner     = "root"
@@ -1513,13 +1620,13 @@ std.deploy {
         on_change = [restart_runner]
     }
 
-    std.run {
+    posix.run {
         desc  = "disable tmpfs for /tmp"
         check = "systemctl is-enabled tmp.mount 2>/dev/null | grep -q masked"
         apply = "sudo systemctl mask tmp.mount"
     }
 
-    std.service { name = "forgejo-runner", state = running, enabled = true }
+    posix.service { name = "forgejo-runner", state = running, enabled = true }
 }
 ```
 
@@ -1527,16 +1634,14 @@ std.deploy {
 
 ```
 import "std"
+import "std/posix"
 import "codeberg.org/scampi-dev/infra/targets"
 
-std.deploy {
-    name    = "tools"
-    targets = [targets.vps]
-
-    std.pkg {
+std.deploy(name = "tools", targets = [targets.vps]) {
+    posix.pkg {
         desc     = "install user tools"
         packages = ["neovim", "htop", "btop"]
-        source   = std.system {}
+        source   = posix.pkg_system {}
     }
 }
 ```
@@ -1545,6 +1650,7 @@ std.deploy {
 
 ```
 import "std"
+import "std/posix"
 import "codeberg.org/scampi-dev/infra/targets"
 
 type TeamMember {
@@ -1555,13 +1661,13 @@ type TeamMember {
 }
 
 decl create_user(member: TeamMember) Step {
-    std.user {
+    posix.user {
         name   = self.member.name
         groups = self.member.groups
         shell  = self.member.shell
     }
 
-    std.dir {
+    posix.dir {
         path  = "/home/${self.member.name}/.ssh"
         perm  = "0700"
         owner = self.member.name
@@ -1569,12 +1675,12 @@ decl create_user(member: TeamMember) Step {
     }
 
     if self.member.admin {
-        std.copy {
-            src   = std.inline { content = "${self.member.name} ALL=(ALL) NOPASSWD:ALL\n" }
-            dest  = "/etc/sudoers.d/${self.member.name}"
-            perm  = "0440"
-            owner = "root"
-            group = "root"
+        posix.copy {
+            src    = posix.source_inline { content = "${self.member.name} ALL=(ALL) NOPASSWD:ALL\n" }
+            dest   = "/etc/sudoers.d/${self.member.name}"
+            perm   = "0440"
+            owner  = "root"
+            group  = "root"
             verify = "visudo -cf %s"
         }
     }
@@ -1586,11 +1692,12 @@ let team = [
     TeamMember { name = "carol", groups = ["ops", "dev"] },
 ]
 
-std.deploy {
-    name    = "users"
-    targets = [targets.vps]
-
-    std.pkg.present ["shadow-utils"]
+std.deploy(name = "users", targets = [targets.vps]) {
+    posix.pkg {
+        packages = ["shadow-utils"]
+        source   = posix.pkg_system {}
+        state    = present
+    }
 
     for m in team {
         create_user { member = m }
@@ -1666,9 +1773,8 @@ func network(
 # Consumer uses the func result in a frozen deploy context
 import "std"
 import "std/rest"
-import "std/target"
 
-let udm = target.rest {
+let udm = rest.target {
     name     = "udm"
     base_url = "https://udm.local/proxy/network"
     auth     = rest.bearer {
@@ -1678,10 +1784,7 @@ let udm = target.rest {
     }
 }
 
-std.deploy {
-    name    = "network"
-    targets = [udm]
-
+std.deploy(name = "network", targets = [udm]) {
     let state = network(
         site_id = "default",
         name    = "Servers",
@@ -1766,7 +1869,7 @@ Explicitly excluded:
 | Dynamic attribute access | Prevents sound rename/refactor in LSP                                 |
 | Eval / exec / reflection | Breaks static analysis                                                |
 | Null (general purpose)   | `none` only exists for optional types                                 |
-| Generics                 | Not needed — collection types are built-in                            |
+| Generics                 | Not needed — collection and block types are built-in                  |
 | Pattern matching         | `if`/`else` chains are sufficient for v1                              |
 | Operator overloading     | Complexity without benefit for config language                        |
 | Mutable bindings         | `let` names are immutable. Collection mutation only in `func` bodies. |
@@ -1776,36 +1879,43 @@ Explicitly excluded:
 ## 12. Grammar (EBNF sketch)
 
 ```ebnf
-file           = (use_decl | declaration | statement)* ;
+file           = module_decl (import_decl | declaration | statement)* ;
 
-use_decl       = 'use' use_path ('as' IDENT)? ;
-use_path       = (IDENT '.')* (IDENT | '*')
-               | STRING ('.' (IDENT | '*'))? ;
+module_decl    = 'module' IDENT ;
+import_decl    = 'import' STRING ;
 
 declaration    = decl_decl | type_decl | enum_decl | fn_decl ;
 
-decl_decl      = 'decl' dotted_name '(' params ')' type_expr?
+decl_decl      = 'decl' IDENT '(' params ')' type_expr?
                  ('{' block_body '}')? ;
 type_decl      = 'type' IDENT ('{' field_defs '}')? ;
+                 (* bare 'type IDENT' is an opaque type declaration *)
 enum_decl      = 'enum' IDENT '{' (IDENT ',')* '}' ;
 
 field_defs     = (IDENT ':' type_expr ('=' expr)?)* ;
 field_assigns  = (IDENT '=' expr)* ;
 
-
-step_inst      = dotted_name '{' field_assigns '}'
+decl_inst      = dotted_name '{' field_assigns '}'
                | dotted_name STRING
                | dotted_name list_expr ;
 
-statement      = let_stmt | for_stmt | if_stmt | step_inst | expr ;
+block_expr     = call_expr '{' block_body '}' ;
+                 (* call must return block[T]; fills the block to produce T *)
+block_fill     = IDENT '{' block_body '}' ;
+                 (* IDENT must be a let-bound block[T] value *)
+
+statement      = let_stmt | for_stmt | if_stmt | decl_inst
+               | block_expr | block_fill | expr ;
 
 let_stmt       = 'let' IDENT ('=' expr) ;
 for_stmt       = 'for' IDENT 'in' expr '{' block_body '}' ;
 if_stmt        = 'if' expr '{' block_body '}' ('else' (if_stmt | '{' block_body '}'))? ;
 
-block_body     = (statement | step_inst)* ;
+block_body     = (statement | decl_inst)* ;
 
-fn_decl        = 'func' IDENT '(' params ')' type_expr? '{' fn_body '}' ;
+fn_decl        = 'func' IDENT '(' params ')' type_expr?
+                 ('{' fn_body '}')? ;
+                 (* body is optional — no body means stub function *)
 params         = (IDENT ':' type_expr ('=' expr)? ',')* ;
 fn_body        = (let_stmt | for_stmt | if_stmt | return_stmt | expr)* ;
 return_stmt    = 'return' expr ;
@@ -1815,10 +1925,12 @@ type_expr      = IDENT
                | type_expr '?' ;
 
 expr           = literal | IDENT | dotted_name | expr '.' IDENT
-               | expr '[' expr ']' | expr '(' args ')'
+               | expr '[' expr ']' | call_expr
                | expr binop expr | unop expr
                | if_expr | list_expr | map_expr | struct_lit
                | list_comp | map_comp | '(' expr ')' ;
+
+call_expr      = expr '(' args ')' ;
 
 if_expr        = 'if' expr '{' expr '}' 'else' '{' expr '}' ;
 list_expr      = '[' (expr ',')* ']' ;

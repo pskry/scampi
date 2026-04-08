@@ -15,9 +15,19 @@ import (
 	"scampi.dev/scampi/star"
 )
 
-// LoadConfig decodes and validates user configuration.
-// It returns ONLY user-facing configuration errors.
-// All other failures are engine or environment bugs and will panic.
+// ConfigLoader loads and evaluates a configuration file, returning
+// a spec.Config. Different frontends (Starlark, scampi-lang) provide
+// different loaders.
+type ConfigLoader func(
+	ctx context.Context,
+	em diagnostic.Emitter,
+	cfgPath string,
+	store *diagnostic.SourceStore,
+	src source.Source,
+) (spec.Config, error)
+
+// LoadConfig decodes and validates user configuration using Starlark.
+// For scampi-lang files, use linker.LoadConfig instead.
 func LoadConfig(
 	ctx context.Context,
 	em diagnostic.Emitter,
