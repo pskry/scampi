@@ -54,13 +54,17 @@ func walkChildren(node Node, pre func(Node) bool, post func(Node)) {
 		Walk(n.Name, pre, post)
 		walkFieldList(n.Params, pre, post)
 		walkTypeExpr(n.Ret, pre, post)
-		Walk(n.Body, pre, post)
+		if n.Body != nil {
+			Walk(n.Body, pre, post)
+		}
 
 	case *DeclDecl:
 		Walk(n.Name, pre, post)
 		walkFieldList(n.Params, pre, post)
 		walkTypeExpr(n.Ret, pre, post)
-		Walk(n.Body, pre, post)
+		if n.Body != nil {
+			Walk(n.Body, pre, post)
+		}
 
 	case *LetDecl:
 		Walk(n.Name, pre, post)
