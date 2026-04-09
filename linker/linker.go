@@ -7,6 +7,7 @@ package linker
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"scampi.dev/scampi/lang/eval"
@@ -153,6 +154,10 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry, lc *linkConfig) (spec.Dep
 		}
 	}
 
+	// Track hook IDs by StructVal pointer to deduplicate.
+	hookIDs := map[*eval.StructVal]string{}
+	hookCounter := 0
+
 	for _, v := range bv.Body {
 		sv, ok := v.(*eval.StructVal)
 		if !ok {
@@ -162,6 +167,31 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry, lc *linkConfig) (spec.Dep
 		if err != nil {
 			return db, err
 		}
+
+		// Extract on_change hooks.
+		if oc, ok := sv.Fields["on_change"]; ok {
+			if list, ok := oc.(*eval.ListVal); ok {
+				for _, hookVal := range list.Items {
+					hookSV, ok := hookVal.(*eval.StructVal)
+					if !ok {
+						continue
+					}
+					hid, exists := hookIDs[hookSV]
+					if !exists {
+						hookStep, err := linkStep(hookSV, reg, lc)
+						if err != nil {
+							return db, err
+						}
+						hookCounter++
+						hid = fmt.Sprintf("hook-%d", hookCounter)
+						hookIDs[hookSV] = hid
+						db.Hooks[hid] = []spec.StepInstance{hookStep}
+					}
+					si.OnChange = append(si.OnChange, hid)
+				}
+			}
+		}
+
 		db.Steps = append(db.Steps, si)
 	}
 

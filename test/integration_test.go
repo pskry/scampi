@@ -1259,7 +1259,7 @@ std.deploy(name = "test", targets = [local]) {
     perm = "0644"
     owner = "user"
     group = "group"
-    on_change = [deploy_app]
+    on_change = deploy_app
   }
 }
 `
@@ -1331,7 +1331,7 @@ std.deploy(name = "test", targets = [local]) {
     perm = "0644"
     owner = "user"
     group = "group"
-    on_change = [deploy_app]
+    on_change = deploy_app
   }
 }
 `
