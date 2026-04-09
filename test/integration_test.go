@@ -1056,8 +1056,9 @@ std.deploy(name = "test", targets = [local]) {
 	}
 }
 
-// TestHook_UnknownRef verifies that referencing a nonexistent hook ID
-// produces a plan error.
+// TestHook_UnknownRef verifies that referencing an undefined variable
+// in on_change produces a compile error. In scampi-lang, on_change
+// takes step values — using an undefined name is a type error.
 func TestHook_UnknownRef(t *testing.T) {
 	cfgStr := `
 module main
@@ -1074,7 +1075,7 @@ std.deploy(name = "test", targets = [local]) {
     perm = "0644"
     owner = "user"
     group = "group"
-    on_change = ["nonexistent-hook"]
+    on_change = [nonexistent_hook]
   }
 }
 `
@@ -1086,20 +1087,10 @@ std.deploy(name = "test", targets = [local]) {
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := diagnostic.NewSourceStore()
 
-	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
-	if err != nil {
-		t.Fatalf("setup failed: %v", err)
-	}
-	defer e.Close()
-
-	err = e.Apply(context.Background())
+	// Should fail at compile time — undefined variable.
+	_, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err == nil {
-		t.Fatal("expected error for unknown hook reference")
-	}
-
-	var abortErr engine.AbortError
-	if !errors.As(err, &abortErr) {
-		t.Errorf("expected AbortError, got %T: %v", err, err)
+		t.Fatal("expected error for undefined hook reference")
 	}
 }
 
@@ -1148,20 +1139,12 @@ std.deploy(name = "test", targets = [local]) {
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := diagnostic.NewSourceStore()
 
-	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
-	if err != nil {
-		t.Fatalf("setup failed: %v", err)
-	}
-	defer e.Close()
-
-	err = e.Apply(context.Background())
+	// In scampi-lang, forward references (hook_b → hook_a before
+	// hook_a is defined) are caught by the eval. This is a compile
+	// error, not a runtime hook cycle.
+	_, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
 	if err == nil {
-		t.Fatal("expected error for hook cycle")
-	}
-
-	var abortErr engine.AbortError
-	if !errors.As(err, &abortErr) {
-		t.Errorf("expected AbortError, got %T: %v", err, err)
+		t.Fatal("expected error for forward reference / hook cycle")
 	}
 }
 

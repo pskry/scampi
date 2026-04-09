@@ -158,6 +158,43 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry, lc *linkConfig) (spec.Dep
 	hookIDs := map[*eval.StructVal]string{}
 	hookCounter := 0
 
+	// extractHooks recursively processes on_change fields and
+	// registers hooks in the deploy block.
+	var extractHooks func(sv *eval.StructVal, si *spec.StepInstance) error
+	extractHooks = func(sv *eval.StructVal, si *spec.StepInstance) error {
+		oc, ok := sv.Fields["on_change"]
+		if !ok {
+			return nil
+		}
+		list, ok := oc.(*eval.ListVal)
+		if !ok {
+			return nil
+		}
+		for _, hookVal := range list.Items {
+			hookSV, ok := hookVal.(*eval.StructVal)
+			if !ok {
+				continue
+			}
+			hid, exists := hookIDs[hookSV]
+			if !exists {
+				hookStep, err := linkStep(hookSV, reg, lc)
+				if err != nil {
+					return err
+				}
+				// Recursively wire this hook's own on_change.
+				if err := extractHooks(hookSV, &hookStep); err != nil {
+					return err
+				}
+				hookCounter++
+				hid = fmt.Sprintf("hook-%d", hookCounter)
+				hookIDs[hookSV] = hid
+				db.Hooks[hid] = []spec.StepInstance{hookStep}
+			}
+			si.OnChange = append(si.OnChange, hid)
+		}
+		return nil
+	}
+
 	for _, v := range bv.Body {
 		sv, ok := v.(*eval.StructVal)
 		if !ok {
@@ -167,31 +204,9 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry, lc *linkConfig) (spec.Dep
 		if err != nil {
 			return db, err
 		}
-
-		// Extract on_change hooks.
-		if oc, ok := sv.Fields["on_change"]; ok {
-			if list, ok := oc.(*eval.ListVal); ok {
-				for _, hookVal := range list.Items {
-					hookSV, ok := hookVal.(*eval.StructVal)
-					if !ok {
-						continue
-					}
-					hid, exists := hookIDs[hookSV]
-					if !exists {
-						hookStep, err := linkStep(hookSV, reg, lc)
-						if err != nil {
-							return db, err
-						}
-						hookCounter++
-						hid = fmt.Sprintf("hook-%d", hookCounter)
-						hookIDs[hookSV] = hid
-						db.Hooks[hid] = []spec.StepInstance{hookStep}
-					}
-					si.OnChange = append(si.OnChange, hid)
-				}
-			}
+		if err := extractHooks(sv, &si); err != nil {
+			return db, err
 		}
-
 		db.Steps = append(db.Steps, si)
 	}
 
