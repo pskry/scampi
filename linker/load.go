@@ -132,7 +132,8 @@ func makeSecretWirer(ctx context.Context, cfgPath string, src source.Source) fun
 					return "", err
 				}
 				if !found {
-					return "", fmt.Errorf("secret %q not found", key)
+					// bare-error: eval callback, no source span available
+					return "", errs.New("secret " + key + " not found")
 				}
 				return v, nil
 			})

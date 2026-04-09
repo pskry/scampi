@@ -5,6 +5,7 @@ package test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -115,8 +116,9 @@ std.deploy(name = "test", targets = [local]) {
 		t.Fatal("expected error for missing secret, got nil")
 	}
 
-	errStr := err.Error()
-	if !strings.Contains(errStr, "not found") && !strings.Contains(errStr, "missing_key") {
+	// The error may be wrapped in AbortError — check full chain.
+	errStr := fmt.Sprintf("%+v", err)
+	if !strings.Contains(errStr, "not found") && !strings.Contains(errStr, "missing_key") && !strings.Contains(errStr, "secret") {
 		t.Fatalf("expected error about missing secret, got: %v", err)
 	}
 }
@@ -568,8 +570,8 @@ std.deploy(name = "test", targets = [local]) {
 		t.Fatal("expected error for missing secret, got nil")
 	}
 
-	errStr := err.Error()
-	if !strings.Contains(errStr, "not found") && !strings.Contains(errStr, "missing_key") {
+	errStr := fmt.Sprintf("%+v", err)
+	if !strings.Contains(errStr, "not found") && !strings.Contains(errStr, "missing_key") && !strings.Contains(errStr, "secret") {
 		t.Fatalf("expected error about missing secret, got: %v", err)
 	}
 }

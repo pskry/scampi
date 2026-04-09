@@ -73,6 +73,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
+			pattern:        "linker/fields.go",
+			allowedImports: "crypto/sha256,net/url",
+		},
+		{
 			pattern:        "lsp/server.go",
 			allowedImports: "os",
 		},

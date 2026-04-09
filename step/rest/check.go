@@ -70,6 +70,9 @@ func (c *JQCheck) Evaluate(statusCode int, body []byte) (bool, error) {
 		return false, errs.WrapErrf(errJQ, "parse response body: %v", err)
 	}
 
+	if c.Compiled == nil {
+		return false, errs.WrapErrf(errJQ, "jq expression %q was not compiled", c.Expr)
+	}
 	iter := c.Compiled.Run(input)
 	for {
 		v, ok := iter.Next()
