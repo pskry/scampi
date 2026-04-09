@@ -289,12 +289,6 @@ func (n *noCommandTarget) RunCommand(_ context.Context, _ string) (target.Comman
 	panic("noCommandTarget.RunCommand called — capability check failed")
 }
 
-type allCapNoImplTarget struct{}
-
-func (allCapNoImplTarget) Capabilities() capability.Capability {
-	return capability.All
-}
-
 type mockTargetType struct {
 	tgt target.Target
 }

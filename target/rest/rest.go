@@ -25,7 +25,7 @@ type (
 	}
 )
 
-func (REST) Kind() string   { return "rest" }
+func (REST) Kind() string { return "rest" }
 func (REST) NewConfig() any {
 	return &Config{
 		Auth: NoAuthConfig{},

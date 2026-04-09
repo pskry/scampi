@@ -289,7 +289,12 @@ import "std/posix"
 let local = posix.local { name = "local" }
 
 std.deploy(name = "test", targets = [local]) {
-  posix.mount { src = "//server/share", dest = "/mnt/share", fs_type = posix.MountType.cifs, opts = "credentials=/etc/smbcreds,uid=1000" }
+  posix.mount {
+    src = "//server/share"
+    dest = "/mnt/share"
+    fs_type = posix.MountType.cifs
+    opts = "credentials=/etc/smbcreds,uid=1000"
+  }
 }`,
 
 		// mount step absent
@@ -300,7 +305,12 @@ import "std/posix"
 let local = posix.local { name = "local" }
 
 std.deploy(name = "test", targets = [local]) {
-  posix.mount { src = "10.10.2.2:/data", dest = "/mnt/data", fs_type = posix.MountType.nfs, state = posix.MountState.absent }
+  posix.mount {
+    src = "10.10.2.2:/data"
+    dest = "/mnt/data"
+    fs_type = posix.MountType.nfs
+    state = posix.MountState.absent
+  }
 }`,
 
 		// mount step invalid state
