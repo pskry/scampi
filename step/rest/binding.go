@@ -27,6 +27,9 @@ var errBinding = errs.New("binding extraction")
 // non-null, non-error result. Returns an error if the expression produces no
 // usable value.
 func (b *JQBinding) Extract(input any) (any, error) {
+	if b.Compiled == nil {
+		return nil, errs.WrapErrf(errBinding, "jq expression %q was not compiled", b.Expr)
+	}
 	iter := b.Compiled.Run(input)
 	for {
 		v, ok := iter.Next()

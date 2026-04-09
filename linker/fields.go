@@ -164,6 +164,10 @@ func setStructVal(dst reflect.Value, sv *eval.StructVal, lc *linkConfig) error {
 		if c := convertCheck(sv); c != nil {
 			dst.Set(reflect.ValueOf(c))
 		}
+	case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(steprest.JQBinding{}):
+		if b := convertBinding(sv); b != nil {
+			dst.Set(reflect.ValueOf(b))
+		}
 	case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(target.Healthcheck{}):
 		dst.Set(reflect.ValueOf(convertHealthcheck(sv)))
 	case dst.Kind() == reflect.Interface:

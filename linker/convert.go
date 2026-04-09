@@ -143,6 +143,22 @@ func convertBody(sv *eval.StructVal) steprest.BodyConfig {
 	return nil
 }
 
+// convertBinding converts a StructVal to a *steprest.JQBinding.
+func convertBinding(sv *eval.StructVal) *steprest.JQBinding {
+	b := &steprest.JQBinding{}
+	if e, ok := sv.Fields["expr"].(*eval.StringVal); ok {
+		b.Expr = e.V
+		q, err := gojq.Parse(e.V)
+		if err == nil {
+			compiled, err := gojq.Compile(q)
+			if err == nil {
+				b.Compiled = compiled
+			}
+		}
+	}
+	return b
+}
+
 // convertCheck converts a StructVal to a steprest.CheckConfig.
 func convertCheck(sv *eval.StructVal) steprest.CheckConfig {
 	switch sv.TypeName {
