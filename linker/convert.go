@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"scampi.dev/scampi/lang/eval"
+	steprest "scampi.dev/scampi/step/rest"
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/rest"
 )
@@ -121,4 +122,40 @@ func convertTLS(sv *eval.StructVal) rest.TLSConfig {
 		return rest.InsecureTLSConfig{}
 	}
 	return rest.SecureTLSConfig{}
+}
+
+// convertBody converts a StructVal to a steprest.BodyConfig.
+func convertBody(sv *eval.StructVal) steprest.BodyConfig {
+	switch sv.TypeName {
+	case "body_json":
+		if d, ok := sv.Fields["data"]; ok {
+			return steprest.JSONBody{Data: evalToGo(d)}
+		}
+		return steprest.JSONBody{}
+	case "body_string":
+		if c, ok := sv.Fields["content"].(*eval.StringVal); ok {
+			return steprest.StringBody{Content: c.V}
+		}
+		return steprest.StringBody{}
+	}
+	return nil
+}
+
+// convertCheck converts a StructVal to a steprest.CheckConfig.
+func convertCheck(sv *eval.StructVal) steprest.CheckConfig {
+	switch sv.TypeName {
+	case "status":
+		c := steprest.StatusCheck{}
+		if code, ok := sv.Fields["code"].(*eval.IntVal); ok {
+			c.Status = int(code.V)
+		}
+		return c
+	case "jq":
+		c := &steprest.JQCheck{}
+		if e, ok := sv.Fields["expr"].(*eval.StringVal); ok {
+			c.Expr = e.V
+		}
+		return c
+	}
+	return nil
 }

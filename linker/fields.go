@@ -14,6 +14,7 @@ import (
 
 	"scampi.dev/scampi/lang/eval"
 	"scampi.dev/scampi/spec"
+	steprest "scampi.dev/scampi/step/rest"
 	"scampi.dev/scampi/target"
 	"scampi.dev/scampi/target/rest"
 )
@@ -62,9 +63,17 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 	if src == nil {
 		return nil
 	}
+	// StructVal needs type-specific handling first — check before
+	// the generic interface path.
+	if sv, ok := src.(*eval.StructVal); ok {
+		return setStructVal(dst, sv, lc)
+	}
 	// Interface fields (any): convert to Go native types.
 	if dst.Kind() == reflect.Interface {
-		dst.Set(reflect.ValueOf(evalToGo(src)))
+		goVal := evalToGo(src)
+		if goVal != nil {
+			dst.Set(reflect.ValueOf(goVal))
+		}
 		return nil
 	}
 	switch sv := src.(type) {
@@ -130,32 +139,44 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 	case *eval.NoneVal:
 		// Leave as zero value.
 	case *eval.StructVal:
-		// Composable types: convert StructVal to the Go type the
-		// engine expects based on the destination field type.
-		dstType := dst.Type()
-		switch {
-		case dstType == reflect.TypeOf(spec.SourceRef{}):
-			dst.Set(reflect.ValueOf(convertSourceRef(sv, lc)))
-		case dstType == reflect.TypeOf(spec.PkgSourceRef{}):
-			dst.Set(reflect.ValueOf(convertPkgSourceRef(sv)))
-		case dstType == reflect.TypeOf((*rest.AuthConfig)(nil)).Elem():
-			dst.Set(reflect.ValueOf(convertAuth(sv)))
-		case dstType == reflect.TypeOf((*rest.TLSConfig)(nil)).Elem():
-			dst.Set(reflect.ValueOf(convertTLS(sv)))
-		case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(target.Healthcheck{}):
-			dst.Set(reflect.ValueOf(convertHealthcheck(sv)))
-		case dst.Kind() == reflect.Interface:
-			dst.Set(reflect.ValueOf(sv))
-		case dst.Kind() == reflect.Pointer && dst.IsNil():
-			ptr := reflect.New(dstType.Elem())
-			if err := mapFields(sv.Fields, ptr.Interface(), lc); err != nil {
-				return err
-			}
-			dst.Set(ptr)
-		case dst.Kind() == reflect.Struct:
-			if err := mapFields(sv.Fields, dst.Addr().Interface(), lc); err != nil {
-				return err
-			}
+		// Handled by setStructVal above — should not reach here.
+	}
+	return nil
+}
+
+// setStructVal handles StructVal → Go type conversion.
+func setStructVal(dst reflect.Value, sv *eval.StructVal, lc *linkConfig) error {
+	dstType := dst.Type()
+	switch {
+	case dstType == reflect.TypeOf(spec.SourceRef{}):
+		dst.Set(reflect.ValueOf(convertSourceRef(sv, lc)))
+	case dstType == reflect.TypeOf(spec.PkgSourceRef{}):
+		dst.Set(reflect.ValueOf(convertPkgSourceRef(sv)))
+	case dstType == reflect.TypeOf((*rest.AuthConfig)(nil)).Elem():
+		dst.Set(reflect.ValueOf(convertAuth(sv)))
+	case dstType == reflect.TypeOf((*rest.TLSConfig)(nil)).Elem():
+		dst.Set(reflect.ValueOf(convertTLS(sv)))
+	case dstType == reflect.TypeOf((*steprest.BodyConfig)(nil)).Elem():
+		if b := convertBody(sv); b != nil {
+			dst.Set(reflect.ValueOf(b))
+		}
+	case dstType == reflect.TypeOf((*steprest.CheckConfig)(nil)).Elem():
+		if c := convertCheck(sv); c != nil {
+			dst.Set(reflect.ValueOf(c))
+		}
+	case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(target.Healthcheck{}):
+		dst.Set(reflect.ValueOf(convertHealthcheck(sv)))
+	case dst.Kind() == reflect.Interface:
+		dst.Set(reflect.ValueOf(sv))
+	case dst.Kind() == reflect.Pointer && dst.IsNil():
+		ptr := reflect.New(dstType.Elem())
+		if err := mapFields(sv.Fields, ptr.Interface(), lc); err != nil {
+			return err
+		}
+		dst.Set(ptr)
+	case dst.Kind() == reflect.Struct:
+		if err := mapFields(sv.Fields, dst.Addr().Interface(), lc); err != nil {
+			return err
 		}
 	}
 	return nil
