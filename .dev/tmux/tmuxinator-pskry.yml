@@ -12,5 +12,5 @@ windows:
         - nvim:
             - nvim
         - claude:
-            - claude
+            - caffeinate -i claude
   - "git  ": lazygit
