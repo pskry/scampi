@@ -109,6 +109,7 @@ func (s *Server) Initialize(
 	}
 	s.log.Printf("initialize: client=%q root=%q", clientName, rootURI)
 	s.loadModule()
+	s.loadUserModules()
 	return &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
 			TextDocumentSync: &protocol.TextDocumentSyncOptions{

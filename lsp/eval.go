@@ -5,12 +5,17 @@ package lsp
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 
+	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/check"
+	"scampi.dev/scampi/lang/lex"
+	"scampi.dev/scampi/lang/parse"
 	"scampi.dev/scampi/lang/token"
+	"scampi.dev/scampi/mod"
 	"scampi.dev/scampi/std"
 )
 
@@ -23,6 +28,105 @@ func bootstrapModules() map[string]*check.Scope {
 		panic("lsp: failed to bootstrap stdlib: " + err.Error())
 	}
 	return modules
+}
+
+// loadUserModules parses and type-checks user module dependencies from
+// scampi.mod, adding their scopes to the module map so the checker can
+// resolve imports in user code.
+func (s *Server) loadUserModules() {
+	if s.module == nil {
+		return
+	}
+	for _, dep := range s.module.Require {
+		dir := depDir(s.module, &dep)
+		data, path := readModuleEntry(dir, lastPathSegment(dep.Path))
+		if data == nil {
+			s.log.Printf("user module %s: no entry point in %s", dep.Path, dir)
+			continue
+		}
+
+		l := lex.New(path, data)
+		p := parse.New(l)
+		f := p.Parse()
+		if f == nil || f.Module == nil {
+			s.log.Printf("user module %s: parse failed", dep.Path)
+			continue
+		}
+
+		c := check.New(s.modules)
+		c.Check(f)
+		modName := f.Module.Name.Name
+		s.modules[modName] = c.FileScope()
+
+		// Register funcs/decls into catalog and goto-def index.
+		s.registerModuleEntries(f, modName, path, data)
+		s.log.Printf("user module %s: loaded as %q", dep.Path, modName)
+	}
+}
+
+// registerModuleEntries adds a user module's funcs and decls to the
+// catalog (for hover/completion) and stubDefs (for goto-def).
+func (s *Server) registerModuleEntries(f *ast.File, modName, filePath string, src []byte) {
+	for _, d := range f.Decls {
+		switch d := d.(type) {
+		case *ast.FuncDecl:
+			name := modName + "." + d.Name.Name
+			info := funcDeclToInfo(d, modName)
+			info.Name = name
+			s.catalog.funcs[name] = info
+			s.stubDefs.locs[name] = stubLocation{
+				path: filePath, src: src, span: d.Name.SrcSpan,
+			}
+		case *ast.DeclDecl:
+			dn := declName(d)
+			name := modName + "." + dn
+			info := declDeclToInfo(d, modName)
+			info.Name = name
+			s.catalog.funcs[name] = info
+			s.stubDefs.locs[name] = stubLocation{
+				path: filePath, src: src, span: d.Name.SrcSpan,
+			}
+		}
+	}
+	// Rebuild the catalog index so new entries show up in completion.
+	s.catalog.buildIndex()
+}
+
+func depDir(m *mod.Module, dep *mod.Dependency) string {
+	if dep.IsLocal() {
+		dir := dep.Version
+		if !filepath.IsAbs(dir) {
+			dir = filepath.Join(filepath.Dir(m.Filename), dir)
+		}
+		return dir
+	}
+	return filepath.Join(mod.DefaultCacheDir(), dep.Path+"@"+dep.Version)
+}
+
+func lastPathSegment(p string) string {
+	if i := len(p) - 1; i >= 0 {
+		for ; i >= 0; i-- {
+			if p[i] == '/' {
+				return p[i+1:]
+			}
+		}
+	}
+	return p
+}
+
+// readModuleEntry finds the entry point .scampi file in a module
+// directory, trying _index.scampi then <name>.scampi.
+func readModuleEntry(dir, name string) ([]byte, string) {
+	for _, candidate := range []string{
+		filepath.Join(dir, "_index.scampi"),
+		filepath.Join(dir, name+".scampi"),
+	} {
+		data, err := os.ReadFile(candidate)
+		if err == nil {
+			return data, candidate
+		}
+	}
+	return nil, ""
 }
 
 // evaluate runs the scampi-lang lex → parse → check pipeline and

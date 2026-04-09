@@ -47,34 +47,58 @@ func (s *Server) References(
 		// Dotted name (posix.pkg, std.Step, etc.) — search for
 		// dotted references in AST nodes.
 		locs = append(locs, findDottedRefs(f, filePath, data, word)...)
-		if s.rootDir != "" {
-			locs = append(locs, s.refsInWorkspace(word, filePath)...)
-		}
+		locs = append(locs, s.refsInAllDirs(word, filePath)...)
 		if loc, ok := s.stubDefs.Lookup(word); ok {
 			locs = append(locs, loc)
 		}
 	} else {
 		// Bare name — search current file for ident matches.
 		locs = append(locs, findIdents(f, filePath, data, word)...)
-		// If we're in a stub file, also search workspace for the
-		// qualified form (e.g. "pkg" → "posix.pkg").
+		// If we're in a module file, also search for the qualified
+		// form (e.g. "pkg" → "posix.pkg") across all dirs.
 		if modName := fileModuleName(f); modName != "" {
 			qualified := modName + "." + word
-			if s.rootDir != "" {
-				locs = append(locs, s.refsInWorkspace(qualified, filePath)...)
-			}
+			locs = append(locs, s.refsInAllDirs(qualified, filePath)...)
 		}
 	}
 
 	return dedup(locs, locationKey), nil
 }
 
-// refsInWorkspace walks all .scampi files under the workspace root and
-// finds references to the given qualified name (e.g. "posix.pkg").
-// excludePath is skipped (already searched by the caller).
-func (s *Server) refsInWorkspace(qualifiedName, excludePath string) []protocol.Location {
+// refsInAllDirs searches the workspace root and all user module
+// directories for references to the given qualified name.
+func (s *Server) refsInAllDirs(qualifiedName, excludePath string) []protocol.Location {
 	var locs []protocol.Location
-	_ = filepath.WalkDir(s.rootDir, func(path string, d os.DirEntry, err error) error {
+	seen := map[string]bool{} // avoid scanning a dir twice
+
+	// Workspace root.
+	if s.rootDir != "" {
+		seen[s.rootDir] = true
+		locs = append(locs, refsInDir(s.rootDir, qualifiedName, excludePath)...)
+	}
+
+	// User module directories.
+	if s.module != nil {
+		for _, dep := range s.module.Require {
+			dir := depDir(s.module, &dep)
+			abs, _ := filepath.Abs(dir)
+			if abs != "" {
+				dir = abs
+			}
+			if seen[dir] {
+				continue
+			}
+			seen[dir] = true
+			locs = append(locs, refsInDir(dir, qualifiedName, excludePath)...)
+		}
+	}
+
+	return locs
+}
+
+func refsInDir(dir, qualifiedName, excludePath string) []protocol.Location {
+	var locs []protocol.Location
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".scampi" || path == excludePath {
 			return nil
 		}
