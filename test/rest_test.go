@@ -692,7 +692,7 @@ std.deploy(name = "test", targets = [api]) {
     method = "POST"
     path = "/hosts"
     body = rest.body_json { data = {"domain": "example.com"} }
-    check = rest.jq { expr = '.[] | select(.domain == "example.com")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"example.com\")" }
   }
 }
 `, srv.URL)
@@ -730,7 +730,7 @@ std.deploy(name = "test", targets = [api]) {
     desc = "create host"
     method = "POST"
     path = "/hosts"
-    check = rest.jq { expr = '.[] | select(.domain == "example.com")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"example.com\")" }
   }
 }
 `, srv.URL)
@@ -942,7 +942,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"name": "test", "port": 80}
@@ -993,7 +993,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"name": "test", "port": 80}
@@ -1041,7 +1041,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     found = rest.request { method = "PUT", path = "/hosts/{id}" }
@@ -1100,7 +1100,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     found = rest.request { method = "DELETE", path = "/hosts/{id}" }
     bindings = {"id": rest.jq { expr = ".id" }}
@@ -1143,7 +1143,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"name": "test", "port": 80}
@@ -1179,7 +1179,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"name": "test"}
@@ -1220,7 +1220,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"name": "test"}
@@ -1258,7 +1258,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"name": "test", "port": 80, "ssl": true}
@@ -1308,7 +1308,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.name == "test")' }
+      check = rest.jq { expr = ".[] | select(.name == \"test\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"name": "test", "port": 80}
@@ -1349,7 +1349,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/items"
-      check = rest.jq { expr = '.[] | select(.name == "x")' }
+      check = rest.jq { expr = ".[] | select(.name == \"x\")" }
     }
     missing = rest.request { method = "POST", path = "/items" }
     found = rest.request { method = "PUT", path = "/items/{id}" }
@@ -1410,7 +1410,7 @@ let cert = rest.resource {
   query = rest.request {
     method = "GET"
     path = "/certs"
-    check = rest.jq { expr = '.[] | select(.domain == "app.example.com")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"app.example.com\")" }
   }
   missing = rest.request { method = "POST", path = "/certs" }
   state = {"domain": "app.example.com"}
@@ -1422,7 +1422,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.domain == "app.example.com")' }
+      check = rest.jq { expr = ".[] | select(.domain == \"app.example.com\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"domain": "app.example.com", "cert_id": ref(cert, ".id")}
@@ -1465,7 +1465,7 @@ let cert = rest.resource {
   query = rest.request {
     method = "GET"
     path = "/certs"
-    check = rest.jq { expr = '.[] | select(.domain == "app.example.com")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"app.example.com\")" }
   }
   missing = rest.request { method = "POST", path = "/certs" }
   state = {"domain": "app.example.com"}
@@ -1477,7 +1477,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.domain == "app.example.com")' }
+      check = rest.jq { expr = ".[] | select(.domain == \"app.example.com\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"domain": "app.example.com", "cert_id": ref(cert, ".id")}
@@ -1506,7 +1506,7 @@ let cert = rest.resource {
   query = rest.request {
     method = "GET"
     path = "/certs"
-    check = rest.jq { expr = '.[] | select(.domain == "x")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"x\")" }
   }
   missing = rest.request { method = "POST", path = "/certs" }
   state = {"domain": "x"}
@@ -1518,7 +1518,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.domain == "x")' }
+      check = rest.jq { expr = ".[] | select(.domain == \"x\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"cert_id": ref(cert, "[invalid jq")}
@@ -1574,7 +1574,7 @@ let cert = rest.resource {
   query = rest.request {
     method = "GET"
     path = "/certs"
-    check = rest.jq { expr = '.[] | select(.domain == "app.example.com")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"app.example.com\")" }
   }
   missing = rest.request { method = "POST", path = "/certs" }
   state = {"domain": "app.example.com"}
@@ -1586,7 +1586,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.domain == "app.example.com")' }
+      check = rest.jq { expr = ".[] | select(.domain == \"app.example.com\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     found = rest.request { method = "PUT", path = "/hosts/{id}" }
@@ -1627,7 +1627,7 @@ let cert = rest.resource {
   query = rest.request {
     method = "GET"
     path = "/certs"
-    check = rest.jq { expr = '.[] | select(.domain == "x")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"x\")" }
   }
   missing = rest.request { method = "POST", path = "/certs" }
   state = {"domain": "x"}
@@ -1638,7 +1638,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.domain == "x")' }
+      check = rest.jq { expr = ".[] | select(.domain == \"x\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"domain": "x", "cert_id": ref(cert, ".id")}
@@ -1665,7 +1665,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.domain == "x")' }
+      check = rest.jq { expr = ".[] | select(.domain == \"x\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"cert_id": ref("not-a-step", ".id")}
@@ -1697,7 +1697,7 @@ let cert = rest.resource {
   query = rest.request {
     method = "GET"
     path = "/certs"
-    check = rest.jq { expr = '.[] | select(.domain == "x")' }
+    check = rest.jq { expr = ".[] | select(.domain == \"x\")" }
   }
   missing = rest.request { method = "POST", path = "/certs" }
   state = {"domain": "x"}
@@ -1709,7 +1709,7 @@ std.deploy(name = "test", targets = [api]) {
     query = rest.request {
       method = "GET"
       path = "/hosts"
-      check = rest.jq { expr = '.[] | select(.domain == "x")' }
+      check = rest.jq { expr = ".[] | select(.domain == \"x\")" }
     }
     missing = rest.request { method = "POST", path = "/hosts" }
     state = {"domain": "x", "cert_id": ref(cert, ".id")}

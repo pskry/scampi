@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/itchyny/gojq"
+
 	"scampi.dev/scampi/lang/eval"
 	steprest "scampi.dev/scampi/step/rest"
 	"scampi.dev/scampi/target"
@@ -154,6 +156,13 @@ func convertCheck(sv *eval.StructVal) steprest.CheckConfig {
 		c := &steprest.JQCheck{}
 		if e, ok := sv.Fields["expr"].(*eval.StringVal); ok {
 			c.Expr = e.V
+			q, err := gojq.Parse(e.V)
+			if err == nil {
+				compiled, err := gojq.Compile(q)
+				if err == nil {
+					c.Compiled = compiled
+				}
+			}
 		}
 		return c
 	}

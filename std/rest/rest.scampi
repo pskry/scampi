@@ -67,9 +67,9 @@ decl request(
 ) std.Step
 
 decl resource(
-  query:     request?,
-  missing:   request?,
-  found:     request?,
+  query:     std.Step?,
+  missing:   std.Step?,
+  found:     std.Step?,
   bindings:  map[string, Check]?,
   state:     map[string, any]?,
   desc:      string?,
