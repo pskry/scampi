@@ -14,6 +14,7 @@ import (
 
 	"scampi.dev/scampi/lang/eval"
 	"scampi.dev/scampi/spec"
+	"scampi.dev/scampi/target"
 )
 
 // mapFields maps eval.Value fields onto a Go config struct pointer
@@ -67,8 +68,13 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 	}
 	switch sv := src.(type) {
 	case *eval.StringVal:
-		if dst.Kind() == reflect.String {
+		switch {
+		case dst.Kind() == reflect.String:
 			dst.SetString(sv.V)
+		case dst.Type() == reflect.TypeOf(target.Port{}):
+			dst.Set(reflect.ValueOf(convertPort(sv.V)))
+		case dst.Type() == reflect.TypeOf(target.Mount{}):
+			dst.Set(reflect.ValueOf(convertMount(sv.V)))
 		}
 	case *eval.IntVal:
 		switch dst.Kind() {
@@ -131,8 +137,16 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 			dst.Set(reflect.ValueOf(convertSourceRef(sv, lc)))
 		case dstType == reflect.TypeOf(spec.PkgSourceRef{}):
 			dst.Set(reflect.ValueOf(convertPkgSourceRef(sv)))
+		case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(target.Healthcheck{}):
+			dst.Set(reflect.ValueOf(convertHealthcheck(sv)))
 		case dst.Kind() == reflect.Interface:
 			dst.Set(reflect.ValueOf(sv))
+		case dst.Kind() == reflect.Pointer && dst.IsNil():
+			ptr := reflect.New(dstType.Elem())
+			if err := mapFields(sv.Fields, ptr.Interface(), lc); err != nil {
+				return err
+			}
+			dst.Set(ptr)
 		case dst.Kind() == reflect.Struct:
 			if err := mapFields(sv.Fields, dst.Addr().Interface(), lc); err != nil {
 				return err
