@@ -257,7 +257,12 @@ func TestCompletionSecretKeys(t *testing.T) {
 func TestCompletionUserDefinedFuncKwargs(t *testing.T) {
 	dir := t.TempDir()
 
-	libContent := "module lib\n\nfunc proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {\n  return \"\"\n}\n"
+	libContent := `module lib
+
+func proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {
+  return ""
+}
+`
 	if err := os.WriteFile(filepath.Join(dir, "lib.scampi"), []byte(libContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +271,14 @@ func TestCompletionUserDefinedFuncKwargs(t *testing.T) {
 	mainPath := filepath.Join(dir, "main.scampi")
 	docURI := protocol.DocumentURI(uri.File(mainPath))
 	// User-defined function in same file
-	text := "module main\n\nfunc proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {\n  return \"\"\n}\n\nproxy_host()\n"
+	text := `module main
+
+func proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {
+  return ""
+}
+
+proxy_host()
+`
 	s.docs.Open(docURI, text, 1)
 
 	// Cursor between the parens on line 6, col 11

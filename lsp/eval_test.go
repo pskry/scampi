@@ -44,7 +44,16 @@ func TestEvaluateTypeError(t *testing.T) {
 	dir := t.TempDir()
 	mainPath := filepath.Join(dir, "test.scampi")
 	docURI := protocol.DocumentURI(uri.File(mainPath))
-	content := "module main\n\nimport \"std\"\nimport \"std/posix\"\n\nlet t = posix.local { name = \"test\" }\nstd.deploy(name = \"d\", targets = [t]) {\n  posix.service { name = 42 }\n}\n"
+	content := `module main
+
+import "std"
+import "std/posix"
+
+let t = posix.local { name = "test" }
+std.deploy(name = "d", targets = [t]) {
+  posix.service { name = 42 }
+}
+`
 	s.docs.Open(docURI, content, 1)
 
 	diags := s.evaluate(context.Background(), docURI, content)

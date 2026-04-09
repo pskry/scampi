@@ -634,6 +634,25 @@ func (ev *Evaluator) AddError(msg string) {
 	ev.errAt(token.Span{}, msg)
 }
 
+func (ev *Evaluator) callRange(positional []Value, kwargs map[string]Value) Value {
+	n := int64(0)
+	if len(positional) > 0 {
+		if iv, ok := positional[0].(*IntVal); ok {
+			n = iv.V
+		}
+	}
+	if nv, ok := kwargs["n"]; ok {
+		if iv, ok := nv.(*IntVal); ok {
+			n = iv.V
+		}
+	}
+	items := make([]Value, n)
+	for i := int64(0); i < n; i++ {
+		items[i] = &IntVal{V: i}
+	}
+	return &ListVal{Items: items}
+}
+
 // SetSecretLookup allows callers (via WithOnEmit) to wire the secret
 // resolver after seeing a SecretsConfig value during evaluation.
 func (ev *Evaluator) SetSecretLookup(fn func(string) (string, error)) {
@@ -717,6 +736,8 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 			return ev.callEnv(positional, kwargs)
 		case "secret":
 			return ev.callSecret(positional, kwargs)
+		case "range":
+			return ev.callRange(positional, kwargs)
 		}
 
 		if strings.HasPrefix(fv.RetType, "block[") && strings.HasSuffix(fv.RetType, "]") {

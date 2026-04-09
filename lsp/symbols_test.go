@@ -13,7 +13,16 @@ import (
 
 func TestDocumentSymbolFunctions(t *testing.T) {
 	s := testServer()
-	text := "module main\n\nfunc greet(name: string) string {\n  return \"\"\n}\n\nfunc farewell() string {\n  return \"\"\n}\n"
+	text := `module main
+
+func greet(name: string) string {
+  return ""
+}
+
+func farewell() string {
+  return ""
+}
+`
 	docURI := protocol.DocumentURI("file:///test.scampi")
 	s.docs.Open(docURI, text, 1)
 

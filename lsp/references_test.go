@@ -34,7 +34,17 @@ func TestReferencesLocalIdent(t *testing.T) {
 
 func TestReferencesInStubFile(t *testing.T) {
 	s := testServer()
-	stub := "module posix\n\nimport \"std\"\n\ntype Source\n\ndecl pkg(\n  packages: list[string],\n  source: PkgSource,\n) std.Step\n"
+	stub := `module posix
+
+import "std"
+
+type Source
+
+decl pkg(
+  packages: list[string],
+  source: PkgSource,
+) std.Step
+`
 	docURI := protocol.DocumentURI("file:///stubs/posix.scampi")
 	s.docs.Open(docURI, stub, 1)
 
@@ -106,7 +116,20 @@ func TestReferencesBareDeclInRealStub(t *testing.T) {
 func TestReferencesStdlibFromConfig(t *testing.T) {
 	s := testServer()
 
-	config := "module main\n\nimport \"std\"\nimport \"std/posix\"\n\nlet t = posix.local { name = \"local\" }\n\nstd.deploy(name = \"test\", targets = [t]) {\n  posix.pkg {\n    packages = [\"nginx\"]\n    source = posix.pkg_system {}\n  }\n}\n"
+	config := `module main
+
+import "std"
+import "std/posix"
+
+let t = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [t]) {
+  posix.pkg {
+    packages = ["nginx"]
+    source = posix.pkg_system {}
+  }
+}
+`
 	docURI := protocol.DocumentURI("file:///test/config.scampi")
 	s.docs.Open(docURI, config, 1)
 
@@ -136,7 +159,14 @@ func TestReferencesStdStepInStub(t *testing.T) {
 
 	dir := t.TempDir()
 	stubContent, _ := os.ReadFile(filepath.Join(
-		os.Getenv("HOME"), "Library", "Caches", "scampls", "stubs", "v0.0.0-dev", "posix", "posix.scampi",
+		os.Getenv("HOME"),
+		"Library",
+		"Caches",
+		"scampls",
+		"stubs",
+		"v0.0.0-dev",
+		"posix",
+		"posix.scampi",
 	))
 	if len(stubContent) == 0 {
 		// Fallback: use the source stub directly.

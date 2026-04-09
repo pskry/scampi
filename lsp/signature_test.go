@@ -83,7 +83,14 @@ func TestSignatureHelpOutsideCall(t *testing.T) {
 func TestSignatureHelpUserDefinedFunc(t *testing.T) {
 	s := testServer()
 	docURI := protocol.DocumentURI("file:///test.scampi")
-	text := "module main\n\nfunc proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {\n  return \"\"\n}\n\nproxy_host()\n"
+	text := `module main
+
+func proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {
+  return ""
+}
+
+proxy_host()
+`
 	s.docs.Open(docURI, text, 1)
 
 	result, err := s.SignatureHelp(context.Background(), &protocol.SignatureHelpParams{

@@ -89,7 +89,7 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
-			pattern:        "lsp/definition.go",
+			pattern:        "lsp/stubdefs.go",
 			allowedImports: "os",
 		},
 		{
@@ -98,10 +98,6 @@ func TestImportCapabilities(t *testing.T) {
 		},
 		{
 			pattern:        "lsp/symbols.go",
-			allowedImports: "os",
-		},
-		{
-			pattern:        "lsp/userfunc.go",
 			allowedImports: "os",
 		},
 		{

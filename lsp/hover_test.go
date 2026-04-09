@@ -104,7 +104,14 @@ func TestHoverOnDottedFunc(t *testing.T) {
 func TestHoverUserDefinedFunc(t *testing.T) {
 	s := testServer()
 	docURI := protocol.DocumentURI("file:///test.scampi")
-	text := "module main\n\nfunc proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {\n  return \"\"\n}\n\nproxy_host(domain = \"test\")\n"
+	text := `module main
+
+func proxy_host(domain: string, forward_host: string, forward_port: int = 443) string {
+  return ""
+}
+
+proxy_host(domain = "test")
+`
 	s.docs.Open(docURI, text, 1)
 
 	// Hover on "proxy_host" at line 6

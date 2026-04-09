@@ -11,6 +11,7 @@ enum SecretsBackend { age, file }
 
 func env(name: string, default: string?) string
 func secret(name: string) string
+func range(n: int) list[int]
 
 func deploy(name: string, targets: list[Target]) block[Deploy]
 

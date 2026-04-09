@@ -122,7 +122,7 @@ func (s *Server) completeModule(word string) []protocol.CompletionItem {
 		if !ok {
 			continue
 		}
-		insertText := member
+		var insertText string
 		if f.IsStep {
 			insertText = member + " {"
 		} else {

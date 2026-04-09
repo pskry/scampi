@@ -30,7 +30,7 @@ They intentionally avoid:
 - disk-heavy work beyond config loading
 */
 
-// Benchmark: loadConfig (Starlark evaluation)
+// Benchmark: loadConfig (scampi-lang evaluation)
 // -----------------------------------------------------------------------------
 
 func BenchmarkLoadConfig(b *testing.B) {
@@ -39,23 +39,24 @@ func BenchmarkLoadConfig(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfg := fmt.Sprintf(`target.local(name="local")
+			cfg := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        copy(
-            desc="step-%%d" %% i,
-            src=local("/tmp/src-%%d" %% i),
-            dest="/tmp/dest-%%d" %% i,
-            perm="0644",
-            owner="user",
-            group="group",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.copy {
+      desc = "step-${i}"
+      src = posix.source_local { path = "/tmp/src-${i}" }
+      dest = "/tmp/dest-${i}"
+      perm = "0644"
+      owner = "user"
+      group = "group"
+    }
+  }
+}
 `, size)
 
 			cfgPath := absPath(filepath.Join(tmp, "config.scampi"))
@@ -102,23 +103,24 @@ func BenchmarkApplyNoOp(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        copy(
-            desc="step-%%d" %% i,
-            src=local("/src.txt"),
-            dest="/dest.txt",
-            perm="0644",
-            owner="perf-owner",
-            group="perf-group",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.copy {
+      desc = "step-${i}"
+      src = posix.source_local { path = "/src.txt" }
+      dest = "/dest.txt"
+      perm = "0644"
+      owner = "perf-owner"
+      group = "perf-group"
+    }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -168,20 +170,17 @@ func BenchmarkApplyNoOp_Symlink(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        symlink(
-            desc="symlink-%%d" %% i,
-            target="/target.txt",
-            link="/link.txt",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.symlink { target = "/target.txt", link = "/link.txt" }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -230,19 +229,17 @@ func BenchmarkApplyNoOp_Dir(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        dir(
-            desc="dir-%%d" %% i,
-            path="/mydir",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.dir { path = "/mydir" }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -291,30 +288,27 @@ func BenchmarkApplyNoOp_Mixed(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        copy(
-            desc="copy-%%d" %% i,
-            src=local("/src.txt"),
-            dest="/dest.txt",
-            perm="0644",
-            owner="perf-owner",
-            group="perf-group",
-        )
-        for i in range(%d)
-    ] + [
-        symlink(
-            desc="symlink-%%d" %% i,
-            target="/target.txt",
-            link="/link.txt",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.copy {
+      desc = "copy-${i}"
+      src = posix.source_local { path = "/src.txt" }
+      dest = "/dest.txt"
+      perm = "0644"
+      owner = "perf-owner"
+      group = "perf-group"
+    }
+  }
+  for i in std.range(%d) {
+    posix.symlink { target = "/target.txt", link = "/link.txt" }
+  }
+}
 `, size, size)
 
 			src := source.NewMemSource()
@@ -365,24 +359,25 @@ func BenchmarkApplyNoOp_Template(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        template(
-            desc="tmpl-%%d" %% i,
-            src=inline("server {{ .name }} port={{ .port }}"),
-            dest="/out.conf",
-            perm="0644",
-            owner="perf-owner",
-            group="perf-group",
-            data={"values": {"name": "bench", "port": 8080}},
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.template {
+      desc = "tmpl-${i}"
+      src = posix.source_inline { content = "server {{ .name }} port={{ .port }}" }
+      dest = "/out.conf"
+      perm = "0644"
+      owner = "perf-owner"
+      group = "perf-group"
+      data = {"values": {"name": "bench", "port": 8080}}
+    }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -431,21 +426,17 @@ func BenchmarkApplyNoOp_Pkg(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        pkg(
-            desc="pkg-%%d" %% i,
-            packages=["nginx"],
-            state="present",
-            source=system(),
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.pkg { packages = ["nginx"], source = posix.pkg_system {} }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -494,21 +485,17 @@ func BenchmarkApplyNoOp_Service(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        service(
-            desc="svc-%%d" %% i,
-            name="nginx",
-            state="running",
-            enabled=True,
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.service { name = "nginx", state = posix.ServiceState.running, enabled = true }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -558,19 +545,17 @@ func BenchmarkApplyNoOp_Group(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        group(
-            desc="grp-%%d" %% i,
-            name="deploy",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.group { name = "deploy" }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -619,21 +604,17 @@ func BenchmarkApplyNoOp_User(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        user(
-            desc="usr-%%d" %% i,
-            name="deploy",
-            shell="/bin/bash",
-            groups=["sudo"],
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.user { name = "deploy", shell = "/bin/bash", groups = ["sudo"] }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -686,20 +667,17 @@ func BenchmarkApplyNoOp_Sysctl(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        sysctl(
-            desc="sysctl-%%d" %% i,
-            key="net.ipv4.ip_forward",
-            value="1",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.sysctl { key = "net.ipv4.ip_forward", value = "1" }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -754,20 +732,17 @@ func BenchmarkApplyNoOp_Firewall(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        firewall(
-            desc="fw-%%d" %% i,
-            port="22/tcp",
-            action="allow",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.firewall { port = "22/tcp" }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -828,20 +803,17 @@ func BenchmarkApplyNoOp_Run(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        run(
-            desc="run-%%d" %% i,
-            apply="do-thing",
-            check="check-thing",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    posix.run { apply = "do-thing", check = "check-thing" }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -895,19 +867,18 @@ func BenchmarkApplyNoOp_Container(b *testing.B) {
 	sizes := []int{1, 10, 100, 1000, 10000}
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size-%d", size), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
+import "std/container"
 
-deploy(
-    name="bench",
-    targets=["local"],
-    steps=[
-        container.instance(
-            name="app-%%d" %% i,
-            image="nginx:1.25",
-        )
-        for i in range(%d)
-    ],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  for i in std.range(%d) {
+    container.instance { name = "app-${i}", image = "nginx:1.25" }
+  }
+}
 `, size)
 
 			src := source.NewMemSource()
@@ -994,11 +965,19 @@ func benchUnarchiveNoOp(b *testing.B, makeFn func(testing.TB, map[string]string)
 	for _, n := range benchArchiveSizes {
 		archive := makeFn(b, generateFiles(n))
 		b.Run(fmt.Sprintf("Size-%d", n), func(b *testing.B) {
-			cfgStr := fmt.Sprintf(`target.local(name="local")
+			cfgStr := fmt.Sprintf(`module main
+import "std"
+import "std/posix"
 
-deploy(name="bench", targets=["local"], steps=[
-    unarchive(src=local("%s"), dest="/output", depth=0),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "bench", targets = [local]) {
+  posix.unarchive {
+    src = posix.source_local { path = "%s" }
+    dest = "/output"
+    depth = 0
+  }
+}
 `, srcPath)
 
 			src := source.NewMemSource()
