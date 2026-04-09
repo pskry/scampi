@@ -1,4 +1,11 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[
-    container.instance(name="test"),
-])
+module main
+
+import "std"
+import "std/posix"
+import "std/container"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  container.instance { name = "test" }
+}

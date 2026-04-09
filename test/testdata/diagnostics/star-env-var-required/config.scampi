@@ -1,1 +1,5 @@
-val = env("SCAMPI_TEST_NONEXISTENT_VAR_9f8a7b6c")
+module main
+
+import "std"
+
+let val = std.env("SCAMPI_TEST_NONEXISTENT_VAR_9f8a7b6c")

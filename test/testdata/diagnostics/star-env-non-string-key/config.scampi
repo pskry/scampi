@@ -1,1 +1,5 @@
-val = env(42)
+module main
+
+import "std"
+
+let val = std.env(42)

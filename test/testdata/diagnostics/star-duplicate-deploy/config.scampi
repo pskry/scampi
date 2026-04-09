@@ -1,3 +1,13 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[dir(path="/tmp/a")])
-deploy(name="main", targets=["host"], steps=[dir(path="/tmp/b")])
+module main
+
+import "std"
+import "std/posix"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  posix.dir { path = "/tmp/a" }
+}
+std.deploy(name = "main", targets = [host]) {
+  posix.dir { path = "/tmp/b" }
+}

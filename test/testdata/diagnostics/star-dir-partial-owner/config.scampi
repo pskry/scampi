@@ -1,4 +1,10 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[
-    dir(path="/tmp/test", owner="root"),
-])
+module main
+
+import "std"
+import "std/posix"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  posix.dir { path = "/tmp/test", owner = "root" }
+}

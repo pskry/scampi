@@ -1,2 +1,7 @@
-target.local(name="dup")
-target.local(name="dup")
+module main
+
+import "std"
+import "std/posix"
+
+let dup = posix.local { name = "dup" }
+let dup = posix.local { name = "dup" }

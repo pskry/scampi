@@ -1,4 +1,10 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[
-    run(apply="echo hi"),
-])
+module main
+
+import "std"
+import "std/posix"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  posix.run { apply = "echo hi" }
+}

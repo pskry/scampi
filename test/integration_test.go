@@ -53,18 +53,22 @@ func loadAndResolve(
 // through execution using in-memory source and target.
 func TestIntegration_FullFlow(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="copy-test",
-		src=local("/src.txt"),
-		dest="/dest.txt",
-		perm="0644",
-		owner="testuser",
-		group="testgroup",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "copy-test"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "testuser"
+    group = "testgroup"
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -117,18 +121,22 @@ deploy(name="test", targets=["local"], steps=[
 // TestIntegration_Idempotency verifies that a second run skips already-satisfied ops.
 func TestIntegration_Idempotency(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="idempotent-copy",
-		src=local("/src.txt"),
-		dest="/dest.txt",
-		perm="0644",
-		owner="owner",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "idempotent-copy"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "owner"
+    group = "group"
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -188,26 +196,30 @@ deploy(name="test", targets=["local"], steps=[
 // TestIntegration_MultipleSteps verifies sequential execution of multiple steps.
 func TestIntegration_MultipleSteps(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="copy-1",
-		src=local("/src-a.txt"),
-		dest="/dest-a.txt",
-		perm="0644",
-		owner="user",
-		group="group",
-	),
-	copy(
-		desc="copy-2",
-		src=local("/src-b.txt"),
-		dest="/dest-b.txt",
-		perm="0600",
-		owner="user",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "copy-1"
+    src = posix.source_local { path = "/src-a.txt" }
+    dest = "/dest-a.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+  }
+  posix.copy {
+    desc = "copy-2"
+    src = posix.source_local { path = "/src-b.txt" }
+    dest = "/dest-b.txt"
+    perm = "0600"
+    owner = "user"
+    group = "group"
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -262,18 +274,22 @@ deploy(name="test", targets=["local"], steps=[
 // target write fails.
 func TestIntegration_ErrorInjection_WriteFailure(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="will-fail",
-		src=local("/src.txt"),
-		dest="/dest.txt",
-		perm="0644",
-		owner="user",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "will-fail"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+  }
+}
 `
 	src := source.NewMemSource()
 	innerTgt := target.NewMemTarget()
@@ -311,18 +327,22 @@ deploy(name="test", targets=["local"], steps=[
 // when source read fails during check.
 func TestIntegration_ErrorInjection_SourceReadFailure(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="source-fail",
-		src=local("/missing.txt"),
-		dest="/dest.txt",
-		perm="0644",
-		owner="user",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "source-fail"
+    src = posix.source_local { path = "/missing.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+  }
+}
 `
 	innerSrc := source.NewMemSource()
 	src := newFaultySource(innerSrc)
@@ -368,26 +388,30 @@ deploy(name="test", targets=["local"], steps=[
 // subsequent actions (fail-fast).
 func TestIntegration_PartialFailure(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="first-fails",
-		src=local("/src-a.txt"),
-		dest="/dest-a.txt",
-		perm="0644",
-		owner="user",
-		group="group",
-	),
-	copy(
-		desc="never-runs",
-		src=local("/src-b.txt"),
-		dest="/dest-b.txt",
-		perm="0644",
-		owner="user",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "first-fails"
+    src = posix.source_local { path = "/src-a.txt" }
+    dest = "/dest-a.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+  }
+  posix.copy {
+    desc = "never-runs"
+    src = posix.source_local { path = "/src-b.txt" }
+    dest = "/dest-b.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+  }
+}
 `
 	src := source.NewMemSource()
 	innerTgt := target.NewMemTarget()
@@ -437,18 +461,22 @@ deploy(name="test", targets=["local"], steps=[
 // and applied correctly.
 func TestIntegration_ContentChange(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="update-content",
-		src=local("/src.txt"),
-		dest="/dest.txt",
-		perm="0644",
-		owner="user",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "update-content"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -504,18 +532,22 @@ deploy(name="test", targets=["local"], steps=[
 // and applied correctly.
 func TestIntegration_ModeChange(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="update-mode",
-		src=local("/src.txt"),
-		dest="/dest.txt",
-		perm="0755",
-		owner="user",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "update-mode"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0755"
+    owner = "user"
+    group = "group"
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -553,18 +585,22 @@ deploy(name="test", targets=["local"], steps=[
 // and applied correctly.
 func TestIntegration_OwnerChange(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="update-owner",
-		src=local("/src.txt"),
-		dest="/dest.txt",
-		perm="0644",
-		owner="newuser",
-		group="newgroup",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "update-owner"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "newuser"
+    group = "newgroup"
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -601,18 +637,22 @@ deploy(name="test", targets=["local"], steps=[
 // TestIntegration_FaultyClearAndRetry verifies that clearing faults allows retry.
 func TestIntegration_FaultyClearAndRetry(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	copy(
-		desc="retry-test",
-		src=local("/src.txt"),
-		dest="/dest.txt",
-		perm="0644",
-		owner="user",
-		group="group",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "retry-test"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+  }
+}
 `
 	src := source.NewMemSource()
 	innerTgt := target.NewMemTarget()
@@ -668,29 +708,28 @@ deploy(name="test", targets=["local"], steps=[
 // TestHook_Triggered verifies that a hook fires when its notifying step changes.
 func TestHook_Triggered(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["restart-nginx"],
-		),
-	],
-	hooks={
-		"restart-nginx": service(
-			name="nginx",
-			state="restarted",
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let restart_nginx = posix.service {
+    name = "nginx"
+    state = posix.ServiceState.restarted
+  }
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [restart_nginx]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -721,29 +760,28 @@ deploy(
 // TestHook_OnChangeSingleString verifies that on_change accepts a bare string.
 func TestHook_OnChangeSingleString(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change="restart-nginx",
-		),
-	],
-	hooks={
-		"restart-nginx": service(
-			name="nginx",
-			state="restarted",
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let restart_nginx = posix.service {
+    name = "nginx"
+    state = posix.ServiceState.restarted
+  }
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [restart_nginx]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -774,29 +812,28 @@ deploy(
 // TestHook_NotTriggered verifies that a hook does not fire when nothing changed.
 func TestHook_NotTriggered(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["restart-nginx"],
-		),
-	],
-	hooks={
-		"restart-nginx": service(
-			name="nginx",
-			state="restarted",
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let restart_nginx = posix.service {
+    name = "nginx"
+    state = posix.ServiceState.restarted
+  }
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [restart_nginx]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -832,38 +869,37 @@ deploy(
 // by multiple steps.
 func TestHook_MultipleNotifiers(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-a",
-			src=local("/src-a.txt"),
-			dest="/dest-a.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["restart-nginx"],
-		),
-		copy(
-			desc="config-b",
-			src=local("/src-b.txt"),
-			dest="/dest-b.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["restart-nginx"],
-		),
-	],
-	hooks={
-		"restart-nginx": service(
-			name="nginx",
-			state="restarted",
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let restart_nginx = posix.service {
+    name = "nginx"
+    state = posix.ServiceState.restarted
+  }
+
+  posix.copy {
+    desc = "config-a"
+    src = posix.source_local { path = "/src-a.txt" }
+    dest = "/dest-a.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [restart_nginx]
+  }
+  posix.copy {
+    desc = "config-b"
+    src = posix.source_local { path = "/src-b.txt" }
+    dest = "/dest-b.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [restart_nginx]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -895,34 +931,33 @@ deploy(
 // TestHook_Chaining verifies that hooks can trigger other hooks.
 func TestHook_Chaining(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["restart-app"],
-		),
-	],
-	hooks={
-		"restart-app": service(
-			name="app",
-			state="restarted",
-			on_change=["restart-proxy"],
-		),
-		"restart-proxy": service(
-			name="proxy",
-			state="restarted",
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let restart_proxy = posix.service {
+    name = "proxy"
+    state = posix.ServiceState.restarted
+  }
+  let restart_app = posix.service {
+    name = "app"
+    state = posix.ServiceState.restarted
+    on_change = [restart_proxy]
+  }
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [restart_app]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -959,29 +994,28 @@ deploy(
 // upstream step would change.
 func TestHook_CheckMode(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["restart-nginx"],
-		),
-	],
-	hooks={
-		"restart-nginx": service(
-			name="nginx",
-			state="restarted",
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let restart_nginx = posix.service {
+    name = "nginx"
+    state = posix.ServiceState.restarted
+  }
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [restart_nginx]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1026,23 +1060,23 @@ deploy(
 // produces a plan error.
 func TestHook_UnknownRef(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["nonexistent-hook"],
-		),
-	],
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = ["nonexistent-hook"]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1073,35 +1107,34 @@ deploy(
 // produces a plan error.
 func TestHook_CycleDetection(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["hook-a"],
-		),
-	],
-	hooks={
-		"hook-a": service(
-			name="svc-a",
-			state="restarted",
-			on_change=["hook-b"],
-		),
-		"hook-b": service(
-			name="svc-b",
-			state="restarted",
-			on_change=["hook-a"],
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let hook_b = posix.service {
+    name = "svc-b"
+    state = posix.ServiceState.restarted
+    on_change = [hook_a]
+  }
+  let hook_a = posix.service {
+    name = "svc-a"
+    state = posix.ServiceState.restarted
+    on_change = [hook_b]
+  }
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [hook_a]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1135,29 +1168,28 @@ deploy(
 // TestHook_RunStepAsHook verifies that non-service steps can be hooks.
 func TestHook_RunStepAsHook(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["run-reload"],
-		),
-	],
-	hooks={
-		"run-reload": run(
-			apply="nginx -s reload",
-			always=True,
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let run_reload = posix.run {
+    apply = "nginx -s reload"
+    always = true
+  }
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [run_reload]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1198,39 +1230,38 @@ deploy(
 // steps sequentially.
 func TestHook_MultiStep(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["deploy-app"],
-		),
-	],
-	hooks={
-		"deploy-app": [
-			copy(
-				desc="app-conf",
-				src=local("/app.conf"),
-				dest="/app.conf.deployed",
-				perm="0644",
-				owner="user",
-				group="group",
-			),
-			service(
-				name="app",
-				state="restarted",
-			),
-		],
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let deploy_app = [
+    posix.copy {
+      desc = "app-conf"
+      src = posix.source_local { path = "/app.conf" }
+      dest = "/app.conf.deployed"
+      perm = "0644"
+      owner = "user"
+      group = "group"
+    },
+    posix.service {
+      name = "app"
+      state = posix.ServiceState.restarted
+    },
+  ]
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [deploy_app]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1266,44 +1297,43 @@ deploy(
 // fires downstream hooks when any step changes.
 func TestHook_MultiStepChaining(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(
-	name="test",
-	targets=["local"],
-	steps=[
-		copy(
-			desc="config-file",
-			src=local("/src.txt"),
-			dest="/dest.txt",
-			perm="0644",
-			owner="user",
-			group="group",
-			on_change=["deploy-app"],
-		),
-	],
-	hooks={
-		"deploy-app": [
-			copy(
-				desc="app-conf",
-				src=local("/app.conf"),
-				dest="/app.conf.deployed",
-				perm="0644",
-				owner="user",
-				group="group",
-			),
-			service(
-				name="app",
-				state="restarted",
-				on_change=["reload-proxy"],
-			),
-		],
-		"reload-proxy": service(
-			name="proxy",
-			state="restarted",
-		),
-	},
-)
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  let reload_proxy = posix.service {
+    name = "proxy"
+    state = posix.ServiceState.restarted
+  }
+  let deploy_app = [
+    posix.copy {
+      desc = "app-conf"
+      src = posix.source_local { path = "/app.conf" }
+      dest = "/app.conf.deployed"
+      perm = "0644"
+      owner = "user"
+      group = "group"
+    },
+    posix.service {
+      name = "app"
+      state = posix.ServiceState.restarted
+      on_change = [reload_proxy]
+    },
+  ]
+
+  posix.copy {
+    desc = "config-file"
+    src = posix.source_local { path = "/src.txt" }
+    dest = "/dest.txt"
+    perm = "0644"
+    owner = "user"
+    group = "group"
+    on_change = [deploy_app]
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()
@@ -1341,15 +1371,19 @@ deploy(
 // falls back to restart when the backend does not support reload.
 func TestIntegration_ReloadFallbackToRestart(t *testing.T) {
 	cfgStr := `
-target.local(name="local")
+module main
+import "std"
+import "std/posix"
 
-deploy(name="test", targets=["local"], steps=[
-	service(
-		desc="reload-or-restart nginx",
-		name="nginx",
-		state="reloaded",
-	),
-])
+let local = posix.local { name = "local" }
+
+std.deploy(name = "test", targets = [local]) {
+  posix.service {
+    desc = "reload-or-restart nginx"
+    name = "nginx"
+    state = posix.ServiceState.reloaded
+  }
+}
 `
 	src := source.NewMemSource()
 	tgt := target.NewMemTarget()

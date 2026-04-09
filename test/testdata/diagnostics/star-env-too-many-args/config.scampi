@@ -1,1 +1,5 @@
-val = env("A", "B", "C")
+module main
+
+import "std"
+
+let val = std.env("A", "B", "C")

@@ -1,8 +1,15 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[
-    container.instance(
-        name="test",
-        image="nginx:latest",
-        healthcheck=container.healthcheck.cmd(cmd="true", interval="lol"),
-    ),
-])
+module main
+
+import "std"
+import "std/posix"
+import "std/container"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  container.instance {
+    name = "test"
+    image = "nginx:latest"
+    healthcheck = container.healthcheck.cmd { cmd = "true", interval = "lol" }
+  }
+}

@@ -1,4 +1,10 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[
-    copy(src="./file.txt", dest="/tmp/out", perm="0644", owner="root", group="root"),
-])
+module main
+
+import "std"
+import "std/posix"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  posix.copy { src = "./file.txt", dest = "/tmp/out", perm = "0644", owner = "root", group = "root" }
+}

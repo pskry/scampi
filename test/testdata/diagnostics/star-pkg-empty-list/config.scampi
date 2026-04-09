@@ -1,4 +1,10 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[
-    pkg(packages=[], source=system()),
-])
+module main
+
+import "std"
+import "std/posix"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  posix.pkg { packages = [], source = posix.pkg_system {} }
+}

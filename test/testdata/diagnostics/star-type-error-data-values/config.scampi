@@ -1,11 +1,17 @@
-target.local(name="host")
-deploy(name="main", targets=["host"], steps=[
-    template(
-        dest="/tmp/out",
-        perm="0644",
-        owner="root",
-        group="root",
-        src=inline("hello"),
-        data={"values": "nope"},
-    ),
-])
+module main
+
+import "std"
+import "std/posix"
+
+let host = posix.local { name = "host" }
+
+std.deploy(name = "main", targets = [host]) {
+  posix.template {
+    dest = "/tmp/out"
+    perm = "0644"
+    owner = "root"
+    group = "root"
+    src = posix.source_inline { content = "hello" }
+    data = {"values": "nope"}
+  }
+}
