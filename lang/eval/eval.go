@@ -629,6 +629,11 @@ func (ev *Evaluator) fillBlockFromStmts(bv *BlockVal, stmts []ast.Stmt) Value {
 	}
 }
 
+// AddError reports an error from an onEmit callback.
+func (ev *Evaluator) AddError(msg string) {
+	ev.errAt(token.Span{}, msg)
+}
+
 // SetSecretLookup allows callers (via WithOnEmit) to wire the secret
 // resolver after seeing a SecretsConfig value during evaluation.
 func (ev *Evaluator) SetSecretLookup(fn func(string) (string, error)) {

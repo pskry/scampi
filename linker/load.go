@@ -68,11 +68,17 @@ func LoadConfig(
 // makeSecretWirer returns an onEmit callback that detects SecretsConfig
 // values and wires the secret backend into the evaluator.
 func makeSecretWirer(ctx context.Context, cfgPath string, src source.Source) func(eval.Value, *eval.Evaluator) {
+	configured := false
 	return func(v eval.Value, ev *eval.Evaluator) {
 		sv, ok := v.(*eval.StructVal)
 		if !ok || sv.RetType != "SecretsConfig" {
 			return
 		}
+		if configured {
+			ev.AddError("secrets() called more than once")
+			return
+		}
+		configured = true
 		backend := ""
 		if b, ok := sv.Fields["backend"].(*eval.StringVal); ok {
 			backend = b.V
@@ -90,6 +96,7 @@ func makeSecretWirer(ctx context.Context, cfgPath string, src source.Source) fun
 		}
 		data, readErr := src.ReadFile(ctx, path)
 		if readErr != nil {
+			ev.AddError(fmt.Sprintf("reading secrets file %q: %s", path, readErr))
 			return
 		}
 		var b secret.Backend
@@ -100,8 +107,23 @@ func makeSecretWirer(ctx context.Context, cfgPath string, src source.Source) fun
 				b = fb
 			}
 		case "age":
-			// Age needs identity keys — skip for now if not available.
-			// TODO: wire age identity resolution
+			readFile := func(p string) ([]byte, error) {
+				return src.ReadFile(ctx, p)
+			}
+			identities, idErr := secret.ResolveIdentities(
+				src.LookupEnv,
+				readFile,
+			)
+			if idErr != nil {
+				ev.AddError(fmt.Sprintf("age identity resolution: %s", idErr))
+			} else {
+				ab, abErr := secret.NewAgeBackend(data, identities)
+				if abErr != nil {
+					ev.AddError(fmt.Sprintf("age backend: %s", abErr))
+				} else {
+					b = ab
+				}
+			}
 		}
 		if b != nil {
 			ev.SetSecretLookup(func(key string) (string, error) {
