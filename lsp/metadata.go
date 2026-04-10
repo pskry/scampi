@@ -22,6 +22,28 @@ type ParamInfo struct {
 	Required   bool
 	Examples   []string
 	EnumValues []string
+
+	// Attributes are the prefix `@name(args)` annotations declared
+	// on this parameter in the source stub. The LSP dispatches on
+	// attribute name to provide special completion, hover, and
+	// goto-definition behaviour for annotated params.
+	Attributes []AttributeUse
+}
+
+// AttributeUse is a single attribute reference attached to a
+// ParamInfo, in the shape the LSP needs for dispatch. The actual
+// argument-binding rules are enforced by lang/check before this
+// reaches the LSP — what we carry here is the resolved name and a
+// shallow rendering of the arguments suitable for hover display.
+type AttributeUse struct {
+	// Name is the bare attribute name without the leading `@`
+	// (e.g. "secretkey", "path", "oneof").
+	Name string
+
+	// QualifiedName is the fully qualified form including the
+	// declaring module and the leading `@`, e.g. `std.@secretkey`.
+	// This is the key the LSP uses to look up completion providers.
+	QualifiedName string
 }
 
 // FuncInfo describes a function or decl from the standard library stubs.
@@ -275,9 +297,10 @@ func fieldsToParams(fields []*ast.Field, modName string) []ParamInfo {
 	params := make([]ParamInfo, len(fields))
 	for i, f := range fields {
 		params[i] = ParamInfo{
-			Name:     f.Name.Name,
-			Type:     qualifiedTypeString(f.Type, modName),
-			Required: f.Default == nil && !isOptionalType(f.Type),
+			Name:       f.Name.Name,
+			Type:       qualifiedTypeString(f.Type, modName),
+			Required:   f.Default == nil && !isOptionalType(f.Type),
+			Attributes: collectAttributeUses(f.Attributes, modName),
 		}
 	}
 	return params
@@ -373,6 +396,36 @@ var builtinTypes = map[string]bool{
 
 func isBuiltinType(name string) bool {
 	return builtinTypes[name]
+}
+
+// collectAttributeUses converts the AST attribute references on a
+// Field into the LSP-friendly AttributeUse shape. Single-segment
+// attribute names are qualified with the declaring module so the LSP
+// can dispatch on a stable key (e.g. `@nonempty` declared in `std`
+// becomes `std.@nonempty`). Two-segment names are already qualified
+// and pass through.
+func collectAttributeUses(attrs []*ast.Attribute, modName string) []AttributeUse {
+	if len(attrs) == 0 {
+		return nil
+	}
+	out := make([]AttributeUse, 0, len(attrs))
+	for _, a := range attrs {
+		parts := a.Name.Parts
+		switch len(parts) {
+		case 1:
+			bare := parts[0].Name
+			out = append(out, AttributeUse{
+				Name:          bare,
+				QualifiedName: modName + ".@" + bare,
+			})
+		case 2:
+			out = append(out, AttributeUse{
+				Name:          parts[1].Name,
+				QualifiedName: parts[0].Name + ".@" + parts[1].Name,
+			})
+		}
+	}
+	return out
 }
 
 // Test stubs (hardcoded until test framework has .scampi stubs)
