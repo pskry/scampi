@@ -9,8 +9,17 @@ type SecretsConfig
 
 enum SecretsBackend { age, file }
 
+// Attribute types
+//
+// `@secretkey` marks a string parameter as a secret-store key.
+// The linker validates literal keys against the configured backend
+// at link time; the LSP offers known keys as completions when the
+// cursor is inside a string argument to a `@secretkey`-annotated
+// parameter.
+type @secretkey {}
+
 func env(name: string, default: string?) string
-func secret(name: string) string
+func secret(@secretkey name: string) string
 func range(n: int) list[int]
 
 func deploy(name: string, targets: list[Target]) block[Deploy]

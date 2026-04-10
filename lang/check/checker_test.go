@@ -551,6 +551,47 @@ decl posix.copy(
 `)
 }
 
+func TestCheckAttrTypeFieldDefCarriesAttributes(t *testing.T) {
+	// After checking, the FuncType for a function whose params carry
+	// attributes should expose those attributes on the corresponding
+	// FieldDef.Attributes slice, qualified by the declaring module.
+	src := `
+module main
+type @secretkey {}
+
+func secret(@secretkey name: string) string
+`
+	l := lex.New("test.scampi", []byte(src))
+	p := parse.New(l)
+	f := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	c := New(nil)
+	c.Check(f)
+	if errs := c.Errors(); len(errs) > 0 {
+		t.Fatalf("check errors: %v", errs)
+	}
+	sym := c.FileScope().Lookup("secret")
+	if sym == nil {
+		t.Fatal("secret symbol not found")
+	}
+	ft, ok := sym.Type.(*FuncType)
+	if !ok {
+		t.Fatalf("expected FuncType, got %T", sym.Type)
+	}
+	if len(ft.Params) != 1 {
+		t.Fatalf("expected 1 param, got %d", len(ft.Params))
+	}
+	if len(ft.Params[0].Attributes) != 1 {
+		t.Fatalf("expected 1 attribute, got %d", len(ft.Params[0].Attributes))
+	}
+	if ft.Params[0].Attributes[0] != "main.@secretkey" {
+		t.Errorf("attr qualified name: got %q, want %q",
+			ft.Params[0].Attributes[0], "main.@secretkey")
+	}
+}
+
 func TestCheckAttrTypeNamespacedUnknown(t *testing.T) {
 	// std has no attribute types registered yet (Stage 4 territory),
 	// so this exercises the dotted-name resolution path: it should

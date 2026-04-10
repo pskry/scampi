@@ -4,17 +4,20 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 
+	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/check"
 	"scampi.dev/scampi/lang/lex"
 	"scampi.dev/scampi/lang/parse"
 	"scampi.dev/scampi/lang/token"
+	"scampi.dev/scampi/linker"
 	"scampi.dev/scampi/mod"
 	"scampi.dev/scampi/std"
 )
@@ -129,9 +132,12 @@ func readModuleEntry(dir, name string) ([]byte, string) {
 	return nil, ""
 }
 
-// evaluate runs the scampi-lang lex → parse → check pipeline and
-// returns LSP diagnostics.
-func (s *Server) evaluate(_ context.Context, docURI protocol.DocumentURI, content string) []protocol.Diagnostic {
+// evaluate runs the scampi-lang full pipeline (lex → parse → check →
+// eval → attribute static checks) on the editor's current buffer and
+// returns LSP diagnostics for everything it finds. The pipeline runs
+// against an overlay source so the in-memory content is used instead
+// of any stale on-disk version.
+func (s *Server) evaluate(ctx context.Context, docURI protocol.DocumentURI, content string) []protocol.Diagnostic {
 	filePath := uriToPath(docURI)
 	if filePath == "" {
 		return nil
@@ -139,7 +145,8 @@ func (s *Server) evaluate(_ context.Context, docURI protocol.DocumentURI, conten
 
 	data := []byte(content)
 
-	// Parse.
+	// Fast-path parse first so we can return parse-only diagnostics
+	// without doing the heavier eval pass when the file is broken.
 	f, parseDiags := Parse(filePath, data)
 	if len(parseDiags) > 0 {
 		return parseDiags
@@ -148,19 +155,87 @@ func (s *Server) evaluate(_ context.Context, docURI protocol.DocumentURI, conten
 		return nil
 	}
 
-	// Type check.
-	c := check.New(s.modules)
-	c.Check(f)
-
-	var diags []protocol.Diagnostic
-	for _, e := range c.Errors() {
-		diags = append(diags, checkerErrorToLSP(data, e))
+	// Run the full linker pipeline against the in-memory content.
+	src := newOverlaySource(filePath, data)
+	if _, err := linker.Analyze(ctx, filePath, src); err != nil {
+		return analysisErrorToLSPDiagnostics(err, data)
 	}
-	return diags
+	return nil
 }
 
-func checkerErrorToLSP(src []byte, e check.Error) protocol.Diagnostic {
-	return spanDiag(src, e.Span, e.Msg)
+// analysisErrorToLSPDiagnostics flattens the error returned by
+// linker.Analyze into a slice of LSP diagnostics. linker.Analyze
+// returns either a single diagnostic.Diagnostic or a
+// diagnostic.Diagnostics slice (when multiple errors fire from the
+// same phase); both shapes are handled.
+func analysisErrorToLSPDiagnostics(err error, src []byte) []protocol.Diagnostic {
+	var ds diagnostic.Diagnostics
+	if errors.As(err, &ds) {
+		out := make([]protocol.Diagnostic, 0, len(ds))
+		for _, d := range ds {
+			out = append(out, diagnosticToLSP(d, src))
+		}
+		return out
+	}
+	var d diagnostic.Diagnostic
+	if errors.As(err, &d) {
+		return []protocol.Diagnostic{diagnosticToLSP(d, src)}
+	}
+	// Non-diagnostic error (e.g. file not found): emit a placeholder
+	// diagnostic at file head so the user sees something.
+	return []protocol.Diagnostic{{
+		Range:    protocol.Range{},
+		Severity: protocol.DiagnosticSeverityError,
+		Source:   "scampls",
+		Message:  err.Error(),
+	}}
+}
+
+// diagnosticToLSP renders a typed scampi diagnostic into the LSP
+// protocol shape. Source spans on the diagnostic are used directly;
+// when no span is present the diagnostic is anchored at file head so
+// the user still sees the message.
+func diagnosticToLSP(d diagnostic.Diagnostic, src []byte) protocol.Diagnostic {
+	tmpl := d.EventTemplate()
+	msg := tmpl.Text
+	if e, ok := d.(error); ok {
+		msg = e.Error()
+	}
+	if tmpl.Hint != "" {
+		msg += "\n\nhint: " + tmpl.Hint
+	}
+	rng := protocol.Range{}
+	if tmpl.Source != nil {
+		// Convert 1-based line/col to 0-based LSP coordinates,
+		// clamping any zero values that would underflow.
+		startLine := uint32(0)
+		if tmpl.Source.StartLine > 0 {
+			startLine = uint32(tmpl.Source.StartLine - 1)
+		}
+		startCol := uint32(0)
+		if tmpl.Source.StartCol > 0 {
+			startCol = uint32(tmpl.Source.StartCol - 1)
+		}
+		endLine := startLine
+		if tmpl.Source.EndLine > 0 {
+			endLine = uint32(tmpl.Source.EndLine - 1)
+		}
+		endCol := startCol
+		if tmpl.Source.EndCol > 0 {
+			endCol = uint32(tmpl.Source.EndCol - 1)
+		}
+		rng = protocol.Range{
+			Start: protocol.Position{Line: startLine, Character: startCol},
+			End:   protocol.Position{Line: endLine, Character: endCol},
+		}
+	}
+	_ = src // currently unused; reserved for future content-based span resolution
+	return protocol.Diagnostic{
+		Range:    rng,
+		Severity: protocol.DiagnosticSeverityError,
+		Source:   "scampls",
+		Message:  msg,
+	}
 }
 
 func uriToPath(u protocol.DocumentURI) string {

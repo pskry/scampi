@@ -39,10 +39,15 @@ func (s *Server) Completion(
 	var items []protocol.CompletionItem
 
 	switch {
-	case cur.InCall && cur.FuncName == "std.secret" && cur.InString:
-		items = s.completeSecretKeys(params.TextDocument.URI, cur)
-	case cur.InCall && cur.ActiveKwarg != "" && cur.InString:
-		items = s.completeEnumValues(params.TextDocument.URI, cur)
+	case cur.InCall && cur.InString:
+		// Check whether the active parameter carries an attribute
+		// that has a registered LSP completion provider (e.g.
+		// `@secretkey` → completeSecretKeys). Falls through to enum
+		// completion when no provider matches.
+		items = s.dispatchAttributeProvider(params.TextDocument.URI, cur)
+		if items == nil && cur.ActiveKwarg != "" {
+			items = s.completeEnumValues(params.TextDocument.URI, cur)
+		}
 	case cur.InCall && cur.ActiveKwarg != "":
 		items = s.completeKwargValue(params.TextDocument.URI, cur)
 	case cur.InList:
@@ -179,6 +184,81 @@ func (s *Server) completeKwargs(docURI protocol.DocumentURI, cur CursorContext) 
 		})
 	}
 	return items
+}
+
+// Attribute-driven completion providers
+// -----------------------------------------------------------------------------
+
+// AttributeCompletionProvider produces completion items for a
+// parameter that carries a particular attribute. Providers are
+// registered in attributeProviders keyed by qualified attribute
+// name (e.g. `std.@secretkey`) and dispatched by
+// dispatchAttributeProvider when the cursor sits inside the
+// parameter's argument.
+type AttributeCompletionProvider func(
+	s *Server,
+	docURI protocol.DocumentURI,
+	cur CursorContext,
+) []protocol.CompletionItem
+
+// attributeProviders maps qualified attribute type names to their
+// LSP completion providers. This is the LSP-side mirror of the
+// linker's AttributeRegistry — same key, different value (UX
+// instead of validation behaviour).
+var attributeProviders = map[string]AttributeCompletionProvider{
+	"std.@secretkey": (*Server).completeSecretKeysProvider,
+}
+
+// completeSecretKeysProvider is the AttributeCompletionProvider
+// adapter around the existing completeSecretKeys helper. The shape
+// difference exists because the historical helper takes a method
+// receiver — wrapping it as a free function with explicit *Server
+// keeps it usable from the providers map.
+func (s *Server) completeSecretKeysProvider(docURI protocol.DocumentURI, cur CursorContext) []protocol.CompletionItem {
+	return s.completeSecretKeys(docURI, cur)
+}
+
+// dispatchAttributeProvider walks the active parameter's attributes,
+// looks up a registered provider for each, and returns the first
+// non-empty result. Returns nil if no provider matches — callers
+// should fall back to other completion strategies.
+func (s *Server) dispatchAttributeProvider(docURI protocol.DocumentURI, cur CursorContext) []protocol.CompletionItem {
+	f, ok := s.lookupFunc(docURI, cur.FuncName)
+	if !ok {
+		return nil
+	}
+	param, ok := activeParam(f, cur)
+	if !ok {
+		return nil
+	}
+	for _, a := range param.Attributes {
+		provider, ok := attributeProviders[a.QualifiedName]
+		if !ok {
+			continue
+		}
+		if items := provider(s, docURI, cur); len(items) > 0 {
+			return items
+		}
+	}
+	return nil
+}
+
+// activeParam returns the parameter the cursor is currently editing
+// the value of, identified by ActiveKwarg (named) or ActiveParam
+// (positional index). Returns false if neither identifies a param.
+func activeParam(f FuncInfo, cur CursorContext) (ParamInfo, bool) {
+	if cur.ActiveKwarg != "" {
+		for _, p := range f.Params {
+			if p.Name == cur.ActiveKwarg {
+				return p, true
+			}
+		}
+		return ParamInfo{}, false
+	}
+	if cur.ActiveParam >= 0 && cur.ActiveParam < len(f.Params) {
+		return f.Params[cur.ActiveParam], true
+	}
+	return ParamInfo{}, false
 }
 
 // Type-based kwarg value completions

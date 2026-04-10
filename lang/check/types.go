@@ -81,10 +81,18 @@ func (b *BlockType) String() string {
 }
 
 // FieldDef is a field in a struct or step declaration.
+//
+// Attributes carries the qualified names of any `@name` annotations
+// declared as prefix attributes on the field, e.g. `["std.@secretkey"]`
+// for `func secret(@secretkey name: string) string`. The linker and
+// LSP read this slice to dispatch behaviour and UX providers per
+// attribute. The lang itself only validates the schema; semantics
+// live one layer up.
 type FieldDef struct {
-	Name   string
-	Type   Type
-	HasDef bool // true if the field has a default value
+	Name       string
+	Type       Type
+	HasDef     bool // true if the field has a default value
+	Attributes []string
 }
 
 // EnumType is a user-defined enum.

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/check"
 	"scampi.dev/scampi/lang/eval"
 	"scampi.dev/scampi/lang/lex"
@@ -18,6 +19,82 @@ import (
 	"scampi.dev/scampi/std"
 )
 
+// Analysis is the result of Analyze: the parsed AST, the eval result,
+// and the original file bytes. Callers needing only diagnostics can
+// discard everything and use the error return; callers needing the
+// pipeline outputs (linker, LSP doc indexing) consume the fields.
+type Analysis struct {
+	File   *ast.File
+	Result *eval.Result
+	Source []byte
+}
+
+// Analyze runs the full lang pipeline (lex → parse → check → eval →
+// attribute static checks) without performing the final Link step.
+// Returns the analysis result and an error wrapping the first
+// failing phase's diagnostics. Suitable for both the linker
+// (LoadConfig wraps Analyze + Link) and the LSP (which surfaces
+// diagnostics inline as the user types).
+func Analyze(ctx context.Context, cfgPath string, src source.Source) (*Analysis, error) {
+	data, err := src.ReadFile(ctx, cfgPath)
+	if err != nil {
+		return nil, errs.WrapErrf(err, "read %s", cfgPath)
+	}
+
+	// Lex + parse.
+	l := lex.New(cfgPath, data)
+	p := parse.New(l)
+	f := p.Parse()
+	if lexErrs := l.Errors(); len(lexErrs) > 0 {
+		return nil, wrapLangErrors(lexErrs, cfgPath, data)
+	}
+	if parseErrs := p.Errors(); len(parseErrs) > 0 {
+		return nil, wrapLangErrors(parseErrs, cfgPath, data)
+	}
+
+	// Type check.
+	modules, err := check.BootstrapModules(std.FS)
+	if err != nil {
+		return nil, wrapLangError(err, cfgPath, data)
+	}
+	c := check.New(modules)
+	c.Check(f)
+	if checkErrs := c.Errors(); len(checkErrs) > 0 {
+		return nil, wrapLangErrors(checkErrs, cfgPath, data)
+	}
+
+	// Evaluate with secret backend wiring. The wirer captures the
+	// configured backend so the post-eval attribute static check pass
+	// can validate literal secret keys against it.
+	onEmit, secretsProvider := newSecretWirer(ctx, cfgPath, src)
+	result, evalErrs := eval.Eval(f, data, eval.WithStubs(std.FS), eval.WithOnEmit(onEmit))
+	if len(evalErrs) > 0 {
+		return nil, wrapLangErrors(evalErrs, cfgPath, data)
+	}
+
+	// Run attribute static checks. This walks the user file's AST
+	// looking for call sites of functions whose parameters carry
+	// `@`-attributes, dispatches each to its registered behaviour,
+	// and validates literal arguments before plan/apply runs.
+	if attrErr := runAttributeStaticChecks(
+		f,
+		data,
+		cfgPath,
+		c.FileScope(),
+		modules,
+		DefaultAttributes(),
+		secretsProvider(),
+	); attrErr != nil {
+		return nil, attrErr
+	}
+
+	return &Analysis{
+		File:   f,
+		Result: result,
+		Source: data,
+	}, nil
+}
+
 // LoadConfig reads a .scampi file, runs the full lang pipeline
 // (lex → parse → check → eval → link), and returns a spec.Config
 // ready for the engine.
@@ -27,49 +104,33 @@ func LoadConfig(
 	src source.Source,
 	reg Registry,
 ) (spec.Config, error) {
-	data, err := src.ReadFile(ctx, cfgPath)
+	a, err := Analyze(ctx, cfgPath, src)
 	if err != nil {
-		return spec.Config{}, errs.WrapErrf(err, "read %s", cfgPath)
+		return spec.Config{}, err
 	}
-
-	// Lex + parse.
-	l := lex.New(cfgPath, data)
-	p := parse.New(l)
-	f := p.Parse()
-	if lexErrs := l.Errors(); len(lexErrs) > 0 {
-		return spec.Config{}, wrapLangErrors(lexErrs, cfgPath, data)
-	}
-	if parseErrs := p.Errors(); len(parseErrs) > 0 {
-		return spec.Config{}, wrapLangErrors(parseErrs, cfgPath, data)
-	}
-
-	// Type check.
-	modules, err := check.BootstrapModules(std.FS)
-	if err != nil {
-		return spec.Config{}, wrapLangError(err, cfgPath, data)
-	}
-	c := check.New(modules)
-	c.Check(f)
-	if checkErrs := c.Errors(); len(checkErrs) > 0 {
-		return spec.Config{}, wrapLangErrors(checkErrs, cfgPath, data)
-	}
-
-	// Evaluate with secret backend wiring.
-	onEmit := makeSecretWirer(ctx, cfgPath, src)
-	result, evalErrs := eval.Eval(f, data, eval.WithStubs(std.FS), eval.WithOnEmit(onEmit))
-	if len(evalErrs) > 0 {
-		return spec.Config{}, wrapLangErrors(evalErrs, cfgPath, data)
-	}
-
-	// Link.
-	return Link(result, reg, cfgPath, WithSourceResolver(ctx, cfgPath, src))
+	return Link(a.Result, reg, cfgPath, WithSourceResolver(ctx, cfgPath, src))
 }
 
-// makeSecretWirer returns an onEmit callback that detects SecretsConfig
-// values and wires the secret backend into the evaluator.
-func makeSecretWirer(ctx context.Context, cfgPath string, src source.Source) func(eval.Value, *eval.Evaluator) {
+// SecretBackendProvider exposes the secret backend captured by
+// newSecretWirer after the evaluator has processed a SecretsConfig
+// value. Returns nil if no backend has been configured (the user did
+// not call std.secrets in their config).
+type SecretBackendProvider func() secret.Backend
+
+// newSecretWirer returns an onEmit callback that detects SecretsConfig
+// values and wires the secret backend into the evaluator, plus a
+// provider that exposes the captured backend after eval has run. The
+// post-eval attribute static-check pass uses the provider to validate
+// literal secret keys against the configured backend.
+func newSecretWirer(
+	ctx context.Context,
+	cfgPath string,
+	src source.Source,
+) (eval.EmitCallback, SecretBackendProvider) {
 	configured := false
-	return func(v eval.Value, ev *eval.Evaluator) {
+	var captured secret.Backend
+	provider := func() secret.Backend { return captured }
+	onEmit := func(v eval.Value, ev *eval.Evaluator) {
 		sv, ok := v.(*eval.StructVal)
 		if !ok || sv.RetType != "SecretsConfig" {
 			return
@@ -126,6 +187,7 @@ func makeSecretWirer(ctx context.Context, cfgPath string, src source.Source) fun
 			b = ab
 		}
 		if b != nil {
+			captured = b
 			ev.SetSecretLookup(func(key string) (string, error) {
 				v, found, err := b.Lookup(key)
 				if err != nil {
@@ -139,4 +201,5 @@ func makeSecretWirer(ctx context.Context, cfgPath string, src source.Source) fun
 			})
 		}
 	}
+	return onEmit, provider
 }

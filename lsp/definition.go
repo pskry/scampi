@@ -58,7 +58,18 @@ func (s *Server) Definition(
 }
 
 // findDefinition searches top-level declarations for a name.
+// Attribute references (with leading `@`) match AttrTypeDecls.
 func findDefinition(f *ast.File, name string) *token.Span {
+	if len(name) > 1 && name[0] == '@' {
+		bare := name[1:]
+		for _, d := range f.Decls {
+			if atd, ok := d.(*ast.AttrTypeDecl); ok && atd.Name.Name == bare {
+				s := atd.Name.SrcSpan
+				return &s
+			}
+		}
+		return nil
+	}
 	for _, d := range f.Decls {
 		switch d := d.(type) {
 		case *ast.FuncDecl:

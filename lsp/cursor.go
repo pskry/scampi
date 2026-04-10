@@ -297,6 +297,12 @@ func wordAtOffset(text string, offset int) string {
 			break
 		}
 	}
+	// Include a leading `@` if present, so attribute references like
+	// `@secretkey` or `@std.path` are returned as a single word and
+	// can be looked up by goto-definition / hover.
+	if start > 0 && text[start-1] == '@' {
+		start--
+	}
 
 	// Expand right.
 	end := offset

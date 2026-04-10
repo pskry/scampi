@@ -114,6 +114,16 @@ func (sd *StubDefs) extract() {
 			case *ast.EnumDecl:
 				qn := modName + "." + d.Name.Name
 				sd.locs[qn] = stubLocation{path: outPath, src: data, span: d.Name.SrcSpan}
+			case *ast.AttrTypeDecl:
+				// Attribute types are looked up by their `@`-prefixed
+				// form. We register both the bare reference (the user
+				// typed `@secretkey`) and the qualified one
+				// (`@std.secretkey`) so goto-def works either way.
+				bare := "@" + d.Name.Name
+				qualified := "@" + modName + "." + d.Name.Name
+				loc := stubLocation{path: outPath, src: data, span: d.Name.SrcSpan}
+				sd.locs[bare] = loc
+				sd.locs[qualified] = loc
 			}
 		}
 

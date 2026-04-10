@@ -29,6 +29,20 @@ func (s *Server) Hover(
 		cur.FuncName,
 	)
 
+	// Attribute reference (e.g. `@secretkey`, `@std.path`) — show the
+	// attribute type's schema.
+	if len(cur.WordUnderCursor) > 1 && cur.WordUnderCursor[0] == '@' {
+		if md := s.hoverAttribute(cur.WordUnderCursor); md != "" {
+			s.log.Printf("hover: returning attribute doc (%d bytes)", len(md))
+			return &protocol.Hover{
+				Contents: protocol.MarkupContent{
+					Kind:  protocol.Markdown,
+					Value: md,
+				},
+			}, nil
+		}
+	}
+
 	// Known function name always wins — handles nested calls like
 	// deploy(steps=[copy(...)]) where copy is inside deploy's parens.
 	if md := s.hoverFunc(params.TextDocument.URI, cur.WordUnderCursor); md != "" {
@@ -63,6 +77,66 @@ func (s *Server) hoverFunc(docURI protocol.DocumentURI, word string) string {
 		return ""
 	}
 	return formatFuncDoc(f)
+}
+
+// hoverAttribute renders the documentation for an attribute type
+// reference. The word includes the leading `@`. Looks up the type in
+// the catalog and renders its qualified name plus its schema fields
+// (or "marker" for empty attribute types).
+func (s *Server) hoverAttribute(word string) string {
+	a, ok := s.catalog.LookupAttrType(word)
+	if !ok {
+		return ""
+	}
+	return formatAttrTypeDoc(a)
+}
+
+func formatAttrTypeDoc(a AttrTypeInfo) string {
+	var b strings.Builder
+	qname := "@" + a.Module + "." + a.Name
+	b.WriteString("```scampi\ntype " + qname + " { ... }\n```\n\n---\n\n")
+	if a.Summary != "" {
+		b.WriteString(a.Summary + "\n\n")
+	}
+	if len(a.Fields) == 0 {
+		b.WriteString("_marker attribute — no fields_\n")
+		b.WriteString("\n---\n")
+		return b.String()
+	}
+	nameW, typeW := 0, 0
+	for _, p := range a.Fields {
+		if l := len(p.Name); l > nameW {
+			nameW = l
+		}
+		if l := len(p.Type); l > typeW {
+			typeW = l
+		}
+	}
+	b.WriteString("```\n")
+	for _, p := range a.Fields {
+		req := ""
+		if p.Required {
+			req = "required"
+		}
+		line := strings.TrimRight(
+			padRight(p.Name, nameW)+"  "+padRight(p.Type, typeW)+"  "+padRight(req, 8),
+			" ",
+		)
+		if p.Default != "" {
+			line += "  (default: " + p.Default + ")"
+		}
+		b.WriteString(line + "\n")
+	}
+	b.WriteString("```\n\n---\n")
+	return b.String()
+}
+
+// padRight returns s padded with spaces on the right to width w.
+func padRight(s string, w int) string {
+	if len(s) >= w {
+		return s
+	}
+	return s + strings.Repeat(" ", w-len(s))
 }
 
 func (s *Server) hoverKwarg(docURI protocol.DocumentURI, cur CursorContext) string {

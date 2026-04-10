@@ -211,6 +211,72 @@ func TestReferencesStdStepInStub(t *testing.T) {
 	}
 }
 
+// References on attribute types
+// -----------------------------------------------------------------------------
+
+func TestReferencesAttrTypeFromDef(t *testing.T) {
+	// Cursor on `secretkey` in `type @secretkey {}` should return:
+	//   - the def site itself
+	//   - every Attribute reference using `@secretkey` in this file
+	s := testServer()
+	text := `module main
+type @secretkey {}
+
+func secret(@secretkey name: string) string
+
+let v = secret("foo")
+`
+	docURI := protocol.DocumentURI("file:///test.scampi")
+	s.docs.Open(docURI, text, 1)
+
+	// Cursor on `secretkey` in the type decl (line 1, col ~7).
+	locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 1, Character: 7},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(locs) < 2 {
+		t.Errorf(
+			"expected at least 2 references for @secretkey (def + 1 use), got %d",
+			len(locs),
+		)
+	}
+}
+
+func TestReferencesAttrTypeFromUse(t *testing.T) {
+	// Cursor on `@secretkey` use should also find both the def and
+	// the use itself.
+	s := testServer()
+	text := `module main
+type @secretkey {}
+
+func secret(@secretkey name: string) string
+`
+	docURI := protocol.DocumentURI("file:///test.scampi")
+	s.docs.Open(docURI, text, 1)
+
+	// Cursor inside `@secretkey` of the param annotation.
+	locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 3, Character: 16},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(locs) < 2 {
+		t.Errorf(
+			"expected at least 2 references for @secretkey from use site, got %d",
+			len(locs),
+		)
+	}
+}
+
 func lineStart(text string, pos int) int {
 	for i := pos - 1; i >= 0; i-- {
 		if text[i] == '\n' {

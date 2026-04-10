@@ -13,6 +13,20 @@ import (
 	"scampi.dev/scampi/lang/token"
 )
 
+// EnvLookupFunc resolves an environment variable name to its value.
+// The bool indicates whether the variable was set.
+type EnvLookupFunc func(name string) (value string, found bool)
+
+// SecretLookupFunc resolves a secret key to its value. Errors are
+// surfaced to the evaluator and reported with source spans.
+type SecretLookupFunc func(key string) (value string, err error)
+
+// EmitCallback is invoked once per value the evaluator produces at
+// top level or into a block body. It receives the value and a handle
+// to the running evaluator so it can configure backends, register
+// hooks, or inspect prior state.
+type EmitCallback func(v Value, ev *Evaluator)
+
 // Evaluator walks a type-checked AST and produces runtime values.
 type Evaluator struct {
 	env  *envScope
@@ -29,10 +43,10 @@ type Evaluator struct {
 	declReturns map[string]string
 
 	// envLookup resolves env vars. Injected by caller.
-	envLookup func(string) (string, bool)
+	envLookup EnvLookupFunc
 
 	// secretLookup resolves secrets. Injected by caller.
-	secretLookup func(string) (string, error)
+	secretLookup SecretLookupFunc
 
 	// source holds the original source bytes for string extraction.
 	source []byte
@@ -43,7 +57,7 @@ type Evaluator struct {
 	blockCollector *[]Value
 
 	// onEmit is called for each emitted value (optional).
-	onEmit func(Value, *Evaluator)
+	onEmit EmitCallback
 }
 
 // Error is an eval-time error.
@@ -61,12 +75,12 @@ func (e Error) GetHint() string              { return e.Hint }
 type Option func(*Evaluator)
 
 // WithEnv sets the environment variable resolver.
-func WithEnv(fn func(string) (string, bool)) Option {
+func WithEnv(fn EnvLookupFunc) Option {
 	return func(e *Evaluator) { e.envLookup = fn }
 }
 
 // WithSecrets sets the secret resolver.
-func WithSecrets(fn func(string) (string, error)) Option {
+func WithSecrets(fn SecretLookupFunc) Option {
 	return func(e *Evaluator) { e.secretLookup = fn }
 }
 
@@ -75,7 +89,7 @@ func WithSecrets(fn func(string) (string, error)) Option {
 // and set up state (e.g. configure secret backends when a SecretsConfig
 // is emitted). This keeps the eval generic while allowing callers to
 // react to domain-specific values.
-func WithOnEmit(fn func(Value, *Evaluator)) Option {
+func WithOnEmit(fn EmitCallback) Option {
 	return func(e *Evaluator) { e.onEmit = fn }
 }
 
@@ -692,7 +706,7 @@ func (ev *Evaluator) callRange(positional []Value, kwargs map[string]Value) Valu
 
 // SetSecretLookup allows callers (via WithOnEmit) to wire the secret
 // resolver after seeing a SecretsConfig value during evaluation.
-func (ev *Evaluator) SetSecretLookup(fn func(string) (string, error)) {
+func (ev *Evaluator) SetSecretLookup(fn SecretLookupFunc) {
 	ev.secretLookup = fn
 }
 

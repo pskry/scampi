@@ -17,6 +17,30 @@ func (c *Checker) checkFieldAttributes(f *ast.Field) {
 	}
 }
 
+// qualifiedAttributeNames returns the fully qualified attribute type
+// names for every annotation on a field, in declaration order.
+// Single-segment names like `@secretkey` are qualified with the
+// checker's current module name (e.g. `std.@secretkey`); two-segment
+// names like `@std.path` pass through as `std.@path`. The result is
+// the same shape the linker uses to look up AttributeBehaviour and
+// the LSP uses to look up providers.
+func (c *Checker) qualifiedAttributeNames(f *ast.Field) []string {
+	if len(f.Attributes) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(f.Attributes))
+	for _, a := range f.Attributes {
+		parts := a.Name.Parts
+		switch len(parts) {
+		case 1:
+			out = append(out, c.modName+".@"+parts[0].Name)
+		case 2:
+			out = append(out, parts[0].Name+".@"+parts[1].Name)
+		}
+	}
+	return out
+}
+
 // checkAttribute resolves a single attribute reference and binds its
 // arguments. Errors are accumulated on the checker.
 func (c *Checker) checkAttribute(a *ast.Attribute) {

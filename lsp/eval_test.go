@@ -106,6 +106,43 @@ func TestDiagnoseWorkspace(t *testing.T) {
 	}
 }
 
+func TestEvaluateBadSecretKey(t *testing.T) {
+	// Tests that the LSP surfaces a diagnostic for a literal secret
+	// key that doesn't exist in the configured backend. The check is
+	// driven by the `@secretkey` attribute on `func secret`'s `name`
+	// parameter and the linker's static-check pass that runs as part
+	// of linker.Analyze.
+	dir := t.TempDir()
+	secretsPath := filepath.Join(dir, "secrets.json")
+	if err := os.WriteFile(
+		secretsPath,
+		[]byte(`{"db.password": "encrypted"}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(dir, "test.scampi")
+	docURI := protocol.DocumentURI(uri.File(mainPath))
+	content := `module main
+
+import "std"
+
+std.secrets { backend = std.SecretsBackend.file, path = "secrets.json" }
+
+let v = std.secret("totally.does.not.exist")
+`
+	if err := os.WriteFile(mainPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := testServer()
+	s.docs.Open(docURI, content, 1)
+	diags := s.evaluate(context.Background(), docURI, content)
+	if len(diags) == 0 {
+		t.Fatal("expected at least one diagnostic for bad secret key")
+	}
+}
+
 // recordingClient captures PublishDiagnostics calls for testing.
 type recordingClient struct {
 	protocol.Client

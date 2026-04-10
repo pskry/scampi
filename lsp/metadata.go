@@ -55,10 +55,25 @@ type FuncInfo struct {
 	ReturnType string // qualified return type, empty for funcs without one
 }
 
+// AttrTypeInfo describes an attribute type declared via
+// `type @name { ... }`. Markers have an empty Fields list.
+type AttrTypeInfo struct {
+	// Name is the bare attribute name without the leading `@`.
+	Name string
+	// Module is the declaring module (e.g. "std").
+	Module string
+	// Summary is the leading line-comment block above the declaration.
+	// Currently unused — populated by future doc-extraction work.
+	Summary string
+	// Fields are the attribute's declared schema fields.
+	Fields []ParamInfo
+}
+
 // Catalog holds stdlib metadata, indexed for fast lookup during
 // completion, hover, and signature help.
 type Catalog struct {
 	funcs     map[string]FuncInfo
+	attrTypes map[string]AttrTypeInfo // keys: "@name" and "@module.name"
 	names     []string
 	modules   map[string][]string // "posix" → ["copy", "dir", ...]
 	byRetType map[string][]string // "posix.Source" → ["posix.source_local", ...]
@@ -67,6 +82,7 @@ type Catalog struct {
 func NewCatalog() *Catalog {
 	c := &Catalog{
 		funcs:     make(map[string]FuncInfo),
+		attrTypes: make(map[string]AttrTypeInfo),
 		modules:   make(map[string][]string),
 		byRetType: make(map[string][]string),
 	}
@@ -74,6 +90,14 @@ func NewCatalog() *Catalog {
 	c.loadTestStubs()
 	c.buildIndex()
 	return c
+}
+
+// LookupAttrType returns the attribute type for the given key. The key
+// may be a bare reference like `@secretkey` or a qualified one like
+// `@std.secretkey`. Returns false if no attribute type is registered.
+func (c *Catalog) LookupAttrType(key string) (AttrTypeInfo, bool) {
+	a, ok := c.attrTypes[key]
+	return a, ok
 }
 
 // Lookup returns the function with the given name, or false.
@@ -113,11 +137,12 @@ func (c *Catalog) ByReturnType(typeName string) []string {
 
 // stubModule holds parsed metadata from a single .scampi stub file.
 type stubModule struct {
-	name  string
-	enums map[string][]string     // enum name → variants
-	types map[string][]*ast.Field // struct name → fields
-	funcs []FuncInfo
-	decls []FuncInfo
+	name      string
+	enums     map[string][]string     // enum name → variants
+	types     map[string][]*ast.Field // struct name → fields
+	attrTypes map[string][]*ast.Field // attribute type name → schema fields
+	funcs     []FuncInfo
+	decls     []FuncInfo
 }
 
 func (c *Catalog) loadFromStubs() {
@@ -152,6 +177,19 @@ func (c *Catalog) loadFromStubs() {
 			params := fieldsToParams(fields, mod.name)
 			resolveEnumValues(params, allEnums)
 			c.funcs[name] = FuncInfo{Name: name, Params: params}
+		}
+
+		// Register attribute types under both bare and qualified
+		// keys (`@name` and `@module.name`).
+		for attrName, fields := range mod.attrTypes {
+			info := AttrTypeInfo{
+				Name:   attrName,
+				Module: mod.name,
+				Fields: fieldsToParams(fields, mod.name),
+			}
+			resolveEnumValues(info.Fields, allEnums)
+			c.attrTypes["@"+attrName] = info
+			c.attrTypes["@"+mod.name+"."+attrName] = info
 		}
 	}
 }
@@ -211,9 +249,10 @@ func parseStubFile(path string) *stubModule {
 	}
 
 	mod := &stubModule{
-		name:  modName,
-		enums: make(map[string][]string),
-		types: make(map[string][]*ast.Field),
+		name:      modName,
+		enums:     make(map[string][]string),
+		types:     make(map[string][]*ast.Field),
+		attrTypes: make(map[string][]*ast.Field),
 	}
 
 	for _, d := range f.Decls {
@@ -229,6 +268,9 @@ func parseStubFile(path string) *stubModule {
 			if d.Fields != nil {
 				mod.types[d.Name.Name] = d.Fields
 			}
+
+		case *ast.AttrTypeDecl:
+			mod.attrTypes[d.Name.Name] = d.Fields
 
 		case *ast.FuncDecl:
 			bf := funcDeclToInfo(d, modName)

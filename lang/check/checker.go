@@ -22,6 +22,13 @@ type Checker struct {
 	// returnType is the expected return type of the enclosing func.
 	// nil when not inside a func body.
 	returnType Type
+
+	// modName is the name of the module being checked (set from
+	// f.Module at the start of Check). Used to qualify single-segment
+	// attribute references on Field.Attributes — for example, an
+	// `@nonempty` annotation on a field declared in `module std`
+	// resolves to the qualified name `std.@nonempty`.
+	modName string
 }
 
 // Error is a type-checker error.
@@ -52,6 +59,11 @@ func (c *Checker) FileScope() *Scope { return c.scope }
 // Check type-checks a parsed file using ast.Walk for traversal.
 func (c *Checker) Check(f *ast.File) {
 	c.scope = NewScope(nil, ScopeFile)
+	if f.Module != nil {
+		c.modName = f.Module.Name.Name
+	} else {
+		c.modName = "main"
+	}
 
 	// Register imports first (they affect all subsequent resolution).
 	for _, imp := range f.Imports {
@@ -344,7 +356,10 @@ func (c *Checker) checkFuncDecl(d *ast.FuncDecl) {
 		for _, p := range d.Params {
 			pt := c.resolveType(p.Type)
 			params = append(params, &FieldDef{
-				Name: p.Name.Name, Type: pt, HasDef: p.Default != nil,
+				Name:       p.Name.Name,
+				Type:       pt,
+				HasDef:     p.Default != nil,
+				Attributes: c.qualifiedAttributeNames(p),
 			})
 		}
 		sym.Type = &FuncType{Params: params, Ret: ret}
@@ -382,7 +397,10 @@ func (c *Checker) checkDeclDecl(d *ast.DeclDecl) {
 		for _, p := range d.Params {
 			pt := c.resolveType(p.Type)
 			params = append(params, &FieldDef{
-				Name: p.Name.Name, Type: pt, HasDef: p.Default != nil,
+				Name:       p.Name.Name,
+				Type:       pt,
+				HasDef:     p.Default != nil,
+				Attributes: c.qualifiedAttributeNames(p),
 			})
 		}
 		sym.Type = &DeclType{

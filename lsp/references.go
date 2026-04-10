@@ -43,7 +43,18 @@ func (s *Server) References(
 	data := []byte(doc.Content)
 	var locs []protocol.Location
 
-	if strings.Contains(word, ".") {
+	switch {
+	case strings.HasPrefix(word, "@"):
+		// Attribute reference (e.g. `@secretkey`, `@std.path`).
+		// Search for matching uses on Field.Attributes everywhere
+		// and include the AttrTypeDecl def site.
+		locs = append(locs, findAttrRefs(f, filePath, data, word)...)
+		locs = append(locs, findAttrDef(f, filePath, data, word)...)
+		locs = append(locs, s.attrRefsInAllDirs(word, filePath)...)
+		if loc, ok := s.stubDefs.Lookup(word); ok {
+			locs = append(locs, loc)
+		}
+	case strings.Contains(word, "."):
 		// Dotted name (posix.pkg, std.Step, etc.) — search for
 		// dotted references in AST nodes.
 		locs = append(locs, findDottedRefs(f, filePath, data, word)...)
@@ -51,7 +62,7 @@ func (s *Server) References(
 		if loc, ok := s.stubDefs.Lookup(word); ok {
 			locs = append(locs, loc)
 		}
-	} else {
+	default:
 		// Bare name — search current file for ident matches.
 		locs = append(locs, findIdents(f, filePath, data, word)...)
 		// If we're in a module file, also search for the qualified
@@ -63,6 +74,131 @@ func (s *Server) References(
 	}
 
 	return dedup(locs, locationKey), nil
+}
+
+// findAttrRefs returns the location of every Attribute reference in
+// the file whose name matches the given `@`-prefixed word. Both
+// single-segment (`@secretkey`) and qualified (`@std.path`) forms
+// are supported; for single-segment lookup any matching last segment
+// counts as a hit, mirroring how the type checker resolves names
+// through scope.
+func findAttrRefs(f *ast.File, filePath string, src []byte, word string) []protocol.Location {
+	bare, qualified := splitAttrWord(word)
+	var locs []protocol.Location
+	ast.Walk(f, func(n ast.Node) bool {
+		if n == nil {
+			return true
+		}
+		a, ok := n.(*ast.Attribute)
+		if !ok {
+			return true
+		}
+		if !attrNameMatches(a.Name, bare, qualified) {
+			return true
+		}
+		locs = append(locs, protocol.Location{
+			URI:   uri.File(filePath),
+			Range: tokenSpanToRange(src, a.Name.SrcSpan),
+		})
+		return true
+	}, nil)
+	return locs
+}
+
+// findAttrDef returns the location of the AttrTypeDecl in this file
+// that defines the given attribute reference. Returns no locations if
+// the def lives in a stub or another file (the caller picks that up
+// via stubDefs.Lookup or attrRefsInAllDirs).
+func findAttrDef(f *ast.File, filePath string, src []byte, word string) []protocol.Location {
+	bare, _ := splitAttrWord(word)
+	var locs []protocol.Location
+	for _, d := range f.Decls {
+		atd, ok := d.(*ast.AttrTypeDecl)
+		if !ok {
+			continue
+		}
+		if atd.Name.Name == bare {
+			locs = append(locs, protocol.Location{
+				URI:   uri.File(filePath),
+				Range: tokenSpanToRange(src, atd.Name.SrcSpan),
+			})
+		}
+	}
+	return locs
+}
+
+// attrRefsInAllDirs walks the workspace root and any user module
+// directories to find Attribute references matching the given word.
+func (s *Server) attrRefsInAllDirs(word, excludePath string) []protocol.Location {
+	var locs []protocol.Location
+	seen := map[string]bool{}
+
+	if s.rootDir != "" {
+		seen[s.rootDir] = true
+		locs = append(locs, attrRefsInDir(s.rootDir, word, excludePath)...)
+	}
+	if s.module != nil {
+		for _, dep := range s.module.Require {
+			dir := depDir(s.module, &dep)
+			abs, _ := filepath.Abs(dir)
+			if abs != "" {
+				dir = abs
+			}
+			if seen[dir] {
+				continue
+			}
+			seen[dir] = true
+			locs = append(locs, attrRefsInDir(dir, word, excludePath)...)
+		}
+	}
+	return locs
+}
+
+func attrRefsInDir(dir, word, excludePath string) []protocol.Location {
+	var locs []protocol.Location
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".scampi" || path == excludePath {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		f, _ := Parse(path, data)
+		if f == nil {
+			return nil
+		}
+		locs = append(locs, findAttrRefs(f, path, data, word)...)
+		return nil
+	})
+	return locs
+}
+
+// splitAttrWord splits an attribute reference word into its bare and
+// qualified forms. Examples:
+//
+//	"@secretkey"     → "secretkey", ""           (single segment)
+//	"@std.secretkey" → "secretkey", "std.secretkey"  (qualified)
+func splitAttrWord(word string) (bare, qualified string) {
+	stripped := strings.TrimPrefix(word, "@")
+	if i := strings.LastIndexByte(stripped, '.'); i >= 0 {
+		return stripped[i+1:], stripped
+	}
+	return stripped, ""
+}
+
+// attrNameMatches reports whether an attribute reference's DottedName
+// matches the requested bare/qualified pair. Single-segment refs
+// match any attribute whose final segment is bare; qualified refs
+// require an exact dotted match.
+func attrNameMatches(name *ast.DottedName, bare, qualified string) bool {
+	if qualified != "" {
+		return dottedString(name) == qualified
+	}
+	if len(name.Parts) == 0 {
+		return false
+	}
+	return name.Parts[len(name.Parts)-1].Name == bare
 }
 
 // refsInAllDirs searches the workspace root and all user module
