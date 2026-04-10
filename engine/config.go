@@ -49,11 +49,16 @@ func LoadConfig(
 	reg := NewRegistry()
 	cfg, err := linker.LoadConfig(ctx, cfgPath, src, reg)
 	if err != nil {
-		impact, emitted := emitEngineDiagnostic(em, cfgPath, err)
-		if emitted && impact.ShouldAbort() {
-			return spec.Config{}, AbortError{Causes: []error{err}}
+		_, emitted := emitEngineDiagnostic(em, cfgPath, err)
+		if !emitted {
+			// Error didn't carry a diagnostic (e.g. raw file-read
+			// failure). Wrap it in a generic LoadConfigError so the
+			// user sees something instead of a silent abort.
+			em.EmitEngineDiagnostic(diagnostic.RaiseEngineDiagnostic(
+				cfgPath,
+				&LoadConfigError{Cause: err},
+			))
 		}
-		// Non-diagnostic errors (parse, check, eval) — treat as abort.
 		return spec.Config{}, AbortError{Causes: []error{err}}
 	}
 

@@ -8,6 +8,7 @@ import (
 
 	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/token"
+	"scampi.dev/scampi/secret"
 	"scampi.dev/scampi/spec"
 )
 
@@ -27,21 +28,33 @@ func (b *stubBackend) Lookup(key string) (string, bool, error) {
 	return v, ok, nil
 }
 
+func newSecretCtx(backend *stubBackend, arg ast.Expr) StaticCheckContext {
+	// Wrap nil typed pointer as a true nil interface so the
+	// "no backend configured" path actually fires.
+	var b secret.Backend
+	if backend != nil {
+		b = backend
+	}
+	return StaticCheckContext{
+		Linker:    &linkContext{backend: b},
+		AttrName:  "std.@secretkey",
+		ParamName: "name",
+		ParamArg:  arg,
+		UseSpan:   spec.SourceSpan{},
+	}
+}
+
 func TestSecretKeyAttribute_LiteralFound(t *testing.T) {
 	backend := &stubBackend{
 		keys:     map[string]string{"db.password": "p4ss"},
 		lookupOK: true,
 	}
-	ctx := &linkContext{backend: backend}
-	arg := stringLitExpr("db.password")
+	ctx := newSecretCtx(backend, stringLitExpr("db.password"))
 
-	SecretKeyAttribute{}.StaticCheck(
-		ctx,
-		[]BoundArg{{Field: "name", Value: arg, SrcSpan: spec.SourceSpan{}}},
-		spec.SourceSpan{},
-	)
-	if len(ctx.diags) != 0 {
-		t.Errorf("expected no diagnostics for known key, got %d: %v", len(ctx.diags), ctx.diags)
+	SecretKeyAttribute{}.StaticCheck(ctx)
+	lc := ctx.Linker.(*linkContext)
+	if len(lc.diags) != 0 {
+		t.Errorf("expected no diagnostics for known key, got %d: %v", len(lc.diags), lc.diags)
 	}
 }
 
@@ -50,19 +63,15 @@ func TestSecretKeyAttribute_LiteralNotFound(t *testing.T) {
 		keys:     map[string]string{"db.password": "p4ss"},
 		lookupOK: true,
 	}
-	ctx := &linkContext{backend: backend}
-	arg := stringLitExpr("totally.unknown")
+	ctx := newSecretCtx(backend, stringLitExpr("totally.unknown"))
 
-	SecretKeyAttribute{}.StaticCheck(
-		ctx,
-		[]BoundArg{{Field: "name", Value: arg, SrcSpan: spec.SourceSpan{}}},
-		spec.SourceSpan{},
-	)
-	if len(ctx.diags) != 1 {
-		t.Fatalf("expected 1 diagnostic for unknown key, got %d", len(ctx.diags))
+	SecretKeyAttribute{}.StaticCheck(ctx)
+	lc := ctx.Linker.(*linkContext)
+	if len(lc.diags) != 1 {
+		t.Fatalf("expected 1 diagnostic for unknown key, got %d", len(lc.diags))
 	}
-	if _, ok := ctx.diags[0].(*secretKeyNotFoundError); !ok {
-		t.Errorf("expected *secretKeyNotFoundError, got %T", ctx.diags[0])
+	if _, ok := lc.diags[0].(*secretKeyNotFoundError); !ok {
+		t.Errorf("expected *secretKeyNotFoundError, got %T", lc.diags[0])
 	}
 }
 
@@ -70,50 +79,39 @@ func TestSecretKeyAttribute_ComputedArgSkipped(t *testing.T) {
 	// A non-literal expression should be skipped — the runtime check
 	// handles dynamic args in lang/eval.
 	backend := &stubBackend{lookupOK: true}
-	ctx := &linkContext{backend: backend}
 	arg := &ast.Ident{Name: "some_var", SrcSpan: token.Span{Start: 1, End: 9}}
+	ctx := newSecretCtx(backend, arg)
 
-	SecretKeyAttribute{}.StaticCheck(
-		ctx,
-		[]BoundArg{{Field: "name", Value: arg, SrcSpan: spec.SourceSpan{}}},
-		spec.SourceSpan{},
-	)
-	if len(ctx.diags) != 0 {
-		t.Errorf("expected no diagnostics for computed arg, got %d", len(ctx.diags))
+	SecretKeyAttribute{}.StaticCheck(ctx)
+	lc := ctx.Linker.(*linkContext)
+	if len(lc.diags) != 0 {
+		t.Errorf("expected no diagnostics for computed arg, got %d", len(lc.diags))
 	}
 }
 
 func TestSecretKeyAttribute_NoBackendSkipped(t *testing.T) {
 	// With no backend configured, the static check should be a no-op
 	// and let the runtime check handle it.
-	ctx := &linkContext{backend: nil}
-	arg := stringLitExpr("any.key")
+	ctx := newSecretCtx(nil, stringLitExpr("any.key"))
 
-	SecretKeyAttribute{}.StaticCheck(
-		ctx,
-		[]BoundArg{{Field: "name", Value: arg, SrcSpan: spec.SourceSpan{}}},
-		spec.SourceSpan{},
-	)
-	if len(ctx.diags) != 0 {
-		t.Errorf("expected no diagnostics with nil backend, got %d", len(ctx.diags))
+	SecretKeyAttribute{}.StaticCheck(ctx)
+	lc := ctx.Linker.(*linkContext)
+	if len(lc.diags) != 0 {
+		t.Errorf("expected no diagnostics with nil backend, got %d", len(lc.diags))
 	}
 }
 
 func TestSecretKeyAttribute_LookupError(t *testing.T) {
 	backend := &stubBackend{lookupOK: false}
-	ctx := &linkContext{backend: backend}
-	arg := stringLitExpr("db.password")
+	ctx := newSecretCtx(backend, stringLitExpr("db.password"))
 
-	SecretKeyAttribute{}.StaticCheck(
-		ctx,
-		[]BoundArg{{Field: "name", Value: arg, SrcSpan: spec.SourceSpan{}}},
-		spec.SourceSpan{},
-	)
-	if len(ctx.diags) != 1 {
-		t.Fatalf("expected 1 diagnostic for backend error, got %d", len(ctx.diags))
+	SecretKeyAttribute{}.StaticCheck(ctx)
+	lc := ctx.Linker.(*linkContext)
+	if len(lc.diags) != 1 {
+		t.Fatalf("expected 1 diagnostic for backend error, got %d", len(lc.diags))
 	}
-	if _, ok := ctx.diags[0].(*secretKeyLookupError); !ok {
-		t.Errorf("expected *secretKeyLookupError, got %T", ctx.diags[0])
+	if _, ok := lc.diags[0].(*secretKeyLookupError); !ok {
+		t.Errorf("expected *secretKeyLookupError, got %T", lc.diags[0])
 	}
 }
 

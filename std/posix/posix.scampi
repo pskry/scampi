@@ -60,9 +60,13 @@ decl pkg_dnf_repo(
 
 decl copy(
   src:       Source,
+  @std.path(absolute=true)
   dest:      string,
+  @std.filemode
   perm:      string,
+  @std.nonempty
   owner:     string,
+  @std.nonempty
   group:     string,
   verify:    string?,
   desc:      string?,
@@ -70,7 +74,9 @@ decl copy(
 ) std.Step
 
 decl dir(
+  @std.path(absolute=true)
   path:      string,
+  @std.filemode
   perm:      string?,
   owner:     string?,
   group:     string?,
@@ -79,7 +85,9 @@ decl dir(
 ) std.Step
 
 decl symlink(
+  @std.path(absolute=true)
   target:    string,
+  @std.path(absolute=true)
   link:      string,
   desc:      string?,
   on_change: list[std.Step] = [],
@@ -87,10 +95,14 @@ decl symlink(
 
 decl template(
   src:       Source,
+  @std.path(absolute=true)
   dest:      string,
   data:      any?,
+  @std.filemode
   perm:      string,
+  @std.nonempty
   owner:     string,
+  @std.nonempty
   group:     string,
   verify:    string?,
   desc:      string?,
@@ -99,10 +111,12 @@ decl template(
 
 decl unarchive(
   src:       Source,
+  @std.path
   dest:      string,
   depth:     int? = 0,
   owner:     string?,
   group:     string?,
+  @std.filemode
   perm:      string?,
   desc:      string?,
   on_change: list[std.Step] = [],
@@ -119,10 +133,16 @@ decl pkg(
   on_change: list[std.Step] = [],
 ) std.Step
 
+// Note on `@std.nonempty` placement:
+// Required string parameters that get used as identifiers (service
+// name, user name, etc.) carry `@std.nonempty` so a literal "" at
+// the call site fails fast with a typed diagnostic.
+
 // Service management
 // -----------------------------------------------------------------------------
 
 decl service(
+  @std.nonempty
   name:      string,
   state:     ServiceState = ServiceState.running,
   enabled:   bool = true,
@@ -134,6 +154,7 @@ decl service(
 // -----------------------------------------------------------------------------
 
 decl user(
+  @std.nonempty
   name:      string,
   state:     UserState = UserState.present,
   shell:     string?,
@@ -146,6 +167,7 @@ decl user(
 ) std.Step
 
 decl group(
+  @std.nonempty
   name:      string,
   state:     GroupState = GroupState.present,
   gid:       int?,
@@ -158,7 +180,9 @@ decl group(
 // -----------------------------------------------------------------------------
 
 decl sysctl(
+  @std.nonempty
   key:       string,
+  @std.nonempty
   value:     string,
   persist:   bool = true,
   desc:      string?,
@@ -166,7 +190,9 @@ decl sysctl(
 ) std.Step
 
 decl mount(
+  @std.nonempty
   src:       string,
+  @std.path
   dest:      string,
   fs_type:   MountType,
   opts:      string? = "defaults",
@@ -176,6 +202,7 @@ decl mount(
 ) std.Step
 
 decl firewall(
+  @std.pattern(regex="^[0-9]+(-[0-9]+)?(/(tcp|udp))?$")
   port:      string,
   action:    FirewallAction = FirewallAction.allow,
   desc:      string?,
@@ -186,6 +213,7 @@ decl firewall(
 // -----------------------------------------------------------------------------
 
 decl run(
+  @std.nonempty
   apply:     string,
   check:     string?,
   always:    bool? = false,

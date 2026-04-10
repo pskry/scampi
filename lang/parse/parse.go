@@ -6,6 +6,8 @@
 package parse
 
 import (
+	"strings"
+
 	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/lex"
 	"scampi.dev/scampi/lang/token"
@@ -146,4 +148,48 @@ func isDeclStart(k token.Kind) bool {
 		return true
 	}
 	return false
+}
+
+// docCommentBefore extracts the doc comment immediately preceding the
+// byte offset `pos` in the parser's source. A doc comment is a
+// contiguous block of `// ...` lines that abuts the declaration with
+// no blank line between them. The leading `//` and any single space
+// after it are stripped from each line; the result is the joined
+// content with `\n` separators. Returns "" if no doc comment is
+// present.
+func (p *Parser) docCommentBefore(pos uint32) string {
+	src := p.lex.Source()
+	if int(pos) > len(src) {
+		return ""
+	}
+
+	// Walk backward to the start of the line containing pos.
+	lineStart := int(pos)
+	for lineStart > 0 && src[lineStart-1] != '\n' {
+		lineStart--
+	}
+
+	var lines []string
+	cursor := lineStart
+	for cursor > 0 {
+		// Move to the previous line. cursor currently sits one byte
+		// past the previous line's newline.
+		prevEnd := cursor - 1 // the '\n' separating the lines
+		prevStart := prevEnd
+		for prevStart > 0 && src[prevStart-1] != '\n' {
+			prevStart--
+		}
+		line := string(src[prevStart:prevEnd])
+		trimmed := strings.TrimLeft(line, " \t")
+		if !strings.HasPrefix(trimmed, "//") {
+			break
+		}
+		// Strip the `//` (and a single following space, by convention).
+		content := strings.TrimPrefix(trimmed, "//")
+		content = strings.TrimPrefix(content, " ")
+		// Prepend so original order is preserved.
+		lines = append([]string{content}, lines...)
+		cursor = prevStart
+	}
+	return strings.Join(lines, "\n")
 }

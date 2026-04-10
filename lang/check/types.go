@@ -82,17 +82,33 @@ func (b *BlockType) String() string {
 
 // FieldDef is a field in a struct or step declaration.
 //
-// Attributes carries the qualified names of any `@name` annotations
-// declared as prefix attributes on the field, e.g. `["std.@secretkey"]`
-// for `func secret(@secretkey name: string) string`. The linker and
-// LSP read this slice to dispatch behaviour and UX providers per
-// attribute. The lang itself only validates the schema; semantics
-// live one layer up.
+// Attributes carries the resolved attribute annotations declared as
+// prefix attributes on the field. The lang itself only validates the
+// schema (binding rules, missing required args, type checking); the
+// linker dispatches behaviour for each by looking up its qualified
+// name in the AttributeRegistry and reading the resolved args.
 type FieldDef struct {
 	Name       string
 	Type       Type
 	HasDef     bool // true if the field has a default value
-	Attributes []string
+	Attributes []ResolvedAttribute
+}
+
+// ResolvedAttribute is a single `@name(args)` annotation on a field
+// after the type checker has resolved the attribute reference and
+// bound its literal arguments to the declared schema fields. Args
+// carries field-name → resolved Go value mappings (string, int,
+// bool, []any), with absent fields meaning "use the schema default".
+type ResolvedAttribute struct {
+	// QualifiedName is the fully qualified attribute type name
+	// (e.g. `std.@secretkey`, `std.@pattern`).
+	QualifiedName string
+
+	// Args holds the bound argument values resolved from literal
+	// expressions at the call site. Non-literal arguments aren't
+	// supported in attribute references — the type checker rejects
+	// them at lang time.
+	Args map[string]any
 }
 
 // EnumType is a user-defined enum.
@@ -144,9 +160,14 @@ func (s *DeclType) String() string {
 // for list-typed fields). Multi-field types accept at most one
 // positional argument bound to the first field; the rest must be
 // keyword arguments.
+//
+// Doc is the doc-comment block immediately preceding the
+// declaration. Linker behaviours read it to render rich Help text
+// on validation diagnostics; the LSP renders it on hover.
 type AttrType struct {
 	Name   string // bare name without `@` (e.g. "nonempty", "path")
 	Fields []*FieldDef
+	Doc    string
 }
 
 func (*AttrType) typeTag() {}

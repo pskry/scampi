@@ -85,7 +85,13 @@ func (sd *StubDefs) extract() {
 
 		outPath := filepath.Join(sd.dir, path)
 		_ = os.MkdirAll(filepath.Dir(outPath), 0o755)
-		_ = os.WriteFile(outPath, data, 0o444)
+		// Remove any prior version first. Earlier builds wrote with
+		// mode 0o444 (read-only), which makes os.WriteFile silently
+		// fail on rewrite — leaving the cache permanently stale.
+		// Removing first guarantees a clean rewrite even when the
+		// existing file was created by an old binary.
+		_ = os.Remove(outPath)
+		_ = os.WriteFile(outPath, data, 0o644)
 
 		l := lex.New(path, data)
 		p := parse.New(l)

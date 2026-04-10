@@ -25,15 +25,60 @@ import (
 // the literal-args case.
 type AttributeBehaviour interface {
 	// StaticCheck is invoked at link time, once per call site of a
-	// function whose parameter carries this attribute. args carries
-	// the bound arguments in declaration order — typically a single
-	// entry holding the user's call-site argument expression for the
-	// annotated parameter.
+	// function whose parameter carries this attribute. The supplied
+	// StaticCheckContext exposes the user's call-site argument
+	// expression (Param), the attribute reference itself (Attribute,
+	// for behaviours that read the attribute's own args like
+	// `@pattern("...")`), the linker context for diagnostic emission
+	// and backend lookup, and the source span of the use.
 	//
-	// Implementations should emit diagnostics through the supplied
-	// LinkContext rather than returning them so the standard pipeline
-	// (source spans, --color, --json) handles formatting.
-	StaticCheck(ctx LinkContext, args []BoundArg, useSpan spec.SourceSpan)
+	// Implementations should emit diagnostics through ctx.Linker
+	// rather than returning them so the standard pipeline (source
+	// spans, --color, --json) handles formatting.
+	StaticCheck(ctx StaticCheckContext)
+}
+
+// StaticCheckContext carries everything an AttributeBehaviour needs
+// to validate a single annotated call site. Each StaticCheck hook
+// receives one of these per use of its attribute.
+type StaticCheckContext struct {
+	// Linker exposes diagnostic emission and the configured secrets
+	// backend.
+	Linker LinkContext
+
+	// AttrName is the fully qualified attribute type name (e.g.
+	// `std.@pattern`). Behaviours can use this for diagnostic
+	// messages without hardcoding their own name.
+	AttrName string
+
+	// AttrArgs holds the resolved literal arguments of the attribute
+	// reference, bound by field name. Markers (`@nonempty`) get an
+	// empty map; behaviours that take their own args (like
+	// `@pattern(regex)`) read them via the field name. Non-literal
+	// or absent args are missing from the map.
+	AttrArgs map[string]any
+
+	// AttrDoc is the doc-comment block declared above the attribute
+	// type's `type @name { ... }` declaration in the source. The
+	// linker uses it as the Help text on validation diagnostics so
+	// the rich content lives in one place: the attribute type
+	// declaration in std/std.scampi (or whichever module declares
+	// it). Empty if no doc comment is present.
+	AttrDoc string
+
+	// ParamName is the declared name of the parameter that carries
+	// this attribute (e.g. "name" for `@secretkey name: string`).
+	ParamName string
+
+	// ParamArg is the user's call-site argument expression bound to
+	// the annotated parameter. May be a literal that the behaviour
+	// can validate eagerly, or any other expression for which the
+	// behaviour should defer to the runtime check.
+	ParamArg ast.Expr
+
+	// UseSpan is the source span of the call-site argument, for
+	// anchoring diagnostics.
+	UseSpan spec.SourceSpan
 }
 
 // LinkContext is the linker-side context passed to an attribute's
@@ -53,6 +98,9 @@ type LinkContext interface {
 // BoundArg is a single argument bound to a declared field of an
 // attribute type, in its raw AST form. Behaviours inspect the
 // expression to detect literal values they can validate eagerly.
+//
+// Deprecated: kept for transitional compatibility with existing
+// callers; prefer reading directly from StaticCheckContext fields.
 type BoundArg struct {
 	Field   string   // declared field name
 	Value   ast.Expr // raw expression (may be a literal or a variable)
@@ -107,9 +155,20 @@ func (r *AttributeRegistry) Names() []string {
 }
 
 // DefaultAttributes returns a registry populated with the standard
-// scampi attribute behaviours.
+// scampi attribute behaviours. Each entry validates literal arguments
+// at link time and emits typed diagnostics through the standard
+// pipeline. Behaviours that need their own arguments (`@pattern`,
+// `@oneof`, `@deprecated`, `@path`) read them from the resolved
+// AttrArgs map carried on each StaticCheckContext.
 func DefaultAttributes() *AttributeRegistry {
 	r := NewAttributeRegistry()
 	r.Register("std.@secretkey", SecretKeyAttribute{})
+	r.Register("std.@nonempty", NonEmptyAttribute{})
+	r.Register("std.@filemode", FileModeAttribute{})
+	r.Register("std.@pattern", PatternAttribute{})
+	r.Register("std.@oneof", OneOfAttribute{})
+	r.Register("std.@deprecated", DeprecatedAttribute{})
+	r.Register("std.@since", SinceAttribute{})
+	r.Register("std.@path", PathAttribute{})
 	return r
 }

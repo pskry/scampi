@@ -17,28 +17,153 @@ func (c *Checker) checkFieldAttributes(f *ast.Field) {
 	}
 }
 
-// qualifiedAttributeNames returns the fully qualified attribute type
-// names for every annotation on a field, in declaration order.
-// Single-segment names like `@secretkey` are qualified with the
-// checker's current module name (e.g. `std.@secretkey`); two-segment
-// names like `@std.path` pass through as `std.@path`. The result is
-// the same shape the linker uses to look up AttributeBehaviour and
-// the LSP uses to look up providers.
-func (c *Checker) qualifiedAttributeNames(f *ast.Field) []string {
+// resolveFieldAttributes returns the resolved attribute annotations
+// on a field, in declaration order. Each entry carries the fully
+// qualified attribute type name and a map of bound argument values
+// resolved from literal expressions. Non-literal expressions are
+// stored as nil in the map; behaviours that need a literal value
+// should defer to runtime checks when they encounter nil.
+func (c *Checker) resolveFieldAttributes(f *ast.Field) []ResolvedAttribute {
 	if len(f.Attributes) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(f.Attributes))
+	out := make([]ResolvedAttribute, 0, len(f.Attributes))
 	for _, a := range f.Attributes {
-		parts := a.Name.Parts
-		switch len(parts) {
-		case 1:
-			out = append(out, c.modName+".@"+parts[0].Name)
-		case 2:
-			out = append(out, parts[0].Name+".@"+parts[1].Name)
+		qn := c.qualifiedAttrName(a)
+		if qn == "" {
+			continue
+		}
+		ra := ResolvedAttribute{
+			QualifiedName: qn,
+			Args:          c.resolveAttributeArgs(a),
+		}
+		out = append(out, ra)
+	}
+	return out
+}
+
+// qualifiedAttrName builds the fully qualified attribute type name
+// for an attribute reference. Single-segment names use the current
+// module's name; two-segment names pass through.
+func (c *Checker) qualifiedAttrName(a *ast.Attribute) string {
+	parts := a.Name.Parts
+	switch len(parts) {
+	case 1:
+		return c.modName + ".@" + parts[0].Name
+	case 2:
+		return parts[0].Name + ".@" + parts[1].Name
+	}
+	return ""
+}
+
+// resolveAttributeArgs converts an attribute reference's argument
+// expressions into a map of resolved Go values. Positional arguments
+// bind to the attribute type's first field (or are wrapped into a
+// list for variadic single-list-field types); named arguments bind
+// by name. Non-literal arguments resolve to nil — behaviours should
+// check for nil before using a value.
+//
+// Resolution is best-effort: the type checker has already validated
+// the binding shape, so we don't re-emit errors here.
+func (c *Checker) resolveAttributeArgs(a *ast.Attribute) map[string]any {
+	at := c.lookupAttrTypeForArgs(a.Name)
+	if at == nil {
+		return nil
+	}
+	out := make(map[string]any)
+
+	// Variadic-positional case: single list field, multiple positionals.
+	if len(at.Fields) == 1 && isListType(at.Fields[0].Type) && len(a.Positionals) > 0 && len(a.Named) == 0 {
+		field := at.Fields[0]
+		// One positional that's already a list literal binds directly.
+		if len(a.Positionals) == 1 {
+			if v, ok := literalValue(a.Positionals[0]); ok {
+				out[field.Name] = v
+				return out
+			}
+		}
+		items := make([]any, 0, len(a.Positionals))
+		for _, p := range a.Positionals {
+			if v, ok := literalValue(p); ok {
+				items = append(items, v)
+			}
+		}
+		out[field.Name] = items
+		return out
+	}
+
+	// Single positional → first field.
+	if len(a.Positionals) == 1 && len(at.Fields) > 0 {
+		field := at.Fields[0]
+		if v, ok := literalValue(a.Positionals[0]); ok {
+			out[field.Name] = v
+		}
+	}
+	for _, na := range a.Named {
+		if v, ok := literalValue(na.Value); ok {
+			out[na.Name.Name] = v
 		}
 	}
 	return out
+}
+
+// lookupAttrTypeForArgs is a side-effect-free lookup of an attribute
+// type by its dotted name reference. Used by resolveAttributeArgs to
+// find the schema for binding without emitting diagnostics — those
+// are handled separately by checkAttribute.
+func (c *Checker) lookupAttrTypeForArgs(name *ast.DottedName) *AttrType {
+	switch len(name.Parts) {
+	case 1:
+		sym := c.scope.Lookup("@" + name.Parts[0].Name)
+		if sym == nil || sym.Kind != SymAttrType {
+			return nil
+		}
+		at, _ := sym.Type.(*AttrType)
+		return at
+	case 2:
+		mod, ok := c.modules[name.Parts[0].Name]
+		if !ok {
+			return nil
+		}
+		sym := mod.Lookup("@" + name.Parts[1].Name)
+		if sym == nil || sym.Kind != SymAttrType {
+			return nil
+		}
+		at, _ := sym.Type.(*AttrType)
+		return at
+	}
+	return nil
+}
+
+// literalValue extracts a Go value from a literal AST expression.
+// Returns false for non-literal expressions (variables, calls,
+// arithmetic, etc.) — those aren't supported in attribute arguments.
+func literalValue(e ast.Expr) (any, bool) {
+	switch v := e.(type) {
+	case *ast.StringLit:
+		if len(v.Parts) == 1 {
+			if t, ok := v.Parts[0].(*ast.StringText); ok {
+				return t.Raw, true
+			}
+		}
+	case *ast.IntLit:
+		return v.Value, true
+	case *ast.BoolLit:
+		return v.Value, true
+	case *ast.NoneLit:
+		return nil, true
+	case *ast.ListLit:
+		items := make([]any, 0, len(v.Items))
+		for _, it := range v.Items {
+			val, ok := literalValue(it)
+			if !ok {
+				return nil, false
+			}
+			items = append(items, val)
+		}
+		return items, true
+	}
+	return nil, false
 }
 
 // checkAttribute resolves a single attribute reference and binds its

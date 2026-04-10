@@ -135,8 +135,11 @@ func (p *Parser) parseTypeDecl() ast.Decl {
 
 // parseAttrTypeDecl parses the body of `type @name { ... }` after the
 // caller has already consumed the `type` keyword. The current token
-// must be `@`.
+// must be `@`. Attaches any preceding `//`-comment block as the
+// declaration's Doc field for downstream consumers (linker rich
+// diagnostics, LSP hover).
 func (p *Parser) parseAttrTypeDecl(start uint32) *ast.AttrTypeDecl {
+	doc := p.docCommentBefore(start)
 	p.advance() // '@'
 	name := p.parseIdent("attribute type name")
 	if name == nil {
@@ -158,6 +161,7 @@ func (p *Parser) parseAttrTypeDecl(start uint32) *ast.AttrTypeDecl {
 	return &ast.AttrTypeDecl{
 		Name:    name,
 		Fields:  fields,
+		Doc:     doc,
 		SrcSpan: token.Span{Start: start, End: endTok.End},
 	}
 }

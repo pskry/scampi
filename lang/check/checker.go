@@ -248,7 +248,7 @@ func (c *Checker) registerDecl(d ast.Decl) {
 	case *ast.AttrTypeDecl:
 		c.scope.Define(&Symbol{
 			Name: "@" + d.Name.Name,
-			Type: &AttrType{Name: d.Name.Name},
+			Type: &AttrType{Name: d.Name.Name, Doc: d.Doc},
 			Kind: SymAttrType,
 			Span: d.SrcSpan,
 		})
@@ -359,7 +359,7 @@ func (c *Checker) checkFuncDecl(d *ast.FuncDecl) {
 				Name:       p.Name.Name,
 				Type:       pt,
 				HasDef:     p.Default != nil,
-				Attributes: c.qualifiedAttributeNames(p),
+				Attributes: c.resolveFieldAttributes(p),
 			})
 		}
 		sym.Type = &FuncType{Params: params, Ret: ret}
@@ -400,7 +400,7 @@ func (c *Checker) checkDeclDecl(d *ast.DeclDecl) {
 				Name:       p.Name.Name,
 				Type:       pt,
 				HasDef:     p.Default != nil,
-				Attributes: c.qualifiedAttributeNames(p),
+				Attributes: c.resolveFieldAttributes(p),
 			})
 		}
 		sym.Type = &DeclType{

@@ -3,6 +3,8 @@
 package linker
 
 import (
+	"strings"
+
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/check"
@@ -61,16 +63,127 @@ type attributeCheckVisitor struct {
 }
 
 func (v *attributeCheckVisitor) enter(n ast.Node) bool {
-	call, ok := n.(*ast.CallExpr)
-	if !ok {
-		return true
+	switch n := n.(type) {
+	case *ast.CallExpr:
+		if ft := v.resolveCallTarget(n.Fn); ft != nil {
+			v.checkCall(n, ft)
+		}
+	case *ast.StructLit:
+		// Decl invocations like `posix.copy { ... }` parse as struct
+		// literals with a typed dotted name. Look up the dotted name
+		// in the modules map and dispatch attribute behaviours
+		// against the field initializers.
+		if dt := v.resolveStructLitDecl(n); dt != nil {
+			v.checkStructLit(n, dt)
+		}
 	}
-	ft := v.resolveCallTarget(call.Fn)
-	if ft == nil {
-		return true
-	}
-	v.checkCall(call, ft)
 	return true
+}
+
+// resolveStructLitDecl looks up the DeclType for a struct literal's
+// dotted type name. Returns nil if the struct literal is anonymous,
+// not declared via `decl ...`, or otherwise not relevant to attribute
+// dispatch.
+func (v *attributeCheckVisitor) resolveStructLitDecl(sl *ast.StructLit) *check.DeclType {
+	if sl.Type == nil {
+		return nil
+	}
+	nt, ok := sl.Type.(*ast.NamedType)
+	if !ok {
+		return nil
+	}
+	parts := nt.Name.Parts
+	switch len(parts) {
+	case 1:
+		if v.fileScope == nil {
+			return nil
+		}
+		sym := v.fileScope.Lookup(parts[0].Name)
+		if sym == nil {
+			return nil
+		}
+		dt, _ := sym.Type.(*check.DeclType)
+		return dt
+	case 2:
+		mod := v.modules[parts[0].Name]
+		if mod == nil {
+			return nil
+		}
+		sym := mod.Lookup(parts[1].Name)
+		if sym == nil {
+			return nil
+		}
+		dt, _ := sym.Type.(*check.DeclType)
+		return dt
+	}
+	return nil
+}
+
+// checkStructLit dispatches attribute behaviours for the parameters
+// of a decl invocation written as a struct literal. Field
+// initializers bind by name (struct literals don't have positional
+// args).
+func (v *attributeCheckVisitor) checkStructLit(sl *ast.StructLit, dt *check.DeclType) {
+	if len(dt.Params) == 0 {
+		return
+	}
+	byName := make(map[string]ast.Expr, len(sl.Fields))
+	for _, fi := range sl.Fields {
+		byName[fi.Name.Name] = fi.Value
+	}
+	for _, p := range dt.Params {
+		if len(p.Attributes) == 0 {
+			continue
+		}
+		argExpr, ok := byName[p.Name]
+		if !ok {
+			continue
+		}
+		for _, attr := range p.Attributes {
+			behaviour := v.registry.Lookup(attr.QualifiedName)
+			if behaviour == nil {
+				continue
+			}
+			useSpan := nodeSourceSpan(argExpr, v.source, v.cfgPath)
+			behaviour.StaticCheck(StaticCheckContext{
+				Linker:    v.ctx,
+				AttrName:  attr.QualifiedName,
+				AttrArgs:  attr.Args,
+				AttrDoc:   v.attrDocFor(attr.QualifiedName),
+				ParamName: p.Name,
+				ParamArg:  argExpr,
+				UseSpan:   useSpan,
+			})
+		}
+	}
+}
+
+// attrDocFor returns the doc-comment block of the attribute type
+// declared at the given qualified name (e.g. `std.@secretkey`).
+// Looks up the AttrType in the modules map; returns "" when the
+// declaring module isn't loaded or when the type carries no doc.
+func (v *attributeCheckVisitor) attrDocFor(qualifiedName string) string {
+	// Qualified name shape: `<module>.@<name>`. Split into module
+	// and bare name. Anything that doesn't match the shape returns "".
+	atIdx := strings.IndexByte(qualifiedName, '@')
+	if atIdx <= 0 || qualifiedName[atIdx-1] != '.' {
+		return ""
+	}
+	modName := qualifiedName[:atIdx-1]
+	bare := qualifiedName[atIdx+1:]
+	mod, ok := v.modules[modName]
+	if !ok {
+		return ""
+	}
+	sym := mod.Lookup("@" + bare)
+	if sym == nil || sym.Kind != check.SymAttrType {
+		return ""
+	}
+	at, ok := sym.Type.(*check.AttrType)
+	if !ok {
+		return ""
+	}
+	return at.Doc
 }
 
 // resolveCallTarget walks the call's function expression and tries to
@@ -111,7 +224,10 @@ func (v *attributeCheckVisitor) resolveCallTarget(e ast.Expr) *check.FuncType {
 
 // checkCall iterates the parameters of the resolved function and, for
 // each parameter that carries an attribute, dispatches the registered
-// behaviour with the corresponding argument expression.
+// behaviour with the corresponding argument expression. The
+// ResolvedAttribute on the FieldDef carries the attribute's own
+// resolved literal arguments — behaviours like `@pattern(regex)`
+// read them via ctx.AttrArgs without needing AST access.
 func (v *attributeCheckVisitor) checkCall(call *ast.CallExpr, ft *check.FuncType) {
 	if len(ft.Params) == 0 {
 		return
@@ -128,19 +244,21 @@ func (v *attributeCheckVisitor) checkCall(call *ast.CallExpr, ft *check.FuncType
 		if !ok {
 			continue
 		}
-		for _, attrName := range p.Attributes {
-			behaviour := v.registry.Lookup(attrName)
+		for _, attr := range p.Attributes {
+			behaviour := v.registry.Lookup(attr.QualifiedName)
 			if behaviour == nil {
 				continue
 			}
 			useSpan := nodeSourceSpan(argExpr, v.source, v.cfgPath)
-			behaviour.StaticCheck(v.ctx, []BoundArg{
-				{
-					Field:   p.Name,
-					Value:   argExpr,
-					SrcSpan: useSpan,
-				},
-			}, useSpan)
+			behaviour.StaticCheck(StaticCheckContext{
+				Linker:    v.ctx,
+				AttrName:  attr.QualifiedName,
+				AttrArgs:  attr.Args,
+				AttrDoc:   v.attrDocFor(attr.QualifiedName),
+				ParamName: p.Name,
+				ParamArg:  argExpr,
+				UseSpan:   useSpan,
+			})
 		}
 	}
 }

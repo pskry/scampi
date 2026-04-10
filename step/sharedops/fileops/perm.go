@@ -29,7 +29,7 @@ func (e InvalidPermissionError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   "builtin.InvalidPermission",
 		Text: "invalid file permission '{{.Value}}'",
-		Hint: "expected octal, ls-style, or posix permissions\nnext\nline",
+		Hint: "expected octal, ls-style, or posix permissions",
 		Help: `supported formats:
   - octal:        0600, 0644, 0755
   - ls-style:     rw-r--r--

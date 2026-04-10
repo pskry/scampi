@@ -11,12 +11,79 @@ enum SecretsBackend { age, file }
 
 // Attribute types
 //
-// `@secretkey` marks a string parameter as a secret-store key.
-// The linker validates literal keys against the configured backend
-// at link time; the LSP offers known keys as completions when the
+// scampi ships a small set of declarative attribute types that
+// stub authors compose with their parameters to drive validation,
+// LSP UX, and documentation. Each is implemented by an
+// AttributeBehaviour in the linker; LSP completion providers (when
+// they apply) are registered separately.
+
+// `@secretkey` marks a string parameter as a secret-store key. The
+// linker validates literal keys against the configured backend at
+// link time; the LSP offers known keys as completions when the
 // cursor is inside a string argument to a `@secretkey`-annotated
 // parameter.
 type @secretkey {}
+
+// value must not be empty
+//
+// the parameter requires a non-empty string. fix the call site by
+// providing a meaningful value, or — if "no value" is a valid
+// state — change the parameter type to `string?` and remove this
+// attribute.
+type @nonempty {}
+
+// expected octal, ls-style, or posix permissions
+//
+// supported formats:
+//   - octal:        0600, 0644, 0755
+//   - ls-style:     rw-r--r--
+//   - posix style:  u=rw,g=r,o=r
+type @filemode {}
+
+// the value must match the pattern declared on the parameter
+//
+// the parameter author has restricted the accepted form to a regex.
+// the error message includes the regex itself; check it against the
+// value you tried to pass.
+type @pattern {
+  regex: string
+}
+
+// the value must be one of the allowed strings
+//
+// the parameter accepts a fixed set of values. the error message
+// lists every accepted value; pass one of them, or talk to the
+// parameter author if you need a new variant added.
+type @oneof {
+  values: list[string]
+}
+
+// `@deprecated` emits a warning at every use of the annotated
+// parameter, with an optional message explaining the migration
+// path.
+type @deprecated {
+  message: string = ""
+}
+
+// `@since` records the version a parameter was introduced in.
+// Informational only — no static check, surfaced via LSP hover.
+type @since {
+  version: string
+}
+
+// the value must be a valid filesystem path
+//
+// supported shapes:
+//   - non-empty
+//   - no NUL bytes
+//   - absolute (when `absolute=true` is set on the attribute)
+//
+// the `must_exist=true` option is reserved for a future on-source
+// existence check; it has no effect at link time today.
+type @path {
+  absolute:   bool = false
+  must_exist: bool = false
+}
 
 func env(name: string, default: string?) string
 func secret(@secretkey name: string) string

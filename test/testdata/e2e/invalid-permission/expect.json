@@ -4,5 +4,5 @@
   },
   "changed": 0,
   "error": true,
-  "diagnostics": ["builtin.InvalidPermission"]
+  "diagnostics": ["linker.AttributeViolation"]
 }

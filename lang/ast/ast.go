@@ -81,9 +81,16 @@ func (*TypeDecl) declNode()          {}
 //
 // Marker attribute types have no fields: `type @marker {}`.
 // Otherwise the field schema describes the accepted arguments.
+//
+// Doc carries the contiguous `//` line comments immediately
+// preceding the declaration in the source. The comment block is
+// joined with newlines and stripped of its `// ` prefix. Linker
+// behaviours read it to render rich Help text on validation
+// diagnostics, and the LSP renders it as hover documentation.
 type AttrTypeDecl struct {
 	Name    *Ident
 	Fields  []*Field // empty list for markers; never nil
+	Doc     string
 	SrcSpan token.Span
 }
 

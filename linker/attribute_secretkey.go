@@ -25,32 +25,28 @@ import (
 // validates the resolved value with a source span.
 type SecretKeyAttribute struct{}
 
-func (SecretKeyAttribute) StaticCheck(ctx LinkContext, args []BoundArg, _ spec.SourceSpan) {
-	backend := ctx.Secrets()
+func (SecretKeyAttribute) StaticCheck(ctx StaticCheckContext) {
+	backend := ctx.Linker.Secrets()
 	if backend == nil {
 		return
 	}
-	if len(args) == 0 {
-		return
-	}
-	arg := args[0]
-	literal := stringLiteralValue(arg.Value)
+	literal := stringLiteralValue(ctx.ParamArg)
 	if literal == "" {
 		return
 	}
 	_, found, err := backend.Lookup(literal)
 	if err != nil {
-		ctx.Emit(&secretKeyLookupError{
+		ctx.Linker.Emit(&secretKeyLookupError{
 			Key: literal,
 			Err: err,
-			Src: &arg.SrcSpan,
+			Src: &ctx.UseSpan,
 		})
 		return
 	}
 	if !found {
-		ctx.Emit(&secretKeyNotFoundError{
+		ctx.Linker.Emit(&secretKeyNotFoundError{
 			Key: literal,
-			Src: &arg.SrcSpan,
+			Src: &ctx.UseSpan,
 		})
 	}
 }

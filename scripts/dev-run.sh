@@ -10,13 +10,18 @@ SRCDIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUTDIR="$SRCDIR/build/bin"
 BINPATH="$OUTDIR/$BIN"
 
-# Rebuild if binary is missing or any .go file is newer.
+# Rebuild if binary is missing or any source file is newer.
+# Includes .go files AND .scampi stubs under std/ — those are
+# embedded into the binary at compile time, so editing a stub
+# requires a rebuild for the change to take effect.
 needs_build=false
 if [[ ! -f "$BINPATH" ]]; then
   needs_build=true
 else
-  # Find any .go file newer than the binary.
-  if [[ -n "$(find "$SRCDIR" -name '*.go' -newer "$BINPATH" -print -quit 2>/dev/null)" ]]; then
+  newer=$(find "$SRCDIR" \
+    \( -name '*.go' -o -path "$SRCDIR/std/*.scampi" \) \
+    -newer "$BINPATH" -print -quit 2>/dev/null)
+  if [[ -n "$newer" ]]; then
     needs_build=true
   fi
 fi

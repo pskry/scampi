@@ -24,6 +24,37 @@ func (AbortError) Error() string {
 	return "execution aborted"
 }
 
+// LoadConfigError is the fallback diagnostic emitted when the linker
+// returns a non-diagnostic error (e.g. raw file-read failure). It
+// guarantees the user sees *something* in the render pipeline rather
+// than a silent abort.
+type LoadConfigError struct {
+	diagnostic.FatalError
+	Cause error
+}
+
+func (e *LoadConfigError) Error() string {
+	if e.Cause == nil {
+		return "failed to load config"
+	}
+	return "failed to load config: " + e.Cause.Error()
+}
+
+func (e *LoadConfigError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   "engine.LoadConfigError",
+		Text: "{{.Message}}",
+		Hint: "check the config file path and any imported modules",
+		Data: loadConfigErrorData{
+			Message: e.Error(),
+		},
+	}
+}
+
+type loadConfigErrorData struct {
+	Message string
+}
+
 // CancelledError is returned when execution is interrupted by a signal
 // (e.g. Ctrl+C). This is normal control flow, not a bug.
 type CancelledError struct{}
