@@ -310,10 +310,13 @@ func (p *Parser) parseLetDecl() *ast.LetDecl {
 
 // parseFields parses field declarations inside a type body:
 //
+//	@attr1
+//	@attr2(...)
 //	name: type = default
 //	name: type
 //
-// Fields separated by Semi (ASI from newlines) and/or Comma.
+// Fields separated by Semi (ASI from newlines) and/or Comma. Each
+// field may be preceded by zero or more `@attr` annotations.
 // Stops when it sees the given end token.
 func (p *Parser) parseFields(end token.Kind) []*ast.Field {
 	var fields []*ast.Field
@@ -322,10 +325,15 @@ func (p *Parser) parseFields(end token.Kind) []*ast.Field {
 			p.advance()
 			continue
 		}
+		attrs := p.parseAttributes()
 		f := p.parseField()
 		if f == nil {
 			p.synchronize()
 			continue
+		}
+		f.Attributes = attrs
+		if len(attrs) > 0 {
+			f.SrcSpan.Start = attrs[0].SrcSpan.Start
 		}
 		fields = append(fields, f)
 	}
@@ -334,9 +342,12 @@ func (p *Parser) parseFields(end token.Kind) []*ast.Field {
 
 // parseParams parses function/step parameters inside parens:
 //
+//	@attr1
+//	@attr2(...)
 //	name: type, name: type = default, ...
 //
 // Params separated by Comma and/or Semi (for multi-line param lists).
+// Each param may be preceded by zero or more `@attr` annotations.
 func (p *Parser) parseParams(end token.Kind) []*ast.Field {
 	var params []*ast.Field
 	for p.cur.Kind != end && p.cur.Kind != token.EOF {
@@ -344,6 +355,7 @@ func (p *Parser) parseParams(end token.Kind) []*ast.Field {
 			p.advance()
 			continue
 		}
+		attrs := p.parseAttributes()
 		f := p.parseField()
 		if f == nil {
 			// Skip ahead to the next comma or the closing token.
@@ -352,12 +364,18 @@ func (p *Parser) parseParams(end token.Kind) []*ast.Field {
 			}
 			continue
 		}
+		f.Attributes = attrs
+		if len(attrs) > 0 {
+			f.SrcSpan.Start = attrs[0].SrcSpan.Start
+		}
 		params = append(params, f)
 	}
 	return params
 }
 
-// parseField parses `name: type` or `name: type = default`.
+// parseField parses `name: type` or `name: type = default`. The caller
+// is responsible for parsing any leading `@attr` annotations and
+// attaching them to the returned field.
 func (p *Parser) parseField() *ast.Field {
 	name := p.parseIdent("field name")
 	if name == nil {
@@ -383,6 +401,99 @@ func (p *Parser) parseField() *ast.Field {
 		Default: def,
 		SrcSpan: token.Span{Start: name.SrcSpan.Start, End: end},
 	}
+}
+
+// parseAttributes consumes zero or more `@name` or `@name(args)`
+// annotations from the current position. Tolerates ASI Semis between
+// consecutive attributes and between the last attribute and the
+// declaration that follows it (a newline after `@nonempty` or
+// `@path(...)` triggers ASI because Ident and RParen end statements).
+func (p *Parser) parseAttributes() []*ast.Attribute {
+	var attrs []*ast.Attribute
+	for p.cur.Kind == token.At {
+		a := p.parseAttribute()
+		if a == nil {
+			// Recovery: skip the @ and try to keep going.
+			p.advance()
+			continue
+		}
+		attrs = append(attrs, a)
+		// Tolerate ASI Semi between attributes and between the last
+		// attribute and the field/decl name. Comma also accepted in
+		// case the attribute appears in a comma-separated context.
+		for p.cur.Kind == token.Semi || p.cur.Kind == token.Comma {
+			p.advance()
+		}
+	}
+	return attrs
+}
+
+// parseAttribute parses a single `@name` or `@name(args)`. The leading
+// `@` must already be the current token. Returns nil on parse error.
+func (p *Parser) parseAttribute() *ast.Attribute {
+	at := p.expect(token.At, "attribute")
+	name := p.parseDottedName("attribute name")
+	if name == nil {
+		return nil
+	}
+	a := &ast.Attribute{
+		Name:    name,
+		SrcSpan: token.Span{Start: at.Pos, End: name.SrcSpan.End},
+	}
+	if p.cur.Kind != token.LParen {
+		return a
+	}
+	p.advance() // (
+	// Empty `()` is allowed (equivalent to `@name`).
+	if p.cur.Kind == token.RParen {
+		end := p.advance().End
+		a.SrcSpan.End = end
+		return a
+	}
+
+	// Parse argument list. Each argument is either positional (a bare
+	// expression) or keyword (`name = expr`). The checker enforces the
+	// "single positional first, then named" rule using BindAttribute;
+	// the parser is permissive about ordering so we can produce a
+	// better diagnostic at the binding step.
+	for {
+		// Skip stray Semi/Comma at the start of each iteration.
+		for p.cur.Kind == token.Semi {
+			p.advance()
+		}
+		if p.cur.Kind == token.RParen || p.cur.Kind == token.EOF {
+			break
+		}
+
+		// Detect `name = expr` form by looking for Ident Assign.
+		if p.cur.Kind == token.Ident && p.peek.Kind == token.Assign {
+			argName := p.parseIdent("attribute argument name")
+			p.expect(token.Assign, "attribute argument value")
+			val := p.parseExpr()
+			if argName != nil && val != nil {
+				a.Named = append(a.Named, &ast.AttrArg{
+					Name:    argName,
+					Value:   val,
+					SrcSpan: token.Span{Start: argName.SrcSpan.Start, End: val.Span().End},
+				})
+			}
+		} else {
+			val := p.parseExpr()
+			if val != nil {
+				a.Positionals = append(a.Positionals, val)
+			}
+		}
+
+		// Argument separator: comma or Semi (for multi-line arg lists).
+		if p.cur.Kind == token.Comma || p.cur.Kind == token.Semi {
+			p.advance()
+			continue
+		}
+		break
+	}
+	end := p.expect(token.RParen, "attribute argument list").End
+	a.SrcSpan.End = end
+	return a
 }
 
 // parseIdent parses a single identifier, returning nil on mismatch.

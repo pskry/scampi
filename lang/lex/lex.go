@@ -374,6 +374,9 @@ func (l *Lexer) scanPunct(start uint32) (token.Token, bool) {
 	case '?':
 		l.pos++
 		return l.emit(token.Question, start, uint32(l.pos)), true
+	case '@':
+		l.pos++
+		return l.emit(token.At, start, uint32(l.pos)), true
 	case ',':
 		l.pos++
 		return l.emit(token.Comma, start, uint32(l.pos)), true

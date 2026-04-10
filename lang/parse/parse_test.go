@@ -490,6 +490,233 @@ type X { m: map[string, int] }
 	}
 }
 
+// attributes
+// -----------------------------------------------------------------------------
+
+func TestParseAttributeMarker(t *testing.T) {
+	f := parseFile(t, `
+module main
+type User {
+    @nonempty
+    name: string
+}
+`)
+	td := f.Decls[0].(*ast.TypeDecl)
+	field := td.Fields[0]
+	if len(field.Attributes) != 1 {
+		t.Fatalf("expected 1 attribute, got %d", len(field.Attributes))
+	}
+	a := field.Attributes[0]
+	if a.Name.Parts[0].Name != "nonempty" {
+		t.Errorf("attr name: got %q, want %q", a.Name.Parts[0].Name, "nonempty")
+	}
+	if len(a.Positionals) != 0 || len(a.Named) != 0 {
+		t.Errorf("marker attr should have no args, got %d positional, %d named",
+			len(a.Positionals), len(a.Named))
+	}
+}
+
+func TestParseAttributeSinglePositional(t *testing.T) {
+	f := parseFile(t, `
+module main
+type X {
+    @since("0.5")
+    v: string
+}
+`)
+	field := f.Decls[0].(*ast.TypeDecl).Fields[0]
+	if len(field.Attributes) != 1 {
+		t.Fatalf("expected 1 attribute, got %d", len(field.Attributes))
+	}
+	a := field.Attributes[0]
+	if a.Name.Parts[0].Name != "since" {
+		t.Errorf("attr name: got %q, want %q", a.Name.Parts[0].Name, "since")
+	}
+	if len(a.Positionals) != 1 {
+		t.Fatalf("expected 1 positional, got %d", len(a.Positionals))
+	}
+	if len(a.Named) != 0 {
+		t.Errorf("expected 0 named, got %d", len(a.Named))
+	}
+}
+
+func TestParseAttributeNamedArgs(t *testing.T) {
+	f := parseFile(t, `
+module main
+type X {
+    @path(absolute=true, on=remote)
+    p: string
+}
+`)
+	field := f.Decls[0].(*ast.TypeDecl).Fields[0]
+	a := field.Attributes[0]
+	if len(a.Positionals) != 0 {
+		t.Errorf("expected 0 positionals, got %d", len(a.Positionals))
+	}
+	if len(a.Named) != 2 {
+		t.Fatalf("expected 2 named, got %d", len(a.Named))
+	}
+	if a.Named[0].Name.Name != "absolute" {
+		t.Errorf("named[0]: got %q, want %q", a.Named[0].Name.Name, "absolute")
+	}
+	if a.Named[1].Name.Name != "on" {
+		t.Errorf("named[1]: got %q, want %q", a.Named[1].Name.Name, "on")
+	}
+}
+
+func TestParseAttributeMixedPositionalAndNamed(t *testing.T) {
+	f := parseFile(t, `
+module main
+type X {
+    @x("foo", b=42)
+    v: string
+}
+`)
+	a := f.Decls[0].(*ast.TypeDecl).Fields[0].Attributes[0]
+	if len(a.Positionals) != 1 {
+		t.Fatalf("expected 1 positional, got %d", len(a.Positionals))
+	}
+	if len(a.Named) != 1 {
+		t.Fatalf("expected 1 named, got %d", len(a.Named))
+	}
+}
+
+func TestParseAttributeVariadic(t *testing.T) {
+	f := parseFile(t, `
+module main
+type X {
+    @oneof("present", "absent", "latest")
+    state: string
+}
+`)
+	a := f.Decls[0].(*ast.TypeDecl).Fields[0].Attributes[0]
+	if len(a.Positionals) != 3 {
+		t.Fatalf("expected 3 positionals, got %d", len(a.Positionals))
+	}
+}
+
+func TestParseAttributeMultipleStacked(t *testing.T) {
+	f := parseFile(t, `
+module main
+type X {
+    @nonempty
+    @path(absolute=true)
+    @oneof("a", "b")
+    v: string
+}
+`)
+	field := f.Decls[0].(*ast.TypeDecl).Fields[0]
+	if len(field.Attributes) != 3 {
+		t.Fatalf("expected 3 attributes, got %d", len(field.Attributes))
+	}
+	want := []string{"nonempty", "path", "oneof"}
+	for i, w := range want {
+		if field.Attributes[i].Name.Parts[0].Name != w {
+			t.Errorf("attr[%d]: got %q, want %q",
+				i, field.Attributes[i].Name.Parts[0].Name, w)
+		}
+	}
+}
+
+func TestParseAttributeOnFuncParam(t *testing.T) {
+	f := parseFile(t, `
+module main
+func secret(@secretkey name: string) string
+`)
+	fn := f.Decls[0].(*ast.FuncDecl)
+	if len(fn.Params) != 1 {
+		t.Fatalf("expected 1 param, got %d", len(fn.Params))
+	}
+	param := fn.Params[0]
+	if len(param.Attributes) != 1 {
+		t.Fatalf("expected 1 attribute, got %d", len(param.Attributes))
+	}
+	if param.Attributes[0].Name.Parts[0].Name != "secretkey" {
+		t.Errorf("attr name: got %q, want %q",
+			param.Attributes[0].Name.Parts[0].Name, "secretkey")
+	}
+}
+
+func TestParseAttributeInlinePrefix(t *testing.T) {
+	// Single attribute can be inline before the field name on the
+	// same line. Useful for short markers like @nonempty.
+	f := parseFile(t, `
+module main
+type X {
+    @nonempty v: string
+}
+`)
+	field := f.Decls[0].(*ast.TypeDecl).Fields[0]
+	if len(field.Attributes) != 1 {
+		t.Fatalf("expected 1 attribute, got %d", len(field.Attributes))
+	}
+	if field.Name.Name != "v" {
+		t.Errorf("field name: got %q, want %q", field.Name.Name, "v")
+	}
+}
+
+func TestParseAttributeOnDeclParam(t *testing.T) {
+	f := parseFile(t, `
+module main
+decl posix.copy(
+    src: string,
+
+    @path(absolute=true, on=remote)
+    @nonempty
+    dest: string,
+)
+`)
+	d := f.Decls[0].(*ast.DeclDecl)
+	if len(d.Params) != 2 {
+		t.Fatalf("expected 2 params, got %d", len(d.Params))
+	}
+	if len(d.Params[0].Attributes) != 0 {
+		t.Errorf("first param should have 0 attrs, got %d", len(d.Params[0].Attributes))
+	}
+	if len(d.Params[1].Attributes) != 2 {
+		t.Fatalf("second param should have 2 attrs, got %d", len(d.Params[1].Attributes))
+	}
+	if d.Params[1].Attributes[0].Name.Parts[0].Name != "path" {
+		t.Errorf("attr[0]: got %q", d.Params[1].Attributes[0].Name.Parts[0].Name)
+	}
+	if d.Params[1].Attributes[1].Name.Parts[0].Name != "nonempty" {
+		t.Errorf("attr[1]: got %q", d.Params[1].Attributes[1].Name.Parts[0].Name)
+	}
+}
+
+func TestParseAttributeDottedName(t *testing.T) {
+	f := parseFile(t, `
+module main
+type X {
+    @std.nonempty
+    v: string
+}
+`)
+	a := f.Decls[0].(*ast.TypeDecl).Fields[0].Attributes[0]
+	if len(a.Name.Parts) != 2 {
+		t.Fatalf("expected dotted name with 2 parts, got %d", len(a.Name.Parts))
+	}
+	if a.Name.Parts[0].Name != "std" || a.Name.Parts[1].Name != "nonempty" {
+		t.Errorf("dotted name parts: got [%s, %s], want [std, nonempty]",
+			a.Name.Parts[0].Name, a.Name.Parts[1].Name)
+	}
+}
+
+func TestParseAttributeEmptyParens(t *testing.T) {
+	f := parseFile(t, `
+module main
+type X {
+    @nonempty()
+    v: string
+}
+`)
+	a := f.Decls[0].(*ast.TypeDecl).Fields[0].Attributes[0]
+	if len(a.Positionals) != 0 || len(a.Named) != 0 {
+		t.Errorf("expected no args, got %d positional, %d named",
+			len(a.Positionals), len(a.Named))
+	}
+}
+
 // real-world snippet
 // -----------------------------------------------------------------------------
 

@@ -356,6 +356,27 @@ func TestSlashIsDivisionNotComment(t *testing.T) {
 	})
 }
 
+func TestAtToken(t *testing.T) {
+	assertTokens(t, "@nonempty", []want{
+		{token.At, "@"},
+		{token.Ident, "nonempty"},
+		{token.Semi, ""},
+	})
+}
+
+func TestAtTokenWithCall(t *testing.T) {
+	assertTokens(t, "@since(version=\"0.5\")", []want{
+		{token.At, "@"},
+		{token.Ident, "since"},
+		{token.LParen, "("},
+		{token.Ident, "version"},
+		{token.Assign, "="},
+		{token.String, "0.5"},
+		{token.RParen, ")"},
+		{token.Semi, ""},
+	})
+}
+
 // Whitespace and ASI
 // -----------------------------------------------------------------------------
 

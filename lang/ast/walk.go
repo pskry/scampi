@@ -194,6 +194,17 @@ func walkChildren(node Node, pre func(Node) bool, post func(Node)) {
 
 	case *OptionalType:
 		walkTypeExpr(n.Inner, pre, post)
+
+	case *Attribute:
+		Walk(n.Name, pre, post)
+		walkExprList(n.Positionals, pre, post)
+		for _, a := range n.Named {
+			Walk(a, pre, post)
+		}
+
+	case *AttrArg:
+		Walk(n.Name, pre, post)
+		walkExpr(n.Value, pre, post)
 	}
 }
 
@@ -231,6 +242,9 @@ func walkStmtList(stmts []Stmt, pre func(Node) bool, post func(Node)) {
 
 func walkFieldList(fields []*Field, pre func(Node) bool, post func(Node)) {
 	for _, f := range fields {
+		for _, a := range f.Attributes {
+			Walk(a, pre, post)
+		}
 		Walk(f.Name, pre, post)
 		walkTypeExpr(f.Type, pre, post)
 		walkExpr(f.Default, pre, post)

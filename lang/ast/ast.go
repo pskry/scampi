@@ -479,13 +479,44 @@ func (*MapComp) exprNode()          {}
 // -----------------------------------------------------------------------------
 
 // Field is a typed field declaration: name: type = default
-// Used in struct decls, step/func params.
+// Used in struct decls, step/func params. Attributes are prefix
+// annotations like `@nonempty` or `@path(absolute=true)` that decorate
+// the field. The lang itself attaches no semantics — the linker and
+// LSP consume them.
 type Field struct {
+	Name       *Ident
+	Type       TypeExpr
+	Default    Expr // optional
+	Attributes []*Attribute
+	SrcSpan    token.Span
+}
+
+// Attribute is a prefix annotation `@name` or `@name(args)` attached
+// to a Field, declaration, or other annotatable position. The lang
+// parses and validates the structural shape but does not interpret
+// the semantics — that lives in the linker (Go behaviour) and LSP
+// (UX providers).
+type Attribute struct {
+	Name        *DottedName // @name or @module.name
+	Positionals []Expr      // bare positional args
+	Named       []*AttrArg  // keyword args
+	SrcSpan     token.Span
+}
+
+func (a *Attribute) Span() token.Span { return a.SrcSpan }
+func (*Attribute) astNode()           {}
+
+// AttrArg is a single keyword argument inside an attribute call:
+// `name=value`. Positional arguments are stored directly as Expr on
+// the Attribute, not wrapped in AttrArg.
+type AttrArg struct {
 	Name    *Ident
-	Type    TypeExpr
-	Default Expr // optional
+	Value   Expr
 	SrcSpan token.Span
 }
+
+func (a *AttrArg) Span() token.Span { return a.SrcSpan }
+func (*AttrArg) astNode()           {}
 
 // TypeExpr is a type expression appearing in declarations.
 type TypeExpr interface {

@@ -64,6 +64,7 @@ const (
 	Colon    // :
 	Dot      // .
 	Question // ?
+	At       // @
 
 	// Delimiters
 	LBrace // {

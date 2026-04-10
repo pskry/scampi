@@ -121,7 +121,7 @@ _patch-license-headers:
   #!/usr/bin/env bash
   set -euo pipefail
   go_header="{{spdx_header}}"
-  scampi_header="# SPDX-License-Identifier: GPL-3.0-only"
+  scampi_header="// SPDX-License-Identifier: GPL-3.0-only"
   patch() {
     local f="$1" header="$2"
     first=$(head -1 "$f")
