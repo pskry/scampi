@@ -4,6 +4,7 @@ package lsp
 
 import (
 	"context"
+	"strings"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
@@ -52,6 +53,19 @@ func (s *Server) Definition(
 	// Stdlib — resolve to extracted stub file.
 	if loc, ok := s.stubDefs.Lookup(word); ok {
 		return []protocol.Location{loc}, nil
+	}
+
+	// Dotted word like `x.yo` from a UFCS or selector context — try
+	// the trailing segment in the same order so the function-name
+	// part of `x.yo()` resolves to local `yo`.
+	if i := strings.LastIndexByte(word, '.'); i >= 0 && i < len(word)-1 {
+		tail := word[i+1:]
+		if span := findDefinition(f, tail); span != nil {
+			return []protocol.Location{spanToLocation(filePath, data, *span)}, nil
+		}
+		if loc, ok := s.stubDefs.Lookup(tail); ok {
+			return []protocol.Location{loc}, nil
+		}
 	}
 
 	return nil, nil

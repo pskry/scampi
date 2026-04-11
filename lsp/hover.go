@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"go.lsp.dev/protocol"
+
+	"scampi.dev/scampi/lang/check"
 )
 
 func (s *Server) Hover(
@@ -68,7 +70,81 @@ func (s *Server) Hover(
 		}
 	}
 
+	// Local symbol (let, type, enum, param) — checker-driven fallback.
+	// Runs after the function/kwarg paths so a name that exists both as
+	// a stdlib func and a local let still prefers the func doc.
+	if md := s.hoverLocalSymbol(params.TextDocument.URI, doc.Content, cur.WordUnderCursor); md != "" {
+		s.log.Printf("hover: returning symbol doc (%d bytes)", len(md))
+		return &protocol.Hover{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: md,
+			},
+		}, nil
+	}
+
 	return nil, nil
+}
+
+// hoverLocalSymbol resolves a name against the file's checker scope
+// and renders a hover doc for lets, params, types, and enums. Falls
+// through cleanly when the name doesn't resolve. Handles dotted words
+// like `x.yo` by trying the trailing segment as well.
+func (s *Server) hoverLocalSymbol(docURI protocol.DocumentURI, content, word string) string {
+	if word == "" {
+		return ""
+	}
+	filePath := uriToPath(docURI)
+	c := tolerantCheck(filePath, []byte(content), s.modules)
+	if c == nil {
+		return ""
+	}
+	if md := lookupAndRenderSymbol(c, word); md != "" {
+		return md
+	}
+	if i := strings.LastIndexByte(word, '.'); i >= 0 && i < len(word)-1 {
+		return lookupAndRenderSymbol(c, word[i+1:])
+	}
+	return ""
+}
+
+func lookupAndRenderSymbol(c *check.Checker, name string) string {
+	if sym := c.FileScope().Lookup(name); sym != nil {
+		return formatSymbolDoc(sym)
+	}
+	if sym, ok := c.AllBindings()[name]; ok {
+		return formatSymbolDoc(sym)
+	}
+	return ""
+}
+
+// formatSymbolDoc renders a hover doc for a checker symbol. Funcs are
+// intentionally skipped — function hovers go through the catalog path
+// in hoverFunc, which has richer params/docs from the FuncInfo
+// representation.
+func formatSymbolDoc(sym *check.Symbol) string {
+	switch sym.Kind {
+	case check.SymLet:
+		return fencedSymbolDoc("let " + sym.Name + typeSuffix(sym))
+	case check.SymParam:
+		return fencedSymbolDoc(sym.Name + typeSuffix(sym))
+	case check.SymType:
+		return fencedSymbolDoc("type " + sym.Name)
+	case check.SymEnum:
+		return fencedSymbolDoc("enum " + sym.Name)
+	}
+	return ""
+}
+
+func typeSuffix(sym *check.Symbol) string {
+	if sym.Type == nil {
+		return ""
+	}
+	return ": " + sym.Type.String()
+}
+
+func fencedSymbolDoc(sig string) string {
+	return "```scampi\n" + sig + "\n```\n\n---\n"
 }
 
 func (s *Server) hoverFunc(docURI protocol.DocumentURI, word string) string {
