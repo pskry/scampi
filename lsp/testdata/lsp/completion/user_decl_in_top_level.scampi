@@ -1,0 +1,13 @@
+module main
+
+type X {
+  name: string
+}
+
+func b() X {
+  return X { name = "hello" }
+}
+
+func bb() string {
+  b‸
+}

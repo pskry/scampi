@@ -1,0 +1,8 @@
+module main
+
+func greet(name: string, prefix: string = "hello") string {
+  return prefix
+}
+
+let a = greet("alice")
+let b = greet("bob", prefix = "howdy")

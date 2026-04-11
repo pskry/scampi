@@ -1,0 +1,11 @@
+module main
+
+func inc(n: int) int {
+  return n + 1
+}
+
+func double(n: int) int {
+  return n + n
+}
+
+let result = (3).inc().double().inc()

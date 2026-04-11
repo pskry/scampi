@@ -1,0 +1,18 @@
+module main
+
+type X {
+  name: string
+}
+
+func a(x: X) string {
+  return ""
+}
+
+func b() X {
+  return X { name = "hello" }
+}
+
+func bb() string {
+  let x = b()
+  x.‸
+}

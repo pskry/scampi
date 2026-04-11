@@ -1,0 +1,7 @@
+{
+  "lets": {
+    "url":      "http://localhost:8080/api",
+    "display":  "localhost:8080",
+    "greeting": "connecting to localhost"
+  }
+}

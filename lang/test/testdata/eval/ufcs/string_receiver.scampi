@@ -1,0 +1,7 @@
+module main
+
+func length(s: string) int {
+  return 5
+}
+
+let result = "hello".length()

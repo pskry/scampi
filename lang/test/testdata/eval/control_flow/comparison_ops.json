@@ -1,0 +1,12 @@
+{
+  "lets": {
+    "lt":   true,
+    "gt":   true,
+    "lte":  true,
+    "gte":  true,
+    "eq":   true,
+    "neq":  true,
+    "s_eq": true,
+    "s_ne": true
+  }
+}

@@ -1,0 +1,13 @@
+module main
+
+import "std"
+import "std/posix"
+
+posix.copy {
+  src = posix.source_inline { content = "x" }
+  dest = "/dest.txt"
+  perm = "0644"
+  owner = "root"
+  group = "root"
+  nope = "this is not a field"
+}

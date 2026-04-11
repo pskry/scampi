@@ -1,0 +1,11 @@
+module main
+
+let cfg = {
+  "host": "localhost",
+  "port": "8080",
+  "user": "admin"
+}
+
+let h = cfg["host"]
+let p = cfg["port"]
+let u = cfg["user"]

@@ -1,0 +1,11 @@
+{
+  "lets": {
+    "and_tt":  true,
+    "and_tf":  false,
+    "or_tf":   true,
+    "or_ff":   false,
+    "not_t":   false,
+    "not_f":   true,
+    "chained": true
+  }
+}

@@ -1,0 +1,11 @@
+module main
+
+let host = "localhost"
+let port = "8080"
+
+// Concatenated interpolation
+let url = "http://${host}:${port}/api"
+
+// Interpolation reused
+let display = "${host}:${port}"
+let greeting = "connecting to ${host}"

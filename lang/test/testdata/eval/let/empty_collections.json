@@ -1,0 +1,9 @@
+{
+  "lets": {
+    "empty_list": [],
+    "empty_map":  {},
+    "zero":       0,
+    "empty_str":  "",
+    "no_value":   null
+  }
+}

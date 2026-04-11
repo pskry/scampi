@@ -1,0 +1,11 @@
+module main
+
+import "std"
+import "std/posix"
+import "std/local"
+
+let host = local.target { name = "h" }
+
+std.deploy(name = "test", targets = [host]) {
+  posix.dir { path = "/etc/foo" }
+}

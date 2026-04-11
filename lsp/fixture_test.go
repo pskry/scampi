@@ -1,0 +1,313 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+package lsp
+
+import (
+	"context"
+	"encoding/json"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
+)
+
+// Data-driven LSP test runner. Fixtures live under
+// `lsp/testdata/lsp/<request>/<name>.scampi` with a sibling
+// `<name>.json` describing the expected response.
+//
+// Each .scampi file may contain a single ‸ marker showing where
+// the cursor sits when the request fires. The runner strips the
+// marker before opening the document and uses its position as the
+// LSP cursor. Fixtures without a marker fall back to the `cursor`
+// field in the JSON.
+//
+// Supported request kinds and their `expect` shapes:
+//
+//   completion → { "labels_include": [...], "labels_exclude": [...] }
+//   hover      → { "contains": [...], "empty": bool }
+//   definition → { "uri_suffix": "...", "line": N }
+//
+// The `_include`/`_exclude`/`contains` shapes deliberately use
+// substring/subset matching, not exact equality, so fixtures don't
+// have to enumerate every catalog item — they just pin the things
+// that matter.
+
+const cursorMarker = "‸"
+
+type fixtureSpec struct {
+	Request string          `json:"request"`
+	Cursor  *cursorPosition `json:"cursor,omitempty"`
+	Expect  json.RawMessage `json:"expect"`
+}
+
+type cursorPosition struct {
+	Line uint32 `json:"line"`
+	Char uint32 `json:"char"`
+}
+
+type completionExpect struct {
+	LabelsInclude []string `json:"labels_include,omitempty"`
+	LabelsExclude []string `json:"labels_exclude,omitempty"`
+}
+
+type hoverExpect struct {
+	Contains []string `json:"contains,omitempty"`
+	Empty    bool     `json:"empty,omitempty"`
+}
+
+type definitionExpect struct {
+	URISuffix string `json:"uri_suffix,omitempty"`
+	Line      uint32 `json:"line"`
+}
+
+func TestLSPFixtures(t *testing.T) {
+	root := "testdata/lsp"
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		t.Skip("no LSP fixtures yet")
+	}
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".scampi") {
+			return nil
+		}
+		jsonPath := strings.TrimSuffix(p, ".scampi") + ".json"
+		if _, err := os.Stat(jsonPath); err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, p)
+		name := strings.TrimSuffix(filepath.ToSlash(rel), ".scampi")
+		t.Run(name, func(t *testing.T) {
+			runFixture(t, p, jsonPath)
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runFixture(t *testing.T, scampiPath, jsonPath string) {
+	t.Helper()
+	rawSrc, err := os.ReadFile(scampiPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expBytes, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var spec fixtureSpec
+	if err := json.Unmarshal(expBytes, &spec); err != nil {
+		t.Fatalf("bad expectation JSON: %v", err)
+	}
+
+	src := string(rawSrc)
+	var line, char uint32
+	idx := strings.Index(src, cursorMarker)
+	switch {
+	case idx >= 0:
+		line, char = lineColAtByteOffset(src, idx)
+		src = src[:idx] + src[idx+len(cursorMarker):]
+	case spec.Cursor != nil:
+		line, char = spec.Cursor.Line, spec.Cursor.Char
+	default:
+		t.Fatal("fixture must contain a ‸ marker or a cursor field in JSON")
+	}
+
+	s := testServer()
+	// Use a real path so file URI conversion works on hover/goto-def.
+	docURI := protocol.DocumentURI(uri.File(scampiPath))
+	s.docs.Open(docURI, src, 1)
+
+	switch spec.Request {
+	case "completion":
+		runCompletionFixture(t, s, docURI, line, char, spec.Expect)
+	case "hover":
+		runHoverFixture(t, s, docURI, line, char, spec.Expect)
+	case "definition":
+		runDefinitionFixture(t, s, docURI, line, char, spec.Expect)
+	default:
+		t.Fatalf("unknown request type: %q", spec.Request)
+	}
+}
+
+func runCompletionFixture(
+	t *testing.T,
+	s *Server,
+	docURI protocol.DocumentURI,
+	line, char uint32,
+	rawExpect json.RawMessage,
+) {
+	var exp completionExpect
+	if err := json.Unmarshal(rawExpect, &exp); err != nil {
+		t.Fatalf("bad completion expect JSON: %v", err)
+	}
+	result, err := s.Completion(context.Background(), &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: line, Character: char},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Completion: %v", err)
+	}
+	labels := make(map[string]bool)
+	if result != nil {
+		for _, item := range result.Items {
+			labels[item.Label] = true
+		}
+	}
+	for _, want := range exp.LabelsInclude {
+		if !labels[want] {
+			t.Errorf("expected completion label %q in result; got %v", want, sortedLabels(labels))
+		}
+	}
+	for _, banned := range exp.LabelsExclude {
+		if labels[banned] {
+			t.Errorf("completion label %q should NOT be present", banned)
+		}
+	}
+}
+
+func runHoverFixture(
+	t *testing.T,
+	s *Server,
+	docURI protocol.DocumentURI,
+	line, char uint32,
+	rawExpect json.RawMessage,
+) {
+	var exp hoverExpect
+	if err := json.Unmarshal(rawExpect, &exp); err != nil {
+		t.Fatalf("bad hover expect JSON: %v", err)
+	}
+	result, err := s.Hover(context.Background(), &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: line, Character: char},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Hover: %v", err)
+	}
+	if exp.Empty {
+		if result != nil && result.Contents.Value != "" {
+			t.Errorf("expected empty hover, got %q", result.Contents.Value)
+		}
+		return
+	}
+	if result == nil {
+		t.Fatalf("expected hover with %v, got nil", exp.Contains)
+	}
+	for _, want := range exp.Contains {
+		if !strings.Contains(result.Contents.Value, want) {
+			t.Errorf("expected hover to contain %q; got:\n%s", want, result.Contents.Value)
+		}
+	}
+}
+
+func runDefinitionFixture(
+	t *testing.T,
+	s *Server,
+	docURI protocol.DocumentURI,
+	line, char uint32,
+	rawExpect json.RawMessage,
+) {
+	var exp definitionExpect
+	if err := json.Unmarshal(rawExpect, &exp); err != nil {
+		t.Fatalf("bad definition expect JSON: %v", err)
+	}
+	result, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: line, Character: char},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Definition: %v", err)
+	}
+	if len(result) == 0 {
+		t.Fatal("expected at least one definition location")
+	}
+	loc := result[0]
+	if exp.URISuffix != "" && !strings.HasSuffix(string(loc.URI), exp.URISuffix) {
+		t.Errorf("expected definition URI to end with %q; got %q", exp.URISuffix, loc.URI)
+	}
+	if loc.Range.Start.Line != exp.Line {
+		t.Errorf("expected definition at line %d; got %d", exp.Line, loc.Range.Start.Line)
+	}
+}
+
+// lineColAtByteOffset converts a byte offset in src to (line, char)
+// where line and char are 0-based and char counts UTF-16 code units
+// (LSP convention). For ASCII-only sources the count matches bytes.
+// Multi-byte characters before the offset are counted as their
+// UTF-16 width.
+func lineColAtByteOffset(src string, offset int) (line, char uint32) {
+	for i := 0; i < offset && i < len(src); {
+		r := rune(src[i])
+		size := 1
+		if r >= 0x80 {
+			r, size = decodeRune(src[i:])
+		}
+		if r == '\n' {
+			line++
+			char = 0
+			i += size
+			continue
+		}
+		// UTF-16 code-unit width: characters in the BMP take 1 unit;
+		// characters above U+FFFF take 2.
+		if r > 0xFFFF {
+			char += 2
+		} else {
+			char++
+		}
+		i += size
+	}
+	return line, char
+}
+
+// decodeRune is a tiny stand-in for utf8.DecodeRuneInString that
+// avoids importing unicode/utf8 just for this one call.
+func decodeRune(s string) (rune, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	b := s[0]
+	switch {
+	case b < 0x80:
+		return rune(b), 1
+	case b < 0xC0:
+		return 0xFFFD, 1
+	case b < 0xE0:
+		if len(s) < 2 {
+			return 0xFFFD, 1
+		}
+		return rune(b&0x1F)<<6 | rune(s[1]&0x3F), 2
+	case b < 0xF0:
+		if len(s) < 3 {
+			return 0xFFFD, 1
+		}
+		return rune(b&0x0F)<<12 | rune(s[1]&0x3F)<<6 | rune(s[2]&0x3F), 3
+	default:
+		if len(s) < 4 {
+			return 0xFFFD, 1
+		}
+		return rune(b&0x07)<<18 | rune(s[1]&0x3F)<<12 | rune(s[2]&0x3F)<<6 | rune(s[3]&0x3F), 4
+	}
+}
+
+func sortedLabels(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
