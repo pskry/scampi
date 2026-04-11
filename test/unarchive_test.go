@@ -343,6 +343,8 @@ std.deploy(name = "test", targets = [host]) {
 // -----------------------------------------------------------------------------
 
 func TestUnarchive_RelativeDest(t *testing.T) {
+	// Relative dest is rejected at link time by `@std.path(absolute=true)`
+	// on unarchive.dest in the stub, before any plan/apply runs.
 	cfgStr := `
 module main
 import "std"
@@ -366,20 +368,8 @@ std.deploy(name = "test", targets = [host]) {
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := diagnostic.NewSourceStore()
 
-	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	defer e.Close()
-
-	err = e.Apply(context.Background())
-	if err == nil {
-		t.Fatal("expected error for relative dest")
-	}
-
-	var abortErr engine.AbortError
-	if !errors.As(err, &abortErr) {
-		t.Errorf("expected AbortError, got %T: %v", err, err)
+	if _, err := loadAndResolve(t, cfgStr, src, tgt, em, store); err == nil {
+		t.Fatal("expected link-time error for relative dest, got nil")
 	}
 }
 

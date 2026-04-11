@@ -136,6 +136,10 @@ std.deploy(name = "test", targets = [host]) {
 }
 
 func TestVerify_CopyMissingPlaceholder(t *testing.T) {
+	// Missing-%s placeholder is caught at link time by the
+	// `@std.pattern(regex=".*%s.*")` attribute on copy.verify, not
+	// at plan/apply time. The config is rejected before any target
+	// state is touched.
 	cfgStr := `
 module main
 import "std"
@@ -162,20 +166,8 @@ std.deploy(name = "test", targets = [host]) {
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := diagnostic.NewSourceStore()
 
-	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	defer e.Close()
-
-	err = e.Apply(context.Background())
-	if err == nil {
-		t.Fatal("expected error for missing placeholder")
-	}
-
-	var abortErr engine.AbortError
-	if !errors.As(err, &abortErr) {
-		t.Errorf("expected AbortError, got %T: %v", err, err)
+	if _, err := loadAndResolve(t, cfgStr, src, tgt, em, store); err == nil {
+		t.Fatal("expected link-time error for missing placeholder, got nil")
 	}
 }
 
@@ -337,6 +329,9 @@ std.deploy(name = "test", targets = [host]) {
 }
 
 func TestVerify_TemplateMissingPlaceholder(t *testing.T) {
+	// Same as TestVerify_CopyMissingPlaceholder: the missing-%s
+	// rule lives on the stub via @std.pattern, so the link step
+	// rejects the config before plan/apply runs.
 	cfgStr := `
 module main
 import "std"
@@ -363,20 +358,8 @@ std.deploy(name = "test", targets = [host]) {
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 	store := diagnostic.NewSourceStore()
 
-	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	defer e.Close()
-
-	err = e.Apply(context.Background())
-	if err == nil {
-		t.Fatal("expected error for missing placeholder")
-	}
-
-	var abortErr engine.AbortError
-	if !errors.As(err, &abortErr) {
-		t.Errorf("expected AbortError, got %T: %v", err, err)
+	if _, err := loadAndResolve(t, cfgStr, src, tgt, em, store); err == nil {
+		t.Fatal("expected link-time error for missing placeholder, got nil")
 	}
 }
 

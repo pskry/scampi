@@ -42,20 +42,30 @@ func literalString(e ast.Expr) (string, bool) {
 }
 
 // NonEmptyAttribute fails when the annotated parameter binds to a
-// literal empty string. Hint and Help come from the attribute type's
-// doc comment.
+// literal empty value. Handles both string and list literals — the
+// "must not be empty" rule reads identically for either shape, and
+// list-typed params (e.g. pkg.packages) deserve the same fast-fail
+// treatment as string-typed ones. Hint and Help come from the
+// attribute type's doc comment.
 type NonEmptyAttribute struct{}
 
 func (NonEmptyAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalString(ctx.ParamArg)
-	if !ok {
+	if v, ok := literalString(ctx.ParamArg); ok {
+		if v == "" {
+			ctx.Linker.Emit(newAttrDocError(
+				ctx,
+				fmt.Sprintf("%s must not be empty", ctx.ParamName),
+			))
+		}
 		return
 	}
-	if v == "" {
-		ctx.Linker.Emit(newAttrDocError(
-			ctx,
-			fmt.Sprintf("%s must not be empty", ctx.ParamName),
-		))
+	if list, ok := ctx.ParamArg.(*ast.ListLit); ok {
+		if len(list.Items) == 0 {
+			ctx.Linker.Emit(newAttrDocError(
+				ctx,
+				fmt.Sprintf("%s must not be empty", ctx.ParamName),
+			))
+		}
 	}
 }
 

@@ -53,6 +53,7 @@ decl copy(
   owner:     string,
   @std.nonempty
   group:     string,
+  @std.pattern(regex="^([^%]|%[^s])*%s([^%]|%[^s])*$")
   verify:    string?,
   desc:      string?,
   on_change: list[std.Step] = [],
@@ -89,6 +90,7 @@ decl template(
   owner:     string,
   @std.nonempty
   group:     string,
+  @std.pattern(regex="^([^%]|%[^s])*%s([^%]|%[^s])*$")
   verify:    string?,
   desc:      string?,
   on_change: list[std.Step] = [],
@@ -96,7 +98,7 @@ decl template(
 
 decl unarchive(
   src:       Source,
-  @std.path
+  @std.path(absolute=true)
   dest:      string,
   depth:     int? = 0,
   owner:     string?,
@@ -111,6 +113,7 @@ decl unarchive(
 // -----------------------------------------------------------------------------
 
 decl pkg(
+  @std.nonempty
   packages:  list[string],
   source:    PkgSource,
   state:     PkgState = PkgState.present,
@@ -177,7 +180,7 @@ decl sysctl(
 decl mount(
   @std.nonempty
   src:       string,
-  @std.path
+  @std.path(absolute=true)
   dest:      string,
   fs_type:   MountType,
   opts:      string? = "defaults",
