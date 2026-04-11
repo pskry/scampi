@@ -49,7 +49,11 @@ jobs:
           done
 
           if [[ "$HTTP_CODE" == "200" ]]; then
-            jq -r '.body' /tmp/cb-release.json > /tmp/notes.md
+            # Rewrite (#N) issue refs to point at Codeberg, since GitHub's
+            # auto-linking would 404 (issues are disabled on the mirror).
+            jq -r '.body' /tmp/cb-release.json \
+              | sed -E 's|\(#([0-9]+)\)|([#\1](https://codeberg.org/scampi-dev/scampi/issues/\1))|g' \
+              > /tmp/notes.md
             {
               echo ""
               echo "---"
