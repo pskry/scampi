@@ -24,8 +24,10 @@ func TestLinkBasicDeploy(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/ssh"
+import "std/local"
 
-let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
+let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
 
 std.deploy(name = "web", targets = [vps]) {
   posix.pkg { packages = ["nginx"], source = posix.pkg_system {} }
@@ -153,9 +155,11 @@ func TestLoadConfig_SecretErrorDiagnostic(t *testing.T) {
 	src.Files["/config.scampi"] = []byte(`module main
 import "std"
 import "std/posix"
-let local = posix.local { name = "local" }
+import "std/ssh"
+import "std/local"
+let host = local.target { name = "local" }
 let x = std.secret("missing_key")
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.dir { path = "/tmp/test" }
 }
 `)
@@ -174,8 +178,8 @@ std.deploy(name = "test", targets = [local]) {
 	if tmpl.Source == nil {
 		t.Fatal("diagnostic should have source span")
 	}
-	if tmpl.Source.StartLine != 5 {
-		t.Errorf("expected error at line 5 (secret call), got line %d", tmpl.Source.StartLine)
+	if tmpl.Source.StartLine != 7 {
+		t.Errorf("expected error at line 7 (secret call), got line %d", tmpl.Source.StartLine)
 	}
 }
 

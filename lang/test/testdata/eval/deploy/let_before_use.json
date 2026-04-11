@@ -1,4 +1,4 @@
 {
-  "targets": [{"name": "vps", "kind": "ssh"}],
+  "targets": [{"name": "vps", "kind": "ssh.target"}],
   "deploys": [{"name": "web", "steps": 1}]
 }

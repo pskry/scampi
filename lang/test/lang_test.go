@@ -298,8 +298,8 @@ func assertTargets(t *testing.T, r *eval.Result, want []expectTarget) {
 		if name != w.Name {
 			t.Errorf("target[%d] name: got %q, want %q", i, name, w.Name)
 		}
-		if targets[i].TypeName != w.Kind {
-			t.Errorf("target[%d] kind: got %q, want %q", i, targets[i].TypeName, w.Kind)
+		if targets[i].QualName != w.Kind {
+			t.Errorf("target[%d] kind: got %q, want %q", i, targets[i].QualName, w.Kind)
 		}
 	}
 }

@@ -20,10 +20,11 @@ func TestTemplate_Inspect_SrcFile(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "inspect-src"
     src = posix.source_local { path = "/tmpl.txt" }
@@ -91,10 +92,11 @@ func TestTemplate_Inspect_Inline(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "inspect-inline"
     src = posix.source_inline { content = "Port: {{.port}}" }
@@ -160,10 +162,11 @@ func TestTemplate_BasicRender(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "render-test"
     src = posix.source_local { path = "/tmpl.txt" }
@@ -249,10 +252,11 @@ func TestTemplate_InlineContent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "inline-template"
     src = posix.source_inline { content = "Inline: {{.msg}}" }
@@ -317,10 +321,11 @@ func TestTemplate_EnvOverride(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "env-override"
     src = posix.source_inline { content = "Port: {{.port}}" }
@@ -390,10 +395,11 @@ func TestTemplate_EnvNotSet_UsesDefault(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "env-default"
     src = posix.source_inline { content = "Port: {{.port}}" }
@@ -462,10 +468,11 @@ func TestTemplate_Idempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "idempotent"
     src = posix.source_inline { content = "static content" }
@@ -539,10 +546,11 @@ func TestTemplate_ContentChange(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "content-change"
     src = posix.source_inline { content = "new content" }
@@ -620,10 +628,11 @@ func TestTemplate_Error_ParseError(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "parse-error"
     src = posix.source_inline { content = "{{.unclosed" }
@@ -687,10 +696,11 @@ func TestTemplate_Error_ExecError(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "exec-error"
     src = posix.source_inline { content = "{{len .missing}}" }
@@ -753,10 +763,11 @@ func TestTemplate_Error_SourceMissing(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "source-missing"
     src = posix.source_local { path = "/nonexistent.txt" }
@@ -820,10 +831,11 @@ func TestTemplate_Error_EnvKeyNotInValues(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "env-key-missing"
     src = posix.source_inline { content = "{{.port}}" }
@@ -895,10 +907,11 @@ func TestTemplate_Error_DestDirMissing(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "dest-dir-missing"
     src = posix.source_inline { content = "content" }
@@ -961,10 +974,11 @@ func TestTemplate_ModeChange(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "mode-change"
     src = posix.source_inline { content = "content" }
@@ -1025,10 +1039,11 @@ func TestTemplate_OwnerChange(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "owner-change"
     src = posix.source_inline { content = "content" }
@@ -1090,10 +1105,11 @@ func TestTemplate_MultipleValues(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "multi-values"
     src = posix.source_inline { content = "{{.host}}:{{.port}} - {{.name}}" }
@@ -1156,10 +1172,11 @@ func TestTemplate_NoData(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "no-data"
     src = posix.source_inline { content = "static template" }
@@ -1215,10 +1232,11 @@ func TestTemplate_NestedValues(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "nested"
     src = posix.source_inline { content = "{{.server.host}}:{{.server.port}}" }
@@ -1282,10 +1300,11 @@ func TestTemplate_MultipleEnvOverrides(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "multi-env"
     src = posix.source_inline { content = "{{.host}}:{{.port}}" }
@@ -1353,10 +1372,11 @@ func TestTemplate_PartialEnvOverride(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "partial-env"
     src = posix.source_inline { content = "{{.host}}:{{.port}}" }
@@ -1425,10 +1445,11 @@ func TestTemplate_WriteFailure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "write-fail"
     src = posix.source_inline { content = "content" }

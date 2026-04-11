@@ -160,7 +160,8 @@ func TestCheckBlockExpr(t *testing.T) {
 module main
 import "std"
 import "std/posix"
-let vps = posix.local { name = "dev" }
+import "std/local"
+let vps = local.target { name = "dev" }
 let d = std.deploy(name = "web", targets = [vps])
 d { posix.dir { path = "/tmp/test" } }
 `)
@@ -171,8 +172,9 @@ func TestCheckBlockExprInline(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-std.deploy(name = "web", targets = [posix.local { name = "dev" }]) {
+std.deploy(name = "web", targets = [local.target { name = "dev" }]) {
     posix.dir { path = "/tmp/test" }
 }
 `)
@@ -227,6 +229,7 @@ func TestCheckDeclDecl(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
 decl create_user(name: string) std.Step {
     posix.dir { path = "/home/${self.name}" }

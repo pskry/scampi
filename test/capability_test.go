@@ -65,10 +65,11 @@ func TestPlan_PkgLatest_RequiresPkgUpdate(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.pkg {
     packages = ["foo"]
     state = posix.PkgState.latest
@@ -83,10 +84,11 @@ func TestPlan_Symlink_RequiresFilesystem(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.symlink { target = "/opt/app/config.yaml", link = "/etc/app/config.yaml" }
 }
 `, newSymlinkOnlyTarget())
@@ -97,10 +99,11 @@ func TestPlan_Run_RequiresCommand(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.run { apply = "echo hello", check = "true" }
 }
 `, newNoCommandTarget())
@@ -111,10 +114,11 @@ func TestPlan_Copy_RequiresOwnership(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_local { path = "/a" }
     dest = "/b"

@@ -117,7 +117,7 @@ func TestCompletionModule(t *testing.T) {
 	for _, item := range result.Items {
 		labels[item.Label] = true
 	}
-	for _, want := range []string{"ssh", "local", "copy"} {
+	for _, want := range []string{"copy", "dir", "service"} {
 		if !labels[want] {
 			t.Errorf("missing posix.%s in completions", want)
 		}
@@ -187,7 +187,7 @@ func TestCompletionSourceResolvers(t *testing.T) {
 func TestCompletionStringKwargOffersSecretAndEnv(t *testing.T) {
 	s := testServer()
 	docURI := protocol.DocumentURI("file:///test.scampi")
-	text := "posix.ssh {\n    name = \"test\",\n    host = "
+	text := "ssh.target {\n    name = \"test\",\n    host = "
 	s.docs.Open(docURI, text, 1)
 
 	result, err := s.Completion(context.Background(), &protocol.CompletionParams{

@@ -2,12 +2,13 @@ module main
 
 import "std"
 import "std/posix"
+import "std/ssh"
 
 std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
 
 let host = "203.0.113.10"
 
-let vps = posix.ssh {
+let vps = ssh.target {
   name = "vps"
   host = host
   user = "hal9000"

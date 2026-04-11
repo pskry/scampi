@@ -21,10 +21,11 @@ func FuzzDiagnostics(f *testing.F) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.dir { path = "/tmp/fuzz" }
 }`,
 
@@ -32,10 +33,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy { src = posix.source_local { path = "/a" }, dest = "/b", perm = "0644", owner = "u", group = "g" }
 }`,
 
@@ -43,10 +45,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy { src = posix.source_local { path = "a" }, dest = "b" }
 }`,
 
@@ -54,10 +57,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.symlink { target = "a" }
 }`,
 
@@ -65,10 +69,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template { src = posix.source_local { path = "a" }, dest = "b" }
 }`,
 
@@ -76,10 +81,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.run { apply = "do-thing", check = "check-thing" }
 }`,
 
@@ -87,10 +93,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.run { apply = "do-thing", always = true }
 }`,
 
@@ -98,10 +105,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.run { apply = "do-thing" }
 }`,
 
@@ -109,10 +117,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.run { apply = "do-thing", check = "check-thing", always = true }
 }`,
 
@@ -120,10 +129,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.run { check = "check-thing" }
 }`,
 
@@ -131,10 +141,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.pkg { packages = ["nginx"], state = posix.PkgState.present, source = posix.pkg_system {} }
 }`,
 
@@ -142,10 +153,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.pkg { packages = ["nginx"], state = "bogus", source = posix.pkg_system {} }
 }`,
 
@@ -153,10 +165,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.service { name = "nginx", state = posix.ServiceState.running, enabled = true }
 }`,
 
@@ -164,10 +177,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.service { state = posix.ServiceState.running }
 }`,
 
@@ -175,10 +189,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.group { name = "deploy" }
 }`,
 
@@ -186,10 +201,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.group { name = "oldgroup", state = posix.GroupState.absent }
 }`,
 
@@ -197,10 +213,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.user { name = "deploy", shell = "/bin/bash", groups = ["sudo"] }
 }`,
 
@@ -208,10 +225,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.user { name = "olduser", state = posix.UserState.absent }
 }`,
 
@@ -219,10 +237,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.sysctl { key = "net.ipv4.ip_forward", value = "1" }
 }`,
 
@@ -230,10 +249,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.sysctl { key = "vm.swappiness", value = "10", persist = false }
 }`,
 
@@ -241,10 +261,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.firewall { port = "22/tcp", action = posix.FirewallAction.allow }
 }`,
 
@@ -252,10 +273,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.firewall { port = "443/tcp", action = posix.FirewallAction.deny }
 }`,
 
@@ -263,10 +285,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.firewall { port = "not-a-port", action = posix.FirewallAction.allow }
 }`,
 
@@ -274,10 +297,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount { src = "10.10.2.2:/data", dest = "/mnt/data", fs_type = posix.MountType.nfs }
 }`,
 
@@ -285,10 +309,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount {
     src = "//server/share"
     dest = "/mnt/share"
@@ -301,10 +326,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount {
     src = "10.10.2.2:/data"
     dest = "/mnt/data"
@@ -317,10 +343,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount { src = "10.10.2.2:/data", dest = "/mnt/data", fs_type = posix.MountType.nfs, state = "bogus" }
 }`,
 
@@ -328,10 +355,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.firewall { port = "22/tcp", action = "bogus" }
 }`,
 
@@ -339,10 +367,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive { src = posix.source_local { path = "/data.tar.gz" }, dest = "/output" }
 }`,
 
@@ -350,10 +379,11 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive { src = posix.source_local { path = "/data.tar.gz" } }
 }`,
 
@@ -361,11 +391,12 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25" }
 }`,
 
@@ -373,11 +404,12 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -396,11 +428,12 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", state = container.State.absent }
 }`,
 
@@ -408,11 +441,12 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { image = "nginx:1.25" }
 }`,
 
@@ -420,11 +454,12 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25", state = "bogus" }
 }`,
 
@@ -432,32 +467,36 @@ std.deploy(name = "test", targets = [local]) {
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local"
-std.deploy(name = "test", targets = [local]) {}`,
+let host = local.target { name = "local"
+std.deploy(name = "test", targets = [host]) {}`,
 
 		// syntax error: unclosed bracket
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
-std.deploy(name = "test", targets = [local]) { posix.dir { path = [} }`,
+let host = local.target { name = "local" }
+std.deploy(name = "test", targets = [host]) { posix.dir { path = [} }`,
 
 		// type error: wrong argument type for targets
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 std.deploy(name = "test", targets = "local") {}`,
 
 		// unknown function call
 		`module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 frobnicate(name = "test")`,
 
 		// garbage

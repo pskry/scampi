@@ -21,21 +21,6 @@ enum MountType { nfs, nfs4, cifs, ext4, xfs, btrfs, tmpfs, glusterfs, ceph }
 enum MountState { mounted, unmounted, absent }
 enum FirewallAction { allow, deny, reject }
 
-// Targets
-// -----------------------------------------------------------------------------
-
-decl ssh(
-  name:     string,
-  host:     string,
-  user:     string,
-  port:     int = 22,
-  key:      string?,
-  insecure: bool?,
-  timeout:  string = "5s",
-) std.Target
-
-decl local(name: string) std.Target
-
 // Source composables
 // -----------------------------------------------------------------------------
 

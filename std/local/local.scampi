@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+module local
+
+import "std"
+
+decl target(name: string) std.Target

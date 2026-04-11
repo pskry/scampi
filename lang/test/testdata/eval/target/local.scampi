@@ -1,5 +1,6 @@
 module main
 
 import "std/posix"
+import "std/local"
 
-let dev = posix.local { name = "dev" }
+let dev = local.target { name = "dev" }

@@ -23,10 +23,11 @@ func TestVerify_CopyPassesAndWrites(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_inline { content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n" }
     dest = "/sudoers-hal9000"
@@ -85,10 +86,11 @@ func TestVerify_CopyFailsAndLeavesDestUntouched(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_inline { content = "INVALID SUDOERS\n" }
     dest = "/sudoers-bad"
@@ -138,10 +140,11 @@ func TestVerify_CopyMissingPlaceholder(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_inline { content = "test\n" }
     dest = "/dest.txt"
@@ -181,10 +184,11 @@ func TestVerify_CopyWithoutVerifyUnchanged(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_inline { content = "plain content\n" }
     dest = "/dest.txt"
@@ -226,10 +230,11 @@ func TestVerify_TemplatePassesAndWrites(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     src = posix.source_inline { content = "server_name {{ .host }};" }
     dest = "/app.conf"
@@ -281,10 +286,11 @@ func TestVerify_TemplateFailsAndLeavesDestUntouched(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     src = posix.source_inline { content = "bad config {{ .x }}" }
     dest = "/bad.conf"
@@ -335,10 +341,11 @@ func TestVerify_TemplateMissingPlaceholder(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     src = posix.source_inline { content = "test" }
     dest = "/dest.txt"
@@ -381,10 +388,11 @@ func TestVerify_CopyIdempotentSkipsVerify(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_inline { content = "already there\n" }
     dest = "/existing.txt"
@@ -430,10 +438,11 @@ func TestVerify_TempFileCleanedUpOnFailure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_inline { content = "test content\n" }
     dest = "/verified.txt"

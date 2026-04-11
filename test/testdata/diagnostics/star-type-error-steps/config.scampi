@@ -2,8 +2,9 @@ module main
 
 import "std"
 import "std/posix"
+import "std/local"
 
-let host = posix.local { name = "host" }
+let host = local.target { name = "host" }
 
 std.deploy(name = "main", targets = [host]) {
   42

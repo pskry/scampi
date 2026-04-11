@@ -592,7 +592,7 @@ funcs) that produce typed records (constructed like type literals).
   (`Target`, `SecretsConfig`, or `Step`)
 - `deploy` is a `func` returning `block[Deploy]`, not a `decl`
 - A decl invocation's expression has the decl's output type: e.g.
-  `let v = posix.ssh { ... }` gives `v` the type `Target`
+  `let v = ssh.target { ... }` gives `v` the type `Target`
 
 ### 4.4 Top-level scope and the engine
 
@@ -614,21 +614,23 @@ expression (e.g. `posix.pkg { ... }`) and suggests wrapping it in a
 An engine-level error is raised post-evaluation when the program
 produces no `Deploy` values.
 
-### 4.5 Targets (from `std/posix`, `std/rest`)
+### 4.5 Targets (from `std/ssh`, `std/local`, `std/rest`)
 
-Targets are `let`-bound decl invocations that produce `Target` values:
+Targets are `let`-bound decl invocations that produce `Target` values.
+Each target lives in its own module as `decl target(...)`:
 
 ```
-import "std/posix"
+import "std/ssh"
+import "std/local"
 import "std/rest"
 
-let vps = posix.ssh {
+let vps = ssh.target {
     name = "vps"
     host = std.secret("vps.host")
     user = "hal9000"
 }
 
-let dev = posix.local { name = "dev" }
+let dev = local.target { name = "dev" }
 
 let api = rest.target {
     name     = "api"
@@ -1360,7 +1362,7 @@ matching Go).
 
 ```
 import "std"
-import "std/posix"
+import "std/ssh"
 
 std.secrets {
     backend = std.SecretsBackend.age
@@ -1369,13 +1371,13 @@ std.secrets {
 
 let vps_host = std.secret("vps.host")
 
-let vps = posix.ssh {
+let vps = ssh.target {
     name = "vps"
     host = vps_host
     user = "hal9000"
 }
 
-let vps_root = posix.ssh {
+let vps_root = ssh.target {
     name = "vps-root"
     host = vps_host
     user = "root"

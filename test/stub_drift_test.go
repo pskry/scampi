@@ -92,18 +92,15 @@ func TestStubsMatchGoConfigs(t *testing.T) {
 //
 //   - dotted kind (`container.instance`, `rest.request`) → look up
 //     leaf decl ("instance"/"request") in the matching module file
-//   - undotted kind (`copy`, `pkg`, `ssh`, `local`) → search every
-//     module for a leaf decl with that name; first hit wins. This is
-//     how posix targets resolve: `decl ssh(...)` and `decl local(...)`
-//     live in `posix.scampi` because the module hosts multiple targets
-//     and they need distinct leaf identities.
-//   - undotted target kind matching a module name (`rest`) → look for
-//     `decl target` inside that module. The single-target module
-//     pattern: when a module hosts exactly one target, calling it
-//     `decl target(...)` makes the user-side syntax `rest.target { ... }`
-//     read cleaner than `rest.rest { ... }` would. Both naming
-//     conventions are legitimate; the linker juggles both via the
-//     three-tier lookup in linker.linkTarget.
+//   - undotted step kind (`copy`, `pkg`) → search every module for a
+//     leaf decl with that name; first hit wins
+//   - undotted target kind matching a module name (`ssh`, `local`,
+//     `rest`) → look for `decl target` inside that module. Every
+//     target stub follows this convention: a module per target,
+//     `decl target(...)` as the single declaration. User-side reads
+//     `ssh.target { ... }`, `local.target { ... }`, `rest.target { ... }`.
+//     The linker resolves these via the module-prefix path in
+//     linker.linkTarget.
 func lookupStubDecl(decls map[string]map[string]map[string]bool, kind string, isStep bool) (map[string]bool, bool) {
 	if i := strings.IndexByte(kind, '.'); i >= 0 {
 		mod, leaf := kind[:i], kind[i+1:]

@@ -2,10 +2,11 @@ module main
 
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.run {
     desc = "ip forwarding already enabled"
     check = "check-ip-forward"

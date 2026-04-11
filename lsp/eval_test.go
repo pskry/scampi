@@ -48,8 +48,9 @@ func TestEvaluateTypeError(t *testing.T) {
 
 import "std"
 import "std/posix"
+import "std/local"
 
-let t = posix.local { name = "test" }
+let t = local.target { name = "test" }
 std.deploy(name = "d", targets = [t]) {
   posix.service { name = 42 }
 }

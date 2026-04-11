@@ -4,10 +4,11 @@ module main
 
 import "std"
 import "std/posix"
+import "std/ssh"
 
 std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
 
-let vps = posix.ssh {
+let vps = ssh.target {
   name = "vps"
   host = "203.0.113.10"
   user = "hal9000"

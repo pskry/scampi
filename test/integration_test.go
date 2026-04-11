@@ -56,10 +56,11 @@ func TestIntegration_FullFlow(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "copy-test"
     src = posix.source_local { path = "/src.txt" }
@@ -124,10 +125,11 @@ func TestIntegration_Idempotency(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "idempotent-copy"
     src = posix.source_local { path = "/src.txt" }
@@ -199,10 +201,11 @@ func TestIntegration_MultipleSteps(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "copy-1"
     src = posix.source_local { path = "/src-a.txt" }
@@ -277,10 +280,11 @@ func TestIntegration_ErrorInjection_WriteFailure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "will-fail"
     src = posix.source_local { path = "/src.txt" }
@@ -330,10 +334,11 @@ func TestIntegration_ErrorInjection_SourceReadFailure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "source-fail"
     src = posix.source_local { path = "/missing.txt" }
@@ -391,10 +396,11 @@ func TestIntegration_PartialFailure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "first-fails"
     src = posix.source_local { path = "/src-a.txt" }
@@ -464,10 +470,11 @@ func TestIntegration_ContentChange(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "update-content"
     src = posix.source_local { path = "/src.txt" }
@@ -535,10 +542,11 @@ func TestIntegration_ModeChange(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "update-mode"
     src = posix.source_local { path = "/src.txt" }
@@ -588,10 +596,11 @@ func TestIntegration_OwnerChange(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "update-owner"
     src = posix.source_local { path = "/src.txt" }
@@ -640,10 +649,11 @@ func TestIntegration_FaultyClearAndRetry(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "retry-test"
     src = posix.source_local { path = "/src.txt" }
@@ -711,10 +721,11 @@ func TestHook_Triggered(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let restart_nginx = posix.service {
     name = "nginx"
     state = posix.ServiceState.restarted
@@ -763,10 +774,11 @@ func TestHook_OnChangeSingleString(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let restart_nginx = posix.service {
     name = "nginx"
     state = posix.ServiceState.restarted
@@ -815,10 +827,11 @@ func TestHook_NotTriggered(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let restart_nginx = posix.service {
     name = "nginx"
     state = posix.ServiceState.restarted
@@ -872,10 +885,11 @@ func TestHook_MultipleNotifiers(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let restart_nginx = posix.service {
     name = "nginx"
     state = posix.ServiceState.restarted
@@ -934,10 +948,11 @@ func TestHook_Chaining(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let restart_proxy = posix.service {
     name = "proxy"
     state = posix.ServiceState.restarted
@@ -997,10 +1012,11 @@ func TestHook_CheckMode(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let restart_nginx = posix.service {
     name = "nginx"
     state = posix.ServiceState.restarted
@@ -1064,10 +1080,11 @@ func TestHook_UnknownRef(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     desc = "config-file"
     src = posix.source_local { path = "/src.txt" }
@@ -1101,10 +1118,11 @@ func TestHook_CycleDetection(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let hook_b = posix.service {
     name = "svc-b"
     state = posix.ServiceState.restarted
@@ -1154,10 +1172,11 @@ func TestHook_RunStepAsHook(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let run_reload = posix.run {
     apply = "nginx -s reload"
     always = true
@@ -1216,10 +1235,11 @@ func TestHook_MultiStep(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let deploy_app = [
     posix.copy {
       desc = "app-conf"
@@ -1283,10 +1303,11 @@ func TestHook_MultiStepChaining(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   let reload_proxy = posix.service {
     name = "proxy"
     state = posix.ServiceState.restarted
@@ -1357,10 +1378,11 @@ func TestIntegration_ReloadFallbackToRestart(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.service {
     desc = "reload-or-restart nginx"
     name = "nginx"

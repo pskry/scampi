@@ -93,7 +93,7 @@ func (v *MapVal) Set(key string, val Value) {
 // interpret it without reparsing stubs.
 type StructVal struct {
 	TypeName string // leaf decl name ("copy", "ssh", "secrets")
-	QualName string // qualified name ("posix.copy", "posix.ssh")
+	QualName string // qualified name ("posix.copy", "ssh.target")
 	RetType  string // return type from stubs ("Step", "Target", etc.)
 	Fields   map[string]Value
 }

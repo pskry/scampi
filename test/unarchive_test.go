@@ -97,10 +97,11 @@ func TestUnarchive_ExtractsAndWritesMarker(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "/var/www/site"
@@ -154,10 +155,11 @@ func TestUnarchive_IdempotentWhenMarkerMatches(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "/var/www/site"
@@ -209,10 +211,11 @@ func TestUnarchive_UnsupportedFormat(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/archive.rar" }
     dest = "/output"
@@ -253,10 +256,11 @@ func TestUnarchive_MissingSourceArchive(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/missing.tar.gz" }
     dest = "/output"
@@ -297,10 +301,11 @@ func TestUnarchive_PartialOwnership(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "/var/www/site"
@@ -342,10 +347,11 @@ func TestUnarchive_RelativeDest(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "relative/path"
@@ -389,10 +395,11 @@ func TestUnarchive_WithOwnerGroupPerm(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "/var/www/site"
@@ -444,10 +451,11 @@ func TestUnarchive_ExtractionFailure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "/var/www/site"
@@ -505,12 +513,13 @@ func TestUnarchive_OnChangeTriggersHook(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
 let restart_app = posix.service { name = "app", state = posix.ServiceState.restarted }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "/var/www/site"
@@ -558,10 +567,11 @@ func TestUnarchive_GoNativeFallback(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/data.tar.gz" }
     dest = "/output"
@@ -624,10 +634,11 @@ func TestUnarchive_TempFileCleanedUpOnFailure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/site.tar.gz" }
     dest = "/output"
@@ -683,10 +694,11 @@ func TestUnarchive_DefaultDepthIsTopLevelOnly(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/data.tar.gz" }
     dest = "/output"
@@ -855,10 +867,11 @@ func TestUnarchive_TarXz(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/data.tar.xz" }
     dest = "/output"
@@ -908,10 +921,11 @@ func TestUnarchive_TarZst(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.unarchive {
     src = posix.source_local { path = "/data.tar.zst" }
     dest = "/output"

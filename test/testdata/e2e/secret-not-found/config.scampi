@@ -2,12 +2,13 @@ module main
 
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
 std.secrets { backend = std.SecretsBackend.file, path = "/secrets.json" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.template {
     desc = "missing secret"
     content = "token={{.token}}"

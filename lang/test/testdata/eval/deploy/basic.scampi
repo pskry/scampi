@@ -2,10 +2,11 @@ module main
 
 import "std"
 import "std/posix"
+import "std/ssh"
 
 std.secrets { backend = std.SecretsBackend.file, path = "secrets.json" }
 
-let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
+let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
 
 std.deploy(name = "web", targets = [vps]) {
   posix.pkg { packages = ["nginx", "certbot"], source = posix.pkg_system {} }

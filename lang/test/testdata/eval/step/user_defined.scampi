@@ -2,6 +2,7 @@ module main
 
 import "std"
 import "std/posix"
+import "std/ssh"
 
 type TeamMember {
   name: string
@@ -13,7 +14,7 @@ decl create_user(member: TeamMember) std.Step {
   posix.dir { path = "/home/${self.member.name}/.ssh" }
 }
 
-let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
+let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
 
 let team = [
   TeamMember { name = "alice", groups = ["wheel", "dev"] },

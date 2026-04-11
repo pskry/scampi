@@ -18,11 +18,12 @@ func TestContainer_CreateAndRun(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25" }
 }
 `
@@ -62,11 +63,12 @@ func TestContainer_Idempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25" }
 }
 `
@@ -105,11 +107,12 @@ func TestContainer_ImageDrift_Recreates(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.26" }
 }
 `
@@ -147,11 +150,12 @@ func TestContainer_WithLabels(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -192,11 +196,12 @@ func TestContainer_LabelsIdempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -237,11 +242,12 @@ func TestContainer_LabelDrift_Recreates(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -284,11 +290,12 @@ func TestContainer_PortWithIPAndProto(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -346,11 +353,12 @@ func TestContainer_WithArgs(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -388,11 +396,12 @@ func TestContainer_ArgsIdempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -433,11 +442,12 @@ func TestContainer_ArgsDrift_Recreates(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -480,11 +490,12 @@ func TestContainer_NoArgsDeclared_ImageDefaultIgnored(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25" }
 }
 `
@@ -521,11 +532,12 @@ func TestContainer_WithHealthcheck(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -586,11 +598,12 @@ func TestContainer_HealthcheckDefaults(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -635,11 +648,12 @@ func TestContainer_HealthcheckDrift_Recreates(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -685,11 +699,12 @@ func TestContainer_NoHealthcheckDeclared_ImageDefaultIgnored(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25" }
 }
 `
@@ -732,11 +747,12 @@ func TestContainer_Stopped(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25", state = container.State.stopped }
 }
 `
@@ -771,11 +787,12 @@ func TestContainer_Absent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", state = container.State.absent }
 }
 `
@@ -809,11 +826,12 @@ func TestContainer_Absent_AlreadyGone(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", state = container.State.absent }
 }
 `
@@ -845,11 +863,12 @@ func TestContainer_WithEnv(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -890,11 +909,12 @@ func TestContainer_EnvIdempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -935,11 +955,12 @@ func TestContainer_EnvDrift_Recreates(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -982,11 +1003,12 @@ func TestContainer_WithMounts(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -1026,11 +1048,12 @@ func TestContainer_MountIdempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -1071,11 +1094,12 @@ func TestContainer_MountDrift_Recreates(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -1120,11 +1144,12 @@ func TestContainer_MountSourceMissing_Aborts(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "app"
     image = "nginx:1.25"
@@ -1155,11 +1180,12 @@ func TestContainer_MountSourcePromised_Deferred(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.dir { path = "/opt/data" }
   container.instance {
     name = "app"
@@ -1198,11 +1224,12 @@ func TestContainer_PortDrift_Recreates(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "app", image = "nginx:1.25", ports = ["9090:80"] }
 }
 `

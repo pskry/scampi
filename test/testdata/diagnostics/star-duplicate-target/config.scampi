@@ -2,6 +2,7 @@ module main
 
 import "std"
 import "std/posix"
+import "std/local"
 
-let dup = posix.local { name = "dup" }
-let dup = posix.local { name = "dup" }
+let dup = local.target { name = "dup" }
+let dup = local.target { name = "dup" }

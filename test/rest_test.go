@@ -30,6 +30,7 @@ func TestRESTTarget_ConfigLoads(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target { name = "api", base_url = "http://localhost:8080/api" }
@@ -71,6 +72,7 @@ func TestRESTTarget_ConfigWithBasicAuth(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target {
@@ -100,6 +102,7 @@ func TestRESTTarget_ConfigWithBearerAuth(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target {
@@ -136,6 +139,7 @@ func TestRESTTarget_ConfigWithHeaderAuth(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target {
@@ -165,6 +169,7 @@ func TestRESTTarget_ConfigWithTLSInsecure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target { name = "api", base_url = "https://localhost/api", tls = rest.tls_insecure {} }
@@ -186,6 +191,7 @@ func TestRESTTarget_ConfigWithTLSSecure(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target { name = "api", base_url = "https://localhost/api", tls = rest.tls_secure {} }
@@ -207,6 +213,7 @@ func TestRESTTarget_ConfigInvalidAuth(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target { name = "api", base_url = "http://localhost/api", auth = "not-an-auth" }
@@ -234,6 +241,7 @@ func TestRESTTarget_ConfigEmptyName(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/rest"
 
 let api = rest.target { name = "", base_url = "http://localhost/api" }
@@ -263,10 +271,11 @@ func TestRESTTarget_RejectsPOSIXSteps(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.copy {
     src = posix.source_local { path = "/a" }
     dest = "/b"

@@ -176,7 +176,8 @@ func TestEvalTarget(t *testing.T) {
 module main
 import "std"
 import "std/posix"
-let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
+import "std/ssh"
+let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
 `
 	r := evalSrc(t, src)
 	targets := findByRetType(r, "Target")
@@ -184,8 +185,8 @@ let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
 		t.Fatalf("expected 1 Target, got %d", len(targets))
 	}
 	sv := targets[0]
-	if sv.TypeName != "ssh" {
-		t.Errorf("target type: got %q, want %q", sv.TypeName, "ssh")
+	if sv.QualName != "ssh.target" {
+		t.Errorf("target type: got %q, want %q", sv.QualName, "ssh.target")
 	}
 	if n, ok := sv.Fields["name"].(*StringVal); !ok || n.V != "vps" {
 		t.Errorf("target name: got %v", sv.Fields["name"])

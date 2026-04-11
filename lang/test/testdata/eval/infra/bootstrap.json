@@ -4,7 +4,7 @@
     "path": "secrets.age.json"
   },
   "targets": [
-    {"name": "vps-root", "kind": "ssh"}
+    {"name": "vps-root", "kind": "ssh.target"}
   ],
   "deploys": [
     {"name": "bootstrap", "steps": 6}

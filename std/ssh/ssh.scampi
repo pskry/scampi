@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+module ssh
+
+import "std"
+
+decl target(
+  name:     string,
+  host:     string,
+  user:     string,
+  port:     int = 22,
+  key:      string?,
+  insecure: bool?,
+  timeout:  string = "5s",
+) std.Target

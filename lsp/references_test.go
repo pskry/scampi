@@ -120,8 +120,9 @@ func TestReferencesStdlibFromConfig(t *testing.T) {
 
 import "std"
 import "std/posix"
+import "std/local"
 
-let t = posix.local { name = "local" }
+let t = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [t]) {
   posix.pkg {

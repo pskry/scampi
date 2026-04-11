@@ -1,5 +1,5 @@
 {
   "targets": [
-    {"name": "dev", "kind": "local"}
+    {"name": "dev", "kind": "local.target"}
   ]
 }

@@ -82,7 +82,7 @@ func TestHoverOnUnknown(t *testing.T) {
 func TestHoverOnDottedFunc(t *testing.T) {
 	s := testServer()
 	docURI := protocol.DocumentURI("file:///test.scampi")
-	s.docs.Open(docURI, "posix.ssh", 1)
+	s.docs.Open(docURI, "ssh.target", 1)
 
 	result, err := s.Hover(context.Background(), &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
@@ -94,10 +94,10 @@ func TestHoverOnDottedFunc(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result == nil {
-		t.Fatal("expected hover for posix.ssh")
+		t.Fatal("expected hover for ssh.target")
 	}
-	if !strings.Contains(result.Contents.Value, "posix.ssh") {
-		t.Errorf("hover should mention 'posix.ssh', got %q", result.Contents.Value)
+	if !strings.Contains(result.Contents.Value, "ssh.target") {
+		t.Errorf("hover should mention 'ssh.target', got %q", result.Contents.Value)
 	}
 }
 

@@ -1,5 +1,5 @@
 {
   "targets": [
-    {"name": "vps", "kind": "ssh"}
+    {"name": "vps", "kind": "ssh.target"}
   ]
 }

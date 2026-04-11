@@ -87,11 +87,12 @@ func TestContainerLifecycle_CreateAndRun(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "%s", image = "traefik/whoami" }
 }
 `, name)
@@ -122,11 +123,12 @@ func TestContainerLifecycle_Idempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "%s", image = "traefik/whoami" }
 }
 `, name)
@@ -157,11 +159,12 @@ func TestContainerLifecycle_WithEnv(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -197,11 +200,12 @@ func TestContainerLifecycle_EnvDrift(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -216,11 +220,12 @@ std.deploy(name = "test", targets = [local]) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -251,11 +256,12 @@ func TestContainerLifecycle_Ports(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -291,11 +297,12 @@ func TestContainerLifecycle_PortIPAndProto(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -348,11 +355,12 @@ func TestContainerLifecycle_Labels(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -387,11 +395,12 @@ func TestContainerLifecycle_Args(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -431,11 +440,12 @@ func TestContainerLifecycle_Mounts(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "traefik/whoami"
@@ -474,11 +484,12 @@ func TestContainerLifecycle_Healthcheck(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance {
     name = "%s"
     image = "nginx:alpine"
@@ -525,11 +536,12 @@ func TestContainerLifecycle_Stopped(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "%s", image = "traefik/whoami" }
 }
 `, name)
@@ -540,11 +552,12 @@ std.deploy(name = "test", targets = [local]) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "%s", image = "traefik/whoami", state = container.State.stopped }
 }
 `, name)
@@ -569,11 +582,12 @@ func TestContainerLifecycle_Absent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "%s", image = "traefik/whoami" }
 }
 `, name)
@@ -584,11 +598,12 @@ std.deploy(name = "test", targets = [local]) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 import "std/container"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   container.instance { name = "%s", state = container.State.absent }
 }
 `, name)

@@ -43,10 +43,11 @@ func TestMount_CreateAndMount(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount { src = "10.10.2.2:/data", dest = "/mnt/data", fs_type = posix.MountType.nfs }
 }
 `
@@ -84,10 +85,11 @@ func TestMount_Idempotent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount { src = "10.10.2.2:/data", dest = "/mnt/data", fs_type = posix.MountType.nfs }
 }
 `
@@ -117,10 +119,11 @@ func TestMount_DriftRemount(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount { src = "10.10.2.2:/data", dest = "/mnt/data", fs_type = posix.MountType.nfs }
 }
 `
@@ -154,10 +157,11 @@ func TestMount_Absent(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount {
     src = "10.10.2.2:/data"
     dest = "/mnt/data"
@@ -200,10 +204,11 @@ func TestMount_Unmounted(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount {
     src = "10.10.2.2:/data"
     dest = "/mnt/data"
@@ -246,10 +251,11 @@ func TestMount_OptsChange(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount {
     src = "10.10.2.2:/data"
     dest = "/mnt/data"
@@ -289,10 +295,11 @@ func TestMount_AbsentAlreadyGone(t *testing.T) {
 module main
 import "std"
 import "std/posix"
+import "std/local"
 
-let local = posix.local { name = "local" }
+let host = local.target { name = "local" }
 
-std.deploy(name = "test", targets = [local]) {
+std.deploy(name = "test", targets = [host]) {
   posix.mount {
     src = "10.10.2.2:/data"
     dest = "/mnt/data"

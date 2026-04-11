@@ -2,8 +2,9 @@ module main
 
 import "std"
 import "std/posix"
+import "std/local"
 
-let host = posix.local { name = "host" }
+let host = local.target { name = "host" }
 
 std.deploy(name = "main", targets = [host]) {
   posix.copy { src = "./file.txt", dest = "/tmp/out", perm = "0644", owner = "root", group = "root" }

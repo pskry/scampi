@@ -1,8 +1,9 @@
 module main
 
 import "std/posix"
+import "std/ssh"
 
-let vps = posix.ssh {
+let vps = ssh.target {
   name = "vps"
   host = "10.0.0.1"
   user = "root"

@@ -2,8 +2,9 @@ module main
 
 import "std"
 import "std/posix"
+import "std/ssh"
 
-let vps = posix.ssh { name = "vps", host = "10.0.0.1", user = "root" }
+let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
 
 type Config {
   enable_firewall: bool
