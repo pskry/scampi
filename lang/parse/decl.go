@@ -62,18 +62,36 @@ func (p *Parser) parseImport() *ast.ImportDecl {
 
 // parseDecl dispatches on the current token to the right decl parser.
 // The caller has already verified isDeclStart(p.cur.Kind).
+//
+// Each branch funnels a concrete pointer type into the ast.Decl
+// return value. A typed-nil escape would let parse errors slip into
+// f.Decls as nil-pointer values that crash the checker, so each
+// branch is checked explicitly and converted to a true nil
+// interface on parse failure.
 func (p *Parser) parseDecl() ast.Decl {
 	switch p.cur.Kind {
 	case token.Type:
 		return p.parseTypeDecl()
 	case token.Enum:
-		return p.parseEnumDecl()
+		if d := p.parseEnumDecl(); d != nil {
+			return d
+		}
+		return nil
 	case token.Func:
-		return p.parseFuncDecl()
+		if d := p.parseFuncDecl(); d != nil {
+			return d
+		}
+		return nil
 	case token.Decl:
-		return p.parseDeclDecl()
+		if d := p.parseDeclDecl(); d != nil {
+			return d
+		}
+		return nil
 	case token.Let:
-		return p.parseLetDecl()
+		if d := p.parseLetDecl(); d != nil {
+			return d
+		}
+		return nil
 	}
 	// Should not reach here given isDeclStart check.
 	p.errAt(
@@ -124,6 +142,13 @@ func (p *Parser) parseTypeDecl() ast.Decl {
 
 	if p.cur.Kind == token.Semi {
 		p.advance()
+	}
+
+	// An empty body `{}` must round-trip as a non-nil zero-length
+	// slice — Fields == nil is the checker's signal for an opaque
+	// type (no body at all), which is a different concept.
+	if fields == nil {
+		fields = []*ast.Field{}
 	}
 
 	return &ast.TypeDecl{
