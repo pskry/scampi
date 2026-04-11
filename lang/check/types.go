@@ -109,6 +109,12 @@ type ResolvedAttribute struct {
 	// supported in attribute references — the type checker rejects
 	// them at lang time.
 	Args map[string]any
+
+	// Type points at the AttrType this annotation resolves to.
+	// Carrying it here lets downstream consumers (linker behaviours,
+	// LSP hover) read the schema and doc directly without a second
+	// scope lookup. May be nil if resolution failed at check time.
+	Type *AttrType
 }
 
 // EnumType is a user-defined enum.

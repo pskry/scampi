@@ -3,8 +3,6 @@
 package linker
 
 import (
-	"strings"
-
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/check"
@@ -149,7 +147,7 @@ func (v *attributeCheckVisitor) checkStructLit(sl *ast.StructLit, dt *check.Decl
 				Linker:    v.ctx,
 				AttrName:  attr.QualifiedName,
 				AttrArgs:  attr.Args,
-				AttrDoc:   v.attrDocFor(attr.QualifiedName),
+				AttrDoc:   attrDoc(attr),
 				ParamName: p.Name,
 				ParamArg:  argExpr,
 				UseSpan:   useSpan,
@@ -158,32 +156,13 @@ func (v *attributeCheckVisitor) checkStructLit(sl *ast.StructLit, dt *check.Decl
 	}
 }
 
-// attrDocFor returns the doc-comment block of the attribute type
-// declared at the given qualified name (e.g. `std.@secretkey`).
-// Looks up the AttrType in the modules map; returns "" when the
-// declaring module isn't loaded or when the type carries no doc.
-func (v *attributeCheckVisitor) attrDocFor(qualifiedName string) string {
-	// Qualified name shape: `<module>.@<name>`. Split into module
-	// and bare name. Anything that doesn't match the shape returns "".
-	atIdx := strings.IndexByte(qualifiedName, '@')
-	if atIdx <= 0 || qualifiedName[atIdx-1] != '.' {
+// attrDoc returns the doc-comment block of an attribute's resolved
+// type, or empty if resolution failed at check time.
+func attrDoc(attr check.ResolvedAttribute) string {
+	if attr.Type == nil {
 		return ""
 	}
-	modName := qualifiedName[:atIdx-1]
-	bare := qualifiedName[atIdx+1:]
-	mod, ok := v.modules[modName]
-	if !ok {
-		return ""
-	}
-	sym := mod.Lookup("@" + bare)
-	if sym == nil || sym.Kind != check.SymAttrType {
-		return ""
-	}
-	at, ok := sym.Type.(*check.AttrType)
-	if !ok {
-		return ""
-	}
-	return at.Doc
+	return attr.Type.Doc
 }
 
 // resolveCallTarget walks the call's function expression and tries to
@@ -254,7 +233,7 @@ func (v *attributeCheckVisitor) checkCall(call *ast.CallExpr, ft *check.FuncType
 				Linker:    v.ctx,
 				AttrName:  attr.QualifiedName,
 				AttrArgs:  attr.Args,
-				AttrDoc:   v.attrDocFor(attr.QualifiedName),
+				AttrDoc:   attrDoc(attr),
 				ParamName: p.Name,
 				ParamArg:  argExpr,
 				UseSpan:   useSpan,

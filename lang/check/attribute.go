@@ -19,10 +19,13 @@ func (c *Checker) checkFieldAttributes(f *ast.Field) {
 
 // resolveFieldAttributes returns the resolved attribute annotations
 // on a field, in declaration order. Each entry carries the fully
-// qualified attribute type name and a map of bound argument values
-// resolved from literal expressions. Non-literal expressions are
-// stored as nil in the map; behaviours that need a literal value
-// should defer to runtime checks when they encounter nil.
+// qualified attribute type name, the bound argument values resolved
+// from literal expressions, and a pointer to the AttrType schema
+// itself. Downstream consumers (linker behaviours, LSP hover) can
+// read .Type.Doc and .Type.Fields directly without re-walking the
+// module scope. Non-literal expressions resolve to nil in Args;
+// behaviours that need a literal value should defer to runtime
+// checks when they encounter nil.
 func (c *Checker) resolveFieldAttributes(f *ast.Field) []ResolvedAttribute {
 	if len(f.Attributes) == 0 {
 		return nil
@@ -36,6 +39,7 @@ func (c *Checker) resolveFieldAttributes(f *ast.Field) []ResolvedAttribute {
 		ra := ResolvedAttribute{
 			QualifiedName: qn,
 			Args:          c.resolveAttributeArgs(a),
+			Type:          c.lookupAttrTypeForArgs(a.Name),
 		}
 		out = append(out, ra)
 	}
