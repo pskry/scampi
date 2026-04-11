@@ -198,8 +198,9 @@ func (c *Checker) checkCall(call *ast.CallExpr) Type {
 	// CallExpr — no AST rewrite, so source spans and diagnostics
 	// from `x.f(...)` keep their original shape. Downstream
 	// consumers (eval) read the flag and dispatch accordingly.
-	if ft := c.detectUFCS(call); ft != nil {
+	if ft, mod := c.detectUFCS(call); ft != nil {
 		call.UFCS = true
+		call.UFCSModule = mod
 		c.typeCheckCallArgs(call, ft, true)
 		return ft.Ret
 	}
@@ -217,34 +218,51 @@ func (c *Checker) checkCall(call *ast.CallExpr) Type {
 	return ft.Ret
 }
 
+// ufcsCandidate is one possible UFCS resolution discovered while
+// walking the local scope and imported modules. The checker collects
+// all matches; multiple matches mean ambiguity.
+type ufcsCandidate struct {
+	module string // empty for local-scope match
+	ft     *FuncType
+}
+
 // detectUFCS reports whether `call` is a UFCS site (`x.f(args)`
-// where x is a value, not a module, and f is a free function in
-// scope whose first parameter accepts x's type). Returns the
-// resolved function type so the caller can validate args, or nil
-// when this isn't a UFCS site — caller falls through to the
-// standard typeOf path.
+// where x is a value, not a module, and f is a free function whose
+// first parameter accepts x's type). Returns the resolved function
+// type and the module name (empty for local-scope matches), or
+// (nil, "") when this isn't a UFCS site — caller falls through to
+// the standard typeOf path.
+//
+// Resolution walks two layers in priority order:
+//
+//  1. Local scope — top-level decls in the current file. A local
+//     match wins outright; imports are not consulted.
+//  2. Imported modules — every module the current file `import`s
+//     gets checked. If multiple imports have a matching function
+//     for the same receiver type, an ambiguity error is emitted at
+//     the call site and the function is treated as unresolved.
 //
 // Module access (`posix.copy(...)`) and struct-field-call
 // (`obj.method(...)` where method is a function-typed field) are
 // not UFCS — both are handled by the existing
 // typeOf/resolveSelector path and this function leaves them alone
 // so the field/member resolution wins by design.
-func (c *Checker) detectUFCS(call *ast.CallExpr) *FuncType {
+func (c *Checker) detectUFCS(call *ast.CallExpr) (*FuncType, string) {
 	sel, ok := call.Fn.(*ast.SelectorExpr)
 	if !ok {
-		return nil
+		return nil, ""
 	}
 	// Skip module-namespace access — `posix.copy(...)` is not UFCS.
 	if id, ok := sel.X.(*ast.Ident); ok {
 		if sym := c.scope.Lookup(id.Name); sym != nil && sym.Kind == SymImport {
-			return nil
+			return nil, ""
 		}
 	}
 	// Type the receiver. If it can't be typed, leave the call
 	// alone — typeOf will emit the right error in the main path.
 	xType := c.typeOf(sel.X)
 	if xType == nil {
-		return nil
+		return nil, ""
 	}
 	// Skip when the receiver's struct type already has a field
 	// matching `sel.Sel.Name` — that's a struct-field call, not
@@ -252,24 +270,86 @@ func (c *Checker) detectUFCS(call *ast.CallExpr) *FuncType {
 	if st, ok := xType.(*StructType); ok {
 		for _, f := range st.Fields {
 			if f.Name == sel.Sel.Name {
-				return nil
+				return nil, ""
 			}
 		}
 	}
-	// UFCS lookup: free function in scope, first param accepts
-	// receiver type.
-	sym := c.scope.Lookup(sel.Sel.Name)
-	if sym == nil {
-		return nil
+
+	name := sel.Sel.Name
+
+	// Tier 1: local scope (current file's top-level decls).
+	if sym := c.scope.Lookup(name); sym != nil {
+		if ft, ok := sym.Type.(*FuncType); ok &&
+			len(ft.Params) > 0 &&
+			IsAssignableTo(xType, ft.Params[0].Type) {
+			return ft, ""
+		}
 	}
-	ft, ok := sym.Type.(*FuncType)
-	if !ok || len(ft.Params) == 0 {
-		return nil
+
+	// Tier 2: imported modules. Walk every module the current file
+	// imports and collect candidates whose first param accepts the
+	// receiver type. More than one match → ambiguity error.
+	var candidates []ufcsCandidate
+	for modName := range c.scope.symbols {
+		sym := c.scope.symbols[modName]
+		if sym.Kind != SymImport {
+			continue
+		}
+		mod, ok := c.modules[modName]
+		if !ok {
+			continue
+		}
+		memberSym := mod.Lookup(name)
+		if memberSym == nil {
+			continue
+		}
+		ft, ok := memberSym.Type.(*FuncType)
+		if !ok || len(ft.Params) == 0 {
+			continue
+		}
+		if !IsAssignableTo(xType, ft.Params[0].Type) {
+			continue
+		}
+		candidates = append(candidates, ufcsCandidate{module: modName, ft: ft})
 	}
-	if !IsAssignableTo(xType, ft.Params[0].Type) {
-		return nil
+	switch len(candidates) {
+	case 0:
+		return nil, ""
+	case 1:
+		return candidates[0].ft, candidates[0].module
+	default:
+		// Build a stable, readable error listing every candidate.
+		names := make([]string, 0, len(candidates))
+		for _, c := range candidates {
+			names = append(names, c.module+"."+name)
+		}
+		c.errAt(
+			call.SrcSpan,
+			"ambiguous UFCS: "+name+" matches "+joinSorted(names)+
+				" — call one of them explicitly to disambiguate",
+		)
+		return nil, ""
 	}
-	return ft
+}
+
+// joinSorted returns the input strings joined with ", " in sorted
+// order so error messages are stable across runs.
+func joinSorted(xs []string) string {
+	out := make([]string, len(xs))
+	copy(out, xs)
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j-1] > out[j]; j-- {
+			out[j-1], out[j] = out[j], out[j-1]
+		}
+	}
+	s := ""
+	for i, n := range out {
+		if i > 0 {
+			s += ", "
+		}
+		s += n
+	}
+	return s
 }
 
 // typeCheckCallArgs validates positional and keyword call arguments

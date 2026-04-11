@@ -1,0 +1,13 @@
+module main
+
+import "std"
+
+// `range(n: int)` lives in std. UFCS dispatches `5.range()` to
+// `std.range(5)` because std is imported and its first param matches
+// the receiver type. (Scampi has no float literals, so `5.` is
+// unambiguous — no parens needed.)
+let zero_to_4 = 5.range()
+
+// Chained: range produces a list, but the next step would also need
+// a list-receiver function in scope, which std doesn't expose. So
+// just test the single-hop case here.

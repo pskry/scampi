@@ -309,28 +309,42 @@ func (s *Server) completeUFCS(
 	recvType := sym.Type
 
 	var items []protocol.CompletionItem
+	seen := make(map[string]bool)
 
-	// File-scope functions (top-level decls in this document).
-	for name, fnSym := range scope.Symbols() {
+	add := func(name string, fnSym *check.Symbol) {
+		if seen[name] {
+			return
+		}
 		if !ufcsAccepts(fnSym, recvType) {
-			continue
+			return
 		}
 		if prefix != "" && !strings.HasPrefix(name, prefix) {
-			continue
+			return
 		}
+		seen[name] = true
 		items = append(items, ufcsItem(name, fnSym))
 	}
 
-	// Functions from imported modules.
-	for _, modScope := range s.modules {
+	// Tier 1: file-scope functions (top-level decls in this
+	// document) — match the checker's local-wins precedence.
+	for name, fnSym := range scope.Symbols() {
+		add(name, fnSym)
+	}
+
+	// Tier 2: functions from explicitly imported modules. Walk
+	// the file scope for SymImport entries and look up matching
+	// functions in each. Mirrors checker.detectUFCS so completion
+	// only offers what the checker can actually resolve.
+	for impName, impSym := range scope.Symbols() {
+		if impSym.Kind != check.SymImport {
+			continue
+		}
+		modScope, ok := s.modules[impName]
+		if !ok {
+			continue
+		}
 		for name, fnSym := range modScope.Symbols() {
-			if !ufcsAccepts(fnSym, recvType) {
-				continue
-			}
-			if prefix != "" && !strings.HasPrefix(name, prefix) {
-				continue
-			}
-			items = append(items, ufcsItem(name, fnSym))
+			add(name, fnSym)
 		}
 	}
 

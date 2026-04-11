@@ -408,11 +408,18 @@ func (*BlockExpr) exprNode()          {}
 // preserved (no rewrite) so source-level tooling and diagnostics can
 // still point at the original syntax; downstream consumers (eval,
 // codegen) check this flag and dispatch accordingly.
+//
+// UFCSModule is non-empty when the resolved UFCS function lives in
+// an imported module rather than the file's top-level scope. The
+// evaluator uses it to look up the function via the module's MapVal
+// instead of a bare env lookup. Empty for local UFCS (function
+// declared in the current file).
 type CallExpr struct {
-	Fn      Expr
-	Args    []*CallArg
-	UFCS    bool
-	SrcSpan token.Span
+	Fn         Expr
+	Args       []*CallArg
+	UFCS       bool
+	UFCSModule string
+	SrcSpan    token.Span
 }
 
 // CallArg is a positional or keyword argument. Name is nil for positional.

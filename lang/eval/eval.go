@@ -611,23 +611,19 @@ func (ev *Evaluator) evalDottedName(dn *ast.DottedName) Value {
 func (ev *Evaluator) evalCall(call *ast.CallExpr) Value {
 	// UFCS dispatch: when the type checker has marked this call
 	// as `x.f(args)` ≡ `f(x, args)`, evaluate the receiver from
-	// `call.Fn.(*ast.SelectorExpr).X`, look up `f` (the trailing
-	// identifier) in env, and prepend the receiver as the first
-	// positional arg. The AST shape stays as a SelectorExpr-Fn
+	// `call.Fn.(*ast.SelectorExpr).X`, look up `f` (either at
+	// top-level env when UFCSModule is empty, or via the imported
+	// module's MapVal when set), and prepend the receiver as the
+	// first positional arg. The AST shape stays as a SelectorExpr
 	// call so source spans and tooling are unaffected.
 	var fv *FuncVal
 	var leadingArgs []Value
 	if call.UFCS {
 		sel := call.Fn.(*ast.SelectorExpr)
 		recv := ev.evalExpr(sel.X)
-		v, ok := ev.env.get(sel.Sel.Name)
-		if !ok {
-			ev.errAt(call.SrcSpan, "ufcs: undefined "+sel.Sel.Name)
-			return &NoneVal{}
-		}
-		fn, ok := v.(*FuncVal)
-		if !ok {
-			ev.errAt(call.SrcSpan, "ufcs: "+sel.Sel.Name+" is not a function")
+		fn, errMsg := ev.lookupUFCSFunc(call.UFCSModule, sel.Sel.Name)
+		if errMsg != "" {
+			ev.errAt(call.SrcSpan, errMsg)
 			return &NoneVal{}
 		}
 		fv = fn
@@ -653,6 +649,43 @@ func (ev *Evaluator) evalCall(call *ast.CallExpr) Value {
 		}
 	}
 	return ev.callFunc(fv, positional, argMap, call.SrcSpan)
+}
+
+// lookupUFCSFunc resolves a UFCS callee. When module is empty, the
+// function name is looked up in the top-level env (the file's
+// declared funcs). When module is set, the lookup goes through the
+// module's MapVal and pulls the function out by name. Returns an
+// error string instead of panicking so the caller can attach the
+// call's source span to the diagnostic.
+func (ev *Evaluator) lookupUFCSFunc(module, name string) (*FuncVal, string) {
+	if module == "" {
+		v, ok := ev.env.get(name)
+		if !ok {
+			return nil, "ufcs: undefined " + name
+		}
+		fv, ok := v.(*FuncVal)
+		if !ok {
+			return nil, "ufcs: " + name + " is not a function"
+		}
+		return fv, ""
+	}
+	modVal, ok := ev.env.get(module)
+	if !ok {
+		return nil, "ufcs: module " + module + " not in scope"
+	}
+	modMap, ok := modVal.(*MapVal)
+	if !ok {
+		return nil, "ufcs: " + module + " is not a module"
+	}
+	member, ok := modMap.Get(name)
+	if !ok {
+		return nil, "ufcs: " + module + "." + name + " not found"
+	}
+	fv, ok := member.(*FuncVal)
+	if !ok {
+		return nil, "ufcs: " + module + "." + name + " is not a function"
+	}
+	return fv, ""
 }
 
 func (ev *Evaluator) evalBlockExpr(e *ast.BlockExpr) Value {

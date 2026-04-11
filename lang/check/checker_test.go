@@ -715,6 +715,110 @@ std.deploy(name = "t", targets = [host]) {
 `)
 }
 
+// TestUFCSImportedModuleFunction — UFCS resolves through an
+// imported module's free functions. `(5).range()` dispatches to
+// `std.range(5)` because `std` is imported and `std.range`'s first
+// parameter accepts an int.
+func TestUFCSImportedModuleFunction(t *testing.T) {
+	expectNoErrors(t, `
+module main
+import "std"
+
+let zero_to_4 = (5).range()
+`)
+}
+
+// TestUFCSImportedModuleNotImported — without `import "std"`, the
+// `range` function isn't reachable and `(5).range()` errors via the
+// standard "no field" path. Confirms imports are gated.
+func TestUFCSImportedModuleNotImported(t *testing.T) {
+	expectError(t, `
+module main
+
+let x = (5).range()
+`, "cannot access .range on int")
+}
+
+// TestUFCSLocalShadowsImported — a local function with the same
+// name as an imported function takes precedence over the import.
+// This mirrors normal lexical-scope shadowing rules.
+func TestUFCSLocalShadowsImported(t *testing.T) {
+	expectNoErrors(t, `
+module main
+import "std"
+
+func range(n: int) int {
+  return n
+}
+
+// Calls the local range, not std.range. The local returns int, so
+// type-checking the binding as int proves the local won.
+let x: int = (5).range()
+`)
+}
+
+// TestUFCSAmbiguousAcrossModules — when two imported modules both
+// expose a function with the same name and a matching first param,
+// the checker emits an ambiguity error listing all candidates.
+//
+// Constructed in-memory because no two stdlib modules currently
+// have a name collision; this exercises the resolution rule
+// directly via synthetic module scopes.
+func TestUFCSAmbiguousAcrossModules(t *testing.T) {
+	// Build two synthetic modules each with a `length(s: string) int`.
+	intRet := IntType
+	mkLengthScope := func() *Scope {
+		s := NewScope(nil, ScopeFile)
+		s.Define(&Symbol{
+			Name: "length",
+			Kind: SymFunc,
+			Type: &FuncType{
+				Params: []*FieldDef{{Name: "s", Type: StringType}},
+				Ret:    intRet,
+			},
+		})
+		return s
+	}
+	modules := map[string]*Scope{
+		"a": mkLengthScope(),
+		"b": mkLengthScope(),
+	}
+
+	src := `module main
+import "a"
+import "b"
+
+let n = "hello".length()
+`
+	l := lex.New("test.scampi", []byte(src))
+	p := parse.New(l)
+	f := p.Parse()
+	if errs := l.Errors(); len(errs) > 0 {
+		t.Fatalf("lex: %v", errs)
+	}
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse: %v", errs)
+	}
+	c := New(modules)
+	c.Check(f)
+	errs := c.Errors()
+	if len(errs) == 0 {
+		t.Fatal("expected ambiguity error, got none")
+	}
+	found := false
+	for _, e := range errs {
+		if contains(e.Msg, "ambiguous UFCS") &&
+			contains(e.Msg, "a.length") &&
+			contains(e.Msg, "b.length") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected ambiguous UFCS error mentioning both candidates, got: %v", errs)
+	}
+}
+
 // TestUFCSStructFieldBeatsUFCS — when a struct has a function-typed
 // field, the field-access path wins over the UFCS fallback. (Scampi
 // doesn't have user-defined function-typed fields today, so this
