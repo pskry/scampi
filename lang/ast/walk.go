@@ -2,6 +2,8 @@
 
 package ast
 
+import "reflect"
+
 // Walk traverses the AST rooted at node in depth-first order. pre is
 // called before visiting a node's children; post is called after. If
 // pre returns false, children and post are skipped for that subtree.
@@ -11,8 +13,15 @@ package ast
 // node type, in what order." Consumers (type checker, LSP, formatter,
 // evaluator) supply the logic via callbacks — they never need to know
 // about traversal order.
+//
+// Walk tolerates typed-nil interface values. AST nodes like
+// `IfStmt.Else *Block` are routinely nil (no else branch), and naively
+// passing them through `Walk(n.Else, ...)` would wrap a nil pointer
+// in a non-nil Node interface — an interface comparison against nil
+// would then return false and a downstream type-switch would panic
+// trying to deref it. The reflect check below catches that.
 func Walk(node Node, pre func(Node) bool, post func(Node)) {
-	if node == nil {
+	if node == nil || isNilPtr(node) {
 		return
 	}
 	if pre != nil && !pre(node) {
@@ -22,6 +31,11 @@ func Walk(node Node, pre func(Node) bool, post func(Node)) {
 	if post != nil {
 		post(node)
 	}
+}
+
+func isNilPtr(node Node) bool {
+	v := reflect.ValueOf(node)
+	return v.Kind() == reflect.Ptr && v.IsNil()
 }
 
 func walkChildren(node Node, pre func(Node) bool, post func(Node)) {
