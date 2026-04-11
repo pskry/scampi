@@ -165,7 +165,7 @@ func (b *AssertionBuilder) builtinRequest(
 	if err := starlark.UnpackPositionalArgs("request", args, kwargs, 2, &method, &path); err != nil {
 		return nil, err
 	}
-	mock, ok := b.tgt.(*MockREST)
+	mock, ok := b.tgt.(*target.MemREST)
 	if !ok {
 		// bare-error: assertion setup error, not engine-reachable
 		return nil, errs.Errorf("request assertions require a rest_mock target")

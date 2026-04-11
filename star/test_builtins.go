@@ -57,7 +57,7 @@ func testAssertModule(tc *testkit.Collector) *starlarkstruct.Module {
 type StarlarkTestTarget struct {
 	Name string
 	Mem  *target.MemTarget
-	REST *testkit.MockREST
+	REST *target.MemREST
 }
 
 var _ starlark.Value = (*StarlarkTestTarget)(nil)
@@ -192,9 +192,9 @@ func builtinTestAssertThat(tc *testkit.Collector) func(
 // test.target.rest_mock
 // -----------------------------------------------------------------------------
 
-// starlarkResponse wraps a MockResponse as a Starlark value.
+// starlarkResponse wraps a target.MemRESTResponse as a Starlark value.
 type starlarkResponse struct {
-	resp testkit.MockResponse
+	resp target.MemRESTResponse
 }
 
 func (r starlarkResponse) String() string        { return "test.response" }
@@ -222,7 +222,7 @@ func builtinTestResponse(
 		return nil, err
 	}
 
-	resp := testkit.MockResponse{
+	resp := target.MemRESTResponse{
 		StatusCode: status,
 		Body:       []byte(body),
 	}
@@ -265,7 +265,7 @@ func builtinTestRESTMock(
 		}
 	}
 
-	routeMap := make(map[string]testkit.MockResponse)
+	routeMap := make(map[string]target.MemRESTResponse)
 	if routes != nil {
 		for _, item := range routes.Items() {
 			key, ok := starlark.AsString(item[0])
@@ -290,7 +290,7 @@ func builtinTestRESTMock(
 		}
 	}
 
-	mock := testkit.NewMockREST(routeMap)
+	mock := target.NewMemREST(routeMap)
 
 	inst := spec.TargetInstance{
 		Type:   testkit.RESTMockTargetType{Tgt: mock},

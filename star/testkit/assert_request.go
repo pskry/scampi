@@ -9,6 +9,7 @@ import (
 	"go.starlark.net/starlark"
 
 	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/target"
 )
 
 var requestAssertionAttrs = []string{
@@ -21,7 +22,7 @@ var requestAssertionAttrs = []string{
 
 // RequestAssertion is the Starlark value returned by assert_that.request(method, path).
 type RequestAssertion struct {
-	mock      *MockREST
+	mock      *target.MemREST
 	method    string
 	path      string
 	collector *Collector
