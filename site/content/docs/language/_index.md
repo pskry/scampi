@@ -71,8 +71,8 @@ import "std/ssh"
 you reference its contents with `posix.copy`, `posix.ServiceState`, etc. The
 last path segment is the binding name.
 
-The standard library is split into focused namespaces — see [std vs posix vs
-…](#whats-in-std-vs-posix) below.
+The standard library is split into focused namespaces — see
+[What's in `std` vs `posix` vs …](#whats-in-std-vs-posix-vs-) below.
 
 ## Let bindings
 
@@ -157,7 +157,35 @@ The `{ … }` after `std.deploy(...)` is the deploy body. Inside it you write
 expressions whose results — typically steps — get attached to the deploy.
 
 This is a first-class language feature. Any function with a `block[T]` return
-type uses this trailing-block syntax. You can write your own.
+type uses this trailing-block syntax.
+
+### Reusable trailing blocks
+
+You can bind a trailing-block function to a `let` and reify it multiple times
+with different bodies:
+
+```scampi
+let to_web = std.deploy(name = "web", targets = [web])
+
+to_web {
+  posix.pkg { packages = ["nginx"], source = posix.pkg_system {} }
+  posix.copy {
+    src  = posix.source_local { path = "./nginx.conf" }
+    dest = "/etc/nginx/nginx.conf"
+    perm = "0644", owner = "root", group = "root"
+  }
+}
+
+to_web {
+  posix.service { name = "nginx", state = posix.ServiceState.running, enabled = true }
+  posix.firewall { port = "80/tcp" }
+  posix.firewall { port = "443/tcp" }
+}
+```
+
+Each `to_web { … }` creates a separate deploy — same name and targets, different
+steps. This is useful for grouping steps logically while deploying to the same
+target.
 
 ## Types and the type system
 
