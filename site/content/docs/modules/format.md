@@ -8,7 +8,7 @@ weight: 1
 Every project and module has a `scampi.mod` file at its root. It declares the
 module path and lists dependencies.
 
-```text {filename="scampi.mod"}
+```scampi-mod {filename="scampi.mod"}
 module codeberg.org/yourname/yourproject
 
 require (
@@ -36,7 +36,7 @@ When a dependency is required transitively (by one of your direct
 dependencies, not by your project itself), scampi marks it with a
 `// indirect` comment:
 
-```text {filename="scampi.mod"}
+```scampi-mod {filename="scampi.mod"}
 module codeberg.org/yourname/yourproject
 
 require (
@@ -60,7 +60,7 @@ requested by any dependency wins.
 
 Lines starting with `//` are comments.
 
-```text {filename="scampi.mod"}
+```scampi-mod {filename="scampi.mod"}
 module codeberg.org/yourname/yourproject
 
 require (
@@ -74,7 +74,7 @@ require (
 `scampi.sum` is auto-generated and records SHA-256 checksums of downloaded
 modules. It ensures that cached modules haven't been tampered with.
 
-```text {filename="scampi.sum"}
+```scampi-mod {filename="scampi.sum"}
 codeberg.org/scampi-modules/npm v1.0.0 h1:abc123...
 codeberg.org/scampi-modules/authelia v0.3.2 h1:def456...
 ```
