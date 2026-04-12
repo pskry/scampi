@@ -36,6 +36,7 @@ func genCmd() *cli.Command {
 
 func genAPICmd() *cli.Command {
 	var specPath, output, prefix string
+	var noTest bool
 
 	return &cli.Command{
 		Name:                   "api",
@@ -58,6 +59,11 @@ func genAPICmd() *cli.Command {
 				Aliases:     []string{"p"},
 				Usage:       "path prefix prepended to all generated routes (e.g. /integration)",
 				Destination: &prefix,
+			},
+			&cli.BoolFlag{
+				Name:        "no-test",
+				Usage:       "skip generating the companion smoke test file",
+				Destination: &noTest,
 			},
 		},
 		Arguments: []cli.Argument{
@@ -84,7 +90,10 @@ func genAPICmd() *cli.Command {
 				outPath = base + ".api.scampi"
 			}
 
-			genOpts := scampigen.APIOptions{PathPrefix: prefix}
+			genOpts := scampigen.APIOptions{
+				PathPrefix: prefix,
+				NoTest:     noTest,
+			}
 
 			if outPath == "-" {
 				return handleEngineError(
@@ -98,6 +107,23 @@ func genAPICmd() *cli.Command {
 				return cli.Exit(err.Error(), exitUserError)
 			}
 			defer func() { _ = f.Close() }()
+
+			// Open test file alongside the module if tests are enabled.
+			if !noTest {
+				base := strings.TrimSuffix(outPath, ".api.scampi")
+				if base == outPath {
+					base = strings.TrimSuffix(outPath, filepath.Ext(outPath))
+				}
+				testPath := base + "_test.scampi"
+				tf, tfErr := os.Create(testPath)
+				if tfErr == nil {
+					genOpts.TestWriter = tf
+					defer func() {
+						_ = tf.Close()
+						_, _ = fmt.Fprintf(os.Stderr, "wrote %s\n", testPath)
+					}()
+				}
+			}
 
 			if err := scampigen.API(specPath, version, f, em, genOpts); err != nil {
 				_ = os.Remove(outPath)
