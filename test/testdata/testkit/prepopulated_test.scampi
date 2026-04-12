@@ -1,48 +1,63 @@
-# Test that pre-populated target state is preserved and modified correctly.
-# The target starts with existing files, packages, and services — steps
-# should converge without clobbering unrelated state.
+module main
 
-t = test.target.in_memory(
-    name = "mock",
+// Test that pre-populated target state is preserved and modified
+// correctly. The target starts with existing files, packages, and
+// services — steps should converge without clobbering unrelated
+// state.
+
+import "std"
+import "std/posix"
+import "std/test"
+import "std/test/matchers"
+
+let mock = test.target_in_memory(
+  name = "mock",
+  initial = test.InitialState {
     files = {
-        "/etc/hostname": "old-host",
-        "/etc/motd": "welcome",
+      "/etc/hostname": posix.source_inline { content = "old-host" },
+      "/etc/motd":     posix.source_inline { content = "welcome" },
     },
     packages = ["curl", "git"],
-    services = {"sshd": "running"},
-    dirs = ["/home/deploy"],
+    services = { "sshd": posix.ServiceState.running },
+    dirs     = ["/home/deploy", "/var/log"],
+  },
+  expect = test.ExpectedState {
+    // Changed state
+    files = {
+      "/etc/hostname": matchers.has_exact_content("new-host"),
+      // Preserved state — not touched by steps
+      "/etc/motd":     matchers.has_exact_content("welcome"),
+    },
+    packages = {
+      "nginx": matchers.has_pkg_status(posix.PkgState.present),
+      "curl":  matchers.has_pkg_status(posix.PkgState.present),
+      "git":   matchers.has_pkg_status(posix.PkgState.present),
+    },
+    services = {
+      "sshd": matchers.has_svc_status(posix.ServiceState.running),
+    },
+    dirs = {
+      "/var/log/app": matchers.is_present(),
+      "/home/deploy": matchers.is_present(),
+    },
+  },
 )
 
-deploy(
-    name = "converge",
-    targets = ["mock"],
-    steps = [
-        # Overwrite hostname
-        copy(
-            desc = "set hostname",
-            dest = "/etc/hostname",
-            src = inline("new-host"),
-            perm = "0644",
-            owner = "root",
-            group = "root",
-        ),
-        # Install additional package
-        pkg(packages = ["nginx"], source = system()),
-        # Add a directory
-        dir(path = "/var/log/app"),
-    ],
-)
-
-a = test.assert.that(t)
-
-# Changed state
-a.file("/etc/hostname").has_content("new-host")
-a.package("nginx").is_installed()
-a.dir("/var/log/app").exists()
-
-# Preserved state — not touched by steps
-a.file("/etc/motd").has_content("welcome")
-a.package("curl").is_installed()
-a.package("git").is_installed()
-a.service("sshd").is_running()
-a.dir("/home/deploy").exists()
+std.deploy(name = "converge", targets = [mock]) {
+  // Overwrite hostname
+  posix.copy {
+    desc  = "set hostname"
+    dest  = "/etc/hostname"
+    src   = posix.source_inline { content = "new-host" }
+    perm  = "0644"
+    owner = "root"
+    group = "root"
+  }
+  // Install additional package
+  posix.pkg {
+    packages = ["nginx"]
+    source   = posix.pkg_system {}
+  }
+  // Add a directory
+  posix.dir { path = "/var/log/app" }
+}

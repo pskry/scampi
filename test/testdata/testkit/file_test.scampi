@@ -1,27 +1,33 @@
-t = test.target.in_memory(
-    name = "mock",
-    files = {"/etc/existing.conf": "old content"},
+module main
+
+import "std"
+import "std/posix"
+import "std/test"
+import "std/test/matchers"
+
+let mock = test.target_in_memory(
+  name = "mock",
+  initial = test.InitialState {
+    files = {
+      "/etc/existing.conf": posix.source_inline { content = "old content" },
+    },
+  },
+  expect = test.ExpectedState {
+    files = {
+      "/etc/app.conf":      matchers.has_exact_content("server_name example.com\nlisten 80\n"),
+      "/etc/existing.conf": matchers.is_present(),
+      "/nonexistent":       matchers.is_absent(),
+    },
+  },
 )
 
-deploy(
-    name = "files",
-    targets = ["mock"],
-    steps = [
-        copy(
-            desc = "write config",
-            dest = "/etc/app.conf",
-            src = inline("server_name example.com\nlisten 80\n"),
-            perm = "0644",
-            owner = "root",
-            group = "root",
-        ),
-    ],
-)
-
-a = test.assert.that(t)
-
-a.file("/etc/app.conf").exists()
-a.file("/etc/app.conf").contains("server_name example.com")
-a.file("/etc/app.conf").has_content("server_name example.com\nlisten 80\n")
-a.file("/etc/existing.conf").exists()
-a.file("/nonexistent").absent()
+std.deploy(name = "files", targets = [mock]) {
+  posix.copy {
+    desc  = "write config"
+    dest  = "/etc/app.conf"
+    src   = posix.source_inline { content = "server_name example.com\nlisten 80\n" }
+    perm  = "0644"
+    owner = "root"
+    group = "root"
+  }
+}

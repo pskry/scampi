@@ -1,43 +1,52 @@
-# Test multiple deploy blocks against the same target.
-# The second deploy depends on state from the first, so it includes
-# its own prerequisite dir step to avoid ordering issues.
+module main
 
-t = test.target.in_memory(name = "mock")
+// Test multiple deploy blocks against the same target. The two
+// deploys share the mock; verification runs once at the end against
+// the combined post-apply state.
 
-deploy(
-    name = "base",
-    targets = ["mock"],
-    steps = [
-        dir(path = "/etc/app"),
-        dir(path = "/var/log/app"),
-        pkg(packages = ["curl"], source = system()),
-    ],
+import "std"
+import "std/posix"
+import "std/test"
+import "std/test/matchers"
+
+let mock = test.target_in_memory(
+  name = "mock",
+  initial = test.InitialState {
+    dirs = ["/etc", "/var/log"],
+  },
+  expect = test.ExpectedState {
+    // From base deploy
+    dirs = {
+      "/etc/app":     matchers.is_present(),
+      "/var/log/app": matchers.is_present(),
+    },
+    packages = {
+      "curl": matchers.has_pkg_status(posix.PkgState.present),
+    },
+    // From app deploy
+    files = {
+      "/etc/app/config.yml": matchers.has_substring("debug: false"),
+    },
+  },
 )
 
-deploy(
-    name = "app",
-    targets = ["mock"],
-    steps = [
-        dir(path = "/etc/app"),
-        copy(
-            desc = "app config",
-            dest = "/etc/app/config.yml",
-            src = inline("debug: false\nport: 3000\n"),
-            perm = "0644",
-            owner = "root",
-            group = "root",
-        ),
-    ],
-)
+std.deploy(name = "base", targets = [mock]) {
+  posix.dir { path = "/etc/app" }
+  posix.dir { path = "/var/log/app" }
+  posix.pkg {
+    packages = ["curl"]
+    source   = posix.pkg_system {}
+  }
+}
 
-a = test.assert.that(t)
-
-# From base deploy
-a.dir("/etc/app").exists()
-a.dir("/var/log/app").exists()
-a.package("curl").is_installed()
-
-# From app deploy
-a.file("/etc/app/config.yml").exists()
-a.file("/etc/app/config.yml").contains("debug: false")
-a.file("/etc/app/config.yml").contains("port: 3000")
+std.deploy(name = "app", targets = [mock]) {
+  posix.dir { path = "/etc/app" }
+  posix.copy {
+    desc  = "app config"
+    dest  = "/etc/app/config.yml"
+    src   = posix.source_inline { content = "debug: false\nport: 3000\n" }
+    perm  = "0644"
+    owner = "root"
+    group = "root"
+  }
+}

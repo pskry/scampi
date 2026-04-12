@@ -1,16 +1,25 @@
-t = test.target.in_memory(name = "mock")
+module main
 
-deploy(
-    name = "dirs",
-    targets = ["mock"],
-    steps = [
-        dir(path = "/var/www"),
-        dir(path = "/var/www/mysite"),
-    ],
+import "std"
+import "std/posix"
+import "std/test"
+import "std/test/matchers"
+
+let mock = test.target_in_memory(
+  name = "mock",
+  initial = test.InitialState {
+    dirs = ["/var"],
+  },
+  expect = test.ExpectedState {
+    dirs = {
+      "/var/www":        matchers.is_present(),
+      "/var/www/mysite": matchers.is_present(),
+      "/nonexistent":    matchers.is_absent(),
+    },
+  },
 )
 
-assert_that = test.assert.that(t)
-
-assert_that.dir("/var/www").exists()
-assert_that.dir("/var/www/mysite").exists()
-assert_that.dir("/nonexistent").absent()
+std.deploy(name = "dirs", targets = [mock]) {
+  posix.dir { path = "/var/www" }
+  posix.dir { path = "/var/www/mysite" }
+}
