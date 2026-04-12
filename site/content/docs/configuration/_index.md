@@ -1,6 +1,6 @@
 ---
 title: Configuration
-weight: 3
+weight: 4
 ---
 
 scampi configs are `.scampi` files written in the scampi language. See the

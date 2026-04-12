@@ -13,11 +13,11 @@ For the **language** itself — syntax, types, decls, the trailing-block pattern
 ## The mental model
 
 ```
-scampi config → Steps → Actions → Ops → Target
+config → steps → plan → check/execute → target
 ```
 
-You write **steps** in scampi. The engine plans **actions** from those steps,
-breaks them into **ops**, and executes those ops against a **target**.
+You write **steps**. scampi plans them, checks what needs to change, and
+executes only the necessary mutations against a **target**.
 
 ## Steps
 
@@ -31,34 +31,35 @@ posix.pkg {
 }
 ```
 
-Each step has a **kind** (`pkg`, `copy`, `service`, etc.) that determines which
-Go handler (called a **step type**) processes it. See the
-[Step Reference]({{< relref "../steps" >}}) for all built-in kinds.
+Steps come from the standard library modules — `posix` for filesystem and
+system operations, `container` for container management, `rest` for HTTP APIs.
+You can also define your own steps in user modules. See the
+[Step Reference]({{< relref "../steps" >}}) for everything the standard library
+provides.
 
-## Actions
+Steps within a deploy block execute in order. Each step is planned, checked
+against current state, and executed only if reality differs from your
+declaration.
 
-An **action** is the planned execution of one step. When scampi reads your
-config, each step becomes an action in the execution plan. Actions execute
-sequentially in the order you declared them.
+## Check and execute
 
-## Ops
+Every step implements two phases:
 
-An **op** is the smallest executable unit. A single action may produce multiple
-ops. For example, a `copy` step produces:
-
-1. A file copy op
-2. A permission op (depends on #1)
-3. An ownership op (depends on #1)
-
-Ops within an action form a DAG (directed acyclic graph) and run in parallel
-where their dependencies allow. Every op implements the **check/execute**
-pattern:
-
-- **Check**: inspect current state, return whether a change is needed
+- **Check**: inspect current state, determine whether a change is needed
 - **Execute**: make the change (only runs if check says so)
 
 This is what makes scampi idempotent. Running `apply` when reality already
-matches your config is a no-op.
+matches your config is a no-op. The three CLI commands map directly to this
+model:
+
+- `scampi plan` — show what would happen, without touching the target
+- `scampi check` — run checks against real state, report what would change
+- `scampi apply` — run checks, then execute whatever needs changing
+
+A single step may produce multiple operations internally. For example, a
+`copy` step checks the file content, permissions, and ownership independently
+— if only the permissions drifted, only the permission fix runs. Operations
+within a step can run in parallel where their dependencies allow.
 
 ## Sources
 
@@ -66,7 +67,7 @@ A **source** tells a step where its content comes from. scampi separates
 *where content comes from* (source resolvers) from *what to do with it* (steps).
 The two compose independently.
 
-The POSIX module ships three source resolvers:
+The `posix` module ships three source resolvers:
 
 | Resolver              | Description                       |
 | --------------------- | --------------------------------- |
@@ -92,11 +93,6 @@ posix.template {
   perm = "0644", owner = "root", group = "root"
 }
 
-posix.unarchive {
-  src  = posix.source_remote { url = "https://github.com/.../v1.0.tar.gz" }
-  dest = "/opt/app"
-}
-
 posix.copy {
   src  = posix.source_inline { content = "nameserver 1.1.1.1\n" }
   dest = "/etc/resolv.conf"
@@ -104,49 +100,26 @@ posix.copy {
 }
 ```
 
-This is a deliberate design choice. Steps and sources scale independently —
-adding a new source type automatically works with every existing step, and
-adding a new step that reads content automatically works with every existing
-source. No combinatorial explosion, no special cases.
+Steps and sources scale independently — adding a new source type automatically
+works with every existing step, and adding a new step that reads content
+automatically works with every existing source.
 
-There is no `fetch` step because none is needed. `posix.copy` with
-`posix.source_remote` already downloads a file to a path — and gets caching,
-checksums, idempotency, ownership, and permission management for free. A
-`fetch` step would just be `copy` with fewer knobs.
-
-## Source machine and targets
+## Source and target
 
 scampi distinguishes between two sides:
 
 - **Source side**: where scampi runs and where your configs, templates, secrets,
   and cached downloads live.
-- **Target side**: where ops execute — the system being converged.
+- **Target side**: where mutations happen — the system being converged.
 
 With `ssh.target { … }`, these are different machines. With `local.target { … }`,
 they're the same machine — but the engine still treats them as separate
-concerns internally: source access reads configs and caches data, target
-access performs convergence mutations.
+concerns. Source access reads configs and caches data. Target access performs
+convergence mutations.
 
-Targets expose **capabilities** that describe what they can do: filesystem
-operations, package management, service control, etc.
-
-Steps declare what capabilities they need. If a target doesn't have the right
-capabilities, scampi fails fast with a clear error before executing anything.
-
-```scampi
-let web = ssh.target { name = "web", host = "app.example.com", user = "deploy" }
-```
-
-See [Configuration]({{< relref "../configuration" >}}) for target setup details.
-
-## Plans
-
-Before executing anything, scampi builds a **plan** — the full set of actions
-for a deploy block. You can inspect plans with three commands:
-
-- `scampi plan` — show the execution plan without touching the target
-- `scampi check` — run the plan's checks to see what would change
-- `scampi apply` — execute the plan and converge the target
+Targets advertise **capabilities** — filesystem, packages, services, etc.
+Steps declare what capabilities they need. If there's a mismatch, scampi fails
+fast with a clear error before executing anything.
 
 ## Convergence
 

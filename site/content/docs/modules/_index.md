@@ -1,6 +1,6 @@
 ---
 title: Modules
-weight: 4
+weight: 5
 ---
 
 scampi modules are reusable packages distributed as git repositories. A module
