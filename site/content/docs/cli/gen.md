@@ -37,7 +37,7 @@ By default the output file is named after the spec: `npm-openapi.yaml` produces
 When the API is served behind a proxy path, use `--prefix` to prepend to
 all generated routes:
 
-```text
+```bash
 scampi gen api --prefix=/integration unifi-network.json
 ```
 
@@ -116,7 +116,7 @@ components:
 
 Running the generator:
 
-```text
+```bash
 scampi gen api npm-openapi.yaml
 ```
 

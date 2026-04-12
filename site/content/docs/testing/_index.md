@@ -49,7 +49,7 @@ mock's recorded state. Mismatches emit typed diagnostics.
 
 ## Running tests
 
-```text
+```bash
 scampi test                        # *_test.scampi in current directory
 scampi test ./...                  # recursive from current directory
 scampi test path/to/test.scampi    # specific file

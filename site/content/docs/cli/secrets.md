@@ -24,7 +24,7 @@ All subcommands that need an age identity resolve it in this order:
 Use `--identity` when working with multiple projects that have
 different keys (e.g. separate prod and dev identities):
 
-```text
+```bash
 scampi secrets -i keys/prod.key get db.password
 scampi secrets -i keys/dev.key set api.url http://localhost:8080
 ```
@@ -49,7 +49,7 @@ list for all secrets at once.
 
 **Adding a recipient** (e.g. a CI pipeline):
 
-```text
+```bash
 scampi secrets recrypt -r age1abc...pipeline
 ```
 
@@ -65,7 +65,7 @@ secrets unrecoverable.
 If you lose your private key (e.g. `secrets init --force` overwrites it),
 any remaining recipient can re-encrypt the secrets for a new key:
 
-```text
+```bash
 # 1. Generate a new keypair
 scampi secrets init
 
@@ -139,7 +139,7 @@ arguments, list all secret key names in the store.
 
 Output is always unformatted, safe for piping:
 
-```text
+```bash
 HOST=$(scampi secrets get vps.host)
 ```
 
