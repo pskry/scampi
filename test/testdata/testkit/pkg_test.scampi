@@ -1,15 +1,24 @@
-t = test.target.in_memory(name = "mock")
+module main
 
-deploy(
-    name = "packages",
-    targets = ["mock"],
-    steps = [
-        pkg(packages = ["nginx", "curl"], source = system()),
-    ],
+import "std"
+import "std/posix"
+import "std/test"
+import "std/test/matchers"
+
+let mock = test.target_in_memory(
+  name = "mock",
+  expect = test.ExpectedState {
+    packages = {
+      "nginx":   matchers.has_pkg_status(posix.PkgState.present),
+      "curl":    matchers.has_pkg_status(posix.PkgState.present),
+      "apache2": matchers.has_pkg_status(posix.PkgState.absent),
+    },
+  },
 )
 
-a = test.assert.that(t)
-
-a.package("nginx").is_installed()
-a.package("curl").is_installed()
-a.package("apache2").is_absent()
+std.deploy(name = "packages", targets = [mock]) {
+  posix.pkg {
+    packages = ["nginx", "curl"]
+    source   = posix.pkg_system {}
+  }
+}

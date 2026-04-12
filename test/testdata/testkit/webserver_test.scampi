@@ -1,43 +1,53 @@
-t = test.target.in_memory(
-    name = "mock",
+module main
+
+import "std"
+import "std/posix"
+import "std/test"
+import "std/test/matchers"
+
+let mock = test.target_in_memory(
+  name = "mock",
+  initial = test.InitialState {
     packages = ["nginx"],
-    services = {"nginx": "stopped"},
+    services = { "nginx": posix.ServiceState.stopped },
+    dirs     = ["/var", "/etc"],
+  },
+  expect = test.ExpectedState {
+    // Directories created
+    dirs = {
+      "/var/www":        matchers.is_present(),
+      "/var/www/mysite": matchers.is_present(),
+      // Nothing unexpected
+      "/var/www/other": matchers.is_absent(),
+    },
+    // Config file written with correct content
+    files = {
+      "/etc/nginx/sites-enabled/mysite.conf": matchers.has_substring("server_name example.com"),
+      // Nothing unexpected
+      "/etc/nginx/sites-enabled/default": matchers.is_absent(),
+    },
+    // Service started
+    services = {
+      "nginx": matchers.has_svc_status(posix.ServiceState.running),
+    },
+  },
 )
 
-deploy(
-    name = "webserver",
-    targets = ["mock"],
-    steps = [
-        dir(path = "/var/www"),
-        dir(path = "/var/www/mysite"),
-        dir(path = "/etc/nginx/sites-enabled"),
-        copy(
-            desc = "nginx site config",
-            dest = "/etc/nginx/sites-enabled/mysite.conf",
-            src = inline("server {\n    server_name example.com;\n    root /var/www/mysite;\n}\n"),
-            perm = "0644",
-            owner = "root",
-            group = "root",
-        ),
-        service(name = "nginx", state = "running"),
-    ],
-)
-
-a = test.assert.that(t)
-
-# Directories created
-a.dir("/var/www").exists()
-a.dir("/var/www/mysite").exists()
-
-# Config file written with correct content
-a.file("/etc/nginx/sites-enabled/mysite.conf").exists()
-a.file("/etc/nginx/sites-enabled/mysite.conf").contains("server_name example.com")
-a.file("/etc/nginx/sites-enabled/mysite.conf").contains("root /var/www/mysite")
-
-# Service started
-a.service("nginx").is_running()
-a.service("nginx").is_enabled()
-
-# Nothing unexpected
-a.file("/etc/nginx/sites-enabled/default").absent()
-a.dir("/var/www/other").absent()
+std.deploy(name = "webserver", targets = [mock]) {
+  posix.dir { path = "/var/www" }
+  posix.dir { path = "/var/www/mysite" }
+  posix.dir { path = "/etc/nginx" }
+  posix.dir { path = "/etc/nginx/sites-enabled" }
+  posix.copy {
+    desc  = "nginx site config"
+    dest  = "/etc/nginx/sites-enabled/mysite.conf"
+    src   = posix.source_inline { content = "server {\n    server_name example.com;\n    root /var/www/mysite;\n}\n" }
+    perm  = "0644"
+    owner = "root"
+    group = "root"
+  }
+  posix.service {
+    name  = "nginx"
+    state = posix.ServiceState.running
+  }
+}

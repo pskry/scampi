@@ -1,30 +1,43 @@
-t = test.target.in_memory(name = "mock")
+module main
 
-deploy(
-    name = "links",
-    targets = ["mock"],
-    steps = [
-        dir(path = "/opt/app"),
-        dir(path = "/opt/app/releases/v1"),
-        symlink(
-            link = "/opt/app/current",
-            target = "/opt/app/releases/v1",
-        ),
-        copy(
-            desc = "app config",
-            dest = "/opt/app/releases/v1/config.yml",
-            src = inline("port: 8080\nenv: production\n"),
-            perm = "0644",
-            owner = "root",
-            group = "root",
-        ),
-    ],
+import "std"
+import "std/posix"
+import "std/test"
+import "std/test/matchers"
+
+let mock = test.target_in_memory(
+  name = "mock",
+  initial = test.InitialState {
+    dirs = ["/opt"],
+  },
+  expect = test.ExpectedState {
+    symlinks = {
+      "/opt/app/current":     matchers.has_exact_content("/opt/app/releases/v1"),
+      "/opt/app/nonexistent": matchers.is_absent(),
+    },
+    files = {
+      "/opt/app/releases/v1/config.yml": matchers.has_substring("port: 8080"),
+    },
+    dirs = {
+      "/opt/app/releases/v1": matchers.is_present(),
+    },
+  },
 )
 
-a = test.assert.that(t)
-
-a.symlink("/opt/app/current").points_to("/opt/app/releases/v1")
-a.file("/opt/app/releases/v1/config.yml").contains("port: 8080")
-a.file("/opt/app/releases/v1/config.yml").contains("env: production")
-a.dir("/opt/app/releases/v1").exists()
-a.symlink("/opt/app/nonexistent").absent()
+std.deploy(name = "links", targets = [mock]) {
+  posix.dir { path = "/opt/app" }
+  posix.dir { path = "/opt/app/releases" }
+  posix.dir { path = "/opt/app/releases/v1" }
+  posix.symlink {
+    link   = "/opt/app/current"
+    target = "/opt/app/releases/v1"
+  }
+  posix.copy {
+    desc  = "app config"
+    dest  = "/opt/app/releases/v1/config.yml"
+    src   = posix.source_inline { content = "port: 8080\nenv: production\n" }
+    perm  = "0644"
+    owner = "root"
+    group = "root"
+  }
+}
