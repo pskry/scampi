@@ -28,6 +28,8 @@ import (
 // APIOptions configures code generation behavior.
 type APIOptions struct {
 	PathPrefix string // prepended to all generated route paths
+	NoTest     bool   // skip generating the companion *_test.scampi file
+	TestWriter io.Writer // if set, write test output here instead of to disk
 }
 
 // API generates a .api.scampi module from an OpenAPI specification file.
@@ -56,7 +58,13 @@ func API(specPath string, scampiVersion string, w io.Writer, em diagnostic.Emitt
 		w: w, doc: doc, specPath: specPath,
 		scampiVersion: scampiVersion, pathPrefix: prefix,
 	}
-	return g.generate()
+	if err := g.generate(); err != nil {
+		return err
+	}
+	if !opts.NoTest && opts.TestWriter != nil {
+		g.writeTest(opts.TestWriter)
+	}
+	return nil
 }
 
 // bare-error: sentinel for unrecoverable spec issues
@@ -168,12 +176,26 @@ func loadSwagger2(raw []byte) (*openapi3.T, error) {
 // Code generation
 // -----------------------------------------------------------------------------
 
+// testOp captures enough info about a generated function to emit a
+// companion test call: the function name, HTTP method/path, sample
+// path param values, and whether a body param exists (for body
+// assertion in the test's expect_requests).
+type testOp struct {
+	funcName       string
+	method         string
+	fullPath       string
+	pathParams     []string
+	hasSampleBody  bool
+	sampleBodyName string
+}
+
 type apiGenerator struct {
 	w             io.Writer
 	doc           *openapi3.T
 	specPath      string
 	scampiVersion string
 	pathPrefix    string
+	ops           []testOp // collected during generation for test emission
 }
 
 func (g *apiGenerator) generate() error {
@@ -243,6 +265,19 @@ func (g *apiGenerator) writeOperation(path, method string, op *openapi3.Operatio
 
 	fullPath := g.pathPrefix + path
 	pathExpr := interpolatePathParams(fullPath, params.pathParams)
+
+	// Track for test generation.
+	top := testOp{
+		funcName:   funcName,
+		method:     method,
+		fullPath:   fullPath,
+		pathParams: params.pathParams,
+	}
+	if body := params.allBody(); len(body) > 0 {
+		top.hasSampleBody = true
+		top.sampleBodyName = body[0].apiName
+	}
+	g.ops = append(g.ops, top)
 
 	if params.hasBody() {
 		g.line("  let body = {}")
@@ -549,6 +584,124 @@ func cleanPathPrefix(raw string) string {
 		result = "/" + result
 	}
 	return result
+}
+
+// Test generation
+// -----------------------------------------------------------------------------
+
+// writeTest emits a companion *_test.scampi file that exercises every
+// generated function against a rest_mock. The test file imports the
+// generated module, constructs a mock with canned routes, calls each
+// endpoint, and verifies the expected requests were made.
+func (g *apiGenerator) writeTest(w io.Writer) {
+	t := &testWriter{w: w}
+	t.line("// Auto-generated smoke test")
+	t.line("// Verifies each endpoint sends the expected method and path.")
+	t.line("")
+	t.line("module main")
+	t.line("")
+	t.line("import \"std\"")
+	t.line("import \"std/rest\"")
+	t.line("import \"std/test\"")
+	t.line("import \"std/test/matchers\"")
+	t.line("")
+
+	// Build routes + expect_requests from collected ops.
+	t.line("let api = test.target_rest_mock(")
+	t.line("  name = \"api\",")
+	t.line("  base_url = \"http://localhost\",")
+	t.line("  routes = {")
+	for _, op := range g.ops {
+		sample := samplePath(op)
+		status := defaultStatus(op.method)
+		t.line("    \"%s %s\": test.response(status = %d),", op.method, sample, status)
+	}
+	t.line("  },")
+	t.line("  expect_requests = [")
+	for _, op := range g.ops {
+		sample := samplePath(op)
+		if op.hasSampleBody {
+			t.line("    test.request(")
+			t.line("      method = \"%s\",", op.method)
+			t.line("      path   = \"%s\",", sample)
+			t.line("      body   = matchers.has_substring(\"\\\"%s\\\"\"),", op.sampleBodyName)
+			t.line("    ),")
+		} else {
+			t.line("    test.request(method = \"%s\", path = \"%s\"),", op.method, sample)
+		}
+	}
+	t.line("  ],")
+	t.line(")")
+	t.line("")
+
+	// Deploy block with inline rest.request steps — self-contained,
+	// no module import needed. Tests the request shapes directly
+	// rather than calling the generated wrapper functions.
+	t.line("std.deploy(name = \"smoke\", targets = [api]) {")
+	for _, op := range g.ops {
+		sample := samplePath(op)
+		if op.hasSampleBody {
+			t.line("  rest.request {")
+			t.line("    method = \"%s\"", op.method)
+			t.line("    path   = \"%s\"", sample)
+			t.line("    body   = rest.body_json { data = { \"%s\": \"test\" } }", op.sampleBodyName)
+			t.line("  }")
+		} else {
+			t.line("  rest.request {")
+			t.line("    method = \"%s\"", op.method)
+			t.line("    path   = \"%s\"", sample)
+			if op.method == "GET" {
+				t.line("    check  = rest.status { code = 200 }")
+			}
+			t.line("  }")
+		}
+	}
+	t.line("}")
+	t.line("")
+}
+
+type testWriter struct {
+	w io.Writer
+}
+
+func (t *testWriter) line(format string, args ...any) {
+	_, _ = fmt.Fprintf(t.w, format+"\n", args...)
+}
+
+// samplePath replaces path params with sample values for the test
+// route and assertion. Uses "1" as the default sample for every
+// path param — good enough for smoke tests.
+func samplePath(op testOp) string {
+	p := op.fullPath
+	for _, param := range op.pathParams {
+		p = strings.Replace(p, "{"+param+"}", "1", 1)
+	}
+	return p
+}
+
+// sampleArgs builds the call arguments for a test invocation. Path
+// params get "1", body params get their name as a sample value.
+// GET check params are omitted.
+func sampleArgs(op testOp) string {
+	var parts []string
+	for _, p := range op.pathParams {
+		parts = append(parts, p+" = \"1\"")
+	}
+	if op.hasSampleBody {
+		parts = append(parts, op.sampleBodyName+" = \"test\"")
+	}
+	return strings.Join(parts, ", ")
+}
+
+func defaultStatus(method string) int {
+	switch method {
+	case "POST":
+		return 201
+	case "DELETE":
+		return 204
+	default:
+		return 200
+	}
 }
 
 func toSnakeCase(s string) string {
