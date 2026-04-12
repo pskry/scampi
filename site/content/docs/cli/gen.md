@@ -3,7 +3,7 @@ title: gen
 weight: 5
 ---
 
-Generate Starlark modules from external schemas. Each generator produces typed
+Generate scampi modules from external schemas. Each generator produces typed
 request wrappers that handle the boring parts (field names, HTTP plumbing) so you
 can focus on convergence logic.
 
@@ -46,7 +46,7 @@ of `path = "/v1/sites/" + siteId + "/networks"`.
 
 ### What it generates
 
-Each endpoint in the spec becomes a Starlark function wrapping `rest.request()`
+Each endpoint in the spec becomes a scampi function wrapping `rest.request()`
 with the correct HTTP method, path, and parameters.
 
 - Path parameters become positional arguments and are interpolated into the path
@@ -122,7 +122,7 @@ scampi gen api npm-openapi.yaml
 
 Produces:
 
-```starlark {filename="npm-openapi.api.scampi"}
+```scampi {filename="npm-openapi.api.scampi"}
 // Generated from npm-openapi.yaml by scampi gen api
 //
 // Nginx Proxy Manager API (subset) 1.0.0
@@ -188,7 +188,7 @@ The generated wrappers work directly as `rest.resource` templates — when calle
 without body args they return a bare method+path request, and `rest.resource`
 provides the body via `state`:
 
-```starlark {filename="npm.scampi"}
+```scampi {filename="npm.scampi"}
 load("npm-openapi.api.scampi", "get_certificates", "create_certificate")
 
 def certificate(domain_names, provider = "letsencrypt"):
