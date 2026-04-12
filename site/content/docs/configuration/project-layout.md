@@ -75,7 +75,7 @@ a `scampi.mod` to declare its module path:
   {{< /filetree/folder >}}
 {{< /filetree/container >}}
 
-```text {filename="scampi.mod"}
+```scampi-mod {filename="scampi.mod"}
 module example.com/my-infra
 ```
 

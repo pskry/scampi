@@ -106,7 +106,7 @@ scampi mod add codeberg.org/yourname/module@v2.0.0-alpha.1
 
 If your module depends on other modules, include a `scampi.mod`:
 
-```text {filename="scampi.mod"}
+```scampi-mod {filename="scampi.mod"}
 module codeberg.org/yourname/my-module
 
 require (

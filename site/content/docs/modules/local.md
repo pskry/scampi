@@ -15,7 +15,7 @@ scampi mod add my/helpers ./modules/helpers
 This adds a local dependency to `scampi.mod` with a filesystem path instead
 of a version:
 
-```text {filename="scampi.mod"}
+```scampi-mod {filename="scampi.mod"}
 module codeberg.org/yourname/yourproject
 
 require (
