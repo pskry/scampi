@@ -3,7 +3,7 @@ title: test
 weight: 7
 ---
 
-Run Starlark test files. See [Testing](/docs/modules/testing) for the full guide
+Run scampi test files. See [Testing]({{< relref "../testing" >}}) for the full guide
 on writing tests.
 
 ```text

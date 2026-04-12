@@ -8,7 +8,7 @@ scampi inspect [flags] <config> [path]
 ```
 
 Reads a declarative configuration file and shows the resolved state of all
-steps after Starlark evaluation.
+steps after scampi evaluation.
 
 ## Modes
 

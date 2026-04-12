@@ -9,7 +9,7 @@ signature help in any editor that supports LSP.
 
 ## Features
 
-- **Full diagnostics** — runs the real Starlark evaluation pipeline, catching
+- **Full diagnostics** — runs the real scampi evaluation pipeline, catching
   unknown kwargs, missing required fields, type errors, invalid enum values,
   and syntax errors with precise source spans
 - **Completion** — step builtins, kwargs inside calls, module members
