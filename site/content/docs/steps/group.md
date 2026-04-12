@@ -6,20 +6,23 @@ Ensure a group exists or is absent on the target.
 
 ## Fields
 
-| Field    | Type   | Required | Default     | Description                          |
-| -------- | ------ | :------: | ----------- | ------------------------------------ |
-| `name`   | string |    ✓     |             | Group name to manage                 |
-| `desc`   | string |          |             | Human-readable description           |
-| `state`  | string |          | `"present"` | Desired state: `present` or `absent` |
-| `gid`    | int    |          |             | Group ID (auto-assigned if omitted)  |
-| `system` | bool   |          | `false`     | Create as system group               |
+| Field       | Type           | Required | Default              | Description                                |
+| ----------- | -------------- | :------: | -------------------- | ------------------------------------------ |
+| `name`      | string         |    ✓     |                      | Group name to manage (`@std.nonempty`)     |
+| `state`     | `GroupState`   |          | `GroupState.present` | Desired state                              |
+| `gid`      | int?           |          |                      | Group ID (auto-assigned if omitted)        |
+| `system`    | bool?          |          |                      | Create as system group                     |
+| `desc`      | string?        |          |                      | Human-readable description                 |
+| `on_change` | list\[Step]    |          |                      | Steps to trigger when this group changes   |
 
 ## States
 
-| State     | Behavior                                                        |
-| --------- | --------------------------------------------------------------- |
-| `present` | Create the group if it doesn't exist. No-op if already present. |
-| `absent`  | Delete the group if it exists. No-op if already absent.         |
+`posix.GroupState` is an enum:
+
+| Value                  | Behavior                                                        |
+| ---------------------- | --------------------------------------------------------------- |
+| `GroupState.present`   | Create the group if it doesn't exist. No-op if already present. |
+| `GroupState.absent`    | Delete the group if it exists. No-op if already absent.         |
 
 ## How it works
 
@@ -33,18 +36,18 @@ For `absent`, the step checks whether the group exists and removes it with
 
 ### Create a group
 
-```python
-group(name="appusers", gid=1100)
+```scampi
+posix.group { name = "appusers", gid = 1100 }
 ```
 
 ### System group
 
-```python
-group(
-    desc="application service group",
-    name="appd",
-    system=True,
-)
+```scampi
+posix.group {
+  desc   = "application service group"
+  name   = "appd"
+  system = true
+}
 ```
 
 ### Create a group for later steps
@@ -53,13 +56,13 @@ Groups created by a `group` step can be referenced as `group` in later steps.
 During `scampi check`, the engine defers "unknown group" errors when the group
 is promised by an earlier step.
 
-```python
-group(name="appusers")
-dir(path="/opt/app", group="appusers")
+```scampi
+posix.group { name = "appusers" }
+posix.dir { path = "/opt/app", group = "appusers" }
 ```
 
 ### Remove a group
 
-```python
-group(name="oldgroup", state="absent")
+```scampi
+posix.group { name = "oldgroup", state = posix.GroupState.absent }
 ```

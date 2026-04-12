@@ -7,28 +7,27 @@ ownership, and permissions.
 
 ## Fields
 
-| Field   | Type   | Required | Default | Description                                                           |
-| ------- | ------ | :------: | :-----: | --------------------------------------------------------------------- |
-| `src`   | source |    ✓     |         | [Source resolver]({{< relref "../configuration#source-resolvers" >}}) |
-| `dest`  | string |    ✓     |         | Target directory for extraction                                       |
-| `depth` | int    |          |    0    | Nested archive recursion (-1=unlimited, 0=top-level only)             |
-| `owner` | string |          |         | Owner applied recursively after extraction                            |
-| `group` | string |          |         | Group applied recursively after extraction                            |
-| `perm`  | string |          |         | Permissions applied recursively after extraction                      |
-| `desc`  | string |          |         | Human-readable description                                            |
+| Field       | Type        | Required | Default | Description                                                  |
+| ----------- | ----------- | :------: | :-----: | ------------------------------------------------------------ |
+| `src`       | `Source`    |    ✓     |         | Source resolver — see [below](#source-resolvers)             |
+| `dest`      | string      |    ✓     |         | Target directory for extraction (`@std.path(absolute=true)`) |
+| `depth`     | int?        |          |    0    | Nested archive recursion (-1 = unlimited, 0 = top-level only) |
+| `owner`     | string?     |          |         | Owner applied recursively after extraction                   |
+| `group`     | string?     |          |         | Group applied recursively after extraction                   |
+| `perm`      | string?     |          |         | Permissions applied recursively after extraction (`@std.filemode`) |
+| `desc`      | string?     |          |         | Human-readable description                                   |
+| `on_change` | list\[Step] |          |         | Steps to trigger when extraction runs                        |
 
 If `owner` is set, `group` must also be set (and vice versa).
 
 ## Source resolvers
 
-The `src` field accepts a source resolver:
+The `src` field accepts a `posix.Source` from one of three resolvers:
 
-- **`local("./path")`** — reads an archive from the local machine
-- **`remote(url="...")`** — downloads an archive via HTTP/HTTPS (with optional
-  `checksum` for verification)
-
-See [Source resolvers]({{< relref "../configuration#source-resolvers" >}}) for
-full details.
+- **`posix.source_local { path = "./path" }`** — reads an archive from the local
+  machine
+- **`posix.source_remote { url = "https://...", checksum = "sha256:..." }`** —
+  downloads via HTTP/HTTPS, with optional checksum verification
 
 ## Supported formats
 
@@ -70,7 +69,7 @@ Two extraction backends are available, chosen per-execution:
 
 When `depth != 0`, after extracting the top-level archive, nested archives
 found inside the destination are extracted in-place and removed. This repeats
-until `depth` is exhausted or no more archives are found. `depth=-1` means
+until `depth` is exhausted or no more archives are found. `depth = -1` means
 unlimited recursion.
 
 ### Idempotency
@@ -84,63 +83,68 @@ entirely. This avoids polluting user directories (git repos, web roots, etc.).
 
 ### Basic extraction
 
-```python {filename="deploy.scampi"}
-unarchive(
-    src = local("./files/site.tar.gz"),
-    dest = "/var/www/mysite",
-    depth = 0,
-)
+```scampi {filename="deploy.scampi"}
+posix.unarchive {
+  src   = posix.source_local { path = "./files/site.tar.gz" }
+  dest  = "/var/www/mysite"
+  depth = 0
+}
 ```
 
 ### With ownership and permissions
 
-```python {filename="deploy.scampi"}
-unarchive(
-    src = local("./files/app.tar.gz"),
-    dest = "/opt/myapp",
-    owner = "myapp",
-    group = "myapp",
-    perm = "0755",
-    desc = "deploy application bundle",
-)
+```scampi {filename="deploy.scampi"}
+posix.unarchive {
+  src   = posix.source_local { path = "./files/app.tar.gz" }
+  dest  = "/opt/myapp"
+  owner = "myapp"
+  group = "myapp"
+  perm  = "0755"
+  desc  = "deploy application bundle"
+}
 ```
 
 ### Nested archive unpacking
 
-```python {filename="deploy.scampi"}
-unarchive(
-    src = local("./release.tar.gz"),
-    dest = "/opt/release",
-    depth = -1,
-    desc = "extract release with nested archives",
-)
+```scampi {filename="deploy.scampi"}
+posix.unarchive {
+  src   = posix.source_local { path = "./release.tar.gz" }
+  dest  = "/opt/release"
+  depth = -1
+  desc  = "extract release with nested archives"
+}
 ```
 
-### Remote archive
+### Remote archive with checksum
 
-```python {filename="deploy.scampi"}
-unarchive(
-    src = remote(
-        url = "https://github.com/caddyserver/caddy/releases/download/v2.9.1/caddy_2.9.1_linux_amd64.tar.gz",
-        checksum = "sha256:a8f23e58ba52c3547e0c0e64be46419e8a8aa52b1bae3eb23c485c3b2a512c55",
-    ),
-    dest = "/opt/caddy",
-    owner = "caddy",
-    group = "caddy",
-    desc = "install caddy binary",
-)
+```scampi {filename="deploy.scampi"}
+posix.unarchive {
+  src = posix.source_remote {
+    url      = "https://github.com/caddyserver/caddy/releases/download/v2.9.1/caddy_2.9.1_linux_amd64.tar.gz"
+    checksum = "sha256:a8f23e58ba52c3547e0c0e64be46419e8a8aa52b1bae3eb23c485c3b2a512c55"
+  }
+  dest  = "/opt/caddy"
+  owner = "caddy"
+  group = "caddy"
+  desc  = "install caddy binary"
+}
 ```
 
-### Top-level only with hook
+### Trigger reload after extraction
 
-```python {filename="deploy.scampi"}
-unarchive(
-    src = local("./files/site.tar.gz"),
-    dest = "/var/www/scampi.dev",
-    depth = 0,
-    owner = "www-data",
-    group = "www-data",
-    desc = "extract site content",
-    on_change = ["restart-caddy"],
-)
+```scampi {filename="deploy.scampi"}
+let reload_caddy = posix.service {
+  name  = "caddy"
+  state = posix.ServiceState.reloaded
+}
+
+posix.unarchive {
+  src       = posix.source_local { path = "./files/site.tar.gz" }
+  dest      = "/var/www/scampi.dev"
+  depth     = 0
+  owner     = "www-data"
+  group     = "www-data"
+  desc      = "extract site content"
+  on_change = [reload_caddy]
+}
 ```
