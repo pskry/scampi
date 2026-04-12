@@ -8,7 +8,7 @@ publishing to a git repository first.
 
 ## Adding a local module
 
-```text
+```bash
 scampi mod add my/helpers ./modules/helpers
 ```
 
@@ -67,7 +67,7 @@ When a local module is ready to be shared:
 3. Tag a release: `git tag v1.0.0 && git push origin v1.0.0`
 4. Update your project's `scampi.mod`:
 
-```text
+```scampi-mod
 // Before (local)
 my/helpers ./modules/helpers
 
@@ -83,7 +83,7 @@ codeberg.org/yourname/helpers v1.0.0
 Local module paths don't need to look like URLs. Any slash-separated path
 works:
 
-```text
+```scampi-mod
 require (
     my/helpers ./modules/helpers
     infra/common ../shared/infra

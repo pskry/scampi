@@ -11,7 +11,7 @@ you use in deploy blocks.
 
 Add a module to your project:
 
-```text
+```bash
 scampi mod init codeberg.org/yourname/yourproject
 scampi mod add codeberg.org/scampi-modules/npm
 ```

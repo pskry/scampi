@@ -3,7 +3,7 @@ title: legend
 weight: 9
 ---
 
-```text
+```bash
 scampi legend
 ```
 

@@ -83,7 +83,7 @@ If no meta tag is found, scampi falls back to cloning
 
 Tag releases with semver: `v1.0.0`, `v0.3.2`, `v2.0.0-alpha.1`.
 
-```text
+```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
@@ -92,7 +92,7 @@ git push origin v1.0.0
 Users can pin to a specific version including pre-releases by specifying
 it explicitly:
 
-```text
+```bash
 scampi mod add codeberg.org/yourname/module@v2.0.0-alpha.1
 ```
 
@@ -122,7 +122,7 @@ list what they directly `import`.
 Include `*_test.scampi` files in your module repository. Consumers and
 CI pipelines can run them with `scampi test`:
 
-```text
+```bash
 scampi test ./...
 ```
 

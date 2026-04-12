@@ -37,7 +37,7 @@ go install scampi.dev/scampi/cmd/scampls@latest
 For development against the source tree, use `go run` directly — it
 recompiles on every editor restart so you always get the latest:
 
-```text
+```bash
 go run ./cmd/scampls
 ```
 
@@ -100,7 +100,7 @@ transport.
 
 Pass `--log` to write debug output to a file:
 
-```text
+```bash
 scampls --log /tmp/scampls.log
 ```
 
