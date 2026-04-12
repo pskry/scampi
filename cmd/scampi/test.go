@@ -63,7 +63,7 @@ func testCmd() *cli.Command {
 			totalPassed, totalFailed := 0, 0
 
 			for _, f := range files {
-				passed, failed, err := runTestFile(ctx, em, f, store, src)
+				passed, failed, err := dispatchTestFile(ctx, em, f, store, src)
 				if err != nil {
 					emitTestDiag(em, &testkit.TestError{
 						Detail: err.Error(),
@@ -88,6 +88,26 @@ func testCmd() *cli.Command {
 			return nil
 		},
 	}
+}
+
+// dispatchTestFile chooses between the legacy Starlark runner and
+// the scampi-lang runner based on the file's first significant line:
+// scampi-lang files start with `module ...`, legacy Starlark files
+// don't. This is the migration switch — once every fixture has been
+// translated to scampi-lang (Phase 5) and star/ deletes (Phase 6),
+// this dispatcher and the legacy path go away with it.
+func dispatchTestFile(
+	ctx context.Context,
+	em diagnostic.Emitter,
+	testPath string,
+	store *diagnostic.SourceStore,
+	src source.Source,
+) (passed, failed int, err error) {
+	data, readErr := src.ReadFile(ctx, testPath)
+	if readErr == nil && detectLangSyntax(data) {
+		return runLangTestFile(ctx, em, testPath, src)
+	}
+	return runTestFile(ctx, em, testPath, store, src)
 }
 
 func runTestFile(
