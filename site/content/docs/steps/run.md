@@ -7,17 +7,15 @@ when no built-in step type fits your needs.
 
 ## Fields
 
-Provide exactly one of:
+| Field       | Type        | Required | Default | Description                                        |
+| ----------- | ----------- | :------: | ------- | -------------------------------------------------- |
+| `apply`     | string      |    ✓     |         | Shell command to execute (`@std.nonempty`)         |
+| `check`     | string?     |          |         | Shell command that exits 0 if apply is unnecessary |
+| `always`    | bool?       |          | `false` | Always run apply, skip check                       |
+| `desc`      | string?     |          |         | Human-readable description                         |
+| `on_change` | list\[Step] |          |         | Steps to trigger when apply runs                   |
 
-| Field    | Type   | Default | Description                                        |
-| -------- | ------ | ------- | -------------------------------------------------- |
-| `check`  | string |         | Shell command that exits 0 if apply is unnecessary |
-| `always` | bool   | `false` | Always run apply, skip check                       |
-
-| Field   | Type   | Required | Description                |
-| ------- | ------ | :------: | -------------------------- |
-| `apply` | string |    ✓     | Shell command to execute   |
-| `desc`  | string |          | Human-readable description |
+Provide either `check` or `always` (or neither — but at least one of them is recommended for idempotency).
 
 ## How it works
 
@@ -46,44 +44,44 @@ command does, so it can't make promises about it.
 
 ### With check
 
-```python
-run(
-    desc = "enable IP forwarding",
-    check = "sysctl net.ipv4.ip_forward | grep -q '= 1'",
-    apply = "sysctl -w net.ipv4.ip_forward=1",
-)
+```scampi
+posix.run {
+  desc  = "enable IP forwarding"
+  check = "sysctl net.ipv4.ip_forward | grep -q '= 1'"
+  apply = "sysctl -w net.ipv4.ip_forward=1"
+}
 ```
 
 ### Extract an archive
 
-```python
-run(
-    desc = "extract site content",
-    check = "test /var/www/site/index.html -nt /tmp/site.tar.gz",
-    apply = "tar xzf /tmp/site.tar.gz -C /var/www/site",
-)
+```scampi
+posix.run {
+  desc  = "extract site content"
+  check = "test /var/www/site/index.html -nt /tmp/site.tar.gz"
+  apply = "tar xzf /tmp/site.tar.gz -C /var/www/site"
+}
 ```
 
 ### Always run
 
-```python
-run(
-    desc = "reload nginx config",
-    always = True,
-    apply = "nginx -s reload",
-)
+```scampi
+posix.run {
+  desc   = "reload nginx config"
+  always = true
+  apply  = "nginx -s reload"
+}
 ```
 
 ### Migration on-ramp
 
 You can wrap existing tools as a stepping stone:
 
-```python
-run(
-    desc = "run ansible playbook",
-    always = True,
-    apply = "ansible-playbook -i inventory site.yml",
-)
+```scampi
+posix.run {
+  desc   = "run ansible playbook"
+  always = true
+  apply  = "ansible-playbook -i inventory site.yml"
+}
 ```
 
 This is deliberately ugly — it works, but you lose all convergence guarantees.

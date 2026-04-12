@@ -6,17 +6,15 @@ Create and manage symbolic links on the target.
 
 ## Fields
 
-| Field    | Type   | Required | Description                                           |
-| -------- | ------ | :------: | ----------------------------------------------------- |
-| `link`   | string |    ✓     | Path where the symlink is created                     |
-| `target` | string |    ✓     | Path the symlink points to (the file being linked to) |
-| `desc`   | string |          | Human-readable description                            |
+| Field       | Type        | Required | Description                                           |
+| ----------- | ----------- | :------: | ----------------------------------------------------- |
+| `target`    | string      |    ✓     | Path the symlink points to (`@std.path(absolute=true)`) |
+| `link`      | string      |    ✓     | Path where the symlink lives (`@std.path(absolute=true)`) |
+| `desc`      | string?     |          | Human-readable description                            |
+| `on_change` | list\[Step] |          | Steps to trigger when the link is created or updated  |
 
 Think of it like `ln -s TARGET LINK` — `target` is what you're pointing at,
 `link` is where the symlink lives.
-
-The `link` path must be absolute. The `target` path can be relative (it's
-resolved relative to the link's parent directory).
 
 ## How it works
 
@@ -28,28 +26,34 @@ recreates) it.
 
 ### Config symlink
 
-```python
-symlink(
-    target = "/opt/app/current/config.yaml",
-    link = "/etc/app/config.yaml",
-)
+```scampi
+posix.symlink {
+  target = "/opt/app/current/config.yaml"
+  link   = "/etc/app/config.yaml"
+}
 ```
 
 ### Version switching
 
-```python
-symlink(
-    desc = "point to active release",
-    target = "/opt/releases/v1.4.2",
-    link = "/opt/app/current",
-)
+```scampi
+posix.symlink {
+  desc   = "point to active release"
+  target = "/opt/releases/v1.4.2"
+  link   = "/opt/app/current"
+}
 ```
 
-### Relative target
+### Reload service when link changes
 
-```python
-symlink(
-    target = "../shared/logging.conf",
-    link = "/opt/app/config/logging.conf",
-)
+```scampi
+let reload_app = posix.service {
+  name  = "myapp"
+  state = posix.ServiceState.reloaded
+}
+
+posix.symlink {
+  target    = "/opt/releases/v1.4.2"
+  link      = "/opt/app/current"
+  on_change = [reload_app]
+}
 ```

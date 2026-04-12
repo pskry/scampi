@@ -6,11 +6,22 @@ Manage firewall rules via UFW or firewalld.
 
 ## Fields
 
-| Field    | Type   | Required | Default   | Description                               |
-| -------- | ------ | :------: | --------- | ----------------------------------------- |
-| `port`   | string |    ✓     |           | Port/protocol string                      |
-| `action` | string |          | `"allow"` | Rule action: `allow`, `deny`, or `reject` |
-| `desc`   | string |          |           | Human-readable description                |
+| Field       | Type             | Required | Default                  | Description                                            |
+| ----------- | ---------------- | :------: | ------------------------ | ------------------------------------------------------ |
+| `port`      | string           |    ✓     |                          | Port/protocol string — see [below](#port-format)       |
+| `action`    | `FirewallAction` |          | `FirewallAction.allow`   | Rule action                                            |
+| `desc`      | string?          |          |                          | Human-readable description                             |
+| `on_change` | list\[Step]      |          |                          | Steps to trigger when this rule changes                |
+
+## Actions
+
+`posix.FirewallAction` is an enum:
+
+| Value                       | UFW command         | firewalld command       |
+| --------------------------- | ------------------- | ----------------------- |
+| `FirewallAction.allow`      | `ufw allow 22/tcp`  | `--add-port=22/tcp`     |
+| `FirewallAction.deny`       | `ufw deny 22/tcp`   | rich rule with `drop`   |
+| `FirewallAction.reject`     | `ufw reject 22/tcp` | rich rule with `reject` |
 
 ## How it works
 
@@ -29,7 +40,7 @@ On every check, scampi probes for a supported backend:
 
 - **Check**: runs `ufw show added` and looks for `ufw <action> <port>`. This
   works even when UFW is inactive — rules are stored, just not enforced. Use the
-  `service()` step to enable UFW itself.
+  `service` step to enable UFW itself.
 - **Apply**: runs `ufw <action> <port>`.
 
 ### firewalld
@@ -42,22 +53,15 @@ On every check, scampi probes for a supported backend:
 
 The `--permanent` + `--reload` pattern ensures rules persist across reboots.
 
-### Action mapping
-
-| Action   | UFW command         | firewalld command       |
-| -------- | ------------------- | ----------------------- |
-| `allow`  | `ufw allow 22/tcp`  | `--add-port=22/tcp`     |
-| `deny`   | `ufw deny 22/tcp`   | rich rule with `drop`   |
-| `reject` | `ufw reject 22/tcp` | rich rule with `reject` |
-
 ## Port format
 
-The `port` field accepts:
+The `port` field is validated against the regex
+`^[0-9]+(-[0-9]+)?(/(tcp|udp))?$` and accepts:
 
 | Format                  | Example         | Description |
 | ----------------------- | --------------- | ----------- |
 | `<port>/<proto>`        | `22/tcp`        | Single port |
-| `<start>:<end>/<proto>` | `6000:6007/tcp` | Port range  |
+| `<start>-<end>/<proto>` | `6000-6007/tcp` | Port range  |
 
 Protocol must be `tcp` or `udp`.
 
@@ -65,44 +69,43 @@ Protocol must be `tcp` or `udp`.
 
 ### Allow SSH
 
-```python {filename="deploy.scampi"}
-firewall(
-    port="22/tcp",
-    action="allow",
-    desc="allow SSH",
-)
+```scampi {filename="deploy.scampi"}
+posix.firewall {
+  port = "22/tcp"
+  desc = "allow SSH"
+}
 ```
 
 ### Allow HTTP and HTTPS
 
-```python {filename="deploy.scampi"}
-firewall(port="80/tcp", desc="allow HTTP")
-firewall(port="443/tcp", desc="allow HTTPS")
+```scampi {filename="deploy.scampi"}
+posix.firewall { port = "80/tcp", desc = "allow HTTP" }
+posix.firewall { port = "443/tcp", desc = "allow HTTPS" }
 ```
 
 ### Deny a port
 
-```python {filename="deploy.scampi"}
-firewall(
-    port="3306/tcp",
-    action="deny",
-    desc="block MySQL from outside",
-)
+```scampi {filename="deploy.scampi"}
+posix.firewall {
+  port   = "3306/tcp"
+  action = posix.FirewallAction.deny
+  desc   = "block MySQL from outside"
+}
 ```
 
 ### Server hardening pattern
 
-```python {filename="harden.scampi"}
-pkg(
-    packages=["ufw"],
-    state="present",
-    source=system(),
-    desc="install firewall",
-)
+```scampi {filename="harden.scampi"}
+posix.pkg {
+  packages = ["ufw"]
+  state    = posix.PkgState.present
+  source   = posix.pkg_system {}
+  desc     = "install firewall"
+}
 
-firewall(port="22/tcp", desc="allow SSH")
-firewall(port="80/tcp", desc="allow HTTP")
-firewall(port="443/tcp", desc="allow HTTPS")
+posix.firewall { port = "22/tcp", desc = "allow SSH" }
+posix.firewall { port = "80/tcp", desc = "allow HTTP" }
+posix.firewall { port = "443/tcp", desc = "allow HTTPS" }
 
-service(name="ufw", state="running", enabled=True)
+posix.service { name = "ufw", state = posix.ServiceState.running, enabled = true }
 ```
