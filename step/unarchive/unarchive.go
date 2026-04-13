@@ -52,10 +52,14 @@ func (u Unarchive) Plan(step spec.StepInstance) (spec.Action, error) {
 	// @std.path(absolute=true) and @std.filemode on the stub.
 	// Archive format detection (filename-based) and owner/group
 	// mutual requirement are runtime/cross-field — they stay.
-	fmt, ok := detectFormat(cfg.Src.Path)
+	formatPath := cfg.Src.Path
+	if cfg.Src.Kind == spec.SourceRemote {
+		formatPath = cfg.Src.URL
+	}
+	fmt, ok := detectFormat(formatPath)
 	if !ok {
 		return nil, UnsupportedArchiveError{
-			Path:   cfg.Src.Path,
+			Path:   formatPath,
 			Source: step.Fields["src"].Value,
 		}
 	}
