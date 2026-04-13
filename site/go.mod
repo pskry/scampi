@@ -86,7 +86,7 @@ require (
 	github.com/frankban/quicktest v1.14.6 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/getkin/kin-openapi v0.133.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
@@ -115,7 +115,6 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hairyhenderson/go-codeowners v0.7.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/imfing/hextra v0.12.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jdkato/prose v1.2.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
