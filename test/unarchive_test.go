@@ -952,3 +952,46 @@ std.deploy(name = "test", targets = [host]) {
 		t.Error("marker file not written after Go-native zstd extraction")
 	}
 }
+
+// Unarchive: remote source format detection
+// -----------------------------------------------------------------------------
+
+func TestUnarchive_RemoteSourceFormatDetected(t *testing.T) {
+	// Plan must detect the archive format from the remote URL, not the
+	// empty cache path. Before the fix, source_remote had Path="" at plan
+	// time, causing detectFormat to return "unsupported archive format".
+	cfgStr := `
+module main
+import "std"
+import "std/posix"
+import "std/local"
+
+let host = local.target { name = "local" }
+
+std.deploy(name = "test", targets = [host]) {
+  posix.unarchive {
+    src  = posix.source_remote { url = "https://example.com/release-v1.0.tar.gz" }
+    dest = "/opt/app"
+  }
+}
+`
+	src := source.NewMemSource()
+	tgt := target.NewMemTarget()
+	tgt.CommandFunc = toolCommandFunc(tgt)
+
+	rec := &recordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+	store := diagnostic.NewSourceStore()
+
+	e, err := loadAndResolve(t, cfgStr, src, tgt, em, store)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer e.Close()
+
+	// Plan is the phase where format detection runs. If this succeeds,
+	// the URL was used for format detection instead of the empty cache path.
+	if err := e.Plan(context.Background()); err != nil {
+		t.Fatalf("Plan failed: %v\nBefore fix, this was 'unsupported archive format: \"\"'", err)
+	}
+}
