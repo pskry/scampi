@@ -88,6 +88,7 @@ type @path {
 func env(name: string, default: string?) string
 func secret(@secretkey name: string) string
 func range(n: int) list[int]
+func ref(step: Step, expr: string) any
 
 func deploy(name: string, targets: list[Target]) block[Deploy]
 

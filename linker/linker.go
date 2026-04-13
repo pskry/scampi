@@ -8,6 +8,7 @@ package linker
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"scampi.dev/scampi/lang/eval"
@@ -195,6 +196,12 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry, lc *linkConfig) (spec.Dep
 		return nil
 	}
 
+	// Link steps and assign sequential StepIDs. Build a mapping
+	// from eval-time StructVal pointer to StepID so we can resolve
+	// ref() values after all steps have been linked.
+	stepIDs := map[*eval.StructVal]spec.StepID{}
+	var nextID spec.StepID = 1
+
 	for _, v := range bv.Body {
 		sv, ok := v.(*eval.StructVal)
 		if !ok {
@@ -204,13 +211,70 @@ func linkDeploy(bv *eval.BlockResultVal, reg Registry, lc *linkConfig) (spec.Dep
 		if err != nil {
 			return db, err
 		}
+		si.ID = nextID
+		stepIDs[sv] = nextID
+		nextID++
 		if err := extractHooks(sv, &si); err != nil {
 			return db, err
 		}
 		db.Steps = append(db.Steps, si)
 	}
 
+	// Resolve ref() values: walk all step configs and replace
+	// RefVals with spec.Refs using the StepID mapping.
+	for i := range db.Steps {
+		resolveStepRefs(&db.Steps[i], stepIDs)
+	}
+
 	return db, nil
+}
+
+// resolveStepRefs walks a StepInstance's config looking for RefVal
+// values (produced by std.ref()) and replaces them with spec.Ref
+// using the StructVal → StepID mapping from linking. RefVals can
+// appear in map[string]any fields because the linker's setValue
+// converts eval.Value → Go native types, but RefVal is special —
+// it passes through as-is (narrow interface path).
+func resolveStepRefs(si *spec.StepInstance, ids map[*eval.StructVal]spec.StepID) {
+	if si.Config == nil {
+		return
+	}
+	v := reflect.ValueOf(si.Config)
+	if v.Kind() == reflect.Pointer {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return
+	}
+	for i := range v.NumField() {
+		fv := v.Field(i)
+		if !fv.CanInterface() {
+			continue
+		}
+		switch val := fv.Interface().(type) {
+		case *eval.RefVal:
+			if val != nil {
+				targetID := ids[val.Step]
+				fv.Set(reflect.ValueOf(spec.Ref{
+					TargetID: targetID,
+					Expr:     val.Expr,
+				}))
+			}
+		case map[string]any:
+			resolveMapRefs(val, ids)
+		}
+	}
+}
+
+func resolveMapRefs(m map[string]any, ids map[*eval.StructVal]spec.StepID) {
+	for k, v := range m {
+		if rv, ok := v.(*eval.RefVal); ok && rv != nil {
+			m[k] = spec.Ref{
+				TargetID: ids[rv.Step],
+				Expr:     rv.Expr,
+			}
+		}
+	}
 }
 
 func linkStep(sv *eval.StructVal, reg Registry, lc *linkConfig) (spec.StepInstance, error) {

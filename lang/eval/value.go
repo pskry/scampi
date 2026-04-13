@@ -149,6 +149,17 @@ type FuncVal struct {
 func (*FuncVal) valueTag()        {}
 func (v *FuncVal) String() string { return "func " + v.Name }
 
+// RefVal is a cross-step value reference. Produced by std.ref(step, expr)
+// at eval time. The linker converts it to a spec.Ref with a concrete
+// StepID once step linking assigns IDs.
+type RefVal struct {
+	Step *StructVal // the step being referenced (eval-time identity)
+	Expr string     // jq expression to extract from the step's output
+}
+
+func (*RefVal) valueTag()        {}
+func (v *RefVal) String() string { return "ref(..," + v.Expr + ")" }
+
 // Result
 // -----------------------------------------------------------------------------
 

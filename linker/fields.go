@@ -63,6 +63,14 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 	if src == nil {
 		return nil
 	}
+	// RefVal: preserve as-is in any-typed fields so resolveStepRefs
+	// can find and convert them to spec.Ref after StepID assignment.
+	if rv, ok := src.(*eval.RefVal); ok {
+		if dst.Kind() == reflect.Interface {
+			dst.Set(reflect.ValueOf(rv))
+			return nil
+		}
+	}
 	// StructVal needs type-specific handling first — check before
 	// the generic interface path.
 	if sv, ok := src.(*eval.StructVal); ok {

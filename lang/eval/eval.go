@@ -873,6 +873,33 @@ func (ev *Evaluator) callRange(positional []Value, kwargs map[string]Value) Valu
 	return &ListVal{Items: items}
 }
 
+func (ev *Evaluator) callRef(positional []Value, kwargs map[string]Value) Value {
+	var step *StructVal
+	var expr string
+
+	if len(positional) > 0 {
+		step, _ = positional[0].(*StructVal)
+	}
+	if len(positional) > 1 {
+		if s, ok := positional[1].(*StringVal); ok {
+			expr = s.V
+		}
+	}
+	if sv, ok := kwargs["step"]; ok {
+		step, _ = sv.(*StructVal)
+	}
+	if sv, ok := kwargs["expr"]; ok {
+		if s, ok := sv.(*StringVal); ok {
+			expr = s.V
+		}
+	}
+
+	if step == nil {
+		return &NoneVal{}
+	}
+	return &RefVal{Step: step, Expr: expr}
+}
+
 // SetSecretLookup allows callers (via WithOnEmit) to wire the secret
 // resolver after seeing a SecretsConfig value during evaluation.
 func (ev *Evaluator) SetSecretLookup(fn SecretLookupFunc) {
@@ -962,6 +989,8 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 			return ev.callSecret(positional, kwargs, callSpan)
 		case "range":
 			return ev.callRange(positional, kwargs)
+		case "ref":
+			return ev.callRef(positional, kwargs)
 		}
 
 		if strings.HasPrefix(fv.RetType, "block[") && strings.HasSuffix(fv.RetType, "]") {
@@ -1038,9 +1067,12 @@ func (ev *Evaluator) evalStructLit(lit *ast.StructLit) Value {
 			// callFunc which handles return statements and builds
 			// proper StructVals with declReturns resolution. Stubs
 			// (no body) fall through to the normal struct-lit path.
-			result := ev.callFunc(fv, nil, fields, lit.Span())
-			ev.emitValue(result)
-			return &NoneVal{}
+			//
+			// Return the result directly — don't emitValue here.
+			// The caller handles emission: ExprStmt emits via
+			// evalStmt; LetStmt binds without emitting so the user
+			// can let-bind and re-emit later (ref() pattern).
+			return ev.callFunc(fv, nil, fields, lit.Span())
 		}
 	}
 
