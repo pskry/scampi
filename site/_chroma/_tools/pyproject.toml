@@ -5,6 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pygments>=2.19.1",
+    "pygments>=2.20.0",
     "pystache>=0.6.8",
 ]
