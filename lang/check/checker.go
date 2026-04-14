@@ -352,9 +352,11 @@ func (c *Checker) registerDecl(d ast.Decl) {
 			Name: d.Name.Parts[0].Name, Kind: SymDecl, Span: d.SrcSpan,
 		})
 	case *ast.LetDecl:
-		c.scope.Define(&Symbol{
+		if !c.scope.Define(&Symbol{
 			Name: d.Name.Name, Kind: SymLet, Span: d.SrcSpan,
-		})
+		}) {
+			c.errAt(d.SrcSpan, "duplicate let binding: "+d.Name.Name)
+		}
 	}
 }
 

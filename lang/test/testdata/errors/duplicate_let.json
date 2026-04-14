@@ -1,0 +1,3 @@
+{
+  "errors": ["duplicate let binding: x"]
+}
