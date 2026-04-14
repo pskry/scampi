@@ -1,0 +1,303 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+package integration
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/engine"
+	"scampi.dev/scampi/test/harness"
+)
+
+func TestIndexAll_EmitsWellFormedEvent(t *testing.T) {
+	rec := &harness.RecordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+	err := engine.IndexAll(context.Background(), em)
+	if err != nil {
+		t.Fatalf("IndexAll failed: %v", err)
+	}
+
+	if len(rec.IndexAllEvents) == 0 {
+		t.Fatal("no IndexAllEvent emitted")
+	}
+
+	if len(rec.IndexAllEvents) != 1 {
+		t.Fatalf("too many IndexAllEvent emitted - have %d, want 1", len(rec.IndexAllEvents))
+	}
+
+	e := rec.IndexAllEvents[0]
+	if len(e.Steps) == 0 {
+		t.Fatal("IndexAllEvent has no steps")
+	}
+
+	// Verify known steps are present with summaries
+	found := make(map[string]string)
+	for _, s := range e.Steps {
+		found[s.Kind] = s.Desc
+	}
+
+	for _, kind := range []string{"copy", "symlink", "unarchive"} {
+		desc, ok := found[kind]
+		if !ok {
+			t.Errorf("missing step %q in index", kind)
+			continue
+		}
+		if desc == "" {
+			t.Errorf("step %q has empty description", kind)
+		}
+	}
+}
+
+func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
+	tests := []struct {
+		kind           string
+		wantSummary    string
+		wantFields     []string
+		wantFieldCount int
+	}{
+		{
+			kind:           "copy",
+			wantSummary:    "Copy files with owner and permission management",
+			wantFields:     []string{"src", "dest", "perm", "owner", "group", "verify"},
+			wantFieldCount: 7, // includes desc
+		},
+		{
+			kind:           "symlink",
+			wantSummary:    "Create and manage symbolic links",
+			wantFields:     []string{"target", "link"},
+			wantFieldCount: 3, // includes desc
+		},
+		{
+			kind:           "pkg",
+			wantSummary:    "Ensure packages are present, absent, or at the latest version on the target",
+			wantFields:     []string{"packages", "state", "source"},
+			wantFieldCount: 4, // includes desc
+		},
+		{
+			kind:           "firewall",
+			wantSummary:    "Manage firewall rules via UFW or firewalld",
+			wantFields:     []string{"port", "action"},
+			wantFieldCount: 3, // includes desc
+		},
+		{
+			kind:           "sysctl",
+			wantSummary:    "Manage kernel parameters via sysctl with optional persistence",
+			wantFields:     []string{"key", "value"},
+			wantFieldCount: 4, // includes desc, persist
+		},
+		{
+			kind:           "unarchive",
+			wantSummary:    "Extract an archive to a target directory with optional recursive unpacking",
+			wantFields:     []string{"src", "dest", "depth", "owner", "group", "perm"},
+			wantFieldCount: 7, // includes desc
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.kind, func(t *testing.T) {
+			rec := &harness.RecordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+			err := engine.IndexStep(context.Background(), tt.kind, em)
+			if err != nil {
+				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
+			}
+
+			if len(rec.IndexStepEvents) == 0 {
+				t.Fatal("no IndexStepEvent emitted")
+			}
+
+			if len(rec.IndexStepEvents) != 1 {
+				t.Fatalf("too many IndexStepEvent emitted - have %d, want 1", len(rec.IndexStepEvents))
+			}
+
+			doc := rec.IndexStepEvents[0].Doc
+
+			if doc.Kind != tt.kind {
+				t.Errorf("Kind = %q, want %q", doc.Kind, tt.kind)
+			}
+
+			if doc.Summary != tt.wantSummary {
+				t.Errorf("Summary = %q, want %q", doc.Summary, tt.wantSummary)
+			}
+
+			if len(doc.Fields) != tt.wantFieldCount {
+				t.Errorf("len(Fields) = %d, want %d", len(doc.Fields), tt.wantFieldCount)
+			}
+
+			fieldNames := make(map[string]bool)
+			for _, f := range doc.Fields {
+				fieldNames[f.Name] = true
+
+				if f.Type == "" {
+					t.Errorf("field %q has empty Type", f.Name)
+				}
+			}
+
+			for _, wantField := range tt.wantFields {
+				if !fieldNames[wantField] {
+					t.Errorf("missing field %q", wantField)
+				}
+			}
+		})
+	}
+}
+
+func TestIndexStep_UnknownKind_Aborts(t *testing.T) {
+	rec := &harness.RecordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+	err := engine.IndexStep(context.Background(), "nonexistent", em)
+	if err == nil {
+		t.Fatal("expected error for unknown kind")
+	}
+
+	var abort engine.AbortError
+	if !errors.As(err, &abort) {
+		t.Errorf("expected AbortError, got %T", err)
+	}
+}
+
+func TestIndexStep_FieldsHaveDocumentation(t *testing.T) {
+	rec := &harness.RecordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+	_ = engine.IndexStep(context.Background(), "symlink", em)
+
+	if len(rec.IndexStepEvents) == 0 {
+		t.Fatal("no IndexStepEvent emitted")
+	}
+
+	if len(rec.IndexStepEvents) != 1 {
+		t.Fatalf("too many IndexStepEvent emitted - have %d, want 1", len(rec.IndexStepEvents))
+	}
+
+	for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+		if f.Desc == "" {
+			t.Errorf("field %q has no description", f.Name)
+		}
+	}
+}
+
+func TestIndexStep_DefaultsPopulated(t *testing.T) {
+	tests := []struct {
+		kind    string
+		field   string
+		wantDef string
+	}{
+		{"pkg", "state", `"present"`},
+		{"service", "state", `"running"`},
+		{"service", "enabled", `"true"`},
+		{"firewall", "action", `"allow"`},
+		{"sysctl", "persist", `"true"`},
+		{"unarchive", "depth", `"0"`},
+		{"user", "state", `"present"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.kind+"/"+tt.field, func(t *testing.T) {
+			rec := &harness.RecordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+			err := engine.IndexStep(context.Background(), tt.kind, em)
+			if err != nil {
+				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
+			}
+
+			if len(rec.IndexStepEvents) != 1 {
+				t.Fatalf("expected 1 IndexStepEvent, got %d", len(rec.IndexStepEvents))
+			}
+
+			var found bool
+			for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+				if f.Name == tt.field {
+					found = true
+					if f.Default != tt.wantDef {
+						t.Errorf("field %q default = %q, want %q", tt.field, f.Default, tt.wantDef)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("field %q not found in %q step", tt.field, tt.kind)
+			}
+		})
+	}
+}
+
+func TestIndexStep_RequiredFieldsMarkedCorrectly(t *testing.T) {
+	rec := &harness.RecordingDisplayer{}
+	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+	_ = engine.IndexStep(context.Background(), "symlink", em)
+
+	if len(rec.IndexStepEvents) == 0 {
+		t.Fatal("no IndexStepEvent emitted")
+	}
+
+	if len(rec.IndexStepEvents) != 1 {
+		t.Fatalf("too many IndexStepEvent emitted - have %d, want 1", len(rec.IndexStepEvents))
+	}
+
+	fields := make(map[string]bool)
+	for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+		fields[f.Name] = f.Required
+	}
+
+	// target and link are required, desc is optional
+	if !fields["target"] {
+		t.Error("target should be required")
+	}
+	if !fields["link"] {
+		t.Error("link should be required")
+	}
+	if fields["desc"] {
+		t.Error("desc should be optional")
+	}
+}
+
+func TestIndexStep_ExclusiveFieldsPopulated(t *testing.T) {
+	tests := []struct {
+		kind  string
+		group string
+		want  []string
+	}{
+		{"run", "trigger", []string{"check", "always"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.kind+"/"+tt.group, func(t *testing.T) {
+			rec := &harness.RecordingDisplayer{}
+			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+
+			err := engine.IndexStep(context.Background(), tt.kind, em)
+			if err != nil {
+				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
+			}
+
+			if len(rec.IndexStepEvents) != 1 {
+				t.Fatalf("expected 1 IndexStepEvent, got %d", len(rec.IndexStepEvents))
+			}
+
+			var got []string
+			for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+				if f.Exclusive == tt.group {
+					got = append(got, f.Name)
+				}
+			}
+
+			if len(got) != len(tt.want) {
+				t.Fatalf("exclusive group %q: got %v, want %v", tt.group, got, tt.want)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Errorf("exclusive group %q[%d] = %q, want %q", tt.group, i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}

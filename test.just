@@ -14,7 +14,7 @@ unit:
 
 [doc("Run integration tests")]
 integration:
-  go test -v ./test/...
+  go test -v ./test/integration/...
 
 [doc("Run tests with race-detector")]
 race:
@@ -28,46 +28,26 @@ containers:
 nocontainers:
   go test -race -v ./...
   just test testkit
-  go test ./test -bench=. -benchmem -count=1 -benchtime=1x
+  go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x
   just test fuzz 5s
 
 [doc("Run all tests with race-detector and containers (pre-push gate)")]
 everything:
   SCAMPI_TEST_CONTAINERS=1 go test -race -v ./...
   just test testkit
-  go test ./test -bench=. -benchmem -count=1 -benchtime=1x
+  go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x
   just test fuzz 5s
 
 # Focused
 # ##############################################################################
 
-[doc("Run diagnostic validation tests")]
-diagnostics:
-  go test -v ./test -run TestDiagnostics
-
-[doc("Run drift detection tests")]
-drift:
-  go test -v ./test -run TestDrift
-
-[doc("Run e2e scenario tests")]
-e2e:
-  go test -v ./test -run TestE2E
-
 [doc("Run SSH tests (requires containers)")]
 ssh:
-  SCAMPI_TEST_CONTAINERS=1 go test -v ./test -run TestSSH
+  SCAMPI_TEST_CONTAINERS=1 go test -v ./test/ssh/...
 
 [doc("Run scampi testkit tests (scampi test framework)")]
 testkit:
   go run ./cmd/scampi test test/testdata/testkit/...
-
-[doc("Run gen api golden tests")]
-genapi:
-  go test -v ./test -run TestGenAPI
-
-[doc("Run code style rule tests")]
-rules:
-  go test -v ./test -run 'TestImportCapabilities|TestFuncSignatureStyle|TestMarkdownTableAlignment|TestBareErrorBan|TestLangPackageIsolation|Test_StepType'
 
 # Fuzz and benchmarks
 # ##############################################################################
@@ -92,7 +72,7 @@ fuzz time='30s' pkg='':
 bench save_as='' count='10' benchtime='100ms':
   {{
     if save_as == '' {
-      f"go test ./test -bench=. -benchmem -count={{count}} -benchtime={{benchtime}}"
+      f"go test ./test/integration -bench=. -benchmem -count={{count}} -benchtime={{benchtime}}"
     } else {
       f'''
       mkdir -p "{{bench_dir}}"
@@ -105,9 +85,9 @@ bench save_as='' count='10' benchtime='100ms':
         fi
       fi
       echo 'Warmup run...'
-      go test ./test -bench=. -benchmem -count=2 -benchtime={{benchtime}}
+      go test ./test/integration -bench=. -benchmem -count=2 -benchtime={{benchtime}}
       echo 'Recorded run...'
-      go test ./test -bench=. -benchmem -count={{count}} -benchtime={{benchtime}} \
+      go test ./test/integration -bench=. -benchmem -count={{count}} -benchtime={{benchtime}} \
         | tee "{{bench_dir}}/$ts-{{save_as}}.txt"
       '''
     }
