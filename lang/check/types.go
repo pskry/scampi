@@ -195,7 +195,13 @@ func IsAssignableTo(src, dst Type) bool {
 	if dst == AnyType {
 		return true
 	}
-	// T is assignable to T?.
+	// T? is assignable to T? (unwrap both sides).
+	if srcOpt, ok := src.(*Optional); ok {
+		if dstOpt, ok := dst.(*Optional); ok {
+			return IsAssignableTo(srcOpt.Inner, dstOpt.Inner)
+		}
+	}
+	// T is assignable to T? (and none is assignable to T?).
 	if opt, ok := dst.(*Optional); ok {
 		if src == NoneType {
 			return true

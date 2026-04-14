@@ -1011,6 +1011,22 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 	}
 	parent, _ := fv.scope.(*envScope)
 	child := newEnv(parent)
+	// If this is a user module function (QualName has a module
+	// prefix), bind the module's sibling functions into the body
+	// scope so bare references like `get_nginx_proxy_hosts()` work
+	// within the module — same as Go's intra-package visibility.
+	if dot := strings.IndexByte(fv.QualName, '.'); dot > 0 {
+		modPrefix := fv.QualName[:dot]
+		if modVal, ok := ev.env.get(modPrefix); ok {
+			if mv, ok := modVal.(*MapVal); ok {
+				for i, k := range mv.Keys {
+					if sk, ok := k.(*StringVal); ok {
+						child.set(sk.V, mv.Values[i])
+					}
+				}
+			}
+		}
+	}
 	for i, name := range fv.Params {
 		if v, ok := kwargs[name]; ok {
 			child.set(name, v)

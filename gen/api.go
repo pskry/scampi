@@ -244,6 +244,7 @@ func (g *apiGenerator) header() {
 	g.line("")
 	g.line("module %s", modName)
 	g.line("")
+	g.line(`import "std"`)
 	g.line(`import "std/rest"`)
 }
 

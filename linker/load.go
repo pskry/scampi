@@ -59,7 +59,23 @@ func Analyze(ctx context.Context, cfgPath string, src source.Source) (*Analysis,
 		return nil, wrapLangError(err, cfgPath, data)
 	}
 	userMods := LoadUserModules(cfgPath, modules)
+
+	// Multi-file module detection: if the file declares a non-main
+	// module and there are sibling .scampi files with the same
+	// module name, load them all into a shared scope (Go package
+	// model). This makes `scampi check module_file.scampi` work
+	// for files that reference siblings.
+	modName := "main"
+	if f.Module != nil {
+		modName = f.Module.Name.Name
+	}
 	c := check.New(modules)
+	if modName != "main" {
+		siblings := loadSiblingDecls(cfgPath, modName, modules)
+		if siblings != nil {
+			c.WithScope(siblings)
+		}
+	}
 	c.Check(f)
 	if checkErrs := c.Errors(); len(checkErrs) > 0 {
 		return nil, wrapLangErrors(checkErrs, cfgPath, data)

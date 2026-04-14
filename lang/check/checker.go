@@ -92,9 +92,18 @@ func (c *Checker) recordBinding(sym *Symbol) {
 	c.allBindings[sym.Name] = sym
 }
 
+// WithScope sets a pre-populated scope for Check to use instead of
+// creating a fresh one. Used by multi-file module loading so all
+// files in a module share one scope (Go package model).
+func (c *Checker) WithScope(scope *Scope) {
+	c.scope = scope
+}
+
 // Check type-checks a parsed file using ast.Walk for traversal.
 func (c *Checker) Check(f *ast.File) {
-	c.scope = NewScope(nil, ScopeFile)
+	if c.scope == nil {
+		c.scope = NewScope(nil, ScopeFile)
+	}
 	if f.Module != nil {
 		c.modName = f.Module.Name.Name
 	} else {
@@ -113,6 +122,25 @@ func (c *Checker) Check(f *ast.File) {
 
 	// Walk the full AST for checking.
 	ast.Walk(f, c.enter, c.leave)
+}
+
+// RegisterForwardDecls runs only the import + forward-declaration
+// pass of Check — no body walking. Used by multi-file module loading
+// to populate a shared scope before any file's bodies are checked.
+// RegisterForwardDecls registers only top-level declarations (not
+// imports) into the checker's scope. Used by multi-file module
+// loading: all files' decls go into a shared scope first, then
+// each file is Check'd individually (which handles its own imports).
+func (c *Checker) RegisterForwardDecls(f *ast.File) {
+	if c.scope == nil {
+		c.scope = NewScope(nil, ScopeFile)
+	}
+	if f.Module != nil {
+		c.modName = f.Module.Name.Name
+	}
+	for _, d := range f.Decls {
+		c.registerDecl(d)
+	}
 }
 
 func (c *Checker) errAt(span token.Span, msg string) {

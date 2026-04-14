@@ -9,6 +9,7 @@
 
 module spec
 
+import "std"
 import "std/rest"
 
 // Things

@@ -40,28 +40,15 @@ func (s *Server) loadUserModules() {
 	if s.module == nil {
 		return
 	}
-	for _, dep := range s.module.Require {
-		dir := depDir(s.module, &dep)
-		data, path := readModuleEntry(dir, lastPathSegment(dep.Path))
-		if data == nil {
-			s.log.Printf("user module %s: no entry point in %s", dep.Path, dir)
-			continue
-		}
-		f, fileScope, err := linker.LoadModule(s.modules, path, data)
-		if err != nil {
-			s.log.Printf("user module %s: %v", dep.Path, err)
-			continue
-		}
-		if f == nil || f.Module == nil {
-			s.log.Printf("user module %s: no module declaration", dep.Path)
-			continue
-		}
-		modName := f.Module.Name.Name
-		s.modules[modName] = fileScope
-
+	// Use the linker's multi-file module loading so the LSP sees
+	// the same merged scope (all .scampi files in the module dir)
+	// that the production pipeline uses.
+	userMods := linker.LoadUserModulesFromMod(s.module, s.modules)
+	for _, um := range userMods {
+		// Scope already set in modules by LoadUserModulesFromMod.
 		// Register funcs/decls into catalog and goto-def index.
-		s.registerModuleEntries(f, modName, path, data)
-		s.log.Printf("user module %s: loaded as %q", dep.Path, modName)
+		s.registerModuleEntries(um.File, um.Name, "", nil)
+		s.log.Printf("user module %s: loaded as %q", um.Name, um.Name)
 	}
 }
 
@@ -102,32 +89,6 @@ func depDir(m *mod.Module, dep *mod.Dependency) string {
 		return dir
 	}
 	return filepath.Join(mod.DefaultCacheDir(), dep.Path+"@"+dep.Version)
-}
-
-func lastPathSegment(p string) string {
-	if i := len(p) - 1; i >= 0 {
-		for ; i >= 0; i-- {
-			if p[i] == '/' {
-				return p[i+1:]
-			}
-		}
-	}
-	return p
-}
-
-// readModuleEntry finds the entry point .scampi file in a module
-// directory, trying _index.scampi then <name>.scampi.
-func readModuleEntry(dir, name string) ([]byte, string) {
-	for _, candidate := range []string{
-		filepath.Join(dir, "_index.scampi"),
-		filepath.Join(dir, name+".scampi"),
-	} {
-		data, err := os.ReadFile(candidate)
-		if err == nil {
-			return data, candidate
-		}
-	}
-	return nil, ""
 }
 
 // evaluate runs the scampi full pipeline (lex → parse → check →
