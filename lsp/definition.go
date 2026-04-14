@@ -4,6 +4,8 @@ package lsp
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"go.lsp.dev/protocol"
@@ -57,6 +59,16 @@ func (s *Server) Definition(
 	// Search current file for definition first.
 	if span := findDefinition(f, word); span != nil {
 		return []protocol.Location{spanToLocation(filePath, data, *span)}, nil
+	}
+
+	// Multi-file module: search sibling .scampi files in the same
+	// directory that share the same module declaration. This
+	// handles goto-def from _index.scampi to api.scampi within
+	// a module package.
+	if f.Module != nil && f.Module.Name.Name != "main" {
+		if loc, ok := s.findInSiblings(filePath, f.Module.Name.Name, word); ok {
+			return []protocol.Location{loc}, nil
+		}
 	}
 
 	// Stdlib — resolve to extracted stub file.
@@ -123,6 +135,44 @@ func findDefinition(f *ast.File, name string) *token.Span {
 		}
 	}
 	return nil
+}
+
+// findInSiblings searches sibling .scampi files in the same directory
+// for a declaration matching word. Used by goto-def in multi-file
+// modules (e.g. _index.scampi → api.scampi).
+func (s *Server) findInSiblings(
+	filePath string,
+	modName string,
+	word string,
+) (protocol.Location, bool) {
+	dir := filepath.Dir(filePath)
+	base := filepath.Base(filePath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return protocol.Location{}, false
+	}
+	for _, e := range entries {
+		if e.IsDir() || e.Name() == base {
+			continue
+		}
+		if !strings.HasSuffix(e.Name(), ".scampi") ||
+			strings.HasSuffix(e.Name(), "_test.scampi") {
+			continue
+		}
+		sibPath := filepath.Join(dir, e.Name())
+		sibData, err := os.ReadFile(sibPath)
+		if err != nil {
+			continue
+		}
+		sibFile, _ := Parse(sibPath, sibData)
+		if sibFile == nil || sibFile.Module == nil || sibFile.Module.Name.Name != modName {
+			continue
+		}
+		if span := findDefinition(sibFile, word); span != nil {
+			return spanToLocation(sibPath, sibData, *span), true
+		}
+	}
+	return protocol.Location{}, false
 }
 
 func spanToLocation(path string, src []byte, s token.Span) protocol.Location {

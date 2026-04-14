@@ -89,6 +89,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
+			pattern:        "lsp/definition.go",
+			allowedImports: "os",
+		},
+		{
 			pattern:        "lsp/stubdefs.go",
 			allowedImports: "os",
 		},
