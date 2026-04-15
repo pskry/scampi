@@ -750,7 +750,7 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "bench", targets = [host]) {
   for i in std.range(%d) {
-    posix.firewall { port = "22/tcp" }
+    posix.firewall { port = 22 }
   }
 }
 `, size)

@@ -108,6 +108,7 @@ func (c *Checker) resolveAttributeArgs(a *ast.Attribute) map[string]any {
 			out[na.Name.Name] = v
 		}
 	}
+
 	return out
 }
 

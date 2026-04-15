@@ -10,7 +10,7 @@ let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
 
 std.deploy(name = "web", targets = [vps]) {
   posix.pkg { packages = ["nginx", "certbot"], source = posix.pkg_system {} }
-  posix.firewall { port = "80/tcp" }
-  posix.firewall { port = "443/tcp" }
+  posix.firewall { port = 80 }
+  posix.firewall { port = 443 }
   posix.service { name = "nginx" }
 }

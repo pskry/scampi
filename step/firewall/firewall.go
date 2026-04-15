@@ -4,77 +4,26 @@ package firewall
 
 import (
 	"strconv"
-	"strings"
 
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
 )
 
-// FirewallPort represents a parsed port/protocol specification.
+// FirewallPort represents a port/protocol specification.
 type FirewallPort struct {
-	Port    string           // single port or range start
-	EndPort string           // range end, empty for single port
+	Port    int              // single port or range start
+	EndPort int              // range end, 0 for single port
 	Proto   target.PortProto // TCP or UDP
 }
 
-// String reconstructs the original port spec, e.g. "22/tcp" or "6000:6007/tcp".
+// String reconstructs the port spec, e.g. "22/tcp" or "6000:6007/tcp".
 func (p FirewallPort) String() string {
-	if p.EndPort != "" {
-		return p.Port + ":" + p.EndPort + "/" + p.Proto.String()
+	if p.EndPort != 0 {
+		return strconv.Itoa(p.Port) + ":" + strconv.Itoa(p.EndPort) + "/" + p.Proto.String()
 	}
-	return p.Port + "/" + p.Proto.String()
+	return strconv.Itoa(p.Port) + "/" + p.Proto.String()
 }
-
-func ParseFirewallPort(s string) (FirewallPort, error) {
-	portPart, proto, ok := strings.Cut(s, "/")
-	if !ok {
-		return FirewallPort{}, portParseError("missing protocol suffix")
-	}
-	var p target.PortProto
-	switch proto {
-	case "tcp":
-		p = target.ProtoTCP
-	case "udp":
-		p = target.ProtoUDP
-	default:
-		return FirewallPort{}, portParseError("unsupported protocol \"" + proto + "\"")
-	}
-
-	start, end, isRange := strings.Cut(portPart, ":")
-	if err := validatePortNumber(start); err != nil {
-		return FirewallPort{}, err
-	}
-	if isRange {
-		if err := validatePortNumber(end); err != nil {
-			return FirewallPort{}, err
-		}
-	}
-
-	fp := FirewallPort{Port: start, Proto: p}
-	if isRange {
-		fp.EndPort = end
-	}
-	return fp, nil
-}
-
-func validatePortNumber(s string) error {
-	if s == "" {
-		return portParseError("empty port number")
-	}
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return portParseError("\"" + s + "\" is not a number")
-	}
-	if n < 0 || n > 65535 {
-		return portParseError(strconv.Itoa(n) + " is out of range (0–65535)")
-	}
-	return nil
-}
-
-type portParseError string
-
-func (e portParseError) Error() string { return string(e) }
 
 // Action represents a firewall rule action.
 type Action uint8
@@ -87,6 +36,9 @@ const (
 
 // ActionValues is the exhaustive list of accepted action strings.
 var ActionValues = []string{"allow", "deny", "reject"}
+
+// ProtoValues is the exhaustive list of accepted protocol strings.
+var ProtoValues = []string{"tcp", "udp"}
 
 func (a Action) String() string {
 	switch a {
@@ -114,14 +66,27 @@ func parseAction(s string) Action {
 	}
 }
 
+func parseProto(s string) target.PortProto {
+	switch s {
+	case "tcp":
+		return target.ProtoTCP
+	case "udp":
+		return target.ProtoUDP
+	default:
+		panic(errs.BUG("invalid protocol %q — should have been caught by validate", s))
+	}
+}
+
 type (
 	Firewall       struct{}
 	FirewallConfig struct {
 		_ struct{} `summary:"Manage firewall rules via UFW or firewalld"`
 
-		Desc   string `step:"Human-readable description" optional:"true"`
-		Port   string `step:"Port/protocol string" example:"22/tcp"`
-		Action string `step:"Rule action" default:"allow" example:"allow|deny|reject"`
+		Desc    string `step:"Human-readable description" optional:"true"`
+		Port    int    `step:"Port number" example:"8080"`
+		EndPort int    `step:"End of port range (for ranges)" optional:"true" example:"9000"`
+		Proto   string `step:"Protocol" default:"tcp" example:"udp"`
+		Action  string `step:"Rule action" default:"allow" example:"allow|deny|reject"`
 	}
 	firewallAction struct {
 		desc   string
@@ -137,6 +102,7 @@ func (Firewall) NewConfig() any { return &FirewallConfig{} }
 func (*FirewallConfig) FieldEnumValues() map[string][]string {
 	return map[string][]string{
 		"action": ActionValues,
+		"proto":  ProtoValues,
 	}
 }
 
@@ -146,20 +112,33 @@ func (Firewall) Plan(step spec.StepInstance) (spec.Action, error) {
 		return nil, errs.BUG("expected %T got %T", &FirewallConfig{}, step.Config)
 	}
 
-	// Action is a typed enum in the stub — lang/check enforces.
-	// Port format is partially validated by @std.pattern; the
-	// parser still runs because the runtime needs the structured
-	// FirewallPort value, and only ParseFirewallPort knows how to
-	// extract Port/EndPort/Proto from the string. A parse error
-	// reaching this point means a non-literal port expression
-	// bypassed the static check — surface the same typed error.
-	port, parseErr := ParseFirewallPort(cfg.Port)
-	if parseErr != nil {
-		return nil, InvalidPortError{
-			Port:   cfg.Port,
-			Detail: parseErr.Error(),
+	// @min/@max on the stub enforce 1-65535 for literal arguments.
+	// Dynamic expressions bypass that, so guard here too.
+	if cfg.Port < 1 || cfg.Port > 65535 {
+		return nil, PortOutOfRangeError{
+			Field: "port", Value: cfg.Port,
 			Source: step.Fields["port"].Value,
 		}
+	}
+	if cfg.EndPort != 0 {
+		if cfg.EndPort < 1 || cfg.EndPort > 65535 {
+			return nil, PortOutOfRangeError{
+				Field: "end_port", Value: cfg.EndPort,
+				Source: step.Fields["end_port"].Value,
+			}
+		}
+		if cfg.EndPort <= cfg.Port {
+			return nil, InvalidRangeError{
+				Port: cfg.Port, EndPort: cfg.EndPort,
+				Source: step.Fields["end_port"].Value,
+			}
+		}
+	}
+
+	port := FirewallPort{
+		Port:    cfg.Port,
+		EndPort: cfg.EndPort,
+		Proto:   parseProto(cfg.Proto),
 	}
 
 	return &firewallAction{

@@ -69,26 +69,45 @@ func (e RuleApplyError) EventTemplate() event.Template {
 	}
 }
 
-// InvalidPortError is returned during validation when the port format is invalid.
-type InvalidPortError struct {
+// PortOutOfRangeError is returned when a port number is outside 1-65535.
+type PortOutOfRangeError struct {
 	diagnostic.FatalError
-	Port   string
-	Detail string
+	Field  string
+	Value  int
 	Source spec.SourceSpan
 }
 
-func (e InvalidPortError) Error() string {
-	if e.Detail != "" {
-		return fmt.Sprintf("invalid port %q: %s", e.Port, e.Detail)
-	}
-	return fmt.Sprintf("invalid port %q", e.Port)
+func (e PortOutOfRangeError) Error() string {
+	return fmt.Sprintf("%s %d is out of range (1–65535)", e.Field, e.Value)
 }
 
-func (e InvalidPortError) EventTemplate() event.Template {
+func (e PortOutOfRangeError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     "builtin.firewall.InvalidPort",
-		Text:   `invalid port "{{.Port}}": {{.Detail}}`,
-		Hint:   `use <port>/<proto> or <start>:<end>/<proto>, e.g. "22/tcp", "53/udp", "6000:6007/tcp"`,
+		ID:     "builtin.firewall.PortOutOfRange",
+		Text:   `{{.Field}} {{.Value}} is out of range`,
+		Hint:   "port numbers must be between 1 and 65535",
+		Data:   e,
+		Source: &e.Source,
+	}
+}
+
+// InvalidRangeError is returned when end_port <= port.
+type InvalidRangeError struct {
+	diagnostic.FatalError
+	Port    int
+	EndPort int
+	Source  spec.SourceSpan
+}
+
+func (e InvalidRangeError) Error() string {
+	return fmt.Sprintf("end_port %d must be greater than port %d", e.EndPort, e.Port)
+}
+
+func (e InvalidRangeError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "builtin.firewall.InvalidRange",
+		Text:   `end_port {{.EndPort}} must be greater than port {{.Port}}`,
+		Hint:   "end_port defines the upper bound of a port range",
 		Data:   e,
 		Source: &e.Source,
 	}

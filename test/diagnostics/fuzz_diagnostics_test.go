@@ -267,7 +267,7 @@ import "std/local"
 let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
-  posix.firewall { port = "22/tcp", action = posix.FirewallAction.allow }
+  posix.firewall { port = 22 }
 }`,
 
 		// firewall step deny
@@ -279,7 +279,7 @@ import "std/local"
 let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
-  posix.firewall { port = "443/tcp", action = posix.FirewallAction.deny }
+  posix.firewall { port = 443, action = posix.FirewallAction.deny }
 }`,
 
 		// firewall step invalid port
@@ -291,7 +291,7 @@ import "std/local"
 let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
-  posix.firewall { port = "not-a-port", action = posix.FirewallAction.allow }
+  posix.firewall { port = 99999, action = posix.FirewallAction.allow }
 }`,
 
 		// mount step
@@ -361,7 +361,7 @@ import "std/local"
 let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
-  posix.firewall { port = "22/tcp", action = "bogus" }
+  posix.firewall { port = 22, action = "bogus" }
 }`,
 
 		// unarchive step

@@ -38,9 +38,9 @@ let packages = base_packages(["nginx", "certbot"])
 std.deploy(name = "bootstrap", targets = [vps]) {
   posix.pkg { packages = packages, source = posix.pkg_system {} }
 
-  posix.firewall { port = "22/tcp" }
-  posix.firewall { port = "80/tcp" }
-  posix.firewall { port = "443/tcp" }
+  posix.firewall { port = 22 }
+  posix.firewall { port = 80 }
+  posix.firewall { port = 443 }
 
   posix.dir { path = "/var/www/html" }
 

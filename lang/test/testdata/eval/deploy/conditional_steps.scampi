@@ -12,7 +12,7 @@ type Config {
 
 let cfg = Config { enable_firewall = true }
 
-let firewall_steps = if cfg.enable_firewall { [posix.firewall { port = "80/tcp" }] } else { [] }
+let firewall_steps = if cfg.enable_firewall { [posix.firewall { port = 80 }] } else { [] }
 
 std.deploy(name = "conditional", targets = [vps]) {
   posix.pkg { packages = ["nginx"], source = posix.pkg_system {} }

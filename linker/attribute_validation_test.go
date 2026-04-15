@@ -320,3 +320,72 @@ func TestSince_Noop(t *testing.T) {
 		t.Errorf("expected 0 diagnostics, got %d", diags(ctx))
 	}
 }
+
+// Min and Max
+// -----------------------------------------------------------------------------
+
+func intLitExpr(value int64) *ast.IntLit {
+	return &ast.IntLit{Value: value, SrcSpan: token.Span{Start: 0, End: 5}}
+}
+
+func TestMin_InRange(t *testing.T) {
+	args := map[string]any{"value": int64(1)}
+	for _, v := range []int64{1, 100, 65535} {
+		ctx := newAttrCtx("std.@min", "port", intLitExpr(v), args)
+		MinAttribute{}.StaticCheck(ctx)
+		if diags(ctx) != 0 {
+			t.Errorf("expected no diagnostics for %d, got %d", v, diags(ctx))
+		}
+	}
+}
+
+func TestMin_BelowRange(t *testing.T) {
+	args := map[string]any{"value": int64(1)}
+	for _, v := range []int64{0, -1, -100} {
+		ctx := newAttrCtx("std.@min", "port", intLitExpr(v), args)
+		MinAttribute{}.StaticCheck(ctx)
+		if diags(ctx) != 1 {
+			t.Errorf("expected 1 diagnostic for %d, got %d", v, diags(ctx))
+		}
+	}
+}
+
+func TestMin_ComputedSkipped(t *testing.T) {
+	args := map[string]any{"value": int64(1)}
+	ctx := newAttrCtx("std.@min", "port", computedExpr(), args)
+	MinAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 0 {
+		t.Errorf("expected no diagnostics for computed expr, got %d", diags(ctx))
+	}
+}
+
+func TestMax_InRange(t *testing.T) {
+	args := map[string]any{"value": int64(65535)}
+	for _, v := range []int64{1, 100, 65535} {
+		ctx := newAttrCtx("std.@max", "port", intLitExpr(v), args)
+		MaxAttribute{}.StaticCheck(ctx)
+		if diags(ctx) != 0 {
+			t.Errorf("expected no diagnostics for %d, got %d", v, diags(ctx))
+		}
+	}
+}
+
+func TestMax_AboveRange(t *testing.T) {
+	args := map[string]any{"value": int64(65535)}
+	for _, v := range []int64{65536, 70000, 100000} {
+		ctx := newAttrCtx("std.@max", "port", intLitExpr(v), args)
+		MaxAttribute{}.StaticCheck(ctx)
+		if diags(ctx) != 1 {
+			t.Errorf("expected 1 diagnostic for %d, got %d", v, diags(ctx))
+		}
+	}
+}
+
+func TestMax_ComputedSkipped(t *testing.T) {
+	args := map[string]any{"value": int64(65535)}
+	ctx := newAttrCtx("std.@max", "port", computedExpr(), args)
+	MaxAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 0 {
+		t.Errorf("expected no diagnostics for computed expr, got %d", diags(ctx))
+	}
+}

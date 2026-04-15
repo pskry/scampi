@@ -172,6 +172,51 @@ type SinceAttribute struct{}
 
 func (SinceAttribute) StaticCheck(_ StaticCheckContext) {}
 
+// literalInt extracts a literal integer value from an expression.
+func literalInt(e ast.Expr) (int64, bool) {
+	il, ok := e.(*ast.IntLit)
+	if !ok {
+		return 0, false
+	}
+	return il.Value, true
+}
+
+// MinAttribute validates that the annotated integer parameter is at
+// least the given minimum. Only fires on literal int arguments.
+type MinAttribute struct{}
+
+func (MinAttribute) StaticCheck(ctx StaticCheckContext) {
+	v, ok := literalInt(ctx.ParamArg)
+	if !ok {
+		return
+	}
+	bound, _ := ctx.AttrArgs["value"].(int64)
+	if v < bound {
+		ctx.Linker.Emit(newAttrDocError(
+			ctx,
+			fmt.Sprintf("%s = %d is below minimum %d", ctx.ParamName, v, bound),
+		))
+	}
+}
+
+// MaxAttribute validates that the annotated integer parameter is at
+// most the given maximum. Only fires on literal int arguments.
+type MaxAttribute struct{}
+
+func (MaxAttribute) StaticCheck(ctx StaticCheckContext) {
+	v, ok := literalInt(ctx.ParamArg)
+	if !ok {
+		return
+	}
+	bound, _ := ctx.AttrArgs["value"].(int64)
+	if v > bound {
+		ctx.Linker.Emit(newAttrDocError(
+			ctx,
+			fmt.Sprintf("%s = %d exceeds maximum %d", ctx.ParamName, v, bound),
+		))
+	}
+}
+
 // PathAttribute validates that the annotated string parameter looks
 // like a filesystem path. v1 checks the most basic shape: non-empty,
 // no NUL bytes. The optional `absolute` arg requires the path to
@@ -308,4 +353,27 @@ func (e *attrDeprecationWarning) EventTemplate() event.Template {
 type attrDeprecationData struct {
 	Param   string
 	Message string
+}
+
+// nonLiteralAttrArgError is emitted when an attribute-annotated
+// parameter receives a non-literal value that can't be validated
+// at compile time.
+type nonLiteralAttrArgError struct {
+	diagnostic.FatalError
+	Param string
+	Src   *spec.SourceSpan
+}
+
+func (e *nonLiteralAttrArgError) Error() string {
+	return fmt.Sprintf("%s must be a literal value", e.Param)
+}
+
+func (e *nonLiteralAttrArgError) EventTemplate() event.Template {
+	return event.Template{
+		ID:     "linker.NonLiteralAttributeArg",
+		Text:   "{{.Param}} must be a literal value",
+		Hint:   "attributes require compile-time constant values",
+		Source: e.Src,
+		Data:   struct{ Param string }{e.Param},
+	}
 }

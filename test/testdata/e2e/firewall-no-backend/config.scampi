@@ -9,7 +9,7 @@ let host = local.target { name = "local" }
 std.deploy(name = "test", targets = [host]) {
   posix.firewall {
     desc = "allow SSH"
-    port = "22/tcp"
+    port = 22
     action = posix.FirewallAction.allow
   }
 }

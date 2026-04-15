@@ -5,6 +5,7 @@ package firewall
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"scampi.dev/scampi/capability"
@@ -223,9 +224,9 @@ func (op *ensureRuleOp) executeFirewalld(
 // -----------------------------------------------------------------------------
 
 func (op *ensureRuleOp) firewalldRichRule() string {
-	port := op.port.Port
-	if op.port.EndPort != "" {
-		port = op.port.Port + "-" + op.port.EndPort
+	port := strconv.Itoa(op.port.Port)
+	if op.port.EndPort != 0 {
+		port = port + "-" + strconv.Itoa(op.port.EndPort)
 	}
 
 	verb := "reject"

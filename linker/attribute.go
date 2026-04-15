@@ -170,5 +170,7 @@ func DefaultAttributes() *AttributeRegistry {
 	r.Register("std.@deprecated", DeprecatedAttribute{})
 	r.Register("std.@since", SinceAttribute{})
 	r.Register("std.@path", PathAttribute{})
+	r.Register("std.@min", MinAttribute{})
+	r.Register("std.@max", MaxAttribute{})
 	return r
 }

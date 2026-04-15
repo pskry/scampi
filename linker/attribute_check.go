@@ -137,6 +137,10 @@ func (v *attributeCheckVisitor) checkStructLit(sl *ast.StructLit, dt *check.Decl
 		if !ok {
 			continue
 		}
+		if !isLiteral(argExpr) {
+			v.rejectNonLiteral(p.Name, argExpr)
+			continue
+		}
 		for _, attr := range p.Attributes {
 			behaviour := v.registry.Lookup(attr.QualifiedName)
 			if behaviour == nil {
@@ -223,6 +227,10 @@ func (v *attributeCheckVisitor) checkCall(call *ast.CallExpr, ft *check.FuncType
 		if !ok {
 			continue
 		}
+		if !isLiteral(argExpr) {
+			v.rejectNonLiteral(p.Name, argExpr)
+			continue
+		}
 		for _, attr := range p.Attributes {
 			behaviour := v.registry.Lookup(attr.QualifiedName)
 			if behaviour == nil {
@@ -288,6 +296,27 @@ func (lc *linkContext) Secrets() secret.Backend {
 // nodeSourceSpan converts an AST node's token.Span into the
 // spec.SourceSpan shape used by the diagnostic pipeline, resolving
 // byte offsets to line/column via the source bytes.
+// isLiteral reports whether an expression is a compile-time constant.
+// Today that means a bare literal node. Once const-folding lands, this
+// will also accept folded expressions.
+func isLiteral(e ast.Expr) bool {
+	switch e.(type) {
+	case *ast.IntLit, *ast.StringLit, *ast.BoolLit, *ast.NoneLit:
+		return true
+	case *ast.ListLit:
+		return true // element validation is the behaviour's job
+	}
+	return false
+}
+
+func (v *attributeCheckVisitor) rejectNonLiteral(paramName string, argExpr ast.Expr) {
+	span := nodeSourceSpan(argExpr, v.source, v.cfgPath)
+	v.ctx.Emit(&nonLiteralAttrArgError{
+		Param: paramName,
+		Src:   &span,
+	})
+}
+
 func nodeSourceSpan(node ast.Node, source []byte, cfgPath string) spec.SourceSpan {
 	span := node.Span()
 	startLine, startCol := offsetToLineCol(source, int(span.Start))

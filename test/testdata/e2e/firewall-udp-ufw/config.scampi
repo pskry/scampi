@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.firewall {
-    desc = "allow SSH"
-    port = 22
-    action = posix.FirewallAction.allow
+    desc  = "allow DNS"
+    port  = 53
+    proto = posix.FirewallProto.udp
   }
 }

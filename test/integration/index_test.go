@@ -80,8 +80,8 @@ func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
 		{
 			kind:           "firewall",
 			wantSummary:    "Manage firewall rules via UFW or firewalld",
-			wantFields:     []string{"port", "action"},
-			wantFieldCount: 3, // includes desc
+			wantFields:     []string{"port", "endport", "proto", "action"},
+			wantFieldCount: 5, // includes desc
 		},
 		{
 			kind:           "sysctl",
@@ -192,6 +192,7 @@ func TestIndexStep_DefaultsPopulated(t *testing.T) {
 		{"pkg", "state", `"present"`},
 		{"service", "state", `"running"`},
 		{"service", "enabled", `"true"`},
+		{"firewall", "proto", `"tcp"`},
 		{"firewall", "action", `"allow"`},
 		{"sysctl", "persist", `"true"`},
 		{"unarchive", "depth", `"0"`},

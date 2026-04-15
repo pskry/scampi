@@ -71,6 +71,22 @@ type @since {
   version: string
 }
 
+// the value must be at least the given minimum
+//
+// integer parameters can carry `@min(value=N)` to enforce a lower
+// bound. the check fires at link time for literal arguments.
+type @min {
+  value: int
+}
+
+// the value must be at most the given maximum
+//
+// integer parameters can carry `@max(value=N)` to enforce an upper
+// bound. the check fires at link time for literal arguments.
+type @max {
+  value: int
+}
+
 // the value must be a valid filesystem path
 //
 // supported shapes:

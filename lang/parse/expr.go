@@ -3,6 +3,8 @@
 package parse
 
 import (
+	"strconv"
+
 	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/token"
 )
@@ -305,8 +307,11 @@ func (p *Parser) parsePrimary() ast.Expr {
 	switch tok.Kind {
 	case token.Int:
 		p.advance()
+		raw := string(p.lex.Source()[tok.Pos:tok.End])
+		v, _ := parseInt(raw)
 		return &ast.IntLit{
-			Raw:     string(p.lex.Source()[tok.Pos:tok.End]),
+			Value:   v,
+			Raw:     raw,
 			SrcSpan: token.Span{Start: tok.Pos, End: tok.End},
 		}
 	case token.String:
@@ -546,6 +551,20 @@ func (p *Parser) finishMapLit(start uint32) ast.Expr {
 		Entries: entries,
 		SrcSpan: token.Span{Start: start, End: endTok.End},
 	}
+}
+
+func parseInt(raw string) (int64, error) {
+	if len(raw) > 2 {
+		switch raw[:2] {
+		case "0x", "0X":
+			return strconv.ParseInt(raw[2:], 16, 64)
+		case "0b", "0B":
+			return strconv.ParseInt(raw[2:], 2, 64)
+		case "0o", "0O":
+			return strconv.ParseInt(raw[2:], 8, 64)
+		}
+	}
+	return strconv.ParseInt(raw, 10, 64)
 }
 
 // parseIfExpr parses `if cond { then } else { else_ }` as an expression.

@@ -36,9 +36,9 @@ std.deploy(name = "harden", targets = [vps]) {
 
   posix.service { name = "fail2ban", state = posix.ServiceState.running, enabled = true }
 
-  posix.firewall { port = "22/tcp" }
-  posix.firewall { port = "80/tcp" }
-  posix.firewall { port = "443/tcp" }
+  posix.firewall { port = 22 }
+  posix.firewall { port = 80 }
+  posix.firewall { port = 443 }
 
   posix.service { name = "ufw", state = posix.ServiceState.running, enabled = true }
 }

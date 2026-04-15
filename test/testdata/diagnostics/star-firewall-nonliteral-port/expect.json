@@ -1,0 +1,17 @@
+{
+  "abort": true,
+  "diagnostics": [
+    {
+      "id": "linker.NonLiteralAttributeArg",
+      "scope": "ScopeEngine",
+      "severity": "Error",
+      "kind": "DiagnosticRaised",
+      "source": {
+        "start_line": 11,
+        "start_col": 27,
+        "end_line": 11,
+        "end_col": 28
+      }
+    }
+  ]
+}
