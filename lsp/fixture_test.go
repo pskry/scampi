@@ -76,6 +76,19 @@ type renameExpect struct {
 	Error     bool `json:"error,omitempty"`
 }
 
+type codeactionExpect struct {
+	TitlesInclude []string              `json:"titles_include,omitempty"`
+	TitlesExclude []string              `json:"titles_exclude,omitempty"`
+	Count         int                   `json:"count,omitempty"`
+	Empty         bool                  `json:"empty,omitempty"`
+	Diagnostics   []syntheticDiagnostic `json:"diagnostics,omitempty"`
+}
+
+type syntheticDiagnostic struct {
+	Message string `json:"message"`
+	Line    uint32 `json:"line"`
+}
+
 func TestLSPFixtures(t *testing.T) {
 	root := "testdata/lsp"
 	if _, err := os.Stat(root); os.IsNotExist(err) {
@@ -123,13 +136,14 @@ func runFixture(t *testing.T, scampiPath, jsonPath string) {
 	src := string(rawSrc)
 	var line, char uint32
 	idx := strings.Index(src, cursorMarker)
+	cursorRequired := spec.Request != "codeaction"
 	switch {
 	case idx >= 0:
 		line, char = lineColAtByteOffset(src, idx)
 		src = src[:idx] + src[idx+len(cursorMarker):]
 	case spec.Cursor != nil:
 		line, char = spec.Cursor.Line, spec.Cursor.Char
-	default:
+	case cursorRequired:
 		t.Fatal("fixture must contain a ‸ marker or a cursor field in JSON")
 	}
 
@@ -149,6 +163,8 @@ func runFixture(t *testing.T, scampiPath, jsonPath string) {
 		runReferencesFixture(t, s, docURI, line, char, spec.Expect)
 	case "rename":
 		runRenameFixture(t, s, docURI, line, char, spec.Expect)
+	case "codeaction":
+		runCodeActionFixture(t, s, docURI, src, spec.Expect)
 	default:
 		t.Fatalf("unknown request type: %q", spec.Request)
 	}
@@ -336,6 +352,78 @@ func runRenameFixture(
 	}
 	if exp.FileCount > 0 && len(result.Changes) != exp.FileCount {
 		t.Errorf("expected edits in %d files, got %d", exp.FileCount, len(result.Changes))
+	}
+}
+
+func runCodeActionFixture(
+	t *testing.T,
+	s *Server,
+	docURI protocol.DocumentURI,
+	content string,
+	rawExpect json.RawMessage,
+) {
+	var exp codeactionExpect
+	if err := json.Unmarshal(rawExpect, &exp); err != nil {
+		t.Fatalf("bad codeaction expect JSON: %v", err)
+	}
+
+	// Build diagnostics: use synthetic ones from the fixture if
+	// provided, otherwise try evaluating the document.
+	var diags []protocol.Diagnostic
+	if len(exp.Diagnostics) > 0 {
+		for _, sd := range exp.Diagnostics {
+			diags = append(diags, protocol.Diagnostic{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: sd.Line, Character: 0},
+					End:   protocol.Position{Line: sd.Line, Character: 0},
+				},
+				Message: sd.Message,
+				Source:  "scampls",
+			})
+		}
+	} else {
+		diags = s.evaluate(context.Background(), docURI, content)
+	}
+
+	result, err := s.CodeAction(context.Background(), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+		Range:        protocol.Range{},
+		Context: protocol.CodeActionContext{
+			Diagnostics: diags,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction: %v", err)
+	}
+
+	if exp.Empty {
+		if len(result) != 0 {
+			t.Errorf("expected no code actions, got %d", len(result))
+		}
+		return
+	}
+
+	if exp.Count > 0 && len(result) != exp.Count {
+		t.Errorf("expected %d code actions, got %d", exp.Count, len(result))
+	}
+
+	titles := make(map[string]bool)
+	for _, a := range result {
+		titles[a.Title] = true
+	}
+	for _, want := range exp.TitlesInclude {
+		if !titles[want] {
+			var got []string
+			for _, a := range result {
+				got = append(got, a.Title)
+			}
+			t.Errorf("expected code action %q, got %v", want, got)
+		}
+	}
+	for _, exclude := range exp.TitlesExclude {
+		if titles[exclude] {
+			t.Errorf("unexpected code action %q", exclude)
+		}
 	}
 }
 

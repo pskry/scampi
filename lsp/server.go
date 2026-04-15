@@ -136,6 +136,11 @@ func (s *Server) Initialize(
 				PrepareProvider: true,
 			},
 			DocumentFormattingProvider: &protocol.DocumentFormattingOptions{},
+			CodeActionProvider: &protocol.CodeActionOptions{
+				CodeActionKinds: []protocol.CodeActionKind{
+					protocol.QuickFix,
+				},
+			},
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "scampls",
@@ -272,8 +277,8 @@ func (s *Server) WorkDoneProgressCancel(context.Context, *protocol.WorkDoneProgr
 func (s *Server) LogTrace(context.Context, *protocol.LogTraceParams) error { return nil }
 func (s *Server) SetTrace(context.Context, *protocol.SetTraceParams) error { return nil }
 
-func (s *Server) CodeAction(context.Context, *protocol.CodeActionParams) ([]protocol.CodeAction, error) {
-	return nil, nil
+func (s *Server) CodeAction(ctx context.Context, params *protocol.CodeActionParams) ([]protocol.CodeAction, error) {
+	return s.codeAction(ctx, params)
 }
 func (s *Server) CodeLens(context.Context, *protocol.CodeLensParams) ([]protocol.CodeLens, error) {
 	return nil, nil
