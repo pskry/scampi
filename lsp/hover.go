@@ -83,6 +83,18 @@ func (s *Server) Hover(
 		}, nil
 	}
 
+	// Stub-defined type (builtins, std types) — last resort.
+	if stubDoc, ok := s.stubDefs.LookupDoc(cur.WordUnderCursor); ok && stubDoc != "" {
+		md := fmt.Sprintf("```scampi\ntype %s\n```\n\n%s", cur.WordUnderCursor, stubDoc)
+		s.log.Printf("hover: returning stub type doc (%d bytes)", len(md))
+		return &protocol.Hover{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: md,
+			},
+		}, nil
+	}
+
 	return nil, nil
 }
 

@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+module builtin
+
+// A sequence of characters.
+type string
+
+// A signed integer.
+type int
+
+// A truth value: true or false.
+type bool
+
+// Any type. Accepts all values.
+type any
+
+// An ordered, homogeneous collection.
+type list
+
+// A collection of key-value pairs.
+type map
+
+// A nested scope that produces steps or declarations.
+type block

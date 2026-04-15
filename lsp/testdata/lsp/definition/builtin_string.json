@@ -1,0 +1,7 @@
+{
+  "request": "definition",
+  "expect": {
+    "uri_suffix": "builtin.scampi",
+    "line": 5
+  }
+}

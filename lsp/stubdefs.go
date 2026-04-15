@@ -72,6 +72,16 @@ func (sd *StubDefs) Lookup(name string) (protocol.Location, bool) {
 	}, true
 }
 
+// LookupDoc returns the doc comment for a stub declaration, if any.
+// Used for hover on builtin types and other stub-defined symbols.
+func (sd *StubDefs) LookupDoc(name string) (string, bool) {
+	sl, ok := sd.locs[name]
+	if !ok {
+		return "", false
+	}
+	return extractDocComment(sl.src, sl.span), true
+}
+
 // LookupParam returns a goto-definition location for a parameter of
 // a stub func/decl/type. qname is the qualified name (e.g.
 // "posix.copy"), paramName is the field/param identifier
@@ -161,7 +171,11 @@ func (sd *StubDefs) extract() {
 				sd.indexParams(qn, d.Params, outPath, data)
 			case *ast.TypeDecl:
 				qn := modName + "." + d.Name.Name
-				sd.locs[qn] = stubLocation{path: outPath, src: data, span: d.Name.SrcSpan}
+				loc := stubLocation{path: outPath, src: data, span: d.Name.SrcSpan}
+				sd.locs[qn] = loc
+				if modName == "builtin" {
+					sd.locs[d.Name.Name] = loc
+				}
 				sd.indexParams(qn, d.Fields, outPath, data)
 			case *ast.EnumDecl:
 				qn := modName + "." + d.Name.Name
@@ -182,4 +196,50 @@ func (sd *StubDefs) extract() {
 
 		return nil
 	})
+}
+
+// extractDocComment collects the `//` comment block immediately above
+// a declaration span by scanning backward through the source bytes.
+func extractDocComment(src []byte, span token.Span) string {
+	// Find the line start of the declaration
+	lineStart := int(span.Start)
+	for lineStart > 0 && src[lineStart-1] != '\n' {
+		lineStart--
+	}
+
+	// Walk backward over blank + comment lines
+	pos := lineStart
+	var lines []string
+	for pos > 0 {
+		// Find start of the previous line
+		end := pos - 1 // skip the \n
+		if end < 0 {
+			break
+		}
+		start := end
+		for start > 0 && src[start-1] != '\n' {
+			start--
+		}
+		line := strings.TrimSpace(string(src[start:end]))
+		if strings.HasPrefix(line, "//") {
+			text := strings.TrimPrefix(line, "//")
+			text = strings.TrimPrefix(text, " ")
+			lines = append(lines, text)
+			pos = start
+		} else if line == "" {
+			pos = start
+		} else {
+			break
+		}
+	}
+
+	if len(lines) == 0 {
+		return ""
+	}
+
+	// Reverse (we collected bottom-up)
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
+	}
+	return strings.Join(lines, "\n")
 }
