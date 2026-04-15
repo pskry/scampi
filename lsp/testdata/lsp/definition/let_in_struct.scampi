@@ -1,0 +1,9 @@
+module main
+
+import "std"
+import "std/local"
+
+let host = local.target { name = "h" }
+
+std.deploy(name = "t", targets = [ho‸st]) {
+}

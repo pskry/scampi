@@ -1,0 +1,6 @@
+{
+  "request": "rename",
+  "expect": {
+    "edit_count": 2
+  }
+}

@@ -64,6 +64,18 @@ type definitionExpect struct {
 	Line      uint32 `json:"line"`
 }
 
+type referencesExpect struct {
+	Count        int  `json:"count"`
+	CountAtLeast int  `json:"count_at_least,omitempty"`
+	Empty        bool `json:"empty,omitempty"`
+}
+
+type renameExpect struct {
+	FileCount int  `json:"file_count,omitempty"`
+	EditCount int  `json:"edit_count"`
+	Error     bool `json:"error,omitempty"`
+}
+
 func TestLSPFixtures(t *testing.T) {
 	root := "testdata/lsp"
 	if _, err := os.Stat(root); os.IsNotExist(err) {
@@ -133,6 +145,10 @@ func runFixture(t *testing.T, scampiPath, jsonPath string) {
 		runHoverFixture(t, s, docURI, line, char, spec.Expect)
 	case "definition":
 		runDefinitionFixture(t, s, docURI, line, char, spec.Expect)
+	case "references":
+		runReferencesFixture(t, s, docURI, line, char, spec.Expect)
+	case "rename":
+		runRenameFixture(t, s, docURI, line, char, spec.Expect)
 	default:
 		t.Fatalf("unknown request type: %q", spec.Request)
 	}
@@ -241,6 +257,85 @@ func runDefinitionFixture(
 	}
 	if loc.Range.Start.Line != exp.Line {
 		t.Errorf("expected definition at line %d; got %d", exp.Line, loc.Range.Start.Line)
+	}
+}
+
+func runReferencesFixture(
+	t *testing.T,
+	s *Server,
+	docURI protocol.DocumentURI,
+	line, char uint32,
+	rawExpect json.RawMessage,
+) {
+	var exp referencesExpect
+	if err := json.Unmarshal(rawExpect, &exp); err != nil {
+		t.Fatalf("bad references expect JSON: %v", err)
+	}
+	result, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: line, Character: char},
+		},
+	})
+	if err != nil {
+		t.Fatalf("References: %v", err)
+	}
+	if exp.Empty {
+		if len(result) != 0 {
+			t.Errorf("expected no references, got %d", len(result))
+		}
+		return
+	}
+	if exp.CountAtLeast > 0 {
+		if len(result) < exp.CountAtLeast {
+			t.Errorf("expected at least %d references, got %d", exp.CountAtLeast, len(result))
+		}
+		return
+	}
+	if len(result) != exp.Count {
+		t.Errorf("expected %d references, got %d", exp.Count, len(result))
+	}
+}
+
+func runRenameFixture(
+	t *testing.T,
+	s *Server,
+	docURI protocol.DocumentURI,
+	line, char uint32,
+	rawExpect json.RawMessage,
+) {
+	var exp renameExpect
+	if err := json.Unmarshal(rawExpect, &exp); err != nil {
+		t.Fatalf("bad rename expect JSON: %v", err)
+	}
+	result, err := s.Rename(context.Background(), &protocol.RenameParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: line, Character: char},
+		},
+		NewName: "renamed",
+	})
+	if exp.Error {
+		if err == nil {
+			t.Fatal("expected rename error, got nil")
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("Rename: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected workspace edit, got nil")
+	}
+	totalEdits := 0
+	for _, edits := range result.Changes {
+		totalEdits += len(edits)
+	}
+	if exp.EditCount > 0 && totalEdits != exp.EditCount {
+		t.Errorf("expected %d edits, got %d", exp.EditCount, totalEdits)
+	}
+	if exp.FileCount > 0 && len(result.Changes) != exp.FileCount {
+		t.Errorf("expected edits in %d files, got %d", exp.FileCount, len(result.Changes))
 	}
 }
 

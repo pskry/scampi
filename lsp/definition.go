@@ -65,6 +65,11 @@ func (s *Server) Definition(
 		if loc, ok := s.stubDefs.LookupParam(cur.FuncName, word); ok {
 			return []protocol.Location{loc}, nil
 		}
+		// User-defined type: search the current file's type/decl
+		// declarations for a matching field name.
+		if loc, ok := findFieldDefinition(f, filePath, data, cur.FuncName, word); ok {
+			return []protocol.Location{loc}, nil
+		}
 	}
 
 	// Search current file for definition first.
@@ -103,7 +108,52 @@ func (s *Server) Definition(
 	return nil, nil
 }
 
-// findDefinition searches top-level declarations for a name.
+// findFieldDefinition searches type/decl declarations for a field
+// matching fieldName within the type named typeName. Returns the
+// field's name span if found.
+func findFieldDefinition(
+	f *ast.File,
+	filePath string,
+	data []byte,
+	typeName string,
+	fieldName string,
+) (protocol.Location, bool) {
+	for _, d := range f.Decls {
+		switch d := d.(type) {
+		case *ast.TypeDecl:
+			if d.Name.Name != typeName {
+				continue
+			}
+			for _, field := range d.Fields {
+				if field.Name != nil && field.Name.Name == fieldName {
+					return spanToLocation(filePath, data, field.Name.SrcSpan), true
+				}
+			}
+		case *ast.DeclDecl:
+			if len(d.Name.Parts) == 0 || d.Name.Parts[0].Name != typeName {
+				continue
+			}
+			for _, field := range d.Params {
+				if field.Name != nil && field.Name.Name == fieldName {
+					return spanToLocation(filePath, data, field.Name.SrcSpan), true
+				}
+			}
+		case *ast.FuncDecl:
+			if d.Name.Name != typeName {
+				continue
+			}
+			for _, field := range d.Params {
+				if field.Name != nil && field.Name.Name == fieldName {
+					return spanToLocation(filePath, data, field.Name.SrcSpan), true
+				}
+			}
+		}
+	}
+	return protocol.Location{}, false
+}
+
+// findDefinition searches the entire AST for a declaration matching name,
+// including nested let bindings inside block bodies.
 // Attribute references (with leading `@`) match AttrTypeDecls.
 func findDefinition(f *ast.File, name string) *token.Span {
 	if len(name) > 1 && name[0] == '@' {
@@ -116,36 +166,42 @@ func findDefinition(f *ast.File, name string) *token.Span {
 		}
 		return nil
 	}
-	for _, d := range f.Decls {
-		switch d := d.(type) {
+
+	var result *token.Span
+	ast.Walk(f, func(n ast.Node) bool {
+		if result != nil {
+			return false
+		}
+		switch d := n.(type) {
 		case *ast.FuncDecl:
 			if d.Name.Name == name {
 				s := d.Name.SrcSpan
-				return &s
+				result = &s
 			}
 		case *ast.DeclDecl:
 			if len(d.Name.Parts) > 0 && d.Name.Parts[0].Name == name {
 				s := d.Name.SrcSpan
-				return &s
+				result = &s
 			}
 		case *ast.LetDecl:
 			if d.Name.Name == name {
 				s := d.Name.SrcSpan
-				return &s
+				result = &s
 			}
 		case *ast.TypeDecl:
 			if d.Name.Name == name {
 				s := d.Name.SrcSpan
-				return &s
+				result = &s
 			}
 		case *ast.EnumDecl:
 			if d.Name.Name == name {
 				s := d.Name.SrcSpan
-				return &s
+				result = &s
 			}
 		}
-	}
-	return nil
+		return true
+	}, nil)
+	return result
 }
 
 // findInSiblings searches sibling .scampi files in the same directory

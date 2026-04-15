@@ -130,6 +130,9 @@ func (s *Server) Initialize(
 			ReferencesProvider:      &protocol.ReferenceOptions{},
 			DocumentSymbolProvider:  &protocol.DocumentSymbolOptions{},
 			WorkspaceSymbolProvider: &protocol.WorkspaceSymbolOptions{},
+			RenameProvider: &protocol.RenameOptions{
+				PrepareProvider: true,
+			},
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "scampls",
@@ -361,8 +364,8 @@ func (s *Server) OnTypeFormatting(
 ) ([]protocol.TextEdit, error) {
 	return nil, nil
 }
-func (s *Server) PrepareRename(context.Context, *protocol.PrepareRenameParams) (*protocol.Range, error) {
-	return nil, nil
+func (s *Server) PrepareRename(ctx context.Context, params *protocol.PrepareRenameParams) (*protocol.Range, error) {
+	return s.prepareRename(ctx, params)
 }
 func (s *Server) RangeFormatting(
 	context.Context,
@@ -370,8 +373,8 @@ func (s *Server) RangeFormatting(
 ) ([]protocol.TextEdit, error) {
 	return nil, nil
 }
-func (s *Server) Rename(context.Context, *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
-	return nil, nil
+func (s *Server) Rename(ctx context.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
+	return s.rename(ctx, params)
 }
 func (s *Server) TypeDefinition(
 	context.Context,

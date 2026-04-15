@@ -1,0 +1,7 @@
+module main
+
+type X‸ {
+  X: string
+}
+
+let x = X { X = "hello" }

@@ -1,0 +1,6 @@
+{
+  "request": "references",
+  "expect": {
+    "count": 2
+  }
+}

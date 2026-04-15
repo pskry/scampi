@@ -1,0 +1,7 @@
+module main
+
+type Cfg {
+  na‸me: string
+}
+
+let c = Cfg { name = "hello" }

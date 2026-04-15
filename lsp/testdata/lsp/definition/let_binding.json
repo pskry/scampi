@@ -1,0 +1,6 @@
+{
+  "request": "definition",
+  "expect": {
+    "line": 2
+  }
+}

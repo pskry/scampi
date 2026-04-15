@@ -63,19 +63,24 @@ func (s *Server) References(
 			locs = append(locs, loc)
 		}
 	default:
-		// Bare name — search current file for ident matches.
-		locs = append(locs, findIdents(f, filePath, data, word)...)
-		// Multi-file module: also search sibling files for bare
-		// ident matches (same-package visibility).
-		modName := fileModuleName(f)
-		if modName != "" && modName != "main" {
-			locs = append(locs, s.refsInSiblings(filePath, modName, word)...)
-		}
-		// Also search for the qualified form (e.g. "pkg" →
-		// "posix.pkg") across all workspace dirs.
-		if modName != "" {
-			qualified := modName + "." + word
-			locs = append(locs, s.refsInAllDirs(qualified, filePath)...)
+		offset := offsetFromPosition(doc.Content, params.Position.Line, params.Position.Character)
+		fieldKeys := collectFieldKeySpans(f)
+		if fieldKeys[uint32(offset)] || isWithinFieldKeySpan(f, uint32(offset)) {
+			// Cursor is on a field key/declaration — search for
+			// field references only (struct lit keys + type field decls).
+			locs = append(locs, findFieldKeyIdents(f, filePath, data, word)...)
+		} else {
+			// Bare name — search for type/variable ident matches
+			// (excluding field keys).
+			locs = append(locs, findIdents(f, filePath, data, word)...)
+			modName := fileModuleName(f)
+			if modName != "" && modName != "main" {
+				locs = append(locs, s.refsInSiblings(filePath, modName, word)...)
+			}
+			if modName != "" {
+				qualified := modName + "." + word
+				locs = append(locs, s.refsInAllDirs(qualified, filePath)...)
+			}
 		}
 	}
 
@@ -295,14 +300,22 @@ func (s *Server) refsInSiblings(
 	return locs
 }
 
-// findIdents walks the AST and returns locations of every Ident matching name.
+// findIdents walks the AST and returns locations of every Ident matching name,
+// excluding field initializer keys (the `name` in `name = value` inside struct
+// literals) and field declaration names in type bodies. Those are field
+// references, not type/variable references.
 func findIdents(f *ast.File, filePath string, src []byte, name string) []protocol.Location {
+	fieldKeys := collectFieldKeySpans(f)
+
 	var locs []protocol.Location
 	ast.Walk(f, func(n ast.Node) bool {
 		if n == nil {
 			return true
 		}
 		if id, ok := n.(*ast.Ident); ok && id.Name == name {
+			if fieldKeys[id.SrcSpan.Start] {
+				return true
+			}
 			locs = append(locs, protocol.Location{
 				URI:   uri.File(filePath),
 				Range: tokenSpanToRange(src, id.SrcSpan),
@@ -311,6 +324,143 @@ func findIdents(f *ast.File, filePath string, src []byte, name string) []protoco
 		return true
 	}, nil)
 	return locs
+}
+
+// collectFieldKeySpans collects the byte offsets of all ident nodes
+// that are struct-literal field keys or type-declaration field names.
+// These are "field namespace" identifiers that should not be confused
+// with type/variable references of the same name.
+// isWithinFieldKeySpan checks if the byte offset falls within any
+// field key or field declaration name span. The collectFieldKeySpans
+// set only has start offsets; this does a range check.
+func isWithinFieldKeySpan(f *ast.File, offset uint32) bool {
+	// StructLit field keys.
+	found := false
+	ast.Walk(f, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		sl, ok := n.(*ast.StructLit)
+		if !ok {
+			return true
+		}
+		for _, fi := range sl.Fields {
+			if fi.Name != nil && offset >= fi.Name.SrcSpan.Start && offset < fi.Name.SrcSpan.End {
+				found = true
+				return false
+			}
+		}
+		return true
+	}, nil)
+	if found {
+		return true
+	}
+	// Type/decl field declarations.
+	for _, d := range f.Decls {
+		switch d := d.(type) {
+		case *ast.TypeDecl:
+			for _, field := range d.Fields {
+				if field.Name != nil && offset >= field.Name.SrcSpan.Start && offset < field.Name.SrcSpan.End {
+					return true
+				}
+			}
+		case *ast.DeclDecl:
+			for _, field := range d.Params {
+				if field.Name != nil && offset >= field.Name.SrcSpan.Start && offset < field.Name.SrcSpan.End {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// findFieldKeyIdents returns locations of idents matching name that ARE
+// field keys (struct literal keys + type/decl field declarations).
+// The inverse of findIdents — only field-namespace hits.
+func findFieldKeyIdents(f *ast.File, filePath string, src []byte, name string) []protocol.Location {
+	var locs []protocol.Location
+
+	// StructLit field keys.
+	ast.Walk(f, func(n ast.Node) bool {
+		sl, ok := n.(*ast.StructLit)
+		if !ok {
+			return true
+		}
+		for _, fi := range sl.Fields {
+			if fi.Name != nil && fi.Name.Name == name {
+				locs = append(locs, protocol.Location{
+					URI:   uri.File(filePath),
+					Range: tokenSpanToRange(src, fi.Name.SrcSpan),
+				})
+			}
+		}
+		return true
+	}, nil)
+
+	// Type/decl field declarations.
+	for _, d := range f.Decls {
+		switch d := d.(type) {
+		case *ast.TypeDecl:
+			for _, field := range d.Fields {
+				if field.Name != nil && field.Name.Name == name {
+					locs = append(locs, protocol.Location{
+						URI:   uri.File(filePath),
+						Range: tokenSpanToRange(src, field.Name.SrcSpan),
+					})
+				}
+			}
+		case *ast.DeclDecl:
+			for _, field := range d.Params {
+				if field.Name != nil && field.Name.Name == name {
+					locs = append(locs, protocol.Location{
+						URI:   uri.File(filePath),
+						Range: tokenSpanToRange(src, field.Name.SrcSpan),
+					})
+				}
+			}
+		}
+	}
+
+	return locs
+}
+
+func collectFieldKeySpans(f *ast.File) map[uint32]bool {
+	spans := map[uint32]bool{}
+
+	// StructLit field keys: `name = value` inside { ... }
+	ast.Walk(f, func(n ast.Node) bool {
+		sl, ok := n.(*ast.StructLit)
+		if !ok {
+			return true
+		}
+		for _, fi := range sl.Fields {
+			if fi.Name != nil {
+				spans[fi.Name.SrcSpan.Start] = true
+			}
+		}
+		return true
+	}, nil)
+
+	// Type/decl field names: `name: type` inside type/decl bodies
+	for _, d := range f.Decls {
+		switch d := d.(type) {
+		case *ast.TypeDecl:
+			for _, field := range d.Fields {
+				if field.Name != nil {
+					spans[field.Name.SrcSpan.Start] = true
+				}
+			}
+		case *ast.DeclDecl:
+			for _, field := range d.Params {
+				if field.Name != nil {
+					spans[field.Name.SrcSpan.Start] = true
+				}
+			}
+		}
+	}
+
+	return spans
 }
 
 // findDottedRefs finds references to a qualified name like "posix.pkg"

@@ -1,0 +1,5 @@
+module main
+
+let greeting = "hello"
+
+let msg = gree‸ting
