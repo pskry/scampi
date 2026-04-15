@@ -28,3 +28,5 @@ func (f *FileBackend) Lookup(key string) (string, bool, error) {
 	v, ok := f.secrets[key]
 	return v, ok, nil
 }
+
+func (f *FileBackend) Keys() []string { return SortedKeys(f.secrets) }

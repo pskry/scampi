@@ -212,6 +212,7 @@ func secretsCmd() *cli.Command {
 			secretsPubkeyCmd(),
 			secretsSetCmd(),
 			secretsGetCmd(),
+			secretsListCmd(),
 			secretsDelCmd(),
 			secretsInfoCmd(),
 			secretsRecryptCmd(),
@@ -390,6 +391,33 @@ func secretsSetCmd() *cli.Command {
 	}
 }
 
+// scampi secrets list
+// -----------------------------------------------------------------------------
+
+func secretsListCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List available secret keys",
+		Flags: []cli.Flag{secretsFileFlag},
+		Action: func(_ context.Context, cmd *cli.Command) error {
+			filePath, err := requireSecretsFile(cmd)
+			if err != nil {
+				return err
+			}
+
+			store, err := readStore(filePath)
+			if err != nil {
+				return cliError(fmt.Sprintf("reading %s: %s", filePath, err))
+			}
+
+			for _, k := range sortedKeys(store) {
+				_, _ = fmt.Println(k)
+			}
+			return nil
+		},
+	}
+}
+
 // scampi secrets get
 // -----------------------------------------------------------------------------
 
@@ -428,7 +456,7 @@ func secretsGetCmd() *cli.Command {
 			if !ok {
 				return cliErrorHint(
 					fmt.Sprintf("key %q not found in %s", key, filePath),
-					"run secrets get (no args) to list available keys",
+					"run secrets list to see available keys",
 				)
 			}
 

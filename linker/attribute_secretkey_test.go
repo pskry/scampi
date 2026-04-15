@@ -28,6 +28,8 @@ func (b *stubBackend) Lookup(key string) (string, bool, error) {
 	return v, ok, nil
 }
 
+func (b *stubBackend) Keys() []string { return secret.SortedKeys(b.keys) }
+
 func newSecretCtx(backend *stubBackend, arg ast.Expr) StaticCheckContext {
 	// Wrap nil typed pointer as a true nil interface so the
 	// "no backend configured" path actually fires.

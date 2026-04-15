@@ -51,6 +51,8 @@ func (a *AgeBackend) Lookup(key string) (string, bool, error) {
 	return v, ok, nil
 }
 
+func (a *AgeBackend) Keys() []string { return SortedKeys(a.secrets) }
+
 // EncryptValue encrypts plaintext with the given recipients and returns
 // the wrapped AGE[base64(ciphertext)] string.
 func EncryptValue(plaintext string, recipients []age.Recipient) (string, error) {
