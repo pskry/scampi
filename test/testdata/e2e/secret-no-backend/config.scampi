@@ -8,16 +8,16 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.template {
-    desc = "no backend configured"
+    desc    = "no backend configured"
     content = "pass={{.pw}}"
-    dest = "/tmp/out.txt"
-    data = {
+    dest    = "/tmp/out.txt"
+    data    = {
       "values": {
         "pw": std.secret("db_pass"),
       },
     }
-    perm = "0644"
-    owner = "testuser"
-    group = "testgroup"
+    perm    = "0644"
+    owner   = "testuser"
+    group   = "testgroup"
   }
 }

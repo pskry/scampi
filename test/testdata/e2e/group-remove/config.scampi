@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.group {
-    desc = "remove group appusers"
-    name = "appusers"
+    desc  = "remove group appusers"
+    name  = "appusers"
     state = posix.GroupState.absent
   }
 }

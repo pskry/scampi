@@ -1,8 +1,8 @@
 module main
 
 type User {
-  name: string
+  name:   string
   groups: list[string] = []
-  shell: string = "/bin/bash"
-  admin: bool = false
+  shell:  string = "/bin/bash"
+  admin:  bool = false
 }

@@ -10,16 +10,16 @@ std.secrets { backend = std.SecretsBackend.file, path = "/secrets.json" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.template {
-    desc = "missing secret"
+    desc    = "missing secret"
     content = "token={{.token}}"
-    dest = "/tmp/out.txt"
-    data = {
+    dest    = "/tmp/out.txt"
+    data    = {
       "values": {
         "token": std.secret("nonexistent_key"),
       },
     }
-    perm = "0644"
-    owner = "testuser"
-    group = "testgroup"
+    perm    = "0644"
+    owner   = "testuser"
+    group   = "testgroup"
   }
 }

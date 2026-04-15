@@ -8,16 +8,16 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.template {
-    desc = "render greeting"
-    src = posix.source_local { path = "/tmpl/greeting.txt" }
-    dest = "/tmp/greeting.txt"
-    data = {
+    desc  = "render greeting"
+    src   = posix.source_local { path = "/tmpl/greeting.txt" }
+    dest  = "/tmp/greeting.txt"
+    data  = {
       "values": {
         "name": "world",
         "count": 3,
       },
     }
-    perm = "0644"
+    perm  = "0644"
     owner = "testuser"
     group = "testgroup"
   }

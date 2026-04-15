@@ -15,8 +15,8 @@ import "std/rest"
 
 // PUT /users/{username} — Update user
 func update_user(
-  username: string,
-  email: string? = none,
+  username:      string
+  email:         string? = none
   body_username: string? = none
 ) std.Step {
   let body = {}

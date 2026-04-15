@@ -16,21 +16,21 @@ let vps = ssh.target {
 
 std.deploy(name = "harden", targets = [vps]) {
   let restart_fail2ban = posix.service {
-    name = "fail2ban"
+    name  = "fail2ban"
     state = posix.ServiceState.restarted
   }
 
   posix.pkg {
     packages = ["fail2ban", "ufw", "unattended-upgrades"]
-    source = posix.pkg_system {}
+    source   = posix.pkg_system {}
   }
 
   posix.copy {
-    src = posix.source_local { path = "./files/fail2ban-sshd.conf" }
-    dest = "/etc/fail2ban/jail.d/sshd.conf"
-    perm = "0644"
-    owner = "root"
-    group = "root"
+    src       = posix.source_local { path = "./files/fail2ban-sshd.conf" }
+    dest      = "/etc/fail2ban/jail.d/sshd.conf"
+    perm      = "0644"
+    owner     = "root"
+    group     = "root"
     on_change = [restart_fail2ban]
   }
 

@@ -1,0 +1,17 @@
+module main
+
+import "std"
+import "std/local"
+
+let a = "one"
+let b = "two"
+
+std.deploy(name = "t", targets = []) {
+  let x = "inner"
+
+  // section A
+  let y = "a"
+
+  // section B
+  let z = "b"
+}

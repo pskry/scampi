@@ -97,6 +97,7 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
+			fmtCmd(),
 			planCmd(),
 			checkCmd(),
 			applyCmd(),
@@ -161,6 +162,15 @@ func onUsageError(_ context.Context, cmd *cli.Command, err error, _ bool) error 
 	_, _ = fmt.Fprintf(os.Stderr, "Incorrect Usage: %s\n\n", err)
 	_ = cli.ShowSubcommandHelp(cmd)
 	return cli.Exit("", exitUserError)
+}
+
+func requireMinArgs(n int) func(context.Context, *cli.Command) (context.Context, error) {
+	return func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+		if cmd.Args().Len() < n {
+			cli.ShowSubcommandHelpAndExit(cmd, exitUserError)
+		}
+		return ctx, nil
+	}
 }
 
 func requireMaxArgs(n int) func(context.Context, *cli.Command) (context.Context, error) {

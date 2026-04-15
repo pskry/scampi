@@ -8,16 +8,16 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.template {
-    desc = "render inline"
-    src = posix.source_inline { content = "server={{ .host }}:{{ .port }}" }
-    dest = "/tmp/config.txt"
-    data = {
+    desc  = "render inline"
+    src   = posix.source_inline { content = "server={{ .host }}:{{ .port }}" }
+    dest  = "/tmp/config.txt"
+    data  = {
       "values": {
         "host": "localhost",
         "port": 8080,
       },
     }
-    perm = "0600"
+    perm  = "0600"
     owner = "testuser"
     group = "testgroup"
   }

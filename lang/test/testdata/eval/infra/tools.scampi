@@ -17,6 +17,6 @@ let vps = ssh.target {
 std.deploy(name = "tools", targets = [vps]) {
   posix.pkg {
     packages = ["neovim", "htop", "btop"]
-    source = posix.pkg_system {}
+    source   = posix.pkg_system {}
   }
 }

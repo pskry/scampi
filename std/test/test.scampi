@@ -75,9 +75,9 @@ type ExpectedState {
 // state. `expect` is optional — omit it for smoke tests that only
 // verify the deploy applies cleanly.
 func target_in_memory(
-  name:    string,
-  initial: InitialState?,
-  expect:  ExpectedState?,
+  name:    string
+  initial: InitialState?
+  expect:  ExpectedState?
 ) std.Target
 
 // REST API mock. Records every request the engine makes; replays
@@ -88,10 +88,10 @@ func target_in_memory(
 // `expect_requests` is a list of test.request(...) values; order
 // doesn't matter, cardinality defaults to "at least once".
 func target_rest_mock(
-  name:            string,
-  base_url:        string,
-  routes:          map[string, Response],
-  expect_requests: list[RequestMatcher]?,
+  name:            string
+  base_url:        string
+  routes:          map[string, Response]
+  expect_requests: list[RequestMatcher]?
 ) std.Target
 
 // Response and request builders
@@ -101,9 +101,9 @@ func target_rest_mock(
 // verbatim; `headers` are merged with sensible defaults
 // (Content-Type defaults to "application/json" if not set).
 func response(
-  status:  int,
-  body:    string?,
-  headers: map[string, string]?,
+  status:  int
+  body:    string?
+  headers: map[string, string]?
 ) Response
 
 // Build a request matcher for use in `expect_requests`. `body` is a
@@ -114,9 +114,9 @@ func response(
 //   - count_at_least = N at least N matching requests (default 1)
 // Set neither for the default (at least one match).
 func request(
-  method:         string,
-  path:           string,
-  body:           matchers.Matcher?,
-  count:          int?,
-  count_at_least: int?,
+  method:         string
+  path:           string
+  body:           matchers.Matcher?
+  count:          int?
+  count_at_least: int?
 ) RequestMatcher

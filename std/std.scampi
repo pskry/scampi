@@ -165,6 +165,6 @@ func deploy(name: string, targets: list[Target]) block[Deploy]
 //
 //   std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
 decl secrets(
-  backend: SecretsBackend,
-  path:    string,
+  backend: SecretsBackend
+  path:    string
 ) SecretsConfig

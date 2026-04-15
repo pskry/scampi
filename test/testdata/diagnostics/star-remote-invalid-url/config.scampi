@@ -8,9 +8,9 @@ let host = local.target { name = "host" }
 
 std.deploy(name = "main", targets = [host]) {
   posix.copy {
-    src = posix.source_remote { url = "://missing-scheme" }
-    dest = "/tmp/out"
-    perm = "0644"
+    src   = posix.source_remote { url = "://missing-scheme" }
+    dest  = "/tmp/out"
+    perm  = "0644"
     owner = "root"
     group = "root"
   }

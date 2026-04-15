@@ -8,9 +8,9 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.user {
-    desc = "user already exists"
-    name = "hal9000"
+    desc  = "user already exists"
+    name  = "hal9000"
     shell = "/bin/bash"
-    home = "/home/hal9000"
+    home  = "/home/hal9000"
   }
 }

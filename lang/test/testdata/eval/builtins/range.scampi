@@ -2,7 +2,7 @@ module main
 
 import "std"
 
-let zero_to_4   = std.range(5)
-let zero_to_9   = std.range(10)
-let just_three  = std.range(3)
+let zero_to_4 = std.range(5)
+let zero_to_9 = std.range(10)
+let just_three = std.range(3)
 let empty_range = std.range(0)

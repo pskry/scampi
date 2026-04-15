@@ -2,10 +2,10 @@ module main
 
 let and_tt = true && true
 let and_tf = true && false
-let or_tf  = true || false
-let or_ff  = false || false
-let not_t  = !true
-let not_f  = !false
+let or_tf = true || false
+let or_ff = false || false
+let not_t = !true
+let not_f = !false
 
 // Short-circuit: rhs of && is not evaluated when lhs is false.
 // Compound expression result.

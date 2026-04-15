@@ -17,6 +17,8 @@ func (c *Checker) typeOf(e ast.Expr) Type {
 		return nil
 	}
 	switch e := e.(type) {
+	case *ast.ParenExpr:
+		return c.typeOf(e.Inner)
 	case *ast.IntLit:
 		return IntType
 	case *ast.BoolLit:

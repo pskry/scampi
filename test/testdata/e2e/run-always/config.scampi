@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.run {
-    desc = "refresh something"
-    apply = "do-the-thing"
+    desc   = "refresh something"
+    apply  = "do-the-thing"
     always = true
   }
 }

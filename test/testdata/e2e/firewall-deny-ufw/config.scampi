@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.firewall {
-    desc = "deny HTTPS"
-    port = 443
+    desc   = "deny HTTPS"
+    port   = 443
     action = posix.FirewallAction.deny
   }
 }

@@ -8,9 +8,9 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.user {
-    desc = "create system user"
-    name = "appd"
+    desc   = "create system user"
+    name   = "appd"
     system = true
-    shell = "/usr/sbin/nologin"
+    shell  = "/usr/sbin/nologin"
   }
 }

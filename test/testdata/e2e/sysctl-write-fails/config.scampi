@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.sysctl {
-    desc = "write fails"
-    key = "net.ipv4.ip_forward"
+    desc  = "write fails"
+    key   = "net.ipv4.ip_forward"
     value = "1"
   }
 }

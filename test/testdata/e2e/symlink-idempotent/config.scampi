@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.symlink {
-    desc = "symlink already correct"
+    desc   = "symlink already correct"
     target = "/tmp/target.txt"
-    link = "/tmp/link.txt"
+    link   = "/tmp/link.txt"
   }
 }

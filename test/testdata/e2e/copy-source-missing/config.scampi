@@ -8,10 +8,10 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.copy {
-    desc = "copy missing file"
-    src = posix.source_local { path = "/tmp/nonexistent.txt" }
-    dest = "/tmp/out.txt"
-    perm = "0644"
+    desc  = "copy missing file"
+    src   = posix.source_local { path = "/tmp/nonexistent.txt" }
+    dest  = "/tmp/out.txt"
+    perm  = "0644"
     owner = "testuser"
     group = "testgroup"
   }

@@ -1,7 +1,7 @@
 module main
 
 let empty_list = []
-let empty_map  = {}
-let zero       = 0
-let empty_str  = ""
-let no_value   = none
+let empty_map = {}
+let zero = 0
+let empty_str = ""
+let no_value = none

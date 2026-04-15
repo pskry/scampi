@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.symlink {
-    desc = "link in missing directory"
+    desc   = "link in missing directory"
     target = "/tmp/target.txt"
-    link = "/tmp/nonexistent/link.txt"
+    link   = "/tmp/nonexistent/link.txt"
   }
 }

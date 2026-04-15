@@ -7,12 +7,12 @@ module main
 import "std"
 
 func client(
-  site: string,
-  name: string,
-  mac: string,
-  fixed_ip: string,
-  network_id: string? = none,
-  dns_record: string? = none,
+  site:       string
+  name:       string
+  mac:        string
+  fixed_ip:   string
+  network_id: string? = none
+  dns_record: string? = none
 ) map[string, any] {
   let state = {
     "name": name,
@@ -34,9 +34,9 @@ func client(
 }
 
 let result = client(
-  site = "default",
-  name = "nas",
-  mac = "aa:bb:cc:dd:ee:ff",
-  fixed_ip = "192.0.2.10",
+  site       = "default",
+  name       = "nas",
+  mac        = "aa:bb:cc:dd:ee:ff",
+  fixed_ip   = "192.0.2.10",
   dns_record = "nas.local",
 )

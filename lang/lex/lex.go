@@ -12,6 +12,13 @@ import (
 	"scampi.dev/scampi/lang/token"
 )
 
+// Comment is a line or block comment found during lexing.
+type Comment struct {
+	Text  string // full text including // or /* */
+	Start uint32
+	End   uint32
+}
+
 // Lexer is a byte-driven scanner over a single source buffer. It is
 // not safe for concurrent use. The caller retains ownership of src.
 type Lexer struct {
@@ -20,6 +27,8 @@ type Lexer struct {
 
 	pos  int        // current byte offset into src
 	prev token.Kind // kind of previous non-Semi token (for ASI)
+
+	comments []Comment // accumulated comments, in source order
 
 	// interp is a stack of interpolation frames. Each frame tracks the
 	// unmatched '{' depth inside an interpolation expression. Empty
@@ -55,6 +64,9 @@ func (l *Lexer) Name() string { return l.name }
 
 // Source returns the source buffer this lexer is scanning.
 func (l *Lexer) Source() []byte { return l.src }
+
+// Comments returns all comments found during lexing, in source order.
+func (l *Lexer) Comments() []Comment { return l.comments }
 
 // Errors returns the accumulated lexer errors. Safe to call any time.
 func (l *Lexer) Errors() []Error { return l.errs }
@@ -142,10 +154,16 @@ func (l *Lexer) skipWSAndComments() (token.Token, bool) {
 			case '/':
 				// Line comment: skip to end-of-line. Don't consume the
 				// newline — the next iteration handles it for ASI.
+				cstart := uint32(l.pos)
 				l.pos += 2
 				for l.pos < len(l.src) && l.src[l.pos] != '\n' {
 					l.pos++
 				}
+				l.comments = append(l.comments, Comment{
+					Text:  string(l.src[cstart:l.pos]),
+					Start: cstart,
+					End:   uint32(l.pos),
+				})
 			case '*':
 				// Nested block comment.
 				if tok, ok := l.skipBlockComment(); ok {
@@ -196,6 +214,11 @@ func (l *Lexer) skipBlockComment() (token.Token, bool) {
 			"unterminated block comment",
 		)
 	}
+	l.comments = append(l.comments, Comment{
+		Text:  string(l.src[startPos:l.pos]),
+		Start: startPos,
+		End:   uint32(l.pos),
+	})
 	if sawNewline && l.prev.EndsStatement() && len(l.interp) == 0 {
 		end := uint32(l.pos)
 		return l.emit(token.Semi, end, end), true

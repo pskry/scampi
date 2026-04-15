@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.user {
-    desc = "remove user hal9000"
-    name = "hal9000"
+    desc  = "remove user hal9000"
+    name  = "hal9000"
     state = posix.UserState.absent
   }
 }

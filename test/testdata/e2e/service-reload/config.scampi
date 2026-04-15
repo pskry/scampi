@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.service {
-    desc = "reload nginx"
-    name = "nginx"
+    desc  = "reload nginx"
+    name  = "nginx"
     state = posix.ServiceState.reloaded
   }
 }

@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.pkg {
-    desc = "install packages"
+    desc     = "install packages"
     packages = ["nginx", "curl"]
-    source = posix.pkg_system {}
+    source   = posix.pkg_system {}
   }
 }

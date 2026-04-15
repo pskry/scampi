@@ -8,7 +8,7 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.run {
-    desc = "ip forwarding already enabled"
+    desc  = "ip forwarding already enabled"
     check = "check-ip-forward"
     apply = "apply-ip-forward"
   }

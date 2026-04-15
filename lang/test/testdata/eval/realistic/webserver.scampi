@@ -18,9 +18,9 @@ let runner_version = "12.7.2"
 let runner_url = "https://example.com/runner/v${runner_version}/runner-linux-amd64"
 
 type TeamMember {
-  name: string
+  name:   string
   groups: list[string] = []
-  admin: bool = false
+  admin:  bool = false
 }
 
 let team = [
@@ -45,9 +45,9 @@ std.deploy(name = "bootstrap", targets = [vps]) {
   posix.dir { path = "/var/www/html" }
 
   posix.copy {
-    src = posix.source_remote { url = runner_url }
-    dest = "/usr/local/bin/runner"
-    perm = "0755"
+    src   = posix.source_remote { url = runner_url }
+    dest  = "/usr/local/bin/runner"
+    perm  = "0755"
     owner = "root"
     group = "root"
   }

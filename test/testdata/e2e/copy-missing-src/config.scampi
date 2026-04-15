@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.copy {
-    dest = "/etc/app/config.txt"
-    perm = "0644"
+    dest  = "/etc/app/config.txt"
+    perm  = "0644"
     owner = "root"
     group = "root"
   }

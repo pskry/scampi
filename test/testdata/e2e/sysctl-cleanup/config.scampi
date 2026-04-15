@@ -8,9 +8,9 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.sysctl {
-    desc = "live only, remove stale drop-in"
-    key = "net.ipv4.ip_forward"
-    value = "1"
+    desc    = "live only, remove stale drop-in"
+    key     = "net.ipv4.ip_forward"
+    value   = "1"
     persist = false
   }
 }

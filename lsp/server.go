@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
@@ -15,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"scampi.dev/scampi/lang/check"
+	"scampi.dev/scampi/lang/format"
 	"scampi.dev/scampi/mod"
 )
 
@@ -133,6 +135,7 @@ func (s *Server) Initialize(
 			RenameProvider: &protocol.RenameOptions{
 				PrepareProvider: true,
 			},
+			DocumentFormattingProvider: &protocol.DocumentFormattingOptions{},
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "scampls",
@@ -350,10 +353,31 @@ func (s *Server) FoldingRanges(
 	return nil, nil
 }
 func (s *Server) Formatting(
-	context.Context,
-	*protocol.DocumentFormattingParams,
+	_ context.Context,
+	params *protocol.DocumentFormattingParams,
 ) ([]protocol.TextEdit, error) {
-	return nil, nil
+	doc, ok := s.docs.Get(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+
+	formatted, err := format.Format([]byte(doc.Content))
+	if err != nil {
+		return nil, nil
+	}
+
+	if string(formatted) == doc.Content {
+		return nil, nil
+	}
+
+	lines := strings.Count(doc.Content, "\n")
+	return []protocol.TextEdit{{
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   protocol.Position{Line: uint32(lines + 1), Character: 0},
+		},
+		NewText: string(formatted),
+	}}, nil
 }
 func (s *Server) Implementation(context.Context, *protocol.ImplementationParams) ([]protocol.Location, error) {
 	return nil, nil

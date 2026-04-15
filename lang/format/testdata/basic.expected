@@ -1,0 +1,20 @@
+module main
+
+import "std"
+import "std/posix"
+import "std/local"
+
+// Secrets
+std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
+
+let host = local.target { name = "h" }
+
+// Main deployment
+std.deploy(name = "test", targets = [host]) {
+  // Firewall rules
+  posix.firewall { port = 22, desc = "allow SSH" }
+  posix.firewall {
+    port = 443
+    desc = "allow HTTPS"
+  }
+}

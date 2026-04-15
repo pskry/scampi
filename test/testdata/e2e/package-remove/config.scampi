@@ -8,9 +8,9 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.pkg {
-    desc = "remove packages"
+    desc     = "remove packages"
     packages = ["tree"]
-    state = posix.PkgState.absent
-    source = posix.pkg_system {}
+    state    = posix.PkgState.absent
+    source   = posix.pkg_system {}
   }
 }

@@ -25,28 +25,28 @@ let just_url = "https://github.com/casey/just/releases/download/${just_version}/
 
 std.deploy(name = "runner", targets = [vps]) {
   let restart_runner = posix.service {
-    name = "forgejo-runner"
+    name  = "forgejo-runner"
     state = posix.ServiceState.restarted
   }
   let restart_docker = posix.service {
-    name = "docker"
+    name  = "docker"
     state = posix.ServiceState.restarted
   }
 
   posix.pkg {
     packages = ["git", "shellcheck", "curl", "nodejs", "npm", "gcc", "libc6-dev", "jq"]
-    source = posix.pkg_system {}
+    source   = posix.pkg_system {}
   }
 
   // Go
   posix.unarchive {
-    src = posix.source_remote { url = go_url }
+    src  = posix.source_remote { url = go_url }
     dest = "/usr/local"
   }
   posix.copy {
-    src = posix.source_inline { content = "export PATH=\"/usr/local/go/bin:$PATH\"\n" }
-    dest = "/etc/profile.d/go.sh"
-    perm = "0644"
+    src   = posix.source_inline { content = "export PATH=\"/usr/local/go/bin:$PATH\"\n" }
+    dest  = "/etc/profile.d/go.sh"
+    perm  = "0644"
     owner = "root"
     group = "root"
   }
@@ -54,72 +54,75 @@ std.deploy(name = "runner", targets = [vps]) {
 
   // just
   posix.unarchive {
-    src = posix.source_remote { url = just_url }
+    src  = posix.source_remote { url = just_url }
     dest = "/usr/local/bin"
   }
 
   // Docker
   posix.pkg {
     packages = [
-      "docker-ce", "docker-ce-cli", "containerd.io",
-      "docker-buildx-plugin", "docker-compose-plugin",
+      "docker-ce",
+      "docker-ce-cli",
+      "containerd.io",
+      "docker-buildx-plugin",
+      "docker-compose-plugin",
     ]
-    source = posix.pkg_apt_repo {
-      url = "https://download.docker.com/linux/debian"
-      key_url = "https://download.docker.com/linux/debian/gpg"
+    source   = posix.pkg_apt_repo {
+      url        = "https://download.docker.com/linux/debian"
+      key_url    = "https://download.docker.com/linux/debian/gpg"
       components = ["stable"]
     }
   }
   posix.copy {
-    src = posix.source_inline { content = "{\"features\":{\"buildkit\":true}}\n" }
-    dest = "/etc/docker/daemon.json"
-    perm = "0644"
-    owner = "root"
-    group = "root"
+    src       = posix.source_inline { content = "{\"features\":{\"buildkit\":true}}\n" }
+    dest      = "/etc/docker/daemon.json"
+    perm      = "0644"
+    owner     = "root"
+    group     = "root"
     on_change = [restart_docker]
   }
   posix.service { name = "docker", state = posix.ServiceState.running, enabled = true }
 
   // Runner user
   posix.user {
-    name = "forgejo-runner"
-    shell = "/bin/bash"
-    home = "/home/forgejo-runner"
+    name   = "forgejo-runner"
+    shell  = "/bin/bash"
+    home   = "/home/forgejo-runner"
     system = true
     groups = ["docker"]
   }
 
   // Runner binary
   posix.copy {
-    src = posix.source_remote { url = runner_url }
-    dest = "/usr/local/bin/forgejo-runner"
-    perm = "0755"
+    src   = posix.source_remote { url = runner_url }
+    dest  = "/usr/local/bin/forgejo-runner"
+    perm  = "0755"
     owner = "root"
     group = "root"
   }
 
   posix.dir {
-    path = "/var/lib/forgejo-runner"
-    perm = "0755"
+    path  = "/var/lib/forgejo-runner"
+    perm  = "0755"
     owner = "forgejo-runner"
     group = "forgejo-runner"
   }
 
   posix.copy {
-    src = posix.source_local { path = "./files/forgejo-runner-config.yml" }
-    dest = "/var/lib/forgejo-runner/config.yml"
-    perm = "0640"
-    owner = "forgejo-runner"
-    group = "forgejo-runner"
+    src       = posix.source_local { path = "./files/forgejo-runner-config.yml" }
+    dest      = "/var/lib/forgejo-runner/config.yml"
+    perm      = "0640"
+    owner     = "forgejo-runner"
+    group     = "forgejo-runner"
     on_change = [restart_runner]
   }
 
   posix.copy {
-    src = posix.source_local { path = "./files/forgejo-runner.service" }
-    dest = "/etc/systemd/system/forgejo-runner.service"
-    perm = "0644"
-    owner = "root"
-    group = "root"
+    src       = posix.source_local { path = "./files/forgejo-runner.service" }
+    dest      = "/etc/systemd/system/forgejo-runner.service"
+    perm      = "0644"
+    owner     = "root"
+    group     = "root"
     on_change = [restart_runner]
   }
 

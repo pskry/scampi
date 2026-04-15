@@ -8,10 +8,10 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.template {
-    desc = "bad syntax"
-    src = posix.source_inline { content = "hello {{.name" }
-    dest = "/tmp/out.txt"
-    perm = "0644"
+    desc  = "bad syntax"
+    src   = posix.source_inline { content = "hello {{.name" }
+    dest  = "/tmp/out.txt"
+    perm  = "0644"
     owner = "testuser"
     group = "testgroup"
   }

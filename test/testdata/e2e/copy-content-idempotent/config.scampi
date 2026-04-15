@@ -8,10 +8,10 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.copy {
-    desc = "already-present sudoers entry"
-    src = posix.source_inline { content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n" }
-    dest = "/etc/sudoers.d/hal9000"
-    perm = "0440"
+    desc  = "already-present sudoers entry"
+    src   = posix.source_inline { content = "hal9000 ALL=(ALL) NOPASSWD:ALL\n" }
+    dest  = "/etc/sudoers.d/hal9000"
+    perm  = "0440"
     owner = "testuser"
     group = "testgroup"
   }

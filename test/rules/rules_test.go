@@ -199,6 +199,10 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "os",
 		},
 		{
+			pattern:        "cmd/scampi/fmt.go",
+			allowedImports: "os",
+		},
+		{
 			pattern:        "gen/api.go",
 			allowedImports: "os",
 		},

@@ -4,6 +4,7 @@
 package gen
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"scampi.dev/scampi/lang/format"
 
 	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi2conv"
@@ -55,12 +58,20 @@ func API(specPath string, scampiVersion string, w io.Writer, em diagnostic.Emitt
 
 	prefix := cleanPathPrefix(opts.PathPrefix)
 
+	var buf bytes.Buffer
 	g := &apiGenerator{
-		w: w, doc: doc, specPath: specPath,
+		w: &buf, doc: doc, specPath: specPath,
 		scampiVersion: scampiVersion, pathPrefix: prefix,
 		moduleName: opts.ModuleName,
 	}
 	if err := g.generate(); err != nil {
+		return err
+	}
+	formatted, fmtErr := format.Format(buf.Bytes())
+	if fmtErr != nil {
+		formatted = buf.Bytes()
+	}
+	if _, err := w.Write(formatted); err != nil {
 		return err
 	}
 	if !opts.NoTest && opts.TestWriter != nil {

@@ -1,0 +1,16 @@
+module main
+
+import "std"
+import "std/posix"
+import "std/local"
+
+let host = local.target { name = "h" }
+
+std.deploy(name = "t", targets = [host]) {
+  let svc = posix.service {
+    name  = "nginx"
+    state = posix.ServiceState.restarted
+  }
+
+  posix.firewall { port = 22, desc = "allow SSH" }
+}

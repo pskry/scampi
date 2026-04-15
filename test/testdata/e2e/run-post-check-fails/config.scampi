@@ -8,7 +8,7 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.run {
-    desc = "apply succeeds but check still fails"
+    desc  = "apply succeeds but check still fails"
     check = "check-thing"
     apply = "apply-thing"
   }

@@ -341,10 +341,14 @@ func (p *Parser) parsePrimary() ast.Expr {
 		// Parse an Ident; postfix handling will attach selectors etc.
 		return p.parseIdent("expression")
 	case token.LParen:
+		start := p.cur.Pos
 		p.advance()
 		e := p.parseExpr()
-		p.expect(token.RParen, "parenthesized expression")
-		return e
+		end := p.expect(token.RParen, "parenthesized expression")
+		return &ast.ParenExpr{
+			Inner:   e,
+			SrcSpan: token.Span{Start: start, End: end.End},
+		}
 	case token.LBrack:
 		return p.parseListOrComp()
 	case token.LBrace:

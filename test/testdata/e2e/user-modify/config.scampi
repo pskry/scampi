@@ -8,10 +8,10 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.user {
-    desc = "modify user shell and groups"
-    name = "hal9000"
-    shell = "/bin/zsh"
-    home = "/home/hal9000"
+    desc   = "modify user shell and groups"
+    name   = "hal9000"
+    shell  = "/bin/zsh"
+    home   = "/home/hal9000"
     groups = ["sudo", "docker"]
   }
 }

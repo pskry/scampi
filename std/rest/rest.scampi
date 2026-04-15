@@ -16,10 +16,10 @@ type Check
 // -----------------------------------------------------------------------------
 
 decl target(
-  name:     string,
-  base_url: string,
-  auth:     Auth?,
-  tls:      TLS?,
+  name:     string
+  base_url: string
+  auth:     Auth?
+  tls:      TLS?
 ) std.Target
 
 // Auth composables
@@ -28,9 +28,9 @@ decl target(
 decl no_auth() Auth
 decl basic(user: string, password: string) Auth
 decl bearer(
-  token_endpoint: string,
-  identity:       string,
-  secret:         string,
+  token_endpoint: string
+  identity:       string
+  secret:         string
 ) Auth
 decl header(name: string, value: string) Auth
 
@@ -57,21 +57,21 @@ decl jq(expr: string) Check
 // -----------------------------------------------------------------------------
 
 decl request(
-  method:    string,
-  path:      string,
-  headers:   map[string, string]?,
-  body:      Body?,
-  check:     Check?,
-  desc:      string?,
-  on_change: list[std.Step] = [],
+  method:    string
+  path:      string
+  headers:   map[string, string]?
+  body:      Body?
+  check:     Check?
+  desc:      string?
+  on_change: list[std.Step] = []
 ) std.Step
 
 decl resource(
-  query:     std.Step?,
-  missing:   std.Step?,
-  found:     std.Step?,
-  bindings:  map[string, Check]?,
-  state:     map[string, any]?,
-  desc:      string?,
-  on_change: list[std.Step] = [],
+  query:     std.Step?
+  missing:   std.Step?
+  found:     std.Step?
+  bindings:  map[string, Check]?
+  state:     map[string, any]?
+  desc:      string?
+  on_change: list[std.Step] = []
 ) std.Step

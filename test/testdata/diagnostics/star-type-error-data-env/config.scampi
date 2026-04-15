@@ -8,11 +8,11 @@ let host = local.target { name = "host" }
 
 std.deploy(name = "main", targets = [host]) {
   posix.template {
-    dest = "/tmp/out"
-    perm = "0644"
+    dest  = "/tmp/out"
+    perm  = "0644"
     owner = "root"
     group = "root"
-    src = posix.source_inline { content = "hello" }
-    data = {"env": 42}
+    src   = posix.source_inline { content = "hello" }
+    data  = {"env": 42}
   }
 }

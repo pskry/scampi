@@ -6,14 +6,14 @@ Manage firewall rules via UFW or firewalld.
 
 ## Fields
 
-| Field       | Type             | Required | Default                  | Description                             |
-| ----------- | ---------------- | :------: | ------------------------ | --------------------------------------- |
-| `port`      | int              |    ✓     |                          | Port number (1–65535)                   |
-| `end_port`  | int?             |          |                          | End of port range (must be > port)      |
-| `proto`     | `FirewallProto`  |          | `FirewallProto.tcp`      | Protocol                                |
-| `action`    | `FirewallAction` |          | `FirewallAction.allow`   | Rule action                             |
-| `desc`      | string?          |          |                          | Human-readable description              |
-| `on_change` | list\[Step]      |          |                          | Steps to trigger when this rule changes |
+| Field       | Type             | Required | Default                | Description                             |
+| ----------- | ---------------- | :------: | ---------------------- | --------------------------------------- |
+| `port`      | int              |    ✓     |                        | Port number (1–65535)                   |
+| `end_port`  | int?             |          |                        | End of port range (must be > port)      |
+| `proto`     | `FirewallProto`  |          | `FirewallProto.tcp`    | Protocol                                |
+| `action`    | `FirewallAction` |          | `FirewallAction.allow` | Rule action                             |
+| `desc`      | string?          |          |                        | Human-readable description              |
+| `on_change` | list\[Step]      |          |                        | Steps to trigger when this rule changes |
 
 ## Actions
 

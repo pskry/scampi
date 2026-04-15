@@ -24,16 +24,16 @@ enum Restart { always, on_failure, unless_stopped, no }
 // -----------------------------------------------------------------------------
 
 decl instance(
-  name:        string,
-  image:       string = "",
-  state:       State = State.running,
-  restart:     Restart = Restart.unless_stopped,
-  ports:       list[string]?,
-  env:         map[string, string]?,
-  mounts:      list[string]?,
-  args:        list[string]?,
-  labels:      map[string, string]?,
-  healthcheck: Healthcheck?,
-  desc:        string?,
-  on_change:   list[std.Step] = [],
+  name:        string
+  image:       string = ""
+  state:       State = State.running
+  restart:     Restart = Restart.unless_stopped
+  ports:       list[string]?
+  env:         map[string, string]?
+  mounts:      list[string]?
+  args:        list[string]?
+  labels:      map[string, string]?
+  healthcheck: Healthcheck?
+  desc:        string?
+  on_change:   list[std.Step] = []
 ) std.Step

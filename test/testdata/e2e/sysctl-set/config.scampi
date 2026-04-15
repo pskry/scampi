@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.sysctl {
-    desc = "enable IP forwarding"
-    key = "net.ipv4.ip_forward"
+    desc  = "enable IP forwarding"
+    key   = "net.ipv4.ip_forward"
     value = "1"
   }
 }

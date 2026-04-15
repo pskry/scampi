@@ -8,8 +8,8 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.run {
-    desc = "always-run that fails"
-    apply = "fail-cmd"
+    desc   = "always-run that fails"
+    apply  = "fail-cmd"
     always = true
   }
 }

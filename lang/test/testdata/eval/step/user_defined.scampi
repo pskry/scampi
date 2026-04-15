@@ -5,7 +5,7 @@ import "std/posix"
 import "std/ssh"
 
 type TeamMember {
-  name: string
+  name:   string
   groups: list[string] = []
 }
 

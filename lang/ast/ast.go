@@ -265,6 +265,17 @@ func (e *DottedName) Span() token.Span { return e.SrcSpan }
 func (*DottedName) astNode()           {}
 func (*DottedName) exprNode()          {}
 
+// ParenExpr wraps an expression in parentheses. Preserving this in
+// the AST lets the formatter re-emit the parens faithfully.
+type ParenExpr struct {
+	Inner   Expr
+	SrcSpan token.Span
+}
+
+func (e *ParenExpr) Span() token.Span { return e.SrcSpan }
+func (*ParenExpr) astNode()           {}
+func (*ParenExpr) exprNode()          {}
+
 // IntLit is an integer literal.
 type IntLit struct {
 	Value   int64

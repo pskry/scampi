@@ -10,6 +10,6 @@ std.deploy(name = "test", targets = [host]) {
   posix.group {
     desc = "create group appusers"
     name = "appusers"
-    gid = 1100
+    gid  = 1100
   }
 }

@@ -8,9 +8,9 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.service {
-    desc = "stop nginx"
-    name = "nginx"
-    state = posix.ServiceState.stopped
+    desc    = "stop nginx"
+    name    = "nginx"
+    state   = posix.ServiceState.stopped
     enabled = false
   }
 }

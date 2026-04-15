@@ -595,6 +595,8 @@ func (ev *Evaluator) evalExpr(e ast.Expr) Value {
 		return &NoneVal{}
 	}
 	switch e := e.(type) {
+	case *ast.ParenExpr:
+		return ev.evalExpr(e.Inner)
 	case *ast.IntLit:
 		v, _ := check.ParseInt(e.Raw)
 		return &IntVal{V: v}

@@ -8,9 +8,9 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.pkg {
-    desc = "upgrade packages"
+    desc     = "upgrade packages"
     packages = ["nginx"]
-    state = posix.PkgState.latest
-    source = posix.pkg_system {}
+    state    = posix.PkgState.latest
+    source   = posix.pkg_system {}
   }
 }

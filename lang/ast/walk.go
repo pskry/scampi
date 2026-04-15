@@ -121,6 +121,9 @@ func walkChildren(node Node, pre func(Node) bool, post func(Node)) {
 	case *DottedName:
 		walkList(n.Parts, pre, post)
 
+	case *ParenExpr:
+		walkExpr(n.Inner, pre, post)
+
 	case *IntLit:
 		// no children
 

@@ -8,10 +8,10 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "test", targets = [host]) {
   posix.template {
-    desc = "missing source"
-    src = posix.source_local { path = "/does/not/exist.tmpl" }
-    dest = "/tmp/out.txt"
-    perm = "0644"
+    desc  = "missing source"
+    src   = posix.source_local { path = "/does/not/exist.tmpl" }
+    dest  = "/tmp/out.txt"
+    perm  = "0644"
     owner = "testuser"
     group = "testgroup"
   }

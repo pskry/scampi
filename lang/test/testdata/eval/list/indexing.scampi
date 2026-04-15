@@ -1,6 +1,6 @@
 module main
 
-let xs    = ["a", "b", "c", "d"]
+let xs = ["a", "b", "c", "d"]
 let first = xs[0]
-let last  = xs[3]
-let mid   = xs[2]
+let last = xs[3]
+let mid = xs[2]

@@ -9,8 +9,8 @@ let host = local.target { name = "host" }
 
 std.deploy(name = "main", targets = [host]) {
   container.instance {
-    name = "test"
-    image = "nginx:latest"
+    name        = "test"
+    image       = "nginx:latest"
     healthcheck = container.healthcheck.cmd { interval = "10s" }
   }
 }
