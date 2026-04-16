@@ -145,6 +145,7 @@ func (s *Server) Initialize(
 				PrepareProvider: true,
 			},
 			DocumentFormattingProvider: &protocol.DocumentFormattingOptions{},
+			DocumentHighlightProvider:  &protocol.DocumentHighlightOptions{},
 			CodeActionProvider: &protocol.CodeActionOptions{
 				CodeActionKinds: []protocol.CodeActionKind{
 					protocol.QuickFix,
@@ -346,10 +347,56 @@ func (s *Server) ColorPresentation(
 	return nil, nil
 }
 func (s *Server) DocumentHighlight(
-	context.Context,
-	*protocol.DocumentHighlightParams,
+	_ context.Context,
+	params *protocol.DocumentHighlightParams,
 ) ([]protocol.DocumentHighlight, error) {
-	return nil, nil
+	doc, ok := s.docs.Get(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+
+	word := wordAtOffset(doc.Content, offsetFromPosition(
+		doc.Content,
+		params.Position.Line,
+		params.Position.Character,
+	))
+	if word == "" {
+		return nil, nil
+	}
+
+	filePath := uriToPath(params.TextDocument.URI)
+	f, _ := Parse(filePath, []byte(doc.Content))
+	if f == nil {
+		return nil, nil
+	}
+
+	data := []byte(doc.Content)
+	var locs []protocol.Location
+	if strings.Contains(word, ".") {
+		locs = findDottedRefs(f, filePath, data, word)
+	} else {
+		locs = findIdents(f, filePath, data, word)
+	}
+
+	// Find definition to mark it as Write, all others as Read.
+	defSpan := findDefinition(f, word)
+
+	var highlights []protocol.DocumentHighlight
+	for _, loc := range locs {
+		kind := protocol.DocumentHighlightKindRead
+		if defSpan != nil {
+			r := tokenSpanToRange(data, *defSpan)
+			if r.Start == loc.Range.Start {
+				kind = protocol.DocumentHighlightKindWrite
+			}
+		}
+		highlights = append(highlights, protocol.DocumentHighlight{
+			Range: loc.Range,
+			Kind:  kind,
+		})
+	}
+	s.log.Printf("documentHighlight: %s %q → %d highlights", filePath, word, len(highlights))
+	return highlights, nil
 }
 func (s *Server) DocumentLink(context.Context, *protocol.DocumentLinkParams) ([]protocol.DocumentLink, error) {
 	return nil, nil

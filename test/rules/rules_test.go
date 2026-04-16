@@ -474,7 +474,7 @@ func argSpansOneLine(fset *token.FileSet, arg ast.Expr) bool {
 }
 
 var formatFuncSuffixes = []string{
-	"Sprintf", "Errorf", "Fatalf", "Logf", "Skipf",
+	"Printf", "Sprintf", "Errorf", "Fatalf", "Logf", "Skipf",
 	"fmtfMsg", "fmtfMsgTo", "BUG",
 }
 
