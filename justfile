@@ -52,6 +52,7 @@ mod test
 fmt:
   go fmt ./...
   ./scripts/fix-markdown-tables.py
+  just scampi fmt ./...
 
 [doc("Lint project (severity: warning|hint)")]
 lint severity='warning':
