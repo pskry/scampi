@@ -125,7 +125,7 @@ func (s *Server) Initialize(
 		Capabilities: protocol.ServerCapabilities{
 			TextDocumentSync: &protocol.TextDocumentSyncOptions{
 				OpenClose: true,
-				Change:    protocol.TextDocumentSyncKindFull,
+				Change:    protocol.TextDocumentSyncKindIncremental,
 				Save: &protocol.SaveOptions{
 					IncludeText: true,
 				},
@@ -240,9 +240,9 @@ func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDo
 	if len(params.ContentChanges) == 0 {
 		return nil
 	}
-	text := params.ContentChanges[len(params.ContentChanges)-1].Text
-	s.log.Printf("didChange: %s (v%d, %d bytes)", td.URI, td.Version, len(text))
-	s.docs.Change(td.URI, text, td.Version)
+	text := s.docs.ApplyIncremental(td.URI, params.ContentChanges, td.Version)
+	s.log.Printf("didChange: %s (v%d, %d changes, %d bytes)",
+		td.URI, td.Version, len(params.ContentChanges), len(text))
 	return s.publishDiagnostics(ctx, td.URI, text)
 }
 
