@@ -862,3 +862,33 @@ func TestScopeMutability(t *testing.T) {
 		t.Error("step scope should not allow mutation")
 	}
 }
+
+// Duplicate field declarations
+// -----------------------------------------------------------------------------
+
+func TestDuplicateFieldInTypeDecl(t *testing.T) {
+	expectError(t, `module main
+type X {
+  name: string
+  name: string
+}
+`, "duplicate field: name")
+}
+
+func TestDuplicateFieldInAttrTypeDecl(t *testing.T) {
+	expectError(t, `module main
+type @tag {
+  value: string
+  value: string
+}
+`, "duplicate field: value")
+}
+
+func TestNoDuplicateFieldInTypeDecl(t *testing.T) {
+	expectNoErrors(t, `module main
+type X {
+  name: string
+  age: int
+}
+`)
+}

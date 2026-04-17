@@ -376,7 +376,13 @@ func (c *Checker) checkTypeDecl(d *ast.TypeDecl) {
 	if !ok {
 		return
 	}
+	seen := map[string]bool{}
 	for _, f := range d.Fields {
+		if seen[f.Name.Name] {
+			c.errAt(f.Name.SrcSpan, CodeDuplicateField, "duplicate field: "+f.Name.Name)
+			continue
+		}
+		seen[f.Name.Name] = true
 		ft := c.resolveType(f.Type)
 		if ft == nil {
 			c.errAt(f.SrcSpan, CodeUnknownFieldType, "unknown type in field "+f.Name.Name)
@@ -404,7 +410,13 @@ func (c *Checker) checkAttrTypeDecl(d *ast.AttrTypeDecl) {
 	if !ok {
 		return
 	}
+	seen := map[string]bool{}
 	for _, f := range d.Fields {
+		if seen[f.Name.Name] {
+			c.errAt(f.Name.SrcSpan, CodeDuplicateField, "duplicate field: "+f.Name.Name)
+			continue
+		}
+		seen[f.Name.Name] = true
 		ft := c.resolveType(f.Type)
 		if ft == nil {
 			c.errAt(f.SrcSpan, CodeUnknownAttrField, "unknown type in attribute field "+f.Name.Name)
