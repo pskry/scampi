@@ -581,26 +581,18 @@ func double(x: int) int {
 
 ## lang.SecretLookup
 
-A `std.secret()` call failed — either no secrets backend is configured, the
-secrets file couldn't be read, or the key doesn't exist.
+A secret lookup failed — either the secrets file couldn't be read, or the
+requested key doesn't exist.
 
 {{< err >}}
 module main
-import "std"
-let key = std.secret("db.password") // ← no std.secrets {} configured yet
+import "std/secrets"
+let age = secrets.from_age(path = "secrets.age.json")
+let key = age.get("db.password") // ← key not found in secrets.age.json
 {{< /err >}}
 
-{{< fix >}}
-module main
-import "std"
-std.secrets {
-  backend = std.SecretsBackend.age
-  path    = "secrets.age.json"
-}
-let key = std.secret("db.password")
-{{< /fix >}}
-
-If the backend is configured but the key is missing, check your secrets file.
+Check that the key exists in your secrets file. If the file itself can't be
+read, the error message will say so.
 
 ## lang.SelfOutsideStep
 
@@ -740,7 +732,7 @@ import "std/networking" // ← no such module
 {{< /err >}}
 
 The standard library modules are `std`, `std/posix`, `std/local`, `std/ssh`,
-`std/container`, `std/rest`, and `std/test`. User modules are declared in
+`std/container`, `std/rest`, `std/secrets`, and `std/test`. User modules are declared in
 `scampi.mod`.
 
 ## lang.UnknownType

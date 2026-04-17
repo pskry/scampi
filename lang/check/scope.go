@@ -82,6 +82,23 @@ func (s *Scope) Symbols() map[string]*Symbol {
 	return s.symbols
 }
 
+// AllImports collects all SymImport symbols from this scope and
+// every parent scope. Used by UFCS detection to find imported
+// modules even from inside nested scopes (struct-lit bodies, blocks).
+func (s *Scope) AllImports() []*Symbol {
+	var imports []*Symbol
+	seen := map[string]bool{}
+	for cur := s; cur != nil; cur = cur.parent {
+		for name, sym := range cur.symbols {
+			if sym.Kind == SymImport && !seen[name] {
+				imports = append(imports, sym)
+				seen[name] = true
+			}
+		}
+	}
+	return imports
+}
+
 // AllowsMutation reports whether this scope (or an enclosing one)
 // permits collection mutation. Only func-body scopes allow it.
 func (s *Scope) AllowsMutation() bool {

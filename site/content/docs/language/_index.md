@@ -19,8 +19,10 @@ module main
 import "std"
 import "std/local"
 import "std/posix"
+import "std/secrets"
 
 let machine = local.target { name = "my-machine" }
+let age = secrets.from_age(path = "secrets.age.json")
 
 let reload_nginx = posix.service {
   name = "nginx"
@@ -42,6 +44,16 @@ std.deploy(name = "webserver", targets = [machine]) {
     on_change = [reload_nginx]
   }
 
+  posix.template {
+    desc = "certbot credentials"
+    src = posix.source_inline { content = "dns_cloudflare_api_token = {{.token}}" }
+    dest = "/etc/letsencrypt/cloudflare.ini"
+    data = { "values": { "token": age.get("cf.token") } }
+    perm = "0600"
+    owner = "root"
+    group = "root"
+  }
+
   posix.service { name = "nginx", state = posix.ServiceState.running, enabled = true }
   posix.firewall { port = "80/tcp" }
   posix.firewall { port = "443/tcp" }
@@ -49,7 +61,7 @@ std.deploy(name = "webserver", targets = [machine]) {
 ```
 
 That's a real, working scampi config. Every concept on this page shows up in
-those 30 lines.
+those ~40 lines.
 
 ## Modules and imports
 
@@ -137,7 +149,7 @@ you'd expect from any other language:
 
 ```scampi
 let pkgs = base_packages(extra = ["nginx"])
-let key  = std.secret("vps.host")
+let key  = age.get("vps.host")
 let nums = std.range(10)
 ```
 
@@ -224,19 +236,21 @@ let s = PkgState.present
 ## Attributes
 
 Attributes annotate types and parameters with extra meaning — validation
-rules, deprecation notices, documentation hints. Built-in attributes from
-`std` cover the common cases:
+rules, deprecation notices, documentation hints. Built-in attributes cover
+the common cases:
 
-| Attribute         | Purpose                                                  |
-| ----------------- | -------------------------------------------------------- |
-| `@std.nonempty`   | String parameter must not be empty                       |
-| `@std.path`       | Validate as a filesystem path (`absolute=true` optional) |
-| `@std.filemode`   | Validate as octal/ls/posix file permissions              |
-| `@std.pattern`    | Match a regex (`regex="..."`)                            |
-| `@std.oneof`      | Must be one of a fixed set of strings                    |
-| `@std.secretkey`  | String is a secret-store key (LSP completion enabled)    |
-| `@std.deprecated` | Emit a warning at every use                              |
-| `@std.since`      | Records the version a parameter was introduced           |
+| Attribute            | Purpose                                                  |
+| -------------------- | -------------------------------------------------------- |
+| `@std.nonempty`      | String parameter must not be empty                       |
+| `@std.filemode`      | Validate as octal/ls/posix file permissions              |
+| `@std.path`          | Validate as a filesystem path (`absolute=true` optional) |
+| `@std.pattern`       | Match a regex (`regex="..."`)                            |
+| `@std.oneof`         | Must be one of a fixed set of strings                    |
+| `@std.min`           | Integer must be at least the given value                 |
+| `@std.max`           | Integer must be at most the given value                  |
+| `@secrets.secretkey` | String is a secret-store key (LSP completion enabled)    |
+| `@std.deprecated`    | Emit a warning at every use                              |
+| `@std.since`         | Records the version a parameter was introduced           |
 
 You'll see them sprinkled across the standard library:
 
@@ -339,8 +353,8 @@ let c = std.range(5)      // module-qualified — also a function call
 ```
 
 This makes method-chain-style code possible without the language having actual
-methods. It's also why `std.range` and `std.secret` look like methods on `std`
-— they're functions, and the dot is just UFCS reaching across the import.
+methods. It's also how `resolver.get("key")` works — `get` is a function in
+the `secrets` module, and the dot is UFCS reaching into the receiver.
 
 ## Cross-step references with `std.ref`
 
@@ -350,11 +364,14 @@ the requested value before the downstream step executes.
 
 ```scampi
 import "scampi.dev/modules/npm"
+import "std/secrets"
+
+let age = secrets.from_age(path = "secrets.age.json")
 
 let cert = npm.certificate {
   domain          = "grafana.example.com"
   email           = "admin@example.com"
-  dns_credentials = "dns_cloudflare_api_token = " + std.secret("cf.token")
+  dns_credentials = "dns_cloudflare_api_token = " + age.get("cf.token")
 }
 
 std.deploy(name = "proxy", targets = [npm_target]) {
@@ -387,12 +404,13 @@ you need.
 
 | Import          | What's inside                                                                                                                |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `std`           | Core types (`Step`, `Target`), validation attributes, `deploy`, `secret`, `env`, `range`, `ref`, secrets config              |
+| `std`           | Core types (`Step`, `Target`), validation attributes, `deploy`, `env`, `range`, `ref`                                        |
 | `std/local`     | `local.target` — execute steps on the local machine                                                                          |
 | `std/ssh`       | `ssh.target` — execute steps on a remote host over SSH                                                                       |
 | `std/posix`     | All POSIX steps (copy, dir, template, pkg, service, user, group, mount, firewall, sysctl, run, …) and source/pkg composables |
 | `std/rest`      | REST target, request/resource steps, auth and TLS composables                                                                |
 | `std/container` | Container management (Docker, Podman)                                                                                        |
+| `std/secrets`   | Secret resolvers (`from_age`, `from_file`) and `get` for secret lookup                                                       |
 | `std/test`      | Test framework: mock targets, assertions, matchers                                                                           |
 
 A typical "real" config imports `std` plus one target module plus the step

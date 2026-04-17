@@ -5,10 +5,6 @@ module std
 type Step
 type Target
 type Deploy
-type SecretsConfig
-
-enum SecretsBackend { age, file }
-
 // Attribute types
 //
 // scampi ships a small set of declarative attribute types that
@@ -16,13 +12,6 @@ enum SecretsBackend { age, file }
 // LSP UX, and documentation. Each is implemented by an
 // AttributeBehaviour in the linker; LSP completion providers (when
 // they apply) are registered separately.
-
-// `@secretkey` marks a string parameter as a secret-store key. The
-// linker validates literal keys against the configured backend at
-// link time; the LSP offers known keys as completions when the
-// cursor is inside a string argument to a `@secretkey`-annotated
-// parameter.
-type @secretkey {}
 
 // value must not be empty
 //
@@ -112,16 +101,6 @@ type @path {
 //   let port = std.env("PORT", default = "8080")
 func env(name: string, default: string?) string
 
-// read a secret from the configured secret backend
-//
-// the secret backend must be configured via `std.secrets { ... }`
-// before any `secret()` call. the `name` argument is validated
-// against the backend at link time when it's a literal.
-//
-//   std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
-//   let token = std.secret("cloudflare.token")
-func secret(@secretkey name: string) string
-
 // produce a list of integers from 0 to n-1
 //
 //   let items = std.range(5)   // [0, 1, 2, 3, 4]
@@ -145,7 +124,7 @@ func range(n: int) list[int]
 // output, the ref resolves to none.
 func ref(step: Step, expr: string) any
 
-// Deploy and secrets configuration
+// Deploy configuration
 // -----------------------------------------------------------------------------
 
 // declare a deploy block that targets one or more hosts
@@ -160,11 +139,3 @@ func ref(step: Step, expr: string) any
 //     posix.service { ... }
 //   }
 func deploy(name: string, targets: list[Target]) block[Deploy]
-
-// configure the secret backend for subsequent `secret()` calls
-//
-//   std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
-decl secrets(
-  backend: SecretsBackend
-  path:    string
-) SecretsConfig

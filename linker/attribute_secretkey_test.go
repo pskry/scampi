@@ -38,11 +38,12 @@ func newSecretCtx(backend *stubBackend, arg ast.Expr) StaticCheckContext {
 		b = backend
 	}
 	return StaticCheckContext{
-		Linker:    &linkContext{backend: b},
-		AttrName:  "std.@secretkey",
-		ParamName: "name",
-		ParamArg:  arg,
-		UseSpan:   spec.SourceSpan{},
+		Linker:          &linkContext{},
+		ResolverBackend: b,
+		AttrName:        "secrets.@secretkey",
+		ParamName:       "key",
+		ParamArg:        arg,
+		UseSpan:         spec.SourceSpan{},
 	}
 }
 

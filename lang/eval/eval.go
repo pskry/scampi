@@ -18,9 +18,19 @@ import (
 // The bool indicates whether the variable was set.
 type EnvLookupFunc func(name string) (value string, found bool)
 
-// SecretLookupFunc resolves a secret key to its value. Errors are
-// surfaced to the evaluator and reported with source spans.
-type SecretLookupFunc func(key string) (value string, err error)
+// BuiltinFunc is a caller-registered function dispatched by qualified
+// stub name (e.g. "secrets.from_age") during eval. The eval layer
+// invokes it when a bodyless stub func matches a registered name and
+// forwards the call's positional and keyword arguments. All domain
+// logic lives in the caller — the eval layer just passes values
+// through.
+//
+// Builtins typically return an OpaqueVal wrapping runtime state that
+// later pipeline stages (linker, attribute checks) can type-assert.
+//
+// Return ("", errMsg) to surface a diagnostic anchored at the call
+// site's source span; the eval layer wraps it as a CodeCallError.
+type BuiltinFunc func(positional []Value, kwargs map[string]Value) (Value, string)
 
 // EmitCallback is invoked once per value the evaluator produces at
 // top level or into a block body. It receives the value and a handle
@@ -46,8 +56,10 @@ type Evaluator struct {
 	// envLookup resolves env vars. Injected by caller.
 	envLookup EnvLookupFunc
 
-	// secretLookup resolves secrets. Injected by caller.
-	secretLookup SecretLookupFunc
+	// builtinFuncs are caller-registered functions dispatched by
+	// qualified name (e.g. "secrets.from_age"). The eval layer
+	// treats them as opaque — all domain logic lives in the caller.
+	builtinFuncs map[string]BuiltinFunc
 
 	// source holds the original source bytes for string extraction.
 	source []byte
@@ -86,16 +98,23 @@ func WithEnv(fn EnvLookupFunc) Option {
 	return func(e *Evaluator) { e.envLookup = fn }
 }
 
-// WithSecrets sets the secret resolver.
-func WithSecrets(fn SecretLookupFunc) Option {
-	return func(e *Evaluator) { e.secretLookup = fn }
+// WithBuiltinFunc registers a named function dispatched by qualified
+// name (e.g. "secrets.from_age") during eval. The eval layer has no
+// knowledge of what the function does — all domain logic stays in
+// the caller. Multiple calls with different names accumulate.
+func WithBuiltinFunc(qualName string, fn BuiltinFunc) Option {
+	return func(e *Evaluator) {
+		if e.builtinFuncs == nil {
+			e.builtinFuncs = map[string]BuiltinFunc{}
+		}
+		e.builtinFuncs[qualName] = fn
+	}
 }
 
 // WithOnEmit registers a callback invoked whenever a value is emitted
 // at top level or into a block body. The callback can inspect the value
-// and set up state (e.g. configure secret backends when a SecretsConfig
-// is emitted). This keeps the eval generic while allowing callers to
-// react to domain-specific values.
+// and set up state. This keeps the eval generic while allowing callers
+// to react to domain-specific values.
 func WithOnEmit(fn EmitCallback) Option {
 	return func(e *Evaluator) { e.onEmit = fn }
 }
@@ -391,10 +410,6 @@ func typeExprName(t ast.TypeExpr) string {
 
 func (ev *Evaluator) errAt(span token.Span, code errs.Code, msg string) {
 	ev.errs = append(ev.errs, Error{Span: span, Code: code, Msg: msg})
-}
-
-func (ev *Evaluator) errWithHint(span token.Span, code errs.Code, msg, hint string) {
-	ev.errs = append(ev.errs, Error{Span: span, Code: code, Msg: msg, Hint: hint})
 }
 
 // evalFile evaluates a complete file.
@@ -905,12 +920,6 @@ func (ev *Evaluator) callRef(positional []Value, kwargs map[string]Value) Value 
 	return &RefVal{Step: step, Expr: expr}
 }
 
-// SetSecretLookup allows callers (via WithOnEmit) to wire the secret
-// resolver after seeing a SecretsConfig value during evaluation.
-func (ev *Evaluator) SetSecretLookup(fn SecretLookupFunc) {
-	ev.secretLookup = fn
-}
-
 func (ev *Evaluator) callEnv(positional []Value, kwargs map[string]Value, span token.Span) Value {
 	name := ""
 	if len(positional) > 0 {
@@ -947,33 +956,6 @@ func (ev *Evaluator) callEnv(positional []Value, kwargs map[string]Value, span t
 	return &StringVal{V: ""}
 }
 
-func (ev *Evaluator) callSecret(positional []Value, kwargs map[string]Value, span token.Span) Value {
-	name := ""
-	if len(positional) > 0 {
-		if s, ok := positional[0].(*StringVal); ok {
-			name = s.V
-		}
-	}
-	if n, ok := kwargs["name"]; ok {
-		if s, ok := n.(*StringVal); ok {
-			name = s.V
-		}
-	}
-	if ev.secretLookup == nil {
-		ev.errWithHint(span, check.CodeSecretLookup,
-			"secret() called but no secret backend configured",
-			`add std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }`+
-				" before any secret() call")
-		return &StringVal{V: ""}
-	}
-	v, err := ev.secretLookup(name)
-	if err != nil {
-		ev.errAt(span, check.CodeSecretLookup, "secret lookup failed: "+err.Error())
-		return &StringVal{V: ""}
-	}
-	return &StringVal{V: v}
-}
-
 func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string]Value, callSpan token.Span) Value {
 	// Stub func (no body) — produce value based on return type.
 	if fv.body == nil && fv.RetType != "" {
@@ -986,12 +968,20 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 			}
 		}
 
+		// Caller-registered builtins (keyed by qualified name).
+		if fn, ok := ev.builtinFuncs[fv.QualName]; ok {
+			result, errMsg := fn(positional, kwargs)
+			if errMsg != "" {
+				ev.errAt(callSpan, check.CodeCallError, errMsg)
+				return &NoneVal{}
+			}
+			return result
+		}
+
 		// Scalar builtins with runtime callbacks.
 		switch fv.Name {
 		case "env":
 			return ev.callEnv(positional, kwargs, callSpan)
-		case "secret":
-			return ev.callSecret(positional, kwargs, callSpan)
 		case "range":
 			return ev.callRange(positional, kwargs)
 		case "ref":

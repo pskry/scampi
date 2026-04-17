@@ -132,32 +132,53 @@ passes it into the template data.
 
 ## Secrets
 
-Secrets are managed through a two-step setup: configure a backend with
-`std.secrets`, then reference individual values with `std.secret(...)`.
-
-### Configure a backend
+Import the `std/secrets` module, create a resolver for your secrets file, and
+call `.get(key)` to look up values:
 
 ```scampi
-std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
+import "std/secrets"
+
+let age = secrets.from_age(path = "secrets.age.json")
+let db_pass = age.get("db_password")
 ```
 
-Currently supported backends:
+### Secret resolvers
 
-| Backend               | Description                                                             |
-| --------------------- | ----------------------------------------------------------------------- |
-| `SecretsBackend.file` | Plain JSON key-value file (unencrypted)                                 |
-| `SecretsBackend.age`  | Encrypted JSON file using [age encryption](https://age-encryption.org/) |
-
-The `std.secrets` call can only appear once per config.
-
-### Reference a secret
+A resolver is a value — you create it with a constructor and bind it with `let`.
+You can have multiple resolvers in the same config (e.g. one for shared secrets,
+one per-environment):
 
 ```scampi
+import "std/secrets"
+
+let shared = secrets.from_age(path = "shared.age.json")
+let prod   = secrets.from_age(path = "prod.age.json")
+```
+
+Available constructors:
+
+| Constructor         | Description                                                             |
+| ------------------- | ----------------------------------------------------------------------- |
+| `secrets.from_file` | Plain JSON key-value file (unencrypted)                                 |
+| `secrets.from_age`  | Encrypted JSON file using [age encryption](https://age-encryption.org/) |
+
+Both take a `path` argument relative to the scampi file.
+
+### Look up a secret
+
+Call `.get(key)` on a resolver to retrieve a value. This uses UFCS — it
+desugars to `secrets.get(resolver, key)`:
+
+```scampi
+import "std/secrets"
+
+let age = secrets.from_age(path = "secrets.age.json")
+
 posix.template {
   src  = posix.source_inline { content = "DATABASE_URL=postgres://app:{{ .values.db_password }}@db:5432/app" }
   dest = "/opt/app/.env"
   perm = "0600", owner = "app", group = "app"
-  data = {"values": {"db_password": std.secret("db_password")}}
+  data = {"values": {"db_password": age.get("db_password")}}
 }
 ```
 

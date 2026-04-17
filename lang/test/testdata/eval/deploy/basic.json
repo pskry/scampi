@@ -1,8 +1,4 @@
 {
-  "secrets": {
-    "backend": "file",
-    "path": "secrets.json"
-  },
   "targets": [
     {"name": "vps", "kind": "ssh.target"}
   ],

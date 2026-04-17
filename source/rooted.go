@@ -56,10 +56,6 @@ func (r *rootedSource) LookupEnv(key string) (string, bool) {
 	return r.src.LookupEnv(key)
 }
 
-func (r *rootedSource) LookupSecret(key string) (string, bool, error) {
-	return r.src.LookupSecret(key)
-}
-
 func baseDir(p string, src Source) (string, error) {
 	abs, err := filepath.Abs(p)
 	if err != nil {

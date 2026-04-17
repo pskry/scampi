@@ -78,10 +78,6 @@ func (d *diskFallbackSource) LookupEnv(key string) (string, bool) {
 	return d.mem.LookupEnv(key)
 }
 
-func (d *diskFallbackSource) LookupSecret(key string) (string, bool, error) {
-	return d.mem.LookupSecret(key)
-}
-
 // Ensure diskFallbackSource implements source.Source at compile time.
 var _ source.Source = (*diskFallbackSource)(nil)
 

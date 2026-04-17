@@ -184,7 +184,7 @@ func TestCompletionSourceResolvers(t *testing.T) {
 	}
 }
 
-func TestCompletionStringKwargOffersSecretAndEnv(t *testing.T) {
+func TestCompletionStringKwargOffersEnv(t *testing.T) {
 	s := testServer()
 	docURI := protocol.DocumentURI("file:///test.scampi")
 	text := "ssh.target {\n    name = \"test\",\n    host = "
@@ -200,15 +200,12 @@ func TestCompletionStringKwargOffersSecretAndEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result == nil || len(result.Items) == 0 {
-		t.Fatal("expected std.secret/std.env completions for string kwarg")
+		t.Fatal("expected completions for string kwarg")
 	}
 
 	labels := make(map[string]bool)
 	for _, item := range result.Items {
 		labels[item.Label] = true
-	}
-	if !labels["std.secret"] {
-		t.Error("expected 'std.secret' completion for string kwarg")
 	}
 	if !labels["std.env"] {
 		t.Error("expected 'std.env' completion for string kwarg")
@@ -226,13 +223,13 @@ func TestCompletionSecretKeys(t *testing.T) {
 	s := testServer()
 	mainPath := filepath.Join(dir, "test.scampi")
 	docURI := protocol.DocumentURI(uri.File(mainPath))
-	text := "std.secrets { backend = \"age\", path = \"secrets.age.json\" }\nstd.secret(\""
+	text := "import \"std/secrets\"\nlet resolver = secrets.from_age(path = \"secrets.age.json\")\nresolver.get(\""
 	s.docs.Open(docURI, text, 1)
 
 	result, err := s.Completion(context.Background(), &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
-			Position:     protocol.Position{Line: 1, Character: 12},
+			Position:     protocol.Position{Line: 2, Character: 14},
 		},
 	})
 	if err != nil {

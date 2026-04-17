@@ -152,7 +152,6 @@ type evalExpected struct {
 	Lets    map[string]json.RawMessage `json:"lets,omitempty"`
 	Targets []expectTarget             `json:"targets,omitempty"`
 	Deploys []expectDeploy             `json:"deploys,omitempty"`
-	Secrets *expectSecrets             `json:"secrets,omitempty"`
 	Errors  []string                   `json:"errors,omitempty"`
 }
 
@@ -164,11 +163,6 @@ type expectTarget struct {
 type expectDeploy struct {
 	Name  string `json:"name"`
 	Steps int    `json:"steps,omitempty"`
-}
-
-type expectSecrets struct {
-	Backend string `json:"backend"`
-	Path    string `json:"path"`
 }
 
 func TestEval(t *testing.T) {
@@ -219,7 +213,6 @@ func TestEval(t *testing.T) {
 		assertLets(t, r, exp.Lets)
 		assertTargets(t, r, exp.Targets)
 		assertDeploys(t, r, exp.Deploys)
-		assertSecrets(t, r, exp.Secrets)
 	})
 }
 
@@ -328,31 +321,8 @@ func assertDeploys(t *testing.T, r *eval.Result, want []expectDeploy) {
 	}
 }
 
-func assertSecrets(t *testing.T, r *eval.Result, want *expectSecrets) {
-	t.Helper()
-	if want == nil {
-		return
-	}
-	secrets := findStructsByRetType(r, "SecretsConfig")
-	if len(secrets) == 0 {
-		t.Fatal("expected secrets config, got none")
-	}
-	sv := secrets[0]
-	backend := ""
-	if b, ok := sv.Fields["backend"].(*eval.StringVal); ok {
-		backend = b.V
-	}
-	path := ""
-	if p, ok := sv.Fields["path"].(*eval.StringVal); ok {
-		path = p.V
-	}
-	if backend != want.Backend {
-		t.Errorf("secrets backend: got %q, want %q", backend, want.Backend)
-	}
-	if path != want.Path {
-		t.Errorf("secrets path: got %q, want %q", path, want.Path)
-	}
-}
+// (assertSecrets removed — SecretsConfig no longer exists, secrets
+// are now per-resolver values via std/secrets module)
 
 // Shared assertions
 // -----------------------------------------------------------------------------

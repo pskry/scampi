@@ -337,8 +337,10 @@ the user restructures their imports (or we revisit aliasing).
 ### 3.2 Standard library layout
 
 ```
-std                            # core types (Step, Target, Deploy, SecretsConfig),
-                               # SecretsBackend enum, deploy, secrets, env(), secret()
+std                            # core types (Step, Target, Deploy),
+                               # deploy, env()
+std/secrets                    # secret resolvers: from_age, from_file,
+                               # get(resolver, key), @secretkey attribute
 std/posix                      # all POSIX steps, targets (ssh, local), sources,
                                # enums (PkgState, ServiceState, etc.)
 std/rest                       # REST target, request, resource, Auth, TLS, Body,
@@ -346,9 +348,9 @@ std/rest                       # REST target, request, resource, Auth, TLS, Body
 std/container                  # container.instance, Healthcheck, State, Restart
 ```
 
-A typical config imports `"std"` for deploy/secrets/env/secret, adds
-`"std/posix"` for system-level steps and targets, and adds `"std/rest"`
-or `"std/container"` when needed.
+A typical config imports `"std"` for deploy/env, adds `"std/secrets"`
+for secret resolvers, `"std/posix"` for system-level steps and targets,
+and `"std/rest"` or `"std/container"` when needed.
 
 All standard library steps are defined as scampi stubs (generated
 from Go struct tags). See §7.
@@ -504,11 +506,10 @@ signature. Both `decl` and `func` can be stubs:
 # std.scampi — func stub returning block[Deploy]
 func deploy(name: string, targets: list[Target]) block[Deploy]
 
-# std.scampi — decl stub
-decl secrets(
-    backend: SecretsBackend,
-    path:    string,
-) SecretsConfig
+# std/secrets.scampi — func stubs
+func from_age(path: string) SecretResolver
+func from_file(path: string) SecretResolver
+func get(resolver: SecretResolver, key: string) string
 
 # std/posix.scampi — decl stubs
 decl ssh(
@@ -589,7 +590,7 @@ funcs) that produce typed records (constructed like type literals).
 - User-defined decls must produce `Step` (no custom output
   types in v0)
 - Builtin decls can produce any value type defined in std
-  (`Target`, `SecretsConfig`, or `Step`)
+  (`Target` or `Step`)
 - `deploy` is a `func` returning `block[Deploy]`, not a `decl`
 - A decl invocation's expression has the decl's output type: e.g.
   `let v = ssh.target { ... }` gives `v` the type `Target`
@@ -599,12 +600,11 @@ funcs) that produce typed records (constructed like type literals).
 A scampi project evaluates to a flat collection of typed values.
 The engine consumes specific value types from the top-level scope:
 
-| Value type      | Cardinality    | Meaning                             |
-| --------------- | -------------- | ----------------------------------- |
-| `SecretsConfig` | 0 or 1         | Configures the secrets backend      |
-| `Target`        | 0 or more      | Execution environment registrations |
-| `Deploy`        | 1 or more      | Deployment specifications           |
-| `Step`          | 0 at top-level | Only valid inside deploy bodies     |
+| Value type | Cardinality    | Meaning                             |
+| ---------- | -------------- | ----------------------------------- |
+| `Target`   | 0 or more      | Execution environment registrations |
+| `Deploy`   | 1 or more      | Deployment specifications           |
+| `Step`     | 0 at top-level | Only valid inside deploy bodies     |
 
 A compile-time error is raised when a `Step` expression
 appears at top-level. The compiler traces this back to a typed
@@ -624,9 +624,13 @@ import "std/ssh"
 import "std/local"
 import "std/rest"
 
+import "std/secrets"
+
+let age = secrets.from_age(path = "secrets.age.json")
+
 let vps = ssh.target {
     name = "vps"
-    host = std.secret("vps.host")
+    host = age.get("vps.host")
     user = "hal9000"
 }
 
@@ -637,8 +641,8 @@ let api = rest.target {
     base_url = "https://api.example.com"
     auth     = rest.bearer {
         token_endpoint = "/oauth/token"
-        identity       = std.secret("api.id")
-        secret         = std.secret("api.secret")
+        identity       = age.get("api.id")
+        secret         = age.get("api.secret")
     }
     tls = rest.tls_secure {}
 }
@@ -753,21 +757,20 @@ current scampi), which bind runtime outputs via JQ expressions. A
 dedicated cross-step output reference construct will be designed
 when we have more examples of the pattern.
 
-### 4.8 Secrets (from `std`)
+### 4.8 Secrets (from `std/secrets`)
 
 ```
-std.secrets {
-    backend = std.SecretsBackend.age
-    path    = "secrets.age.json"
-}
+import "std/secrets"
 
-let host = std.secret("vps.host")
+let age = secrets.from_age(path = "secrets.age.json")
+let host = age.get("vps.host")
 ```
 
-`std.secrets` is a decl invocation producing a `SecretsConfig` value.
-The `backend` field is an `std.SecretsBackend` enum (not a bare string).
-At most one may appear at top-level across the project. `std.secret(key)`
-is a scalar function that returns a string resolved at evaluation time.
+`secrets.from_age(path)` and `secrets.from_file(path)` create secret
+resolver values. A resolver's `.get(key)` method (UFCS for
+`secrets.get(resolver, key)`) returns a string resolved at evaluation
+time. Multiple resolvers may coexist in the same project — there is no
+singleton restriction.
 
 ---
 
@@ -926,13 +929,15 @@ Expressions inside `${}` are evaluated and stringified.
 Function-call syntax (parens, positional args) is reserved for scalar
 computations:
 
-| Function                 | Type                           | Description                         |
-| ------------------------ | ------------------------------ | ----------------------------------- |
-| `std.env(name)`          | `(string) -> string`           | Read environment variable           |
-| `std.env(name, default)` | `(string, string) -> string`   | With fallback                       |
-| `std.secret(name)`       | `(string) -> string`           | Read secret from configured backend |
-| `len(coll)`              | `(list[T] \| map[K,V]) -> int` | Collection length                   |
-| `int(s)`                 | `(string) -> int`              | String → int parse                  |
+| Function                   | Type                                 | Description                             |
+| -------------------------- | ------------------------------------ | --------------------------------------- |
+| `std.env(name)`            | `(string) -> string`                 | Read environment variable               |
+| `std.env(name, default)`   | `(string, string) -> string`         | With fallback                           |
+| `secrets.from_age(path)`   | `(string) -> SecretResolver`         | Create age secret resolver              |
+| `secrets.from_file(path)`  | `(string) -> SecretResolver`         | Create file secret resolver             |
+| `secrets.get(resolver, k)` | `(SecretResolver, string) -> string` | Read secret (UFCS: `resolver.get(key)`) |
+| `len(coll)`                | `(list[T] \| map[K,V]) -> int`       | Collection length                       |
+| `int(s)`                   | `(string) -> int`                    | String → int parse                      |
 
 ### 6.2 Composable types
 
@@ -963,13 +968,13 @@ source = posix.pkg_dnf_repo { url = "https://example.com/repo/el9" }
 
 ```
 auth = rest.no_auth {}
-auth = rest.basic { user = "admin", password = std.secret("api.pass") }
+auth = rest.basic { user = "admin", password = age.get("api.pass") }
 auth = rest.bearer {
     token_endpoint = "/oauth/token"
-    identity       = std.secret("api.id")
-    secret         = std.secret("api.secret")
+    identity       = age.get("api.id")
+    secret         = age.get("api.secret")
 }
-auth = rest.header { name = "X-API-Key", value = std.secret("api.key") }
+auth = rest.header { name = "X-API-Key", value = age.get("api.key") }
 ```
 
 **REST TLS:**
@@ -1049,22 +1054,25 @@ module std
 type Step
 type Target
 type Deploy
-type SecretsConfig
-
-enum SecretsBackend { age, file }
 
 func env(name: string, default: string?) string
-func secret(name: string) string
 
 func deploy(name: string, targets: list[Target]) block[Deploy]
-
-decl secrets(
-    backend: SecretsBackend,
-    path:    string,
-) SecretsConfig
 ```
 
-### 7.2 `std/posix` module
+### 7.2 `std/secrets` module
+
+```
+module secrets
+
+type SecretResolver
+
+func from_age(path: string) SecretResolver
+func from_file(path: string) SecretResolver
+func get(resolver: SecretResolver, key: string) string
+```
+
+### 7.3 `std/posix` module
 
 ```
 module posix
@@ -1241,7 +1249,7 @@ decl run(
 ) std.Step
 ```
 
-### 7.3 `std/rest` module
+### 7.4 `std/rest` module
 
 ```
 module rest
@@ -1307,7 +1315,7 @@ decl resource(
 ) std.Step
 ```
 
-### 7.4 `std/container` module
+### 7.5 `std/container` module
 
 ```
 module container
@@ -1363,13 +1371,11 @@ matching Go).
 ```
 import "std"
 import "std/ssh"
+import "std/secrets"
 
-std.secrets {
-    backend = std.SecretsBackend.age
-    path    = "secrets.age.json"
-}
+let age = secrets.from_age(path = "secrets.age.json")
 
-let vps_host = std.secret("vps.host")
+let vps_host = age.get("vps.host")
 
 let vps = ssh.target {
     name = "vps"
@@ -1775,14 +1781,17 @@ func network(
 # Consumer uses the func result in a frozen deploy context
 import "std"
 import "std/rest"
+import "std/secrets"
+
+let age = secrets.from_age(path = "secrets.age.json")
 
 let udm = rest.target {
     name     = "udm"
     base_url = "https://udm.local/proxy/network"
     auth     = rest.bearer {
         token_endpoint = "/integration/v1/auth"
-        identity       = std.secret("udm.id")
-        secret         = std.secret("udm.secret")
+        identity       = age.get("udm.id")
+        secret         = age.get("udm.secret")
     }
 }
 
@@ -1821,7 +1830,6 @@ std.deploy(name = "network", targets = [udm]) {
    functions are called, loops are unrolled, conditionals are evaluated.
    Step invocations produce typed values.
 3. After evaluation, the engine collects top-level values by type:
-   - Exactly zero or one `SecretsConfig`
    - Zero or more `Target`
    - One or more `Deploy` (each carrying its collected desired-state
      `Step` values and any reactive steps referenced from
@@ -1831,7 +1839,7 @@ std.deploy(name = "network", targets = [udm]) {
 
 The evaluation is deterministic and hermetic. No filesystem access, no
 network access, no randomness. The only external inputs are environment
-variables (`std.env()`) and secrets (`std.secret()`).
+variables (`std.env()`) and secrets (`secrets.get()`).
 
 ---
 

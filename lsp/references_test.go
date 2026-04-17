@@ -278,6 +278,66 @@ func secret(@secretkey name: string) string
 	}
 }
 
+func TestReferencesUFCSFromStub(t *testing.T) {
+	// Cursor on "get" in a module stub. User files call it as
+	// `age.get("key")` (UFCS), not `secrets.get(...)`. The
+	// reference search must find these UFCS call sites.
+	dir := t.TempDir()
+
+	stub := `module secrets
+
+type SecretResolver
+func get(resolver: SecretResolver, key: string) string
+`
+	config := `module main
+
+import "std/secrets"
+
+let age = secrets.from_age(path = "s.json")
+let v = age.get("key")
+`
+	if err := os.WriteFile(filepath.Join(dir, "secrets.scampi"), []byte(stub), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.scampi"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := testServer()
+	s.rootDir = dir
+
+	stubPath := filepath.Join(dir, "secrets.scampi")
+	configPath := filepath.Join(dir, "config.scampi")
+	stubURI := protocol.DocumentURI(uri.File(stubPath))
+	configURI := protocol.DocumentURI(uri.File(configPath))
+	s.docs.Open(stubURI, stub, 1)
+	s.docs.Open(configURI, config, 1)
+
+	// Cursor on "get" in `func get(` at line 3, character 5.
+	locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: stubURI},
+			Position:     protocol.Position{Line: 3, Character: 5},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, loc := range locs {
+		if loc.URI == configURI {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected UFCS reference in config file, got %d locations:", len(locs))
+		for _, l := range locs {
+			t.Logf("  %s L%d:%d", l.URI, l.Range.Start.Line, l.Range.Start.Character)
+		}
+	}
+}
+
 func lineStart(text string, pos int) int {
 	for i := pos - 1; i >= 0; i-- {
 		if text[i] == '\n' {

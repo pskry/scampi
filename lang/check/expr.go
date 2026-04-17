@@ -291,12 +291,10 @@ func (c *Checker) detectUFCS(call *ast.CallExpr) (*FuncType, string) {
 	// Tier 2: imported modules. Walk every module the current file
 	// imports and collect candidates whose first param accepts the
 	// receiver type. More than one match → ambiguity error.
+	// Imports live in the file scope, so walk up the scope chain.
 	var candidates []ufcsCandidate
-	for modName := range c.scope.symbols {
-		sym := c.scope.symbols[modName]
-		if sym.Kind != SymImport {
-			continue
-		}
+	for _, sym := range c.scope.AllImports() {
+		modName := sym.Name
 		mod, ok := c.modules[modName]
 		if !ok {
 			continue

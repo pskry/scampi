@@ -52,7 +52,3 @@ func (o *overlaySource) Stat(ctx context.Context, path string) (source.FileMeta,
 func (o *overlaySource) LookupEnv(key string) (string, bool) {
 	return o.base.LookupEnv(key)
 }
-
-func (o *overlaySource) LookupSecret(key string) (string, bool, error) {
-	return o.base.LookupSecret(key)
-}

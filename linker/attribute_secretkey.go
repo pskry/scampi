@@ -11,22 +11,21 @@ import (
 
 // SecretKeyAttribute is the linker behaviour for `@secretkey`. It
 // validates that string literal arguments to a `@secretkey`-annotated
-// parameter exist in the configured secrets backend at link time,
-// surfacing missing keys as typed diagnostics with source spans
-// pointing at the offending literal.
+// parameter exist in the resolver's backend at link time, surfacing
+// missing keys as typed diagnostics with source spans pointing at
+// the offending literal.
 //
-// If the user has not configured a secrets backend (no `std.secrets`
-// call in their config), the static check is a no-op — the existing
-// runtime check in lang/eval will catch the misuse with its own
-// diagnostic when the call actually fires.
+// The backend is extracted from the ResolverBackend field on the
+// StaticCheckContext, which is populated from the let-bound
+// SecretResolverVal receiver of the UFCS get() call.
 //
-// Computed (non-literal) arguments are also skipped at link time;
-// they fall through to the runtime check in lang/eval which already
+// Computed (non-literal) arguments are skipped at link time; they
+// fall through to the runtime check in lang/eval which already
 // validates the resolved value with a source span.
 type SecretKeyAttribute struct{}
 
 func (SecretKeyAttribute) StaticCheck(ctx StaticCheckContext) {
-	backend := ctx.Linker.Secrets()
+	backend := ctx.ResolverBackend
 	if backend == nil {
 		return
 	}
@@ -97,7 +96,7 @@ func (e *secretKeyNotFoundError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeSecretKeyNotFound,
 		Text:   `secret key {{printf "%q" .Key}} not found in backend`,
-		Hint:   "check std.secrets() path or add the key to your secrets backend",
+		Hint:   "check secrets.from_age/from_file path or add the key to your secrets file",
 		Source: e.Src,
 		Data:   secretKeyNotFoundData{Key: e.Key},
 	}

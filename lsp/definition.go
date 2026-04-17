@@ -94,7 +94,8 @@ func (s *Server) Definition(
 
 	// Dotted word like `x.yo` from a UFCS or selector context — try
 	// the trailing segment in the same order so the function-name
-	// part of `x.yo()` resolves to local `yo`.
+	// part of `x.yo()` resolves to local `yo`. For UFCS calls like
+	// `age.get`, also try every module prefix (→ `secrets.get`).
 	if i := strings.LastIndexByte(word, '.'); i >= 0 && i < len(word)-1 {
 		tail := word[i+1:]
 		if span := findDefinition(f, tail); span != nil {
@@ -102,6 +103,11 @@ func (s *Server) Definition(
 		}
 		if loc, ok := s.stubDefs.Lookup(tail); ok {
 			return []protocol.Location{loc}, nil
+		}
+		for _, mod := range s.catalog.Modules() {
+			if loc, ok := s.stubDefs.Lookup(mod + "." + tail); ok {
+				return []protocol.Location{loc}, nil
+			}
 		}
 	}
 

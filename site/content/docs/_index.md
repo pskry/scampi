@@ -17,11 +17,6 @@ reality match.
 {{< cards >}}
   {{< card link="getting-started" title="Getting Started" subtitle="Install scampi and write your first config" >}}
   {{< card link="language" title="Language" subtitle="Modules, types, decl calls, trailing blocks — the language at a glance" >}}
-  {{< card link="concepts" title="Concepts" subtitle="Understand the mental model: steps, actions, ops, targets" >}}
   {{< card link="configuration" title="Configuration" subtitle="Deploy blocks, source resolvers, secrets, and project layout" >}}
-  {{< card link="modules" title="Modules" subtitle="Reusable scampi packages, local development, and testing" >}}
-  {{< card link="targets" title="Target Reference" subtitle="Local, SSH, and REST target types" >}}
   {{< card link="steps" title="Step Reference" subtitle="Every built-in step type, with fields and examples" >}}
-  {{< card link="cli" title="CLI" subtitle="Subcommands, flags, output semantics, and exit codes" >}}
-  {{< card link="philosophy" title="Philosophy" subtitle="Why convergence, why a real language, why opinions over options" >}}
 {{< /cards >}}

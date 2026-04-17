@@ -6,8 +6,6 @@ import "std"
 import "std/posix"
 import "std/ssh"
 
-std.secrets { backend = std.SecretsBackend.age, path = "secrets.age.json" }
-
 let vps_root = ssh.target {
   name = "vps-root"
   host = "203.0.113.10"

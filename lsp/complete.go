@@ -469,7 +469,7 @@ type AttributeCompletionProvider func(
 // linker's AttributeRegistry — same key, different value (UX
 // instead of validation behaviour).
 var attributeProviders = map[string]AttributeCompletionProvider{
-	"std.@secretkey": (*Server).completeSecretKeysProvider,
+	"secrets.@secretkey": (*Server).completeSecretKeysProvider,
 }
 
 // completeSecretKeysProvider is the AttributeCompletionProvider
@@ -486,11 +486,17 @@ func (s *Server) completeSecretKeysProvider(docURI protocol.DocumentURI, cur Cur
 // non-empty result. Returns nil if no provider matches — callers
 // should fall back to other completion strategies.
 func (s *Server) dispatchAttributeProvider(docURI protocol.DocumentURI, cur CursorContext) []protocol.CompletionItem {
-	f, ok := s.lookupFunc(docURI, cur.FuncName)
-	if !ok {
+	r := s.lookupFuncEx(docURI, cur.FuncName)
+	if r.Func.Name == "" {
 		return nil
 	}
-	param, ok := activeParam(f, cur)
+	// For UFCS calls, the receiver occupies param 0 but isn't
+	// visible in the source args — shift the active index.
+	adjusted := cur
+	if r.UFCS {
+		adjusted.ActiveParam++
+	}
+	param, ok := activeParam(r.Func, adjusted)
 	if !ok {
 		return nil
 	}
@@ -676,22 +682,26 @@ func findSecretsPathAST(filePath, content string) string {
 		if n == nil || secretsPath != "" {
 			return false
 		}
-		// Look for a struct-lit invocation of "secrets" — in the new lang
-		// secrets config is a decl invocation: secrets { path = "...", ... }
-		sl, ok := n.(*ast.StructLit)
+		// Look for secrets.from_age(path = "...") or
+		// secrets.from_file(path = "...") call expressions.
+		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
 		}
-		if sl.Type == nil {
+		sel, ok := call.Fn.(*ast.SelectorExpr)
+		if !ok {
 			return true
 		}
-		name := typeExprString(sl.Type)
-		if name != "secrets" && name != "std.secrets" {
+		modIdent, ok := sel.X.(*ast.Ident)
+		if !ok || modIdent.Name != "secrets" {
 			return true
 		}
-		for _, fi := range sl.Fields {
-			if fi.Name.Name == "path" {
-				if str := stringLitValue(fi.Value); str != "" {
+		if sel.Sel.Name != "from_age" && sel.Sel.Name != "from_file" {
+			return true
+		}
+		for _, arg := range call.Args {
+			if arg.Name != nil && arg.Name.Name == "path" {
+				if str := stringLitValue(arg.Value); str != "" {
 					secretsPath = str
 				}
 			}

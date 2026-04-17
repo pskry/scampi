@@ -15,7 +15,6 @@ type MemSource struct {
 	Files    map[string][]byte
 	ModTimes map[string]time.Time
 	Env      map[string]string
-	Secrets  map[string]string
 }
 
 func NewMemSource() *MemSource {
@@ -23,7 +22,6 @@ func NewMemSource() *MemSource {
 		Files:    make(map[string][]byte),
 		ModTimes: make(map[string]time.Time),
 		Env:      make(map[string]string),
-		Secrets:  make(map[string]string),
 	}
 }
 
@@ -76,9 +74,4 @@ func (m *MemSource) Stat(_ context.Context, path string) (FileMeta, error) {
 func (m *MemSource) LookupEnv(key string) (string, bool) {
 	v, ok := m.Env[key]
 	return v, ok
-}
-
-func (m *MemSource) LookupSecret(key string) (string, bool, error) {
-	v, ok := m.Secrets[key]
-	return v, ok, nil
 }

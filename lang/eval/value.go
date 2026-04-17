@@ -160,6 +160,25 @@ type RefVal struct {
 func (*RefVal) valueTag()        {}
 func (v *RefVal) String() string { return "ref(..," + v.Expr + ")" }
 
+// OpaqueVal is a runtime value opaque to the evaluator. It wraps
+// an arbitrary Go object produced by a caller-registered BuiltinFunc
+// during eval. Unlike StructVal (which holds user-provided config
+// fields as map[string]Value), OpaqueVal carries runtime state that
+// the eval layer cannot interpret — the caller constructs it and
+// later type-asserts Inner to recover the concrete type.
+//
+// Example: secrets.from_age() constructs a secret.Backend at eval
+// time. The eval layer stores it as OpaqueVal{Inner: backend}; the
+// linker's attribute static-check pass type-asserts Inner back to
+// secret.Backend to validate literal keys.
+type OpaqueVal struct {
+	TypeName string // matches the stub's return type (e.g. "SecretResolver")
+	Inner    any    // concrete Go value — eval never touches this
+}
+
+func (*OpaqueVal) valueTag()        {}
+func (v *OpaqueVal) String() string { return v.TypeName }
+
 // Result
 // -----------------------------------------------------------------------------
 

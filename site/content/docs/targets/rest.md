@@ -8,14 +8,17 @@ orchestrators, DNS providers.
 
 ```scampi
 import "std/rest"
+import "std/secrets"
+
+let age = secrets.from_age(path = "secrets.age.json")
 
 let npm_api = rest.target {
   name     = "npm_api"
   base_url = "http://198.51.100.30:81/api"
   auth     = rest.bearer {
     token_endpoint = "/tokens"
-    identity       = std.secret("npm.admin.email")
-    secret         = std.secret("npm.admin.password")
+    identity       = age.get("npm.admin.email")
+    secret         = age.get("npm.admin.password")
   }
 }
 ```
@@ -48,7 +51,7 @@ auth = rest.no_auth {}
 HTTP Basic authentication.
 
 ```scampi
-auth = rest.basic { user = "admin", password = std.secret("pass") }
+auth = rest.basic { user = "admin", password = age.get("admin.password") }
 ```
 
 | Field      | Type   | Required | Description |
@@ -62,7 +65,7 @@ Static header authentication. Works for API keys, static bearer tokens, or any
 auth that uses a single header.
 
 ```scampi
-auth = rest.header { name = "X-API-Key", value = std.secret("grafana.api_key") }
+auth = rest.header { name = "X-API-Key", value = age.get("grafana.api_key") }
 ```
 
 | Field   | Type   | Required | Description  |
@@ -78,8 +81,8 @@ token, and automatically re-authenticates on 401 responses.
 ```scampi
 auth = rest.bearer {
   token_endpoint = "/tokens"
-  identity       = std.secret("npm.admin.email")
-  secret         = std.secret("npm.admin.password")
+  identity       = age.get("npm.admin.email")
+  secret         = age.get("npm.admin.password")
 }
 ```
 

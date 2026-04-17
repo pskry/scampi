@@ -57,6 +57,37 @@ func TestDefinitionFuncDecl(t *testing.T) {
 	}
 }
 
+func TestDefinitionUFCSResolvesToStub(t *testing.T) {
+	s := testServer()
+	docURI := protocol.DocumentURI("file:///test.scampi")
+	text := `
+module main
+
+import "std/secrets"
+
+let age = secrets.from_age(path = "s.json")
+let v = age.get("key")
+`
+	s.docs.Open(docURI, text, 1)
+
+	// Cursor on "get" in "age.get" at line 6, character 12
+	locs, err := s.Definition(context.Background(), &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 6, Character: 12},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(locs) == 0 {
+		t.Fatal("expected UFCS definition to resolve to secrets.get stub")
+	}
+	if locs[0].URI == "" {
+		t.Error("expected non-empty URI for secrets.get stub")
+	}
+}
+
 func TestDefinitionStdlibResolvesToStub(t *testing.T) {
 	s := testServer()
 	docURI := protocol.DocumentURI("file:///test.scampi")

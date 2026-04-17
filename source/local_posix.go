@@ -41,7 +41,3 @@ func (LocalPosixSource) Stat(_ context.Context, path string) (FileMeta, error) {
 func (LocalPosixSource) LookupEnv(key string) (string, bool) {
 	return os.LookupEnv(key)
 }
-
-func (LocalPosixSource) LookupSecret(_ string) (string, bool, error) {
-	return "", false, nil
-}

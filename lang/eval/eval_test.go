@@ -145,26 +145,53 @@ let result = add(1, 2)
 	_ = r
 }
 
-// Secrets config
+// Secret resolvers
 // -----------------------------------------------------------------------------
 
-func TestEvalSecrets(t *testing.T) {
+func TestEvalSecretResolver(t *testing.T) {
 	src := `
 module main
-import "std"
-std.secrets { backend = std.SecretsBackend.file, path = "secrets.json" }
+import "std/secrets"
+let resolver = secrets.from_file(path = "secrets.json")
 `
-	r := evalSrc(t, src)
-	secrets := findByRetType(r, "SecretsConfig")
-	if len(secrets) != 1 {
-		t.Fatalf("expected 1 SecretsConfig, got %d", len(secrets))
+	modules, err := check.BootstrapModules(std.FS)
+	if err != nil {
+		t.Fatalf("bootstrap: %v", err)
 	}
-	sv := secrets[0]
-	if b, ok := sv.Fields["backend"].(*StringVal); !ok || b.V != "file" {
-		t.Errorf("backend: got %v", sv.Fields["backend"])
+	l := lex.New("test.scampi", []byte(src))
+	p := parse.New(l)
+	f := p.Parse()
+	if errs := l.Errors(); len(errs) > 0 {
+		t.Fatalf("lex errors: %v", errs)
 	}
-	if p, ok := sv.Fields["path"].(*StringVal); !ok || p.V != "secrets.json" {
-		t.Errorf("path: got %v", sv.Fields["path"])
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	c := check.New(modules)
+	c.Check(f)
+	if errs := c.Errors(); len(errs) > 0 {
+		t.Fatalf("check errors: %v", errs)
+	}
+	stubBackend := "stub-backend"
+	r, errs := Eval(f, []byte(src),
+		WithStubs(std.FS),
+		WithBuiltinFunc("secrets.from_file", func(_ []Value, _ map[string]Value) (Value, string) {
+			return &OpaqueVal{TypeName: "SecretResolver", Inner: stubBackend}, ""
+		}),
+	)
+	if len(errs) > 0 {
+		t.Fatalf("eval errors: %v", errs)
+	}
+	val, ok := r.Bindings["resolver"]
+	if !ok {
+		t.Fatal("expected binding 'resolver'")
+	}
+	rv, ok := val.(*OpaqueVal)
+	if !ok {
+		t.Fatalf("expected *OpaqueVal, got %T", val)
+	}
+	if rv.Inner != stubBackend {
+		t.Errorf("expected stub backend, got %v", rv.Inner)
 	}
 }
 

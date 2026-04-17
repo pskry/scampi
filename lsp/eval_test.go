@@ -126,11 +126,11 @@ func TestEvaluateBadSecretKey(t *testing.T) {
 	docURI := protocol.DocumentURI(uri.File(mainPath))
 	content := `module main
 
-import "std"
+import "std/secrets"
 
-std.secrets { backend = std.SecretsBackend.file, path = "secrets.json" }
+let resolver = secrets.from_file(path = "secrets.json")
 
-let v = std.secret("totally.does.not.exist")
+let v = resolver.get("totally.does.not.exist")
 `
 	if err := os.WriteFile(mainPath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)

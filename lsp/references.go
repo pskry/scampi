@@ -469,6 +469,12 @@ func collectFieldKeySpans(f *ast.File) map[uint32]bool {
 // in the AST. Matches StructLit type references (posix.pkg { ... }),
 // NamedType references (types in annotations), and DottedName nodes.
 func findDottedRefs(f *ast.File, filePath string, src []byte, qualifiedName string) []protocol.Location {
+	// Extract the method/member name for UFCS matching.
+	tail := qualifiedName
+	if i := strings.LastIndexByte(qualifiedName, '.'); i >= 0 {
+		tail = qualifiedName[i+1:]
+	}
+
 	var locs []protocol.Location
 	ast.Walk(f, func(n ast.Node) bool {
 		if n == nil {
@@ -497,8 +503,19 @@ func findDottedRefs(f *ast.File, filePath string, src []byte, qualifiedName stri
 				})
 			}
 		case *ast.SelectorExpr:
-			// posix.pkg in expression context is parsed as SelectorExpr
-			if selectorString(n) == qualifiedName {
+			// posix.pkg in expression context is parsed as SelectorExpr.
+			ss := selectorString(n)
+			if ss == qualifiedName {
+				locs = append(locs, protocol.Location{
+					URI:   uri.File(filePath),
+					Range: tokenSpanToRange(src, n.SrcSpan),
+				})
+			}
+			// UFCS: `age.get(...)` has SelectorExpr with Sel.Name == "get"
+			// but X is a variable, not the module. Match when the method
+			// name is the tail of the qualified name and the receiver is
+			// NOT the module (otherwise the exact match above handles it).
+			if ss != qualifiedName && n.Sel.Name == tail {
 				locs = append(locs, protocol.Location{
 					URI:   uri.File(filePath),
 					Range: tokenSpanToRange(src, n.SrcSpan),

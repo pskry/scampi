@@ -3,10 +3,10 @@ module main
 import "std"
 import "std/posix"
 import "std/local"
+import "std/secrets"
 
 let host = local.target { name = "local" }
-
-std.secrets { backend = std.SecretsBackend.file, path = "/secrets.json" }
+let resolver = secrets.from_file(path = "/secrets.json")
 
 std.deploy(name = "test", targets = [host]) {
   posix.template {
@@ -15,7 +15,7 @@ std.deploy(name = "test", targets = [host]) {
     dest  = "/tmp/dsn.txt"
     data  = {
       "values": {
-        "db_pass": std.secret("db_pass"),
+        "db_pass": resolver.get("db_pass"),
       },
     }
     perm  = "0600"

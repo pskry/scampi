@@ -10,27 +10,50 @@ import (
 	"scampi.dev/scampi/lang/ast"
 )
 
+// funcLookupResult holds the result of a function lookup, including
+// whether it was resolved via UFCS (in which case positional param
+// indices are shifted by 1 since the receiver is implicit).
+type funcLookupResult struct {
+	Func FuncInfo
+	UFCS bool
+}
+
 // lookupFunc checks the stdlib catalog first, then falls back to resolving
 // user-defined functions from the current file. When the name is dotted
 // (e.g. `x.yo` from a UFCS-style call or selector), the last segment is
 // also tried so the function-name part of `x.yo()` resolves to `yo`.
+//
+// For UFCS calls like `resolver.get(...)`, the cursor reports `resolver.get`
+// but the catalog has `secrets.get`. When direct and tail lookups both miss,
+// we try every known module prefix with the tail segment.
 func (s *Server) lookupFunc(docURI protocol.DocumentURI, name string) (FuncInfo, bool) {
+	r := s.lookupFuncEx(docURI, name)
+	return r.Func, r.Func.Name != ""
+}
+
+func (s *Server) lookupFuncEx(docURI protocol.DocumentURI, name string) funcLookupResult {
 	if f, ok := s.catalog.Lookup(name); ok {
-		return f, true
+		return funcLookupResult{Func: f}
 	}
 	if f, ok := s.resolveUserFunc(docURI, name); ok {
-		return f, true
+		return funcLookupResult{Func: f}
 	}
 	if i := strings.LastIndexByte(name, '.'); i >= 0 && i < len(name)-1 {
 		tail := name[i+1:]
 		if f, ok := s.catalog.Lookup(tail); ok {
-			return f, true
+			return funcLookupResult{Func: f}
 		}
 		if f, ok := s.resolveUserFunc(docURI, tail); ok {
-			return f, true
+			return funcLookupResult{Func: f}
+		}
+		// UFCS: `var.method` — try every module as prefix.
+		for _, mod := range s.catalog.Modules() {
+			if f, ok := s.catalog.Lookup(mod + "." + tail); ok {
+				return funcLookupResult{Func: f, UFCS: true}
+			}
 		}
 	}
-	return FuncInfo{}, false
+	return funcLookupResult{}
 }
 
 // resolveUserFunc attempts to find a user-defined function by name in the

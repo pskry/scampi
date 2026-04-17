@@ -4,7 +4,7 @@ package linker
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"path/filepath"
 
 	"scampi.dev/scampi/errs"
@@ -81,16 +81,21 @@ func Analyze(ctx context.Context, cfgPath string, src source.Source) (*Analysis,
 		return nil, wrapLangErrors(checkErrs, cfgPath, data)
 	}
 
-	// Evaluate with secret backend wiring. The wirer captures the
-	// configured backend so the post-eval attribute static check pass
-	// can validate literal secret keys against it.
-	onEmit, secretsProvider := newSecretWirer(ctx, cfgPath, src)
+	// Evaluate with secret backend builtins registered so
+	// secrets.from_age / secrets.from_file / secrets.get work.
+	readFile := func(path string) ([]byte, error) {
+		return src.ReadFile(ctx, path)
+	}
+	configDir := filepath.Dir(cfgPath)
 	result, evalErrs := eval.Eval(
 		f,
 		data,
 		eval.WithStubs(std.FS),
-		eval.WithOnEmit(onEmit),
 		eval.WithUserModules(userMods),
+		eval.WithEnv(src.LookupEnv),
+		eval.WithBuiltinFunc("secrets.from_age", secretFromAge(configDir, src.LookupEnv, readFile)),
+		eval.WithBuiltinFunc("secrets.from_file", secretFromFile(configDir, readFile)),
+		eval.WithBuiltinFunc("secrets.get", secretGetBuiltin()),
 	)
 	if len(evalErrs) > 0 {
 		return nil, wrapLangErrors(evalErrs, cfgPath, data)
@@ -107,7 +112,7 @@ func Analyze(ctx context.Context, cfgPath string, src source.Source) (*Analysis,
 		c.FileScope(),
 		modules,
 		DefaultAttributes(),
-		secretsProvider(),
+		result,
 	); attrErr != nil {
 		return nil, attrErr
 	}
@@ -172,97 +177,117 @@ func LoadConfig(
 	return Link(a.Result, reg, cfgPath, WithSourceResolver(ctx, cfgPath, src))
 }
 
-// SecretBackendProvider exposes the secret backend captured by
-// newSecretWirer after the evaluator has processed a SecretsConfig
-// value. Returns nil if no backend has been configured (the user did
-// not call std.secrets in their config).
-type SecretBackendProvider func() secret.Backend
-
-// newSecretWirer returns an onEmit callback that detects SecretsConfig
-// values and wires the secret backend into the evaluator, plus a
-// provider that exposes the captured backend after eval has run. The
-// post-eval attribute static-check pass uses the provider to validate
-// literal secret keys against the configured backend.
-func newSecretWirer(
-	ctx context.Context,
-	cfgPath string,
-	src source.Source,
-) (eval.EmitCallback, SecretBackendProvider) {
-	configured := false
-	var captured secret.Backend
-	provider := func() secret.Backend { return captured }
-	onEmit := func(v eval.Value, ev *eval.Evaluator) {
-		sv, ok := v.(*eval.StructVal)
-		if !ok || sv.RetType != "SecretsConfig" {
-			return
-		}
-		if configured {
-			ev.AddError(check.CodeSecretLookup, "secrets() called more than once")
-			return
-		}
-		configured = true
-		backend := ""
-		if b, ok := sv.Fields["backend"].(*eval.StringVal); ok {
-			backend = b.V
-		}
-		path := ""
-		if p, ok := sv.Fields["path"].(*eval.StringVal); ok {
-			path = p.V
-		}
+// secretFromAge returns a BuiltinFunc for secrets.from_age(path).
+func secretFromAge(
+	configDir string,
+	envLookup func(string) (string, bool),
+	readFile func(string) ([]byte, error),
+) eval.BuiltinFunc {
+	return func(positional []eval.Value, kwargs map[string]eval.Value) (eval.Value, string) {
+		path := stringArg(positional, kwargs, "path")
 		if path == "" {
-			return
+			return nil, "secrets.from_age requires a path argument"
 		}
-		// Resolve path relative to config file.
 		if !filepath.IsAbs(path) {
-			path = filepath.Join(filepath.Dir(cfgPath), path)
+			path = filepath.Join(configDir, path)
 		}
-		data, readErr := src.ReadFile(ctx, path)
-		if readErr != nil {
-			ev.AddError(check.CodeSecretLookup, fmt.Sprintf("reading secrets file %q: %s", path, readErr))
-			return
+		data, err := readFile(path)
+		if err != nil {
+			return nil, "reading secrets file: " + err.Error()
 		}
-		var b secret.Backend
-		switch backend {
-		case "file":
-			fb, err := secret.NewFileBackend(data)
-			if err == nil {
-				b = fb
-			}
-		case "age":
-			readFile := func(p string) ([]byte, error) {
-				return src.ReadFile(ctx, p)
-			}
-			identities, idErr := secret.ResolveIdentities(
-				src.LookupEnv,
-				readFile,
-			)
-			if idErr != nil {
-				ev.AddError(check.CodeSecretLookup,
-					fmt.Sprintf("secrets backend \"age\": cannot resolve identity keys: %s", idErr))
-				return
-			}
-			ab, abErr := secret.NewAgeBackend(data, identities)
-			if abErr != nil {
-				ev.AddError(check.CodeSecretLookup,
-					fmt.Sprintf("secrets backend \"age\": cannot decrypt %q: %s", path, abErr))
-				return
-			}
-			b = ab
+		var raw map[string]string
+		if jsonErr := json.Unmarshal(data, &raw); jsonErr != nil {
+			return nil, "parsing secrets file: " + jsonErr.Error()
 		}
-		if b != nil {
-			captured = b
-			ev.SetSecretLookup(func(key string) (string, error) {
-				v, found, err := b.Lookup(key)
-				if err != nil {
-					return "", err
-				}
-				if !found {
-					// bare-error: eval callback, no source span available
-					return "", errs.New("secret " + key + " not found")
-				}
-				return v, nil
-			})
+		lookup := envLookup
+		if lookup == nil {
+			lookup = func(string) (string, bool) { return "", false }
+		}
+		identities, idErr := secret.ResolveIdentities(lookup, readFile)
+		if idErr != nil {
+			keys := make(map[string]string, len(raw))
+			for k := range raw {
+				keys[k] = "<secret>"
+			}
+			return &eval.OpaqueVal{
+				TypeName: "SecretResolver",
+				Inner: &secret.PlaceholderBackend{
+					KeyMap: keys,
+					Cause:  idErr,
+				},
+			}, ""
+		}
+		ab, abErr := secret.NewAgeBackend(data, identities)
+		if abErr != nil {
+			return nil, "age backend: " + abErr.Error()
+		}
+		return &eval.OpaqueVal{TypeName: "SecretResolver", Inner: ab}, ""
+	}
+}
+
+// secretFromFile returns a BuiltinFunc for secrets.from_file(path).
+func secretFromFile(
+	configDir string,
+	readFile func(string) ([]byte, error),
+) eval.BuiltinFunc {
+	return func(positional []eval.Value, kwargs map[string]eval.Value) (eval.Value, string) {
+		path := stringArg(positional, kwargs, "path")
+		if path == "" {
+			return nil, "secrets.from_file requires a path argument"
+		}
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(configDir, path)
+		}
+		data, err := readFile(path)
+		if err != nil {
+			return nil, "reading secrets file: " + err.Error()
+		}
+		fb, fbErr := secret.NewFileBackend(data)
+		if fbErr != nil {
+			return nil, "file backend: " + fbErr.Error()
+		}
+		return &eval.OpaqueVal{TypeName: "SecretResolver", Inner: fb}, ""
+	}
+}
+
+// secretGetBuiltin returns a BuiltinFunc for secrets.get(resolver, key).
+func secretGetBuiltin() eval.BuiltinFunc {
+	return func(positional []eval.Value, kwargs map[string]eval.Value) (eval.Value, string) {
+		if len(positional) == 0 {
+			return nil, "secrets.get requires a resolver and key"
+		}
+		opaque, ok := positional[0].(*eval.OpaqueVal)
+		if !ok {
+			return nil, "first argument to secrets.get must be a SecretResolver"
+		}
+		b, ok := opaque.Inner.(secret.Backend)
+		if !ok {
+			return nil, "invalid secret backend"
+		}
+		key := stringArg(positional[1:], kwargs, "key")
+		v, found, err := b.Lookup(key)
+		if err != nil {
+			return nil, "secret lookup failed: " + err.Error()
+		}
+		if !found {
+			return nil, "secret key " + key + " not found"
+		}
+		return &eval.StringVal{V: v}, ""
+	}
+}
+
+// stringArg extracts a string from the first positional arg or the
+// named kwarg.
+func stringArg(positional []eval.Value, kwargs map[string]eval.Value, name string) string {
+	if len(positional) > 0 {
+		if s, ok := positional[0].(*eval.StringVal); ok {
+			return s.V
 		}
 	}
-	return onEmit, provider
+	if v, ok := kwargs[name]; ok {
+		if s, ok := v.(*eval.StringVal); ok {
+			return s.V
+		}
+	}
+	return ""
 }

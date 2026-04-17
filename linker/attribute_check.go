@@ -6,6 +6,7 @@ import (
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/lang/ast"
 	"scampi.dev/scampi/lang/check"
+	"scampi.dev/scampi/lang/eval"
 	"scampi.dev/scampi/secret"
 	"scampi.dev/scampi/spec"
 )
@@ -26,14 +27,12 @@ func runAttributeStaticChecks(
 	fileScope *check.Scope,
 	modules map[string]*check.Scope,
 	registry *AttributeRegistry,
-	backend secret.Backend,
+	result *eval.Result,
 ) error {
 	if registry == nil {
 		return nil
 	}
-	ctx := &linkContext{
-		backend: backend,
-	}
+	ctx := &linkContext{}
 	visitor := &attributeCheckVisitor{
 		ctx:       ctx,
 		registry:  registry,
@@ -41,6 +40,7 @@ func runAttributeStaticChecks(
 		modules:   modules,
 		source:    source,
 		cfgPath:   cfgPath,
+		result:    result,
 	}
 	ast.Walk(f, visitor.enter, nil)
 	if len(ctx.diags) == 0 {
@@ -58,24 +58,44 @@ type attributeCheckVisitor struct {
 	modules   map[string]*check.Scope
 	source    []byte
 	cfgPath   string
+	result    *eval.Result
 }
 
 func (v *attributeCheckVisitor) enter(n ast.Node) bool {
 	switch n := n.(type) {
 	case *ast.CallExpr:
-		if ft := v.resolveCallTarget(n.Fn); ft != nil {
+		if n.UFCS && n.UFCSModule != "" {
+			if ft := v.resolveUFCSTarget(n); ft != nil {
+				v.checkCall(n, ft)
+			}
+		} else if ft := v.resolveCallTarget(n.Fn); ft != nil {
 			v.checkCall(n, ft)
 		}
 	case *ast.StructLit:
-		// Decl invocations like `posix.copy { ... }` parse as struct
-		// literals with a typed dotted name. Look up the dotted name
-		// in the modules map and dispatch attribute behaviours
-		// against the field initializers.
 		if dt := v.resolveStructLitDecl(n); dt != nil {
 			v.checkStructLit(n, dt)
 		}
 	}
 	return true
+}
+
+// resolveUFCSTarget resolves the function type for a UFCS call.
+// The real function lives in call.UFCSModule, not the receiver.
+func (v *attributeCheckVisitor) resolveUFCSTarget(call *ast.CallExpr) *check.FuncType {
+	mod := v.modules[call.UFCSModule]
+	if mod == nil {
+		return nil
+	}
+	sel, ok := call.Fn.(*ast.SelectorExpr)
+	if !ok {
+		return nil
+	}
+	sym := mod.Lookup(sel.Sel.Name)
+	if sym == nil {
+		return nil
+	}
+	ft, _ := sym.Type.(*check.FuncType)
+	return ft
 }
 
 // resolveStructLitDecl looks up the DeclType for a struct literal's
@@ -172,8 +192,9 @@ func attrDoc(attr check.ResolvedAttribute) string {
 // resolveCallTarget walks the call's function expression and tries to
 // look up the resulting symbol's FuncType. Currently handles two
 // shapes: a bare identifier (resolves in the file scope) and a
-// dotted name like `std.secret` (resolves in the imported module's
-// scope). Returns nil if the function isn't a known annotated target.
+// dotted name like `secrets.from_age` (resolves in the imported
+// module's scope). Returns nil if the function isn't a known
+// annotated target.
 func (v *attributeCheckVisitor) resolveCallTarget(e ast.Expr) *check.FuncType {
 	switch fn := e.(type) {
 	case *ast.Ident:
@@ -207,18 +228,31 @@ func (v *attributeCheckVisitor) resolveCallTarget(e ast.Expr) *check.FuncType {
 
 // checkCall iterates the parameters of the resolved function and, for
 // each parameter that carries an attribute, dispatches the registered
-// behaviour with the corresponding argument expression. The
-// ResolvedAttribute on the FieldDef carries the attribute's own
-// resolved literal arguments — behaviours like `@pattern(regex)`
-// read them via ctx.AttrArgs without needing AST access.
+// behaviour with the corresponding argument expression.
 func (v *attributeCheckVisitor) checkCall(call *ast.CallExpr, ft *check.FuncType) {
 	if len(ft.Params) == 0 {
 		return
 	}
-	// Build a map: param index → arg expression. The lang's
-	// CallExpr.Args entries are either positional (no Name) or
-	// keyword (Name=value). We need to bind them back to params.
 	argFor := bindCallArgs(call, ft)
+
+	// For UFCS calls, the receiver is param 0 but isn't in Args —
+	// it lives in call.Fn.(*SelectorExpr).X. Shift all arg indices
+	// up by 1 so they align with the function's parameter list.
+	if call.UFCS {
+		shifted := make(map[int]ast.Expr, len(argFor))
+		for i, e := range argFor {
+			shifted[i+1] = e
+		}
+		argFor = shifted
+	}
+
+	// If this is a UFCS call, try to extract the resolver backend
+	// from the receiver for @secretkey validation.
+	var resolverBackend ResolverBackendFunc
+	if call.UFCS && v.result != nil {
+		resolverBackend = v.resolverBackendFromResult
+	}
+
 	for i, p := range ft.Params {
 		if len(p.Attributes) == 0 {
 			continue
@@ -237,7 +271,7 @@ func (v *attributeCheckVisitor) checkCall(call *ast.CallExpr, ft *check.FuncType
 				continue
 			}
 			useSpan := nodeSourceSpan(argExpr, v.source, v.cfgPath)
-			behaviour.StaticCheck(StaticCheckContext{
+			ctx := StaticCheckContext{
 				Linker:    v.ctx,
 				AttrName:  attr.QualifiedName,
 				AttrArgs:  attr.Args,
@@ -245,9 +279,38 @@ func (v *attributeCheckVisitor) checkCall(call *ast.CallExpr, ft *check.FuncType
 				ParamName: p.Name,
 				ParamArg:  argExpr,
 				UseSpan:   useSpan,
-			})
+			}
+			// For UFCS calls with a resolver receiver, extract
+			// the backend from the let-bound variable.
+			if resolverBackend != nil {
+				if sel, ok := call.Fn.(*ast.SelectorExpr); ok {
+					if ident, ok := sel.X.(*ast.Ident); ok {
+						ctx.ResolverBackend = resolverBackend(ident.Name)
+					}
+				}
+			}
+			behaviour.StaticCheck(ctx)
 		}
 	}
+}
+
+// resolverBackendFromResult looks up a let-bound variable name in the
+// eval result and returns its secret.Backend if it's an OpaqueVal
+// wrapping a secret backend.
+func (v *attributeCheckVisitor) resolverBackendFromResult(name string) secret.Backend {
+	if v.result == nil || v.result.Bindings == nil {
+		return nil
+	}
+	val, ok := v.result.Bindings[name]
+	if !ok {
+		return nil
+	}
+	opaque, ok := val.(*eval.OpaqueVal)
+	if !ok {
+		return nil
+	}
+	b, _ := opaque.Inner.(secret.Backend)
+	return b
 }
 
 // bindCallArgs maps parameter indices to argument expressions for a
@@ -281,21 +344,13 @@ func bindCallArgs(call *ast.CallExpr, ft *check.FuncType) map[int]ast.Expr {
 // during the static check pass; the caller wraps them into a single
 // diagnostic.Diagnostics for return through the standard pipeline.
 type linkContext struct {
-	backend secret.Backend
-	diags   diagnostic.Diagnostics
+	diags diagnostic.Diagnostics
 }
 
 func (lc *linkContext) Emit(d diagnostic.Diagnostic) {
 	lc.diags = append(lc.diags, d)
 }
 
-func (lc *linkContext) Secrets() secret.Backend {
-	return lc.backend
-}
-
-// nodeSourceSpan converts an AST node's token.Span into the
-// spec.SourceSpan shape used by the diagnostic pipeline, resolving
-// byte offsets to line/column via the source bytes.
 // isLiteral reports whether an expression is a compile-time constant.
 // Today that means a bare literal node. Once const-folding lands, this
 // will also accept folded expressions.

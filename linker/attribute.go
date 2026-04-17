@@ -9,6 +9,12 @@ import (
 	"scampi.dev/scampi/spec"
 )
 
+// ResolverBackendFunc extracts a secret.Backend from the eval result
+// for a given receiver expression (typically a let-bound variable).
+// Used by @secretkey to validate literal keys against the specific
+// resolver used in a UFCS get() call.
+type ResolverBackendFunc func(receiverName string) secret.Backend
+
 // AttributeBehaviour is the scampi-specific semantics attached to an
 // attribute type. Lang owns the schema (declared via `type @name { ... }`
 // in stubs); the linker owns what an attribute *means* at link time.
@@ -42,9 +48,14 @@ type AttributeBehaviour interface {
 // to validate a single annotated call site. Each StaticCheck hook
 // receives one of these per use of its attribute.
 type StaticCheckContext struct {
-	// Linker exposes diagnostic emission and the configured secrets
-	// backend.
+	// Linker exposes diagnostic emission.
 	Linker LinkContext
+
+	// ResolverBackend is the secret.Backend extracted from the
+	// resolver argument of the enclosing call, when available.
+	// Used by @secretkey to validate literal keys against the
+	// specific resolver rather than a global backend.
+	ResolverBackend secret.Backend
 
 	// AttrName is the fully qualified attribute type name (e.g.
 	// `std.@pattern`). Behaviours can use this for diagnostic
@@ -82,17 +93,11 @@ type StaticCheckContext struct {
 }
 
 // LinkContext is the linker-side context passed to an attribute's
-// StaticCheck hook. It exposes the secrets backend and a diagnostic
-// emitter without requiring the attribute to import the entire
-// linker package.
+// StaticCheck hook. It exposes a diagnostic emitter without
+// requiring the attribute to import the entire linker package.
 type LinkContext interface {
 	// Emit records a diagnostic with the standard pipeline.
 	Emit(d diagnostic.Diagnostic)
-
-	// Secrets returns the configured secrets backend, or nil if no
-	// backend has been configured. Attribute hooks like `@secretkey`
-	// use this to validate literal keys against known entries.
-	Secrets() secret.Backend
 }
 
 // BoundArg is a single argument bound to a declared field of an
@@ -162,7 +167,7 @@ func (r *AttributeRegistry) Names() []string {
 // AttrArgs map carried on each StaticCheckContext.
 func DefaultAttributes() *AttributeRegistry {
 	r := NewAttributeRegistry()
-	r.Register("std.@secretkey", SecretKeyAttribute{})
+	r.Register("secrets.@secretkey", SecretKeyAttribute{})
 	r.Register("std.@nonempty", NonEmptyAttribute{})
 	r.Register("std.@filemode", FileModeAttribute{})
 	r.Register("std.@pattern", PatternAttribute{})

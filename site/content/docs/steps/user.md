@@ -38,8 +38,8 @@ For `absent`, the step checks whether the user exists and removes it with
 `userdel` if so.
 
 The `password` field accepts a pre-hashed password string (as produced by
-`openssl passwd` or `mkpasswd`). Use `std.secret(...)` to avoid storing hashes
-in plain text.
+`openssl passwd` or `mkpasswd`). Use a secret resolver to avoid storing hashes
+in plain text — see [Secrets]({{< relref "../configuration#secrets" >}}).
 
 ## Examples
 
@@ -85,9 +85,13 @@ posix.user { name = "olduser", state = posix.UserState.absent }
 ### User with password from secret store
 
 ```scampi
+import "std/secrets"
+
+let age = secrets.from_age(path = "secrets.age.json")
+
 posix.user {
   name     = "deploy"
   shell    = "/bin/bash"
-  password = std.secret("deploy_password_hash")
+  password = age.get("deploy_password_hash")
 }
 ```

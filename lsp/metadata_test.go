@@ -37,7 +37,8 @@ func TestCatalogHasNonStepDecls(t *testing.T) {
 	c := NewCatalog()
 
 	names := []string{
-		"std.deploy", "std.env", "std.secret", "std.secrets",
+		"std.deploy", "std.env",
+		"secrets.from_age", "secrets.from_file", "secrets.get",
 		"local.target", "ssh.target",
 		"posix.source_local", "posix.source_inline", "posix.source_remote",
 		"posix.pkg_system", "posix.pkg_apt_repo", "posix.pkg_dnf_repo",
@@ -59,7 +60,7 @@ func TestCatalogModules(t *testing.T) {
 	c := NewCatalog()
 
 	modules := c.Modules()
-	want := []string{"container", "local", "posix", "rest", "ssh", "std", "test"}
+	want := []string{"container", "local", "posix", "rest", "secrets", "ssh", "std", "test"}
 	if len(modules) != len(want) {
 		t.Fatalf("got modules %v, want %v", modules, want)
 	}
