@@ -779,6 +779,7 @@ var keywords = []struct {
 	insert string
 	detail string
 }{
+	{"pub", "pub ", "Public visibility modifier"},
 	{"let", "let ", "Declare a constant binding"},
 	{"func", "func ", "Declare a function"},
 	{"decl", "decl ", "Declare a step or target type"},
