@@ -75,6 +75,12 @@ type Evaluator struct {
 	// userModules holds parsed user module ASTs from scampi.mod deps.
 	// Registered into the env at init time alongside std stubs.
 	userModules []UserModule
+
+	// modInternalMaps holds the full (pub + non-pub) symbol maps for
+	// user modules. Used by callFunc for intra-module visibility so
+	// non-pub helpers are callable within the same module. The env
+	// only stores the pub-filtered map for external callers.
+	modInternalMaps map[string]*MapVal
 }
 
 // Error is an eval-time error.
@@ -204,14 +210,15 @@ func (ev *Evaluator) registerStubInfo() {
 // FuncVals (with bodies for user-defined decls, without for stubs)
 // under the module's declaration name in a MapVal.
 func (ev *Evaluator) registerUserModules() {
+	if ev.modInternalMaps == nil {
+		ev.modInternalMaps = map[string]*MapVal{}
+	}
 	for _, um := range ev.userModules {
-		modMap := &MapVal{}
+		fullMap := &MapVal{}
+		pubMap := &MapVal{}
 		for _, d := range um.File.Decls {
 			switch d := d.(type) {
 			case *ast.FuncDecl:
-				if !d.Public {
-					continue
-				}
 				retName := ""
 				if d.Ret != nil {
 					if _, isGeneric := d.Ret.(*ast.GenericType); isGeneric {
@@ -238,11 +245,11 @@ func (ev *Evaluator) registerUserModules() {
 					fv.body = d.Body
 					fv.scope = ev.env
 				}
-				modMap.Set(d.Name.Name, fv)
-			case *ast.DeclDecl:
-				if !d.Public {
-					continue
+				fullMap.Set(d.Name.Name, fv)
+				if d.Public {
+					pubMap.Set(d.Name.Name, fv)
 				}
+			case *ast.DeclDecl:
 				declName := d.Name.Parts[0].Name
 				retName := ""
 				if d.Ret != nil {
@@ -266,19 +273,23 @@ func (ev *Evaluator) registerUserModules() {
 					fv.body = d.Body
 					fv.scope = ev.env
 				}
-				modMap.Set(declName, fv)
-			case *ast.EnumDecl:
-				if !d.Public {
-					continue
+				fullMap.Set(declName, fv)
+				if d.Public {
+					pubMap.Set(declName, fv)
 				}
+			case *ast.EnumDecl:
 				variantMap := &MapVal{}
 				for _, v := range d.Variants {
 					variantMap.Set(v.Name, &StringVal{V: v.Name})
 				}
-				modMap.Set(d.Name.Name, variantMap)
+				fullMap.Set(d.Name.Name, variantMap)
+				if d.Public {
+					pubMap.Set(d.Name.Name, variantMap)
+				}
 			}
 		}
-		ev.env.set(um.Name, modMap)
+		ev.env.set(um.Name, pubMap)
+		ev.modInternalMaps[um.Name] = fullMap
 	}
 }
 
@@ -1019,14 +1030,14 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 	// prefix), bind the module's sibling functions into the body
 	// scope so bare references like `get_nginx_proxy_hosts()` work
 	// within the module — same as Go's intra-package visibility.
+	// Uses modInternalMaps (full pub+non-pub set) rather than the
+	// env map (pub-only) so non-pub helpers are reachable.
 	if dot := strings.IndexByte(fv.QualName, '.'); dot > 0 {
 		modPrefix := fv.QualName[:dot]
-		if modVal, ok := ev.env.get(modPrefix); ok {
-			if mv, ok := modVal.(*MapVal); ok {
-				for i, k := range mv.Keys {
-					if sk, ok := k.(*StringVal); ok {
-						child.set(sk.V, mv.Values[i])
-					}
+		if mv, ok := ev.modInternalMaps[modPrefix]; ok {
+			for i, k := range mv.Keys {
+				if sk, ok := k.(*StringVal); ok {
+					child.set(sk.V, mv.Values[i])
 				}
 			}
 		}
