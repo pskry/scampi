@@ -308,6 +308,44 @@ func (ev *Evaluator) registerUserModules() {
 	}
 }
 
+// registerSiblingModules injects functions from sibling files (same
+// module, different file) directly into the top-level env. These are
+// callable by bare name — same-package visibility.
+func (ev *Evaluator) registerSiblingModules() {
+	for _, um := range ev.siblingModules {
+		for _, d := range um.File.Decls {
+			switch d := d.(type) {
+			case *ast.FuncDecl:
+				var params []string
+				var defaults []any
+				for _, p := range d.Params {
+					params = append(params, p.Name.Name)
+					if p.Default != nil {
+						defaults = append(defaults, p.Default)
+					} else {
+						defaults = append(defaults, nil)
+					}
+				}
+				ev.env.set(d.Name.Name, &FuncVal{
+					Name:     d.Name.Name,
+					Params:   params,
+					Defaults: defaults,
+					body:     d.Body,
+					scope:    ev.env,
+				})
+			case *ast.DeclDecl:
+				if d.Body != nil {
+					ev.env.set(d.Name.Parts[0].Name, &FuncVal{
+						Name:  d.Name.Parts[0].Name,
+						body:  d,
+						scope: ev.env,
+					})
+				}
+			}
+		}
+	}
+}
+
 // stubFunc describes a stub function extracted from a .scampi file.
 type stubFunc struct {
 	Name    string
