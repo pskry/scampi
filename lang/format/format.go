@@ -486,8 +486,20 @@ func (p *printer) block(b *ast.Block) {
 	p.write("{")
 	p.newline()
 	p.in()
+	p.stmtSequence(b.Stmts)
+	p.emitCommentsBefore(b.SrcSpan.End)
+	p.out()
+	p.writeIndent()
+	p.write("}")
+}
+
+// stmtSequence emits a slice of statements, detecting column groups
+// of consecutive one-line struct-lit expressions and aligning them.
+func (p *printer) stmtSequence(stmts []ast.Stmt) {
 	var prevEnd uint32
-	for i, s := range b.Stmts {
+	i := 0
+	for i < len(stmts) {
+		s := stmts[i]
 		target := s.Span().Start
 		if len(p.comments) > 0 && p.comments[0].Start < target {
 			target = p.comments[0].Start
@@ -495,13 +507,21 @@ func (p *printer) block(b *ast.Block) {
 		if i > 0 && p.hasBlankLineBetween(prevEnd, target) {
 			p.newline()
 		}
+
+		// Try to form a column group starting at i.
+		groupEnd := p.findColumnGroup(stmts, i)
+		if groupEnd > i+1 {
+			p.emitColumnGroup(stmts[i:groupEnd])
+			prevEnd = stmts[groupEnd-1].Span().End
+			i = groupEnd
+			continue
+		}
+
 		p.emitCommentsBefore(s.Span().Start)
 		p.stmt(s)
 		prevEnd = s.Span().End
+		i++
 	}
-	p.out()
-	p.writeIndent()
-	p.write("}")
 }
 
 // Expressions
@@ -628,13 +648,8 @@ func (p *printer) listLit(l *ast.ListLit) {
 	p.write("[")
 	p.newline()
 	p.in()
-	for _, item := range l.Items {
-		p.emitCommentsBefore(item.Span().Start)
-		p.writeIndent()
-		p.expr(item)
-		p.write(",")
-		p.newline()
-	}
+	p.listItemsAligned(l.Items)
+	p.emitCommentsBefore(l.SrcSpan.End)
 	p.out()
 	p.writeIndent()
 	p.write("]")
@@ -839,4 +854,256 @@ func (p *printer) hasBlankLineBetween(from, to uint32) bool {
 		}
 	}
 	return bytes.Contains(stripped, []byte("\n\n"))
+}
+
+// Column alignment for consecutive one-line blocks
+// -----------------------------------------------------------------------------
+
+// oneLineStructLit returns the StructLit if stmt is an ExprStmt wrapping
+// a one-line typed struct literal, or nil otherwise.
+func (p *printer) oneLineStructLit(s ast.Stmt) *ast.StructLit {
+	es, ok := s.(*ast.ExprStmt)
+	if !ok {
+		return nil
+	}
+	sl, ok := es.Expr.(*ast.StructLit)
+	if !ok || len(sl.Fields) == 0 || len(sl.Body) > 0 {
+		return nil
+	}
+	if p.spanContainsNewline(sl.SrcSpan) {
+		return nil
+	}
+	return sl
+}
+
+// columnFieldNames returns the field names of a struct lit.
+func columnFieldNames(sl *ast.StructLit) []string {
+	names := make([]string, len(sl.Fields))
+	for i, fi := range sl.Fields {
+		names[i] = fi.Name.Name
+	}
+	return names
+}
+
+// columnTypeName returns the type prefix for grouping (e.g. "rest.request").
+func columnTypeName(sl *ast.StructLit) string {
+	nt, ok := sl.Type.(*ast.NamedType)
+	if !ok {
+		return ""
+	}
+	var b strings.Builder
+	for _, part := range nt.Name.Parts {
+		if b.Len() > 0 {
+			b.WriteByte('.')
+		}
+		b.WriteString(part.Name)
+	}
+	return b.String()
+}
+
+// fieldsCompatible reports whether b's fields are prefix-compatible with a.
+// Items join a group when their shared leading field names match — extra
+// trailing fields on either side are fine.
+func fieldsCompatible(a, b []string) bool {
+	n := min(len(a), len(b))
+	for i := range n {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// findColumnGroup returns the exclusive end index of a column group
+// starting at idx. Returns idx+1 (no group) if fewer than 2 consecutive
+// one-line struct lits share the same signature with no intervening
+// blank lines or comments.
+func (p *printer) findColumnGroup(stmts []ast.Stmt, idx int) int {
+	first := p.oneLineStructLit(stmts[idx])
+	if first == nil {
+		return idx + 1
+	}
+	typeName := columnTypeName(first)
+	fields := columnFieldNames(first)
+	end := idx + 1
+	for end < len(stmts) {
+		if p.hasBlankLineBetween(stmts[end-1].Span().End, stmts[end].Span().Start) {
+			break
+		}
+		sl := p.oneLineStructLit(stmts[end])
+		if sl == nil || columnTypeName(sl) != typeName || !fieldsCompatible(fields, columnFieldNames(sl)) {
+			break
+		}
+		end++
+	}
+	return end
+}
+
+// emitColumnGroup formats a column group of one-line struct lits with
+// aligned field values.
+func (p *printer) emitColumnGroup(stmts []ast.Stmt) {
+	lits := make([]*ast.StructLit, len(stmts))
+	for i, s := range stmts {
+		lits[i] = p.oneLineStructLit(s)
+	}
+	maxWidths := p.computeColumnWidths(lits)
+
+	for _, s := range stmts {
+		sl := p.oneLineStructLit(s)
+		p.emitCommentsBefore(s.Span().Start)
+		p.writeIndent()
+		if sl.Type != nil {
+			p.typeExpr(sl.Type)
+			p.write(" ")
+		}
+		p.emitAlignedFields(sl.Fields, maxWidths)
+		p.newline()
+	}
+}
+
+// computeColumnWidths measures the max value width per column. Only
+// items where the column is NOT the last field contribute — the last
+// field is never padded, so its width shouldn't inflate padding for
+// items that have more fields after it.
+func (p *printer) computeColumnWidths(lits []*ast.StructLit) []int {
+	maxCols := 0
+	for _, sl := range lits {
+		if len(sl.Fields) > maxCols {
+			maxCols = len(sl.Fields)
+		}
+	}
+	maxWidths := make([]int, maxCols)
+	for _, sl := range lits {
+		for col, fi := range sl.Fields {
+			if col == len(sl.Fields)-1 {
+				continue // last field — never padded, skip
+			}
+			w := p.measureExpr(fi.Value)
+			if w > maxWidths[col] {
+				maxWidths[col] = w
+			}
+		}
+	}
+	return maxWidths
+}
+
+// emitAlignedFields writes a one-line struct body `{ f = v, f = v }` with
+// column-aligned values. Non-last fields are padded; the last field for
+// each item is written tight.
+func (p *printer) emitAlignedFields(fields []*ast.FieldInit, maxWidths []int) {
+	nFields := len(fields)
+	p.write("{ ")
+	for col, fi := range fields {
+		if col > 0 {
+			p.write(" ")
+		}
+		p.write(fi.Name.Name + " = ")
+		before := p.buf.Len()
+		p.expr(fi.Value)
+		w := p.buf.Len() - before
+		if col < nFields-1 {
+			p.write(",")
+			if col < len(maxWidths) {
+				if pad := maxWidths[col] - w; pad > 0 {
+					p.write(strings.Repeat(" ", pad))
+				}
+			}
+		}
+	}
+	p.write(" }")
+}
+
+// measureExpr formats an expression to a scratch buffer and returns its width.
+func (p *printer) measureExpr(e ast.Expr) int {
+	var scratch bytes.Buffer
+	tmp := &printer{src: p.src, buf: &scratch, indent: p.indent}
+	tmp.expr(e)
+	return scratch.Len()
+}
+
+// oneLineStructLitExpr is like oneLineStructLit but works on an Expr
+// directly (for list items, which are expressions not statements).
+func (p *printer) oneLineStructLitExpr(e ast.Expr) *ast.StructLit {
+	sl, ok := e.(*ast.StructLit)
+	if !ok || len(sl.Fields) == 0 || len(sl.Body) > 0 {
+		return nil
+	}
+	if p.spanContainsNewline(sl.SrcSpan) {
+		return nil
+	}
+	return sl
+}
+
+// listItemsAligned emits list items, detecting column groups of
+// consecutive one-line struct-lit elements and aligning them.
+func (p *printer) listItemsAligned(items []ast.Expr) {
+	var prevEnd uint32
+	i := 0
+	for i < len(items) {
+		if i > 0 && p.hasBlankLineBetween(prevEnd, items[i].Span().Start) {
+			p.newline()
+		}
+		// Try to form a column group of consecutive one-line struct lits.
+		groupEnd := p.findListColumnGroup(items, i)
+		if groupEnd > i+1 {
+			p.emitListColumnGroup(items[i:groupEnd])
+			prevEnd = items[groupEnd-1].Span().End
+			i = groupEnd
+			continue
+		}
+		p.emitCommentsBefore(items[i].Span().Start)
+		p.writeIndent()
+		p.expr(items[i])
+		p.write(",")
+		p.newline()
+		prevEnd = items[i].Span().End
+		i++
+	}
+}
+
+func (p *printer) findListColumnGroup(items []ast.Expr, idx int) int {
+	first := p.oneLineStructLitExpr(items[idx])
+	if first == nil {
+		return idx + 1
+	}
+	typeName := columnTypeName(first)
+	fields := columnFieldNames(first)
+	end := idx + 1
+	for end < len(items) {
+		if p.hasBlankLineBetween(items[end-1].Span().End, items[end].Span().Start) {
+			break
+		}
+		sl := p.oneLineStructLitExpr(items[end])
+		if sl == nil || columnTypeName(sl) != typeName || !fieldsCompatible(fields, columnFieldNames(sl)) {
+			break
+		}
+		end++
+	}
+	return end
+}
+
+func (p *printer) emitListColumnGroup(items []ast.Expr) {
+	lits := make([]*ast.StructLit, len(items))
+	for i, item := range items {
+		lits[i] = p.oneLineStructLitExpr(item)
+	}
+	maxWidths := p.computeColumnWidths(lits)
+
+	var prevEnd uint32
+	for i, item := range items {
+		if i > 0 && p.hasBlankLineBetween(prevEnd, item.Span().Start) {
+			p.newline()
+		}
+		sl := p.oneLineStructLitExpr(item)
+		p.emitCommentsBefore(item.Span().Start)
+		p.writeIndent()
+		if sl.Type != nil {
+			p.typeExpr(sl.Type)
+			p.write(" ")
+		}
+		p.emitAlignedFields(sl.Fields, maxWidths)
+		p.write(",")
+		p.newline()
+		prevEnd = item.Span().End
+	}
 }

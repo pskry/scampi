@@ -18,7 +18,7 @@ let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
 
 let team = [
   TeamMember { name = "alice", groups = ["wheel", "dev"] },
-  TeamMember { name = "bob", groups = ["dev"] },
+  TeamMember { name = "bob",   groups = ["dev"] },
 ]
 
 std.deploy(name = "users", targets = [vps]) {

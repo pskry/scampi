@@ -1,0 +1,47 @@
+module main
+
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = "http://localhost" }
+
+std.deploy(name = "test", targets = [api]) {
+  // Block statements: consecutive typed one-line struct lits
+  rest.request { method = "GET", path = "/short" }
+  rest.request { method = "POST", path = "/very/long/path" }
+  rest.request { method = "DELETE", path = "/medium" }
+
+  // Different type breaks the group
+  rest.request { method = "GET", path = "/a" }
+  rest.request { method = "PATCH", path = "/bb" }
+
+  // Comment breaks the group
+  rest.request { method = "GET",  path = "/first" }
+  // no break
+  rest.request { method = "POST", path = "/second-and-longer" }
+
+  // Single line — no group needed, no padding
+  rest.request { method = "GET", path = "/solo" }
+
+  // List items: anonymous struct lits
+  let clients = [
+    { name = "usw24", mac = "74:ac:b9:43:90:0f", ip = "10.10.1.10" },
+    { name = "usw-office", mac = "f4:e2:c6:52:ed:88", ip = "10.10.1.11" },
+    { name = "ap-kitchen", mac = "74:ac:b9:29:d8:79", ip = "10.10.1.20" },
+    // Servers (VLAN 2)
+    { name = "asgard", mac = "78:72:64:41:38:6a", ip = "10.10.2.2", dns = "asgard.srv.skrynet.dk" },
+    { name = "midgard", mac = "b0:0c:d1:6f:30:1f", ip = "10.10.2.10", dns = "midgard.srv.skrynet.dk" },
+    { name = "loki", mac = "be:ef:00:00:02:00", ip = "10.10.2.20" },
+    // Comment without whitesapce does not break
+    { name = "ap-office", mac = "74:ac:b9:29:de:07", ip = "10.10.1.21" },
+    { name = "ap-cp", mac = "74:ac:b9:29:de:fb", ip = "10.10.1.22" },
+    // Comment at end of list stays put
+  ]
+
+  // List items: different field sets don't align
+  let mixed = [
+    { a = 1, b = 2 },
+    { x = 100 },
+  ]
+  // Comment at end of block stays put
+}

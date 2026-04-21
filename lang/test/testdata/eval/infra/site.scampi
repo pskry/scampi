@@ -21,7 +21,7 @@ std.deploy(name = "site", targets = [vps]) {
   posix.pkg { packages = ["caddy"], source = posix.pkg_system {} }
 
   posix.dir { path = "/var/www/scampi.dev", perm = "0755" }
-  posix.dir { path = "/etc/caddy", perm = "0755", owner = "root", group = "root" }
+  posix.dir { path = "/etc/caddy",          perm = "0755", owner = "root", group = "root" }
 
   posix.copy {
     src       = posix.source_local { path = "./files/Caddyfile" }

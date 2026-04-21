@@ -23,7 +23,7 @@ type TeamMember {
 
 let team = [
   TeamMember { name = "alice", groups = ["wheel", "dev"], admin = true },
-  TeamMember { name = "bob", groups = ["dev"] },
+  TeamMember { name = "bob",   groups = ["dev"] },
 ]
 
 func base_packages(extra: list[string] = []) list[string] {
