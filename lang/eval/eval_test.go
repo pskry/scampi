@@ -670,3 +670,51 @@ std.deploy(name = "t", targets = [host]) {
 		t.Fatal("expected at least the host binding and deploy expr")
 	}
 }
+
+// Struct indexing
+// -----------------------------------------------------------------------------
+
+func TestEvalStructIndexAccess(t *testing.T) {
+	r := evalSrc(t, `
+module main
+
+let s = { name = "alice", age = 30 }
+let n = s["name"]
+let a = s["age"]
+let missing = s["nope"]
+`)
+	if v, ok := r.Bindings["n"].(*StringVal); !ok || v.V != "alice" {
+		t.Fatalf("expected n = alice, got %v", r.Bindings["n"])
+	}
+	if v, ok := r.Bindings["a"].(*IntVal); !ok || v.V != 30 {
+		t.Fatalf("expected a = 30, got %v", r.Bindings["a"])
+	}
+	if _, ok := r.Bindings["missing"].(*NoneVal); !ok {
+		t.Fatalf("expected missing = none, got %T", r.Bindings["missing"])
+	}
+}
+
+func TestEvalStructIndexInComprehension(t *testing.T) {
+	r := evalSrc(t, `
+module main
+
+let people = [
+  { name = "alice", role = "admin" },
+  { name = "bob", role = "user" },
+]
+let names = [p["name"] for p in people]
+`)
+	v, ok := r.Bindings["names"].(*ListVal)
+	if !ok {
+		t.Fatalf("expected ListVal, got %T", r.Bindings["names"])
+	}
+	if len(v.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(v.Items))
+	}
+	if s, ok := v.Items[0].(*StringVal); !ok || s.V != "alice" {
+		t.Fatalf("expected alice, got %v", v.Items[0])
+	}
+	if s, ok := v.Items[1].(*StringVal); !ok || s.V != "bob" {
+		t.Fatalf("expected bob, got %v", v.Items[1])
+	}
+}

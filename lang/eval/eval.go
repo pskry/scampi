@@ -1271,6 +1271,12 @@ func (ev *Evaluator) evalIndex(idx *ast.IndexExpr) Value {
 				return v
 			}
 		}
+	case *StructVal:
+		if sk, ok := key.(*StringVal); ok {
+			if v, found := c.Fields[sk.V]; found {
+				return v
+			}
+		}
 	}
 	return &NoneVal{}
 }

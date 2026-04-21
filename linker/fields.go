@@ -187,7 +187,11 @@ func setStructVal(dst reflect.Value, sv *eval.StructVal, lc *linkConfig) error {
 	case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(target.Healthcheck{}):
 		dst.Set(reflect.ValueOf(convertHealthcheck(sv)))
 	case dst.Kind() == reflect.Interface:
-		dst.Set(reflect.ValueOf(sv))
+		if dstType == reflect.TypeFor[any]() {
+			dst.Set(reflect.ValueOf(structValToMap(sv)))
+		} else {
+			dst.Set(reflect.ValueOf(sv))
+		}
 	case dst.Kind() == reflect.Pointer && dst.IsNil():
 		ptr := reflect.New(dstType.Elem())
 		if err := mapFields(sv.Fields, ptr.Interface(), lc); err != nil {
@@ -322,6 +326,14 @@ func evalToGo(v eval.Value) any {
 		return sv
 	}
 	return nil
+}
+
+func structValToMap(sv *eval.StructVal) map[string]any {
+	m := make(map[string]any, len(sv.Fields))
+	for k, v := range sv.Fields {
+		m[k] = evalToGo(v)
+	}
+	return m
 }
 
 func evalMapToGo(mv *eval.MapVal) map[string]any {

@@ -1736,3 +1736,445 @@ std.deploy(name = "test", targets = [api]) {
 		t.Fatal("expected at least one deploy block")
 	}
 }
+
+// rest.resource_set step
+// -----------------------------------------------------------------------------
+
+func TestRestResourceSet_CreatesMissingItems(t *testing.T) {
+	var posts [][]byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/users":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data": []}`))
+		case r.Method == "POST" && r.URL.Path == "/users":
+			body, _ := io.ReadAll(r.Body)
+			posts = append(posts, body)
+			w.WriteHeader(http.StatusCreated)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = [
+      {"mac": "aa:bb", "name": "alpha"},
+      {"mac": "cc:dd", "name": "beta"},
+    ]
+    missing = rest.request { method = "POST", path = "/users" }
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	if len(posts) != 2 {
+		t.Fatalf("expected 2 POSTs, got %d", len(posts))
+	}
+	if rec.CountChangedOps() != 1 {
+		t.Fatalf("expected 1 changed op, got %d", rec.CountChangedOps())
+	}
+}
+
+func TestRestResourceSet_NoopWhenConverged(t *testing.T) {
+	var requestCount atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		if r.Method == "GET" && r.URL.Path == "/users" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data": [{"mac": "aa:bb", "name": "alpha"}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = [{"mac": "aa:bb", "name": "alpha"}]
+    missing = rest.request { method = "POST", path = "/users" }
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	if rec.CountChangedOps() != 0 {
+		t.Fatalf("expected 0 changed ops, got %d", rec.CountChangedOps())
+	}
+	// Only the query GET should have been made.
+	if requestCount.Load() != 1 {
+		t.Fatalf("expected 1 request (query only), got %d", requestCount.Load())
+	}
+}
+
+func TestRestResourceSet_UpdatesOnDrift(t *testing.T) {
+	var puts [][]byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/users":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data": [{"_id": "123", "mac": "aa:bb", "name": "old-name"}]}`))
+		case r.Method == "PUT":
+			body, _ := io.ReadAll(r.Body)
+			puts = append(puts, body)
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = [{"mac": "aa:bb", "name": "new-name"}]
+    missing = rest.request { method = "POST", path = "/users" }
+    found = rest.request { method = "PUT", path = "/users/{id}" }
+    bindings = {"id": rest.jq { expr = "._id" }}
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	if len(puts) != 1 {
+		t.Fatalf("expected 1 PUT, got %d", len(puts))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(puts[0], &body); err != nil {
+		t.Fatalf("PUT body not valid JSON: %v", err)
+	}
+	if body["name"] != "new-name" {
+		t.Fatalf("expected name=new-name, got %v", body["name"])
+	}
+}
+
+func TestRestResourceSet_RemovesOrphans(t *testing.T) {
+	var orphanPuts [][]byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/users":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data": [{"_id": "999", "mac": "zz:zz", "name": "stale", "use_fixedip": true}]}`))
+		case r.Method == "PUT":
+			body, _ := io.ReadAll(r.Body)
+			orphanPuts = append(orphanPuts, body)
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = []
+    orphan = rest.request { method = "PUT", path = "/users/{id}" }
+    bindings = {"id": rest.jq { expr = "._id" }}
+    orphan_state = {"use_fixedip": false}
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	if len(orphanPuts) != 1 {
+		t.Fatalf("expected 1 orphan PUT, got %d", len(orphanPuts))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(orphanPuts[0], &body); err != nil {
+		t.Fatalf("orphan PUT body not valid JSON: %v", err)
+	}
+	if body["use_fixedip"] != false {
+		t.Fatalf("expected use_fixedip=false, got %v", body["use_fixedip"])
+	}
+}
+
+func TestRestResourceSet_OrphanOmitted_ExtrasIgnored(t *testing.T) {
+	var requestCount atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		if r.Method == "GET" && r.URL.Path == "/users" {
+			w.Header().Set("Content-Type", "application/json")
+			// Remote has an extra item not in declared set.
+			_, _ = w.Write([]byte(`{"data": [
+				{"mac": "aa:bb", "name": "alpha"},
+				{"mac": "zz:zz", "name": "extra"}
+			]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = [{"mac": "aa:bb", "name": "alpha"}]
+    missing = rest.request { method = "POST", path = "/users" }
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	if rec.CountChangedOps() != 0 {
+		t.Fatalf("expected 0 changed ops (extra ignored), got %d", rec.CountChangedOps())
+	}
+}
+
+func TestRestResourceSet_Mixed(t *testing.T) {
+	var posts, puts, orphanPuts int
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/users":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data": [
+				{"_id": "1", "mac": "aa:bb", "name": "old-name"},
+				{"_id": "2", "mac": "zz:zz", "name": "stale", "use_fixedip": true}
+			]}`))
+		case r.Method == "POST" && r.URL.Path == "/users":
+			posts++
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == "PUT" && r.URL.Path == "/users/1":
+			puts++
+			w.WriteHeader(http.StatusOK)
+		case r.Method == "PUT" && r.URL.Path == "/users/2":
+			orphanPuts++
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = [
+      {"mac": "aa:bb", "name": "new-name"},
+      {"mac": "cc:dd", "name": "fresh"},
+    ]
+    missing = rest.request { method = "POST", path = "/users" }
+    found = rest.request { method = "PUT", path = "/users/{id}" }
+    orphan = rest.request { method = "PUT", path = "/users/{id}" }
+    bindings = {"id": rest.jq { expr = "._id" }}
+    orphan_state = {"use_fixedip": false}
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	if posts != 1 {
+		t.Fatalf("expected 1 POST (missing), got %d", posts)
+	}
+	if puts != 1 {
+		t.Fatalf("expected 1 PUT (drift), got %d", puts)
+	}
+	if orphanPuts != 1 {
+		t.Fatalf("expected 1 orphan PUT, got %d", orphanPuts)
+	}
+}
+
+func TestRestResourceSet_ConfigLoads(t *testing.T) {
+	cfgStr := `
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = "http://localhost" }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = [{"mac": "aa:bb", "name": "test"}]
+    missing = rest.request { method = "POST", path = "/users" }
+    found = rest.request { method = "PUT", path = "/users/{id}" }
+    orphan = rest.request { method = "PUT", path = "/users/{id}" }
+    bindings = {"id": rest.jq { expr = "._id" }}
+    orphan_state = {"use_fixedip": false}
+  }
+}
+`
+	cfg := loadConfig(t, cfgStr)
+	if len(cfg.Deploy) == 0 {
+		t.Fatal("expected at least one deploy block")
+	}
+}
+
+func TestRestResourceSet_StructLiteralItems(t *testing.T) {
+	var posts [][]byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/users":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data": []}`))
+		case r.Method == "POST" && r.URL.Path == "/users":
+			body, _ := io.ReadAll(r.Body)
+			posts = append(posts, body)
+			w.WriteHeader(http.StatusCreated)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	// Exercises the real-world pattern: struct literals in a list,
+	// indexed with c["field"] in a comprehension to build map items.
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+let clients = [
+  { name = "alpha", mac = "aa:bb" },
+  { name = "beta",  mac = "cc:dd" },
+]
+
+let items = [{"mac": c["mac"], "name": c["name"]} for c in clients]
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = items
+    missing = rest.request { method = "POST", path = "/users" }
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	if len(posts) != 2 {
+		t.Fatalf("expected 2 POSTs, got %d", len(posts))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(posts[0], &body); err != nil {
+		t.Fatalf("POST body not valid JSON: %v", err)
+	}
+	if body["mac"] == nil {
+		t.Fatal("mac field is nil -- struct index access broken")
+	}
+}
