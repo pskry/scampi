@@ -40,14 +40,15 @@ type categorizedItem struct {
 
 type resourceSetOp struct {
 	sharedops.BaseOp
-	query       *RequestConfig
-	keyJQ       *JQCheck
-	items       []map[string]any
-	missing     *RequestConfig
-	found       *RequestConfig
-	orphan      *RequestConfig
-	bindings    map[string]*JQBinding
-	orphanState map[string]any
+	query        *RequestConfig
+	keyJQ        *JQCheck
+	orphanFilter *JQCheck
+	items        []map[string]any
+	missing      *RequestConfig
+	found        *RequestConfig
+	orphan       *RequestConfig
+	bindings     map[string]*JQBinding
+	orphanState  map[string]any
 
 	// Set during Check, consumed during Execute.
 	plan        []categorizedItem
@@ -158,6 +159,9 @@ func (op *resourceSetOp) Check(
 		for key, remote := range remoteByKey {
 			if matchedKeys[key] {
 				continue
+			}
+			if op.orphanFilter != nil && extractJQ(op.orphanFilter.Compiled, remote) == nil {
+				continue // filter doesn't match — not an orphan
 			}
 			op.plan = append(op.plan, categorizedItem{
 				key:      key,

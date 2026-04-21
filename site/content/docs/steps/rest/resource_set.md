@@ -30,18 +30,19 @@ rest.resource_set {
 
 ## Fields
 
-| Field          | Type                      | Required | Description                                             |
-| -------------- | ------------------------- | :------: | ------------------------------------------------------- |
-| `query`        | `rest.request`            |    ✓     | Request to fetch the full remote set                    |
-| `key`          | `rest.Check`              |    ✓     | jq expression to extract the match key from each item   |
-| `items`        | list\[map\[string, any]]  |          | Desired set of items (empty = everything is an orphan)  |
-| `missing`      | `rest.request?`           |          | Request for items in declared set but not remote        |
-| `found`        | `rest.request?`           |          | Request for items in both sets with drift               |
-| `orphan`       | `rest.request?`           |          | Request for items in remote but not declared            |
-| `bindings`     | map\[string, rest.Check]? |          | Per-item jq bindings for path interpolation             |
-| `orphan_state` | map\[string, any]?        |          | State to send as body for orphan items                  |
-| `desc`         | string?                   |          | Human-readable description                              |
-| `on_change`    | list\[Step]               |          | Steps to trigger when any item changes                  |
+| Field           | Type                      | Required | Description                                            |
+| --------------- | ------------------------- | :------: | ------------------------------------------------------ |
+| `query`         | `rest.request`            |    ✓     | Request to fetch the full remote set                   |
+| `key`           | `rest.Check`              |    ✓     | jq expression to extract the match key from each item  |
+| `items`         | list\[map\[string, any]]  |          | Desired set of items (empty = everything is an orphan) |
+| `missing`       | `rest.request?`           |          | Request for items in declared set but not remote       |
+| `found`         | `rest.request?`           |          | Request for items in both sets with drift              |
+| `orphan`        | `rest.request?`           |          | Request for items in remote but not declared           |
+| `orphan_filter` | `rest.Check?`             |          | jq filter narrowing which unmatched items are orphans  |
+| `bindings`      | map\[string, rest.Check]? |          | Per-item jq bindings for path interpolation            |
+| `orphan_state`  | map\[string, any]?        |          | State to send as body for orphan items                 |
+| `desc`          | string?                   |          | Human-readable description                             |
+| `on_change`     | list\[Step]               |          | Steps to trigger when any item changes                 |
 
 At least one of `missing`, `found`, or `orphan` is required.
 
@@ -116,6 +117,27 @@ orphan = rest.request { method = "DELETE", path = "/api/users/{id}" }
 When `orphan` is omitted, extra remote items are left alone. This gives
 additive-only behavior — you can add and update items without touching
 anything else.
+
+### orphan_filter
+
+When the query returns a wide set (e.g. all users, not just those with
+fixed IPs), `orphan_filter` narrows which unmatched remote items count
+as orphans. Only items where the jq expression produces a truthy result
+trigger the orphan request. Items that don't match the filter are left
+alone.
+
+```scampi
+// Wide query to match all MACs correctly
+query = rest.request {
+  method = "GET"
+  path   = "/api/s/default/rest/user"
+  check  = rest.jq { expr = ".data[]" }
+}
+// Only orphan items that have a fixed IP — ignore plain DHCP clients
+orphan_filter = rest.jq { expr = "select(.use_fixedip == true)" }
+```
+
+Without `orphan_filter`, all unmatched remote items are orphaned.
 
 ## Examples
 

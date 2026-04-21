@@ -12,23 +12,25 @@ type (
 	ResourceSetConfig struct {
 		_ struct{} `summary:"Declarative REST set reconciliation with key-based matching"`
 
-		Desc        string                `step:"Human-readable description" optional:"true"`
-		Query       *RequestConfig        `step:"Query to fetch the full remote set"`
-		Key         CheckConfig           `step:"jq expression to extract match key from each item"`
-		Items       []any                 `step:"Desired set of items" optional:"true"`
-		Missing     *RequestConfig        `step:"Request for items in declared set but not remote" optional:"true"`
-		Found       *RequestConfig        `step:"Request for items in both sets with drift" optional:"true"`
-		Orphan      *RequestConfig        `step:"Request for items in remote but not declared" optional:"true"`
-		Bindings    map[string]*JQBinding `step:"Per-item bindings from matched remote object" optional:"true"`
-		OrphanState map[string]any        `step:"State to send for orphan items" optional:"true"`
+		Desc         string                `step:"Human-readable description" optional:"true"`
+		Query        *RequestConfig        `step:"Query to fetch the full remote set"`
+		Key          CheckConfig           `step:"jq expression to extract match key from each item"`
+		Items        []any                 `step:"Desired set of items" optional:"true"`
+		Missing      *RequestConfig        `step:"Request for items in declared set but not remote" optional:"true"`
+		Found        *RequestConfig        `step:"Request for items in both sets with drift" optional:"true"`
+		Orphan       *RequestConfig        `step:"Request for items in remote but not declared" optional:"true"`
+		OrphanFilter CheckConfig           `step:"jq filter for orphan narrowing" optional:"true"`
+		Bindings     map[string]*JQBinding `step:"Per-item bindings from matched remote object" optional:"true"`
+		OrphanState  map[string]any        `step:"State to send for orphan items" optional:"true"`
 	}
 
 	resourceSetAction struct {
-		desc  string
-		step  spec.StepInstance
-		cfg   *ResourceSetConfig
-		keyJQ *JQCheck
-		items []map[string]any
+		desc           string
+		step           spec.StepInstance
+		cfg            *ResourceSetConfig
+		keyJQ          *JQCheck
+		orphanFilterJQ *JQCheck
+		items          []map[string]any
 	}
 )
 
@@ -97,13 +99,25 @@ func (ResourceSet) Plan(step spec.StepInstance) (spec.Action, error) {
 	if len(cfg.Bindings) > 0 && cfg.Found == nil && cfg.Orphan == nil {
 		return nil, invalid("rest.resource_set: bindings require a found or orphan request")
 	}
+	var orphanFilterJQ *JQCheck
+	if cfg.OrphanFilter != nil {
+		var ok bool
+		orphanFilterJQ, ok = cfg.OrphanFilter.(*JQCheck)
+		if !ok {
+			return nil, invalid(
+				"rest.resource_set: orphan_filter must be rest.jq, got %s",
+				cfg.OrphanFilter.Kind(),
+			)
+		}
+	}
 
 	return &resourceSetAction{
-		desc:  cfg.Desc,
-		step:  step,
-		cfg:   cfg,
-		keyJQ: keyJQ,
-		items: items,
+		desc:           cfg.Desc,
+		step:           step,
+		cfg:            cfg,
+		keyJQ:          keyJQ,
+		orphanFilterJQ: orphanFilterJQ,
+		items:          items,
 	}, nil
 }
 
@@ -112,14 +126,15 @@ func (a *resourceSetAction) Kind() string { return "rest.resource_set" }
 
 func (a *resourceSetAction) Ops() []spec.Op {
 	op := &resourceSetOp{
-		query:       a.cfg.Query,
-		keyJQ:       a.keyJQ,
-		items:       a.items,
-		missing:     a.cfg.Missing,
-		found:       a.cfg.Found,
-		orphan:      a.cfg.Orphan,
-		bindings:    a.cfg.Bindings,
-		orphanState: a.cfg.OrphanState,
+		query:        a.cfg.Query,
+		keyJQ:        a.keyJQ,
+		orphanFilter: a.orphanFilterJQ,
+		items:        a.items,
+		missing:      a.cfg.Missing,
+		found:        a.cfg.Found,
+		orphan:       a.cfg.Orphan,
+		bindings:     a.cfg.Bindings,
+		orphanState:  a.cfg.OrphanState,
 	}
 	op.SetAction(a)
 	return []spec.Op{op}

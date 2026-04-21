@@ -120,14 +120,15 @@ pub decl resource(
 // missing, drifted, and orphaned entries. Config becomes the truth —
 // remove a line, next apply cleans up the remote side.
 pub decl resource_set(
-  query:        std.Step
-  key:          Check
-  items:        list[any] = []
-  missing:      std.Step?
-  found:        std.Step?
-  orphan:       std.Step?
-  bindings:     map[string, Check]?
-  orphan_state: map[string, any]?
-  desc:         string?
-  on_change:    list[std.Step] = []
+  query:         std.Step
+  key:           Check
+  items:         list[any] = []
+  missing:       std.Step?
+  found:         std.Step?
+  orphan:        std.Step?
+  orphan_filter: Check?
+  bindings:      map[string, Check]?
+  orphan_state:  map[string, any]?
+  desc:          string?
+  on_change:     list[std.Step] = []
 ) std.Step

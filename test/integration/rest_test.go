@@ -2178,3 +2178,115 @@ std.deploy(name = "test", targets = [api]) {
 		t.Fatal("mac field is nil -- struct index access broken")
 	}
 }
+
+func TestRestResourceSet_OrphanFilter_MatchingOrphaned(t *testing.T) {
+	var orphanPuts [][]byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/users":
+			w.Header().Set("Content-Type", "application/json")
+			// Two remote items: one with fixed IP (should be orphaned),
+			// one plain DHCP client (should be ignored by filter).
+			_, _ = w.Write([]byte(`{"data": [
+				{"_id": "1", "mac": "aa:aa", "use_fixedip": true},
+				{"_id": "2", "mac": "bb:bb", "use_fixedip": false}
+			]}`))
+		case r.Method == "PUT":
+			body, _ := io.ReadAll(r.Body)
+			orphanPuts = append(orphanPuts, body)
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = []
+    orphan = rest.request { method = "PUT", path = "/users/{id}" }
+    orphan_filter = rest.jq { expr = "select(.use_fixedip == true)" }
+    bindings = {"id": rest.jq { expr = "._id" }}
+    orphan_state = {"use_fixedip": false}
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	// Only the fixed-IP user should be orphaned, not the DHCP client.
+	if len(orphanPuts) != 1 {
+		t.Fatalf("expected 1 orphan PUT, got %d", len(orphanPuts))
+	}
+}
+
+func TestRestResourceSet_OrphanFilter_NoFilterOrphansAll(t *testing.T) {
+	var orphanPuts int
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/users":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data": [
+				{"_id": "1", "mac": "aa:aa", "use_fixedip": true},
+				{"_id": "2", "mac": "bb:bb", "use_fixedip": false}
+			]}`))
+		case r.Method == "PUT":
+			orphanPuts++
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	cfgStr := fmt.Sprintf(`
+module main
+import "std"
+import "std/rest"
+
+let api = rest.target { name = "api", base_url = %q }
+
+std.deploy(name = "test", targets = [api]) {
+  rest.resource_set {
+    desc = "users"
+    query = rest.request {
+      method = "GET"
+      path = "/users"
+      check = rest.jq { expr = ".data[]" }
+    }
+    key = rest.jq { expr = ".mac" }
+    items = []
+    orphan = rest.request { method = "PUT", path = "/users/{id}" }
+    bindings = {"id": rest.jq { expr = "._id" }}
+    orphan_state = {"use_fixedip": false}
+  }
+}
+`, srv.URL)
+
+	rec, err := applyREST(t, cfgStr, srv.URL)
+	if err != nil {
+		t.Fatalf("Apply failed: %v\n%s", err, rec)
+	}
+	// No orphan_filter — both remote items should be orphaned.
+	if orphanPuts != 2 {
+		t.Fatalf("expected 2 orphan PUTs, got %d", orphanPuts)
+	}
+}
