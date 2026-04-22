@@ -19,8 +19,42 @@ pub type Tag {
 // vv = SPICE (remote-viewer), html5 = noVNC, xtermjs = xterm.js
 pub enum Console { vv, html5, xtermjs }
 
+// LXC container state.
+pub enum LxcState { running, stopped, absent }
+
+// OS template with storage pool and filename.
+pub type Template {
+  storage: string = "local"
+  name:    string
+}
+
+// Network configuration for a single LXC interface (net0).
+pub type LxcNet {
+  bridge: string = "vmbr0"
+  ip:     string
+  gw:     string?
+}
+
 // Steps
 // -----------------------------------------------------------------------------
+
+// LXC container lifecycle on a PVE host. Creates the container
+// from a template if it doesn't exist, ensures it matches the
+// desired running state.
+pub decl lxc(
+  id:       int
+  node:     string
+  template: Template
+  hostname: string
+  state:    LxcState = LxcState.running
+  cores:    int = 1
+  memory:   int = 512
+  storage:  string = "local-zfs"
+  size:     string = "8G"
+  network:  LxcNet
+  desc:     string?
+  on_change: list[std.Step] = []
+) std.Step
 
 // Declarative datacenter configuration. Renders and writes
 // /etc/pve/datacenter.cfg from the declared fields.

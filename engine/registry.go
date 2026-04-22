@@ -13,6 +13,7 @@ import (
 	"scampi.dev/scampi/step/group"
 	"scampi.dev/scampi/step/mount"
 	"scampi.dev/scampi/step/pkg"
+	"scampi.dev/scampi/step/pve/lxc"
 	steprest "scampi.dev/scampi/step/rest"
 	"scampi.dev/scampi/step/run"
 	"scampi.dev/scampi/step/service"
@@ -43,6 +44,7 @@ func NewRegistry() *Registry {
 		steprest.Request{},
 		steprest.Resource{},
 		steprest.ResourceSet{},
+		lxc.LXC{},
 		run.Run{},
 		service.Service{},
 		sysctl.Sysctl{},
