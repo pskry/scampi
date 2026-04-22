@@ -124,6 +124,36 @@ pub func range(n: int) list[int]
 // output, the ref resolves to none.
 pub func ref(step: Step, expr: string) any
 
+// Utility functions
+// -----------------------------------------------------------------------------
+
+// join a list of strings with a separator
+//
+//   std.join(["a", "b", "c"], ";")   // "a;b;c"
+//   std.join(["a", "b", "c"])        // "a b c"
+pub func join(items: list[string], sep: string = " ") string {
+  let acc = {"v": ""}
+  for item in items {
+    if acc["v"] != "" {
+      acc["v"] = acc["v"] + sep + item
+    } else {
+      acc["v"] = item
+    }
+  }
+  return acc["v"]
+}
+
+// trim a prefix from a string
+//
+//   std.trim_prefix("#2a5a8e", "#")   // "2a5a8e"
+//   std.trim_prefix("hello", "#")     // "hello"
+pub func trim_prefix(s: string, prefix: string) string
+
+// trim a suffix from a string
+//
+//   std.trim_suffix("file.bak", ".bak")   // "file"
+pub func trim_suffix(s: string, suffix: string) string
+
 // Deploy configuration
 // -----------------------------------------------------------------------------
 

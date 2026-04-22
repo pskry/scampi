@@ -123,7 +123,9 @@ func (m *MemTarget) WriteFile(_ context.Context, path string, data []byte) error
 	copy(cp, data)
 
 	m.Files[path] = cp
-	m.Modes[path] = 0o644
+	if _, exists := m.Modes[path]; !exists {
+		m.Modes[path] = 0o644
+	}
 	m.ModTimes[path] = time.Now()
 	// Set default owner so chown to the same owner is a no-op (matches SSH behavior)
 	if _, exists := m.Owners[path]; !exists {

@@ -60,7 +60,7 @@ func TestCatalogModules(t *testing.T) {
 	c := NewCatalog()
 
 	modules := c.Modules()
-	want := []string{"container", "local", "posix", "rest", "secrets", "ssh", "std", "test"}
+	want := []string{"container", "local", "posix", "pve", "rest", "secrets", "ssh", "std", "test"}
 	if len(modules) != len(want) {
 		t.Fatalf("got modules %v, want %v", modules, want)
 	}

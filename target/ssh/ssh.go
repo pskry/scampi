@@ -160,6 +160,7 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	}
 	sshTgt.SvcBackend = svcmgr.Detect(detectCmd)
 	sshTgt.CtrBackend = ctrmgr.Detect(detectCmd)
+	sshTgt.HasPVE = detectAllCmds(detectCmd, "pct", "qm", "pvesm")
 
 	// Privilege escalation detection.
 	if result, err := sshTgt.RunCommand(ctx, "id -u"); err == nil {
@@ -168,6 +169,16 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	sshTgt.Escalate = posix.DetectEscalation(ctx, sshTgt.RunCommand, sshTgt.IsRoot)
 
 	return sshTgt, nil
+}
+
+func detectAllCmds(run func(string) (int, error), cmds ...string) bool {
+	for _, cmd := range cmds {
+		code, err := run("command -v " + cmd)
+		if err != nil || code != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func buildSSHConfig(

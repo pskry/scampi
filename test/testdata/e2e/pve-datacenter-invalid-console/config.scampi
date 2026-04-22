@@ -1,0 +1,13 @@
+module main
+
+import "std"
+import "std/pve"
+import "std/local"
+
+let host = local.target { name = "local" }
+
+std.deploy(name = "test", targets = [host]) {
+  pve.datacenter {
+    console = pve.Console.yolo
+  }
+}

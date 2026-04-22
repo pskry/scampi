@@ -234,9 +234,12 @@ func (ev *Evaluator) registerStubInfo() {
 		// (same-module visibility).
 		if len(bodied) > 0 {
 			modScope := newEnv(ev.env)
-			for _, sf := range info.funcs[modName] {
-				if v, ok := modMap.Get(sf.Name); ok {
-					modScope.set(sf.Name, v)
+			// Inject all module symbols (funcs, enums, types) as bare
+			// names so same-module references work — including enum
+			// defaults like Console.xtermjs.
+			for i, k := range modMap.Keys {
+				if sk, ok := k.(*StringVal); ok {
+					modScope.set(sk.V, modMap.Values[i])
 				}
 			}
 			for _, fv := range bodied {
@@ -1019,6 +1022,32 @@ func (ev *Evaluator) callRange(positional []Value, kwargs map[string]Value) Valu
 	return &ListVal{Items: items}
 }
 
+func (ev *Evaluator) callTrimPrefix(positional []Value, kwargs map[string]Value) Value {
+	s := stringArg(positional, kwargs, "s", 0)
+	prefix := stringArg(positional, kwargs, "prefix", 1)
+	return &StringVal{V: strings.TrimPrefix(s, prefix)}
+}
+
+func (ev *Evaluator) callTrimSuffix(positional []Value, kwargs map[string]Value) Value {
+	s := stringArg(positional, kwargs, "s", 0)
+	suffix := stringArg(positional, kwargs, "suffix", 1)
+	return &StringVal{V: strings.TrimSuffix(s, suffix)}
+}
+
+func stringArg(positional []Value, kwargs map[string]Value, name string, idx int) string {
+	if idx < len(positional) {
+		if sv, ok := positional[idx].(*StringVal); ok {
+			return sv.V
+		}
+	}
+	if v, ok := kwargs[name]; ok {
+		if sv, ok := v.(*StringVal); ok {
+			return sv.V
+		}
+	}
+	return ""
+}
+
 func (ev *Evaluator) callRef(positional []Value, kwargs map[string]Value) Value {
 	var step *StructVal
 	var expr string
@@ -1112,6 +1141,10 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 			return ev.callRange(positional, kwargs)
 		case "ref":
 			return ev.callRef(positional, kwargs)
+		case "trim_prefix":
+			return ev.callTrimPrefix(positional, kwargs)
+		case "trim_suffix":
+			return ev.callTrimSuffix(positional, kwargs)
 		}
 
 		if strings.HasPrefix(fv.RetType, "block[") && strings.HasSuffix(fv.RetType, "]") {
@@ -1148,6 +1181,8 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 			}
 		}
 	}
+	prev := ev.env
+	ev.env = child
 	for i, name := range fv.Params {
 		if v, ok := kwargs[name]; ok {
 			child.set(name, v)
@@ -1163,8 +1198,6 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 			child.set(name, &NoneVal{})
 		}
 	}
-	prev := ev.env
-	ev.env = child
 	ev.returnVal = nil
 	for _, s := range body.Stmts {
 		ev.evalStmt(s)
