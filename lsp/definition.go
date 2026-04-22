@@ -108,6 +108,9 @@ func (s *Server) Definition(
 			if loc, ok := s.stubDefs.Lookup(mod + "." + tail); ok {
 				return []protocol.Location{loc}, nil
 			}
+			if loc, ok := s.stubDefs.Lookup(mod + "." + word); ok {
+				return []protocol.Location{loc}, nil
+			}
 		}
 	}
 
@@ -203,6 +206,18 @@ func findDefinition(f *ast.File, name string) *token.Span {
 			if d.Name.Name == name {
 				s := d.Name.SrcSpan
 				result = &s
+			}
+			if dot := strings.IndexByte(name, '.'); dot > 0 {
+				enumName := name[:dot]
+				variant := name[dot+1:]
+				if d.Name.Name == enumName {
+					for _, v := range d.Variants {
+						if v.Name == variant {
+							s := v.SrcSpan
+							result = &s
+						}
+					}
+				}
 			}
 		}
 		return true

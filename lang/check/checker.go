@@ -482,6 +482,9 @@ func (c *Checker) checkFuncDecl(d *ast.FuncDecl) {
 		var params []*FieldDef
 		for _, p := range d.Params {
 			pt := c.resolveType(p.Type)
+			if p.Default != nil {
+				c.typeOf(p.Default)
+			}
 			params = append(params, &FieldDef{
 				Name:       p.Name.Name,
 				Type:       pt,
@@ -549,6 +552,9 @@ func (c *Checker) checkDeclDecl(d *ast.DeclDecl) {
 		var params []*FieldDef
 		for _, p := range d.Params {
 			pt := c.resolveType(p.Type)
+			if p.Default != nil {
+				c.typeOf(p.Default)
+			}
 			params = append(params, &FieldDef{
 				Name:       p.Name.Name,
 				Type:       pt,

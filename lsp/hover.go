@@ -111,23 +111,61 @@ func (s *Server) hoverLocalSymbol(docURI protocol.DocumentURI, content, word str
 	if c == nil {
 		return ""
 	}
-	if md := lookupAndRenderSymbol(c, word); md != "" {
-		return md
+	if sym := lookupSymbol(c, word); sym != nil {
+		md := formatSymbolDoc(sym)
+		if sym.Kind == check.SymEnum {
+			if doc := s.enumDoc(word); doc != "" {
+				md += doc
+			}
+		}
+		if md != "" {
+			return md
+		}
 	}
 	if i := strings.LastIndexByte(word, '.'); i >= 0 && i < len(word)-1 {
-		return lookupAndRenderSymbol(c, word[i+1:])
+		prefix := word[:i]
+		variant := word[i+1:]
+		// Try local scope first, then imported module scopes.
+		sym := c.FileScope().Lookup(prefix)
+		if sym == nil {
+			for _, imp := range c.FileScope().AllImports() {
+				if modScope, ok := s.modules[imp.Name]; ok {
+					if s := modScope.Lookup(prefix); s != nil {
+						sym = s
+						break
+					}
+				}
+			}
+		}
+		if sym != nil && sym.Kind == check.SymEnum {
+			if et, ok := sym.Type.(*check.EnumType); ok {
+				for _, v := range et.Variants {
+					if v == variant {
+						sig := "type " + prefix + "." + variant
+						doc := s.enumDoc(prefix)
+						if doc != "" {
+							return fencedSymbolDoc(sig) + doc
+						}
+						return fencedSymbolDoc(sig)
+					}
+				}
+			}
+		}
+		if sym := lookupSymbol(c, variant); sym != nil {
+			return formatSymbolDoc(sym)
+		}
 	}
 	return ""
 }
 
-func lookupAndRenderSymbol(c *check.Checker, name string) string {
+func lookupSymbol(c *check.Checker, name string) *check.Symbol {
 	if sym := c.FileScope().Lookup(name); sym != nil {
-		return formatSymbolDoc(sym)
+		return sym
 	}
 	if sym, ok := c.AllBindings()[name]; ok {
-		return formatSymbolDoc(sym)
+		return sym
 	}
-	return ""
+	return nil
 }
 
 // formatSymbolDoc renders a hover doc for a checker symbol. Funcs are
@@ -153,6 +191,18 @@ func typeSuffix(sym *check.Symbol) string {
 		return ""
 	}
 	return ": " + sym.Type.String()
+}
+
+func (s *Server) enumDoc(enumName string) string {
+	if doc, ok := s.stubDefs.LookupDoc(enumName); ok && doc != "" {
+		return doc
+	}
+	for _, mod := range s.catalog.Modules() {
+		if doc, ok := s.stubDefs.LookupDoc(mod + "." + enumName); ok && doc != "" {
+			return doc
+		}
+	}
+	return ""
 }
 
 func fencedSymbolDoc(sig string) string {

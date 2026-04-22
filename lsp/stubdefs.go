@@ -214,6 +214,10 @@ func (sd *StubDefs) extract() {
 			case *ast.EnumDecl:
 				qn := modName + "." + d.Name.Name
 				sd.locs[qn] = stubLocation{path: outPath, src: data, span: d.Name.SrcSpan}
+				for _, v := range d.Variants {
+					vqn := qn + "." + v.Name
+					sd.locs[vqn] = stubLocation{path: outPath, src: data, span: v.SrcSpan}
+				}
 			case *ast.AttrTypeDecl:
 				// Attribute types are looked up by their `@`-prefixed
 				// form. We register both the bare reference (the user
