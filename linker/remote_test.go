@@ -134,8 +134,8 @@ func TestEnsureRemoteDep_LiveClone(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(cacheDir, "_index.scampi")); err != nil {
 		t.Errorf("_index.scampi not found in cache: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(cacheDir, "api.scampi")); err != nil {
-		t.Errorf("api.scampi not found in cache: %v", err)
+	if _, err := os.Stat(filepath.Join(cacheDir, "npm.api.scampi")); err != nil {
+		t.Errorf("npm.api.scampi not found in cache: %v", err)
 	}
 
 	// Second call: cache hit, no-op.
