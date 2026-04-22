@@ -195,17 +195,17 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 
 				impact, consumed := emitOpDiagnostic(s.em, s.actIdx, s.actKind, s.actDesc, displayID, err)
 
-				s.emitOp(diagnostic.OpChecked(
-					s.actIdx,
-					s.actKind,
-					s.actDesc,
-					displayID,
-					res,
-					err,
-					s.checkOnly,
-					nil,
-				))
 				if impact.ShouldAbort() {
+					s.emitOp(diagnostic.OpChecked(
+						s.actIdx,
+						s.actKind,
+						s.actDesc,
+						displayID,
+						res,
+						err,
+						s.checkOnly,
+						nil,
+					))
 					s.mu.Lock()
 					n.outcome = model.OpAborted
 					n.err = err
@@ -213,11 +213,12 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 					return AbortError{Causes: []error{err}}
 				}
 
-				if consumed {
-					return nil
+				if !consumed {
+					// Raw error (not a diagnostic) — propagate.
+					return err
 				}
 
-				return err
+				// Non-fatal diagnostic (warning) — proceed with the check result.
 			}
 
 			if !s.checkOnly {

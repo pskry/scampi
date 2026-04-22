@@ -40,6 +40,12 @@ func (op *sshKeysLxcOp) Check(
 		}}, nil
 	}
 	if status != stateRunning {
+		if len(op.sshPublicKeys) > 0 {
+			return spec.CheckSatisfied, nil, SSHKeysSkippedWarning{
+				VMID:   op.id,
+				Source: op.step.Source,
+			}
+		}
 		return spec.CheckSatisfied, nil, nil
 	}
 

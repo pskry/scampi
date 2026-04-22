@@ -438,13 +438,16 @@ func TestSSHKeyDrift_StoppedContainer(t *testing.T) {
 		t.Fatal("sshKeyDrift should report drift when pull fails and keys desired")
 	}
 
-	// But Check guards on status — stopped container → satisfied, skip key management.
+	// Check guards on status — stopped container → satisfied + warning.
 	result, _, err := op.Check(context.Background(), nil, mock)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 	if result != spec.CheckSatisfied {
 		t.Errorf("Check on stopped container: got %v, want CheckSatisfied", result)
+	}
+	if err == nil {
+		t.Fatal("expected SSHKeysSkippedWarning, got nil")
+	}
+	if _, ok := err.(SSHKeysSkippedWarning); !ok {
+		t.Fatalf("expected SSHKeysSkippedWarning, got %T: %v", err, err)
 	}
 }
 
