@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	gotmpl "text/template"
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/errs"
+	rendertmpl "scampi.dev/scampi/render/template"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/step/sharedops"
@@ -52,7 +52,7 @@ func (op *renderTemplateOp) Check(
 		return spec.CheckUnsatisfied, nil, err
 	}
 
-	tmpl, err := gotmpl.New("template").Option("missingkey=error").Parse(string(tmplContent))
+	tmpl, err := rendertmpl.New("template").Parse(string(tmplContent))
 	if err != nil {
 		return spec.CheckUnsatisfied, nil, TemplateParseError{
 			Err:    err,
@@ -105,7 +105,7 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 		return spec.Result{}, err
 	}
 
-	tmpl, err := gotmpl.New("template").Option("missingkey=error").Parse(string(tmplContent))
+	tmpl, err := rendertmpl.New("template").Parse(string(tmplContent))
 	if err != nil {
 		return spec.Result{}, err
 	}
@@ -167,7 +167,7 @@ func (op *renderTemplateOp) DesiredContent(ctx context.Context, src source.Sourc
 		return nil, err
 	}
 
-	tmpl, err := gotmpl.New("template").Option("missingkey=error").Parse(string(tmplContent))
+	tmpl, err := rendertmpl.New("template").Parse(string(tmplContent))
 	if err != nil {
 		return nil, TemplateParseError{Err: err, Source: op.SrcSpan}
 	}

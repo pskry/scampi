@@ -59,6 +59,33 @@ cleaned up.
 Verify only runs when the content actually needs to change — idempotent runs
 skip it entirely.
 
+## Template functions
+
+Templates have access to Go's built-in template functions plus these
+scampi additions:
+
+| Function     | Signature                           | Description                       |
+| ------------ | ----------------------------------- | --------------------------------- |
+| `join`       | `join sep []string → string`        | Join strings with separator       |
+| `upper`      | `upper string → string`             | Uppercase                         |
+| `lower`      | `lower string → string`             | Lowercase                         |
+| `trimSpace`  | `trimSpace string → string`         | Strip leading/trailing whitespace |
+| `trimPrefix` | `trimPrefix string prefix → string` | Remove prefix                     |
+| `trimSuffix` | `trimSuffix string suffix → string` | Remove suffix                     |
+| `contains`   | `contains string substr → bool`     | Substring test                    |
+| `hasPrefix`  | `hasPrefix string prefix → bool`    | Prefix test                       |
+| `hasSuffix`  | `hasSuffix string suffix → bool`    | Suffix test                       |
+| `replace`    | `replace string old new → string`   | Replace all occurrences           |
+
+Usage follows Go template pipe syntax:
+
+```text
+{{ join ";" .names }}
+{{ .name | upper }}
+{{ .path | trimPrefix "/" }}
+{{ if contains .host "prod" }}production{{ end }}
+```
+
 ## Examples
 
 ### From a file
