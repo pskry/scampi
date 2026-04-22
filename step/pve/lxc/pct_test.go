@@ -2,7 +2,13 @@
 
 package lxc
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"scampi.dev/scampi/target"
+)
 
 func TestParsePctList(t *testing.T) {
 	tests := []struct {
@@ -227,6 +233,177 @@ func TestParseSizeGiB(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("parseSizeGiB(%q) = %d, want %d", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestParsePVEKeys(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    []string
+	}{
+		{
+			name:    "standard PVE block",
+			content: "# --- BEGIN PVE ---\nssh-rsa AAAA... user@host\nssh-ed25519 AAAA... other\n# --- END PVE ---\n",
+			want:    []string{"ssh-rsa AAAA... user@host", "ssh-ed25519 AAAA... other"},
+		},
+		{
+			name:    "empty PVE block",
+			content: "# --- BEGIN PVE ---\n# --- END PVE ---\n",
+			want:    nil,
+		},
+		{
+			name:    "no PVE block",
+			content: "ssh-rsa AAAA... manually-added\n",
+			want:    nil,
+		},
+		{
+			name:    "PVE block with user keys outside",
+			content: "ssh-rsa manual-key\n# --- BEGIN PVE ---\nssh-rsa managed-key\n# --- END PVE ---\nssh-ed25519 another-manual\n",
+			want:    []string{"ssh-rsa managed-key"},
+		},
+		{
+			name:    "empty file",
+			content: "",
+			want:    nil,
+		},
+		{
+			name:    "single key",
+			content: "# --- BEGIN PVE ---\nssh-ed25519 AAAA... hal9000\n# --- END PVE ---\n",
+			want:    []string{"ssh-ed25519 AAAA... hal9000"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parsePVEKeys(tt.content)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d keys, want %d", len(got), len(tt.want))
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("key[%d]: got %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestBuildAuthorizedKeys(t *testing.T) {
+	t.Run("with keys", func(t *testing.T) {
+		got := buildAuthorizedKeys([]string{"ssh-rsa AAAA...", "ssh-ed25519 BBBB..."})
+		want := "# --- BEGIN PVE ---\nssh-rsa AAAA...\nssh-ed25519 BBBB...\n# --- END PVE ---\n"
+		if got != want {
+			t.Errorf("got:\n%s\nwant:\n%s", got, want)
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		got := buildAuthorizedKeys(nil)
+		want := "# --- BEGIN PVE ---\n# --- END PVE ---\n"
+		if got != want {
+			t.Errorf("got:\n%s\nwant:\n%s", got, want)
+		}
+	})
+
+	t.Run("roundtrip", func(t *testing.T) {
+		keys := []string{"ssh-rsa AAAA...", "ssh-ed25519 BBBB..."}
+		content := buildAuthorizedKeys(keys)
+		parsed := parsePVEKeys(content)
+		if len(parsed) != len(keys) {
+			t.Fatalf("roundtrip: got %d keys, want %d", len(parsed), len(keys))
+		}
+		for i := range parsed {
+			if parsed[i] != keys[i] {
+				t.Errorf("roundtrip key[%d]: got %q, want %q", i, parsed[i], keys[i])
+			}
+		}
+	})
+}
+
+func TestSSHKeyDrift(t *testing.T) {
+	tests := []struct {
+		name       string
+		desired    []string
+		catOutput  string
+		catFails   bool
+		wantDrift  bool
+	}{
+		{
+			name:      "no keys desired, no file",
+			desired:   nil,
+			catFails:  true,
+			wantDrift: false,
+		},
+		{
+			name:      "keys desired, no file",
+			desired:   []string{"ssh-rsa AAAA..."},
+			catFails:  true,
+			wantDrift: true,
+		},
+		{
+			name:      "keys match",
+			desired:   []string{"ssh-rsa AAAA..."},
+			catOutput: "# --- BEGIN PVE ---\nssh-rsa AAAA...\n# --- END PVE ---\n",
+			wantDrift: false,
+		},
+		{
+			name:      "keys differ",
+			desired:   []string{"ssh-ed25519 NEW..."},
+			catOutput: "# --- BEGIN PVE ---\nssh-rsa OLD...\n# --- END PVE ---\n",
+			wantDrift: true,
+		},
+		{
+			name:      "no keys desired, file has PVE keys",
+			desired:   nil,
+			catOutput: "# --- BEGIN PVE ---\nssh-rsa LEFTOVER...\n# --- END PVE ---\n",
+			wantDrift: true,
+		},
+		{
+			name:      "no keys desired, file has no PVE section",
+			desired:   nil,
+			catOutput: "ssh-rsa manual-only\n",
+			wantDrift: false,
+		},
+		{
+			name:      "extra key added",
+			desired:   []string{"ssh-rsa A", "ssh-rsa B"},
+			catOutput: "# --- BEGIN PVE ---\nssh-rsa A\n# --- END PVE ---\n",
+			wantDrift: true,
+		},
+		{
+			name:      "key removed",
+			desired:   []string{"ssh-rsa A"},
+			catOutput: "# --- BEGIN PVE ---\nssh-rsa A\nssh-rsa B\n# --- END PVE ---\n",
+			wantDrift: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmdr := &mockCommand{handler: func(cmd string) (target.CommandResult, error) {
+				switch {
+				case cmd == "pct status 100":
+					return target.CommandResult{Stdout: "status: running\n"}, nil
+				case strings.Contains(cmd, "cat /root/.ssh/authorized_keys"):
+					if tt.catFails {
+						return target.CommandResult{ExitCode: 1, Stderr: "No such file"}, nil
+					}
+					return target.CommandResult{Stdout: tt.catOutput}, nil
+				default:
+					return target.CommandResult{ExitCode: 1}, nil
+				}
+			}}
+
+			op := &ensureLxcOp{id: 100, sshPublicKeys: tt.desired}
+			d := op.sshKeyDrift(context.Background(), cmdr)
+			if tt.wantDrift && d == nil {
+				t.Error("expected drift, got nil")
+			}
+			if !tt.wantDrift && d != nil {
+				t.Errorf("expected no drift, got %+v", d)
+			}
+		})
 	}
 }
 

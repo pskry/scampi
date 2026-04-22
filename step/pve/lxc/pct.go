@@ -244,6 +244,39 @@ func buildCreateCmd(cfg lxcAction) string {
 	return cmd
 }
 
+// parsePVEKeys extracts SSH keys from the PVE-managed section of authorized_keys.
+// Returns the keys between "# --- BEGIN PVE ---" and "# --- END PVE ---".
+func parsePVEKeys(content string) []string {
+	var keys []string
+	inPVE := false
+	for line := range strings.SplitSeq(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "# --- BEGIN PVE ---" {
+			inPVE = true
+			continue
+		}
+		if line == "# --- END PVE ---" {
+			break
+		}
+		if inPVE && line != "" {
+			keys = append(keys, line)
+		}
+	}
+	return keys
+}
+
+// buildAuthorizedKeys builds the PVE-managed authorized_keys content.
+func buildAuthorizedKeys(keys []string) string {
+	var b strings.Builder
+	b.WriteString("# --- BEGIN PVE ---\n")
+	for _, k := range keys {
+		b.WriteString(k)
+		b.WriteByte('\n')
+	}
+	b.WriteString("# --- END PVE ---\n")
+	return b.String()
+}
+
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }

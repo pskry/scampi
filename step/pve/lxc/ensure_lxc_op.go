@@ -86,6 +86,13 @@ func (op *ensureLxcOp) Check(
 	// Mutable drift.
 	drift := op.configDrift(cfg)
 
+	// SSH key drift (only checkable on running containers).
+	if status == stateRunning {
+		if d := op.sshKeyDrift(ctx, cmdr); d != nil {
+			drift = append(drift, *d)
+		}
+	}
+
 	// State drift.
 	switch op.state {
 	case StateRunning:
@@ -169,6 +176,16 @@ func (op *ensureLxcOp) Execute(
 			return spec.Result{}, err
 		}
 		changed = true
+	}
+
+	// SSH key drift (only on running containers).
+	if status == stateRunning {
+		if d := op.sshKeyDrift(ctx, cmdr); d != nil {
+			if err := op.applySSHKeys(ctx, cmdr, tgt); err != nil {
+				return spec.Result{}, err
+			}
+			changed = true
+		}
 	}
 
 	// State transitions.
@@ -429,6 +446,69 @@ func valueOrNone(s string) string {
 		return "(none)"
 	}
 	return s
+}
+
+// sshKeyDrift checks if the SSH keys inside the container match the desired set.
+func (op *ensureLxcOp) sshKeyDrift(ctx context.Context, cmdr target.Command) *spec.DriftDetail {
+	result, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct exec %d -- cat /root/.ssh/authorized_keys", op.id))
+	if err != nil || result.ExitCode != 0 {
+		// File doesn't exist — no keys desired means satisfied.
+		if len(op.sshPublicKeys) == 0 {
+			return nil
+		}
+		return &spec.DriftDetail{
+			Field:   "ssh_public_keys",
+			Current: "0 key(s)",
+			Desired: fmt.Sprintf("%d key(s)", len(op.sshPublicKeys)),
+		}
+	}
+
+	current := parsePVEKeys(result.Stdout)
+	if slicesEqual(current, op.sshPublicKeys) {
+		return nil
+	}
+
+	return &spec.DriftDetail{
+		Field:   "ssh_public_keys",
+		Current: fmt.Sprintf("%d key(s)", len(current)),
+		Desired: fmt.Sprintf("%d key(s)", len(op.sshPublicKeys)),
+	}
+}
+
+// applySSHKeys writes the desired SSH keys into the container's authorized_keys.
+// Uses the target filesystem to write a temp file on the host, then copies it
+// into the container via pct push.
+func (op *ensureLxcOp) applySSHKeys(ctx context.Context, cmdr target.Command, tgt target.Target) error {
+	content := buildAuthorizedKeys(op.sshPublicKeys)
+	tmpFile := fmt.Sprintf("/tmp/.scampi-ssh-keys-%d", op.id)
+
+	fs := target.Must[target.Filesystem](ensureLxcID, tgt)
+	if err := fs.WriteFile(ctx, tmpFile, []byte(content)); err != nil {
+		return op.cmdErrWrap("write ssh keys", err)
+	}
+	defer func() { _ = fs.Remove(ctx, tmpFile) }()
+
+	mkdirCmd := fmt.Sprintf("pct exec %d -- mkdir -p /root/.ssh", op.id)
+	if err := op.runCmd(ctx, cmdr, "ssh key setup", mkdirCmd); err != nil {
+		return err
+	}
+	pushCmd := fmt.Sprintf("pct push %d %s /root/.ssh/authorized_keys --perms 600", op.id, shellQuote(tmpFile))
+	if err := op.runCmd(ctx, cmdr, "push ssh keys", pushCmd); err != nil {
+		return err
+	}
+	return nil
+}
+
+func slicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func templateStr(t *LxcTemplate) string {
