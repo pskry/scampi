@@ -10,6 +10,7 @@ import (
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/diagnostic"
+	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/diagnostic/event"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
@@ -26,6 +27,7 @@ type copyFileOp struct {
 	srcRef spec.SourceRef
 	dest   string
 	verify string
+	backup bool
 }
 
 func (op *copyFileOp) getContent(ctx context.Context, src source.Source) ([]byte, error) {
@@ -73,11 +75,19 @@ func (op *copyFileOp) Check(
 	}
 
 	if !bytes.Equal(srcData, destData) {
-		return spec.CheckUnsatisfied, []spec.DriftDetail{{
+		drift := []spec.DriftDetail{{
 			Field:   "content",
 			Current: fmt.Sprintf("%d bytes", len(destData)),
 			Desired: fmt.Sprintf("%d bytes", len(srcData)),
-		}}, nil
+		}}
+		if op.backup {
+			drift = append(drift, spec.DriftDetail{
+				Field:     "backup",
+				Desired:   op.dest + ".*.bak",
+				Verbosity: signal.VVV,
+			})
+		}
+		return spec.CheckUnsatisfied, drift, nil
 	}
 
 	return spec.CheckSatisfied, nil, nil
@@ -102,6 +112,12 @@ func (op *copyFileOp) Execute(ctx context.Context, src source.Source, tgt target
 	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err == nil && bytes.Equal(srcData, destData) {
 		return spec.Result{Changed: false}, nil
+	}
+
+	if op.backup {
+		if err := fileops.Backup(ctx, fsTgt, op.dest); err != nil {
+			return spec.Result{}, sharedops.DiagnoseTargetError(err)
+		}
 	}
 
 	if op.verify != "" {

@@ -25,6 +25,7 @@ type (
 		Owner  string         `step:"Owner user name or UID" example:"root"`
 		Group  string         `step:"Group name or GID" example:"root"`
 		Verify string         `step:"Validation command (%s = temp file)" optional:"true" example:"visudo -cf %s"`
+		Backup bool           `step:"Back up existing file to .bak before overwriting" optional:"true"`
 	}
 	copyAction struct {
 		desc   string
@@ -36,6 +37,7 @@ type (
 		owner  string
 		group  string
 		verify string
+		backup bool
 		step   spec.StepInstance
 	}
 )
@@ -72,6 +74,7 @@ func (c Copy) Plan(step spec.StepInstance) (spec.Action, error) {
 		owner:  cfg.Owner,
 		group:  cfg.Group,
 		verify: cfg.Verify,
+		backup: cfg.Backup,
 
 		step: step,
 	}, nil
@@ -105,6 +108,7 @@ func (c *copyAction) Ops() []spec.Op {
 		srcRef: c.srcRef,
 		dest:   c.dest,
 		verify: c.verify,
+		backup: c.backup,
 	}
 	chown := &fileops.EnsureOwnerOp{
 		BaseOp: sharedops.BaseOp{

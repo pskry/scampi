@@ -24,6 +24,7 @@ type (
 		Owner  string         `step:"Owner user name or UID" example:"root"`
 		Group  string         `step:"Group name or GID" example:"root"`
 		Verify string         `step:"Validation command (%s = temp file)" optional:"true" example:"nginx -t -c %s"`
+		Backup bool           `step:"Back up existing file to .bak before overwriting" optional:"true"`
 	}
 	DataConfig struct {
 		Values map[string]any
@@ -40,6 +41,7 @@ type (
 		owner  string
 		group  string
 		verify string
+		backup bool
 		step   spec.StepInstance
 	}
 )
@@ -73,6 +75,7 @@ func (t Template) Plan(step spec.StepInstance) (spec.Action, error) {
 		owner:  cfg.Owner,
 		group:  cfg.Group,
 		verify: cfg.Verify,
+		backup: cfg.Backup,
 		step:   step,
 	}, nil
 }
@@ -109,6 +112,7 @@ func (a *templateAction) Ops() []spec.Op {
 		dest:   a.dest,
 		data:   a.data,
 		verify: a.verify,
+		backup: a.backup,
 	}
 	chown := &fileops.EnsureOwnerOp{
 		BaseOp: sharedops.BaseOp{

@@ -13,6 +13,7 @@ import (
 
 	"scampi.dev/scampi/capability"
 	"scampi.dev/scampi/errs"
+	"scampi.dev/scampi/signal"
 	rendertmpl "scampi.dev/scampi/render/template"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
@@ -30,6 +31,7 @@ type renderTemplateOp struct {
 	dest   string
 	data   DataConfig
 	verify string
+	backup bool
 }
 
 func (op *renderTemplateOp) Check(
@@ -82,11 +84,19 @@ func (op *renderTemplateOp) Check(
 	}
 
 	if !bytes.Equal(buf.Bytes(), destData) {
-		return spec.CheckUnsatisfied, []spec.DriftDetail{{
+		drift := []spec.DriftDetail{{
 			Field:   "content",
 			Current: fmt.Sprintf("%d bytes", len(destData)),
 			Desired: fmt.Sprintf("%d bytes", buf.Len()),
-		}}, nil
+		}}
+		if op.backup {
+			drift = append(drift, spec.DriftDetail{
+				Field:     "backup",
+				Desired:   op.dest + ".*.bak",
+				Verbosity: signal.VVV,
+			})
+		}
+		return spec.CheckUnsatisfied, drift, nil
 	}
 
 	return spec.CheckSatisfied, nil, nil
@@ -126,6 +136,12 @@ func (op *renderTemplateOp) Execute(ctx context.Context, src source.Source, tgt 
 	destData, err := fsTgt.ReadFile(ctx, op.dest)
 	if err == nil && bytes.Equal(buf.Bytes(), destData) {
 		return spec.Result{Changed: false}, nil
+	}
+
+	if op.backup {
+		if err := fileops.Backup(ctx, fsTgt, op.dest); err != nil {
+			return spec.Result{}, sharedops.DiagnoseTargetError(err)
+		}
 	}
 
 	if op.verify != "" {
