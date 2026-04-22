@@ -679,8 +679,8 @@ func TestMarkdownTableAlignment(t *testing.T) {
 		}
 	}
 
-	// Walk site/content/ and docs/
-	for _, dir := range []string{"site/content", "docs"} {
+	// Walk site/content/ and doc/
+	for _, dir := range []string{"site/content", "doc"} {
 		abs := filepath.Join(root, dir)
 		err := filepath.WalkDir(abs, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {

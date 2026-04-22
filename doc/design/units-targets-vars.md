@@ -62,11 +62,11 @@ target.ssh(
 
 ### Target Types
 
-| Type    | Builtin                                  | Use case                                             |
-| ------- | ---------------------------------------- | ---------------------------------------------------- |
-| `local` | `target.local(name)`                     | Local machine execution                              |
-| `ssh`   | `target.ssh(name, host, user, ...)`      | Remote execution via SSH                             |
-| `rest`  | `target.rest(name, base_url, auth, ...)` | API-driven services (planned, see `docs/roadmap.md`) |
+| Type    | Builtin                                  | Use case                 |
+| ------- | ---------------------------------------- | ------------------------ |
+| `local` | `target.local(name)`                     | Local machine execution  |
+| `ssh`   | `target.ssh(name, host, user, ...)`      | Remote execution via SSH |
+| `rest`  | `target.rest(name, base_url, auth, ...)` | API-driven services      |
 
 SSH targets accept additional keyword arguments:
 
@@ -92,7 +92,7 @@ Steps are the executable primitives. They are **built into `scampi`**, not plugi
 
 Current steps: `copy`, `dir`, `symlink`, `template`, `pkg`, `service`, `run`
 
-Planned steps: see `docs/roadmap.md`
+Planned steps: see `scampi index` for the current list
 
 ### Why No Plugins
 
@@ -199,7 +199,6 @@ api_token = secret("npm.api_token")
 V1 ships with an `unencrypted_file` backend that reads a flat JSON
 `secrets.json` next to the config file. Additional backends (age, Bitwarden,
 Vault, etc.) are planned — the backend is selected by the user, not by scampi.
-See `docs/roadmap.md` for the full design direction.
 
 Secret values never appear in diagnostic output — only key names.
 

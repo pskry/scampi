@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package testkit is the scampi-lang test framework runtime.
+// Package testkit is the scampi test framework runtime.
 //
-// It owns the bridge between scampi-lang test configs and Go-side
+// It owns the bridge between scampi test configs and Go-side
 // mock targets:
 //
 //   - Matcher dispatch: each `matchers.*` constructor evaluates to a
@@ -13,6 +13,4 @@
 //     mismatches.
 //   - (Future) Test runner: drives the lex → parse → check → eval →
 //     resolve → apply → verify pipeline used by `scampi test`.
-//
-// See docs/test-framework.md for the design.
 package testkit

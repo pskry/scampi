@@ -91,9 +91,9 @@ Because configuration drift is inevitable, but suffering through YAML isn't.
 ## Development
 
 See the docs:
-- `docs/naming.md` — terminology and concepts
-- `docs/units-targets-vars.md` — configuration model
-- `docs/cli-semantics.md` — CLI output and verbosity
+- `doc/design/naming.md` — terminology and concepts
+- `doc/design/units-targets-vars.md` — configuration model
+- `doc/design/cli-semantics.md` — CLI output and verbosity
 
 Commands:
 ```bash

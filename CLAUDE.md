@@ -82,14 +82,14 @@ target/      # Write-side effects (mutations only)
 
 ## Design Docs
 
-- `docs/workflow.md` — end-to-end workflow contract (issue → implementation → commit)
-- `docs/naming.md` — terminology and conceptual model
-- `docs/units-targets-vars.md` — configuration model, targets, deploy blocks, project layout
-- `docs/cli-semantics.md` — CLI output colors and verbosity
+- `doc/design/workflow.md` — end-to-end workflow contract (issue → implementation → commit)
+- `doc/design/naming.md` — terminology and conceptual model
+- `doc/design/units-targets-vars.md` — configuration model, targets, deploy blocks, project layout
+- `doc/design/cli-semantics.md` — CLI output colors and verbosity
 
 ## Naming Conventions
 
-See `docs/naming.md` for authoritative terminology.
+See `doc/design/naming.md` for authoritative terminology.
 
 - **Step**: declarative work item
 - **StepType**: Go handler for a step kind (one per kind)
@@ -188,7 +188,7 @@ fields, behaviors, or new step types.
 
 **Markdown tables must have aligned columns** — pad cells so that pipe
 characters line up vertically. This applies to all markdown files in
-`site/`, `docs/`, and `README.md`.
+`site/`, `doc/`, and `README.md`.
 
 ## Adding a New Step Type
 

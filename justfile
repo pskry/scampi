@@ -107,6 +107,19 @@ setup:
     exit 1
   fi
 
+[doc("Generate manpages from markdown sources")]
+manpages:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  out="{{build_dir}}/man/man1"
+  mkdir -p "$out"
+  for src in doc/man/*.1.md; do
+    [ -f "$src" ] || continue
+    name=$(basename "$src" .md)
+    go tool github.com/cpuguy83/go-md2man/v2 -in "$src" -out "$out/$name"
+    echo "  $name"
+  done
+
 # Housekeeping
 # ##############################################################################
 
