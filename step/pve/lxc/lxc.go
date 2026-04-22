@@ -66,7 +66,7 @@ type (
 
 		ID       int         `step:"Container VMID (unique per cluster)" example:"100"`
 		Node     string      `step:"PVE node name" example:"pve1"`
-		Template LxcTemplate `step:"OS template"`
+		Template *LxcTemplate `step:"OS template" optional:"true"`
 		Hostname string      `step:"Container hostname" example:"pihole"`
 		State    string      `step:"Desired state" default:"running"`
 		Cores    int         `step:"CPU cores" default:"1"`
@@ -205,11 +205,11 @@ func (c *LxcConfig) validate(step spec.StepInstance) error {
 			Source: step.Fields["hostname"].Value,
 		}
 	}
-	if c.Template.Name == "" {
+	if c.State != stateAbsent && (c.Template == nil || c.Template.Name == "") {
 		return InvalidConfigError{
-			Field:  "template.name",
-			Reason: "template name is required",
-			Source: step.Fields["template"].Value,
+			Field:  "template",
+			Reason: "template is required when state is not absent",
+			Source: step.Source,
 		}
 	}
 	if _, _, err := parseSizeSpec(c.Memory); err != nil {
@@ -260,7 +260,7 @@ type lxcAction struct {
 	desc      string
 	id        int
 	node      string
-	template  LxcTemplate
+	template  *LxcTemplate
 	hostname  string
 	state     State
 	cores     int
@@ -275,12 +275,6 @@ func (a *lxcAction) Desc() string { return a.desc }
 func (a *lxcAction) Kind() string { return "pve.lxc" }
 
 func (a *lxcAction) Ops() []spec.Op {
-	dlOp := &downloadTemplateOp{
-		template: a.template,
-		step:     a.step,
-	}
-	dlOp.SetAction(a)
-
 	lxcOp := &ensureLxcOp{
 		id:        a.id,
 		node:      a.node,
@@ -295,6 +289,17 @@ func (a *lxcAction) Ops() []spec.Op {
 		step:      a.step,
 	}
 	lxcOp.SetAction(a)
+
+	// Absent: just the ensure op (shutdown + destroy). No download or reboot.
+	if a.state == StateAbsent {
+		return []spec.Op{lxcOp}
+	}
+
+	dlOp := &downloadTemplateOp{
+		template: *a.template,
+		step:     a.step,
+	}
+	dlOp.SetAction(a)
 	lxcOp.AddDependency(dlOp)
 
 	rebootOp := &rebootLxcOp{

@@ -126,7 +126,7 @@ func TestBuildCreateCmd(t *testing.T) {
 	cfg := lxcAction{
 		id:        100,
 		node:      "pve1",
-		template:  LxcTemplate{Storage: "local", Name: "debian-12-standard_12.7-1_amd64.tar.zst"},
+		template:  &LxcTemplate{Storage: "local", Name: "debian-12-standard_12.7-1_amd64.tar.zst"},
 		hostname:  "pihole",
 		cores:     2,
 		memoryMiB: 512,

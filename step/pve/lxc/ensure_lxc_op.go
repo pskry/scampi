@@ -21,7 +21,7 @@ type ensureLxcOp struct {
 	sharedops.BaseOp
 	id        int
 	node      string
-	template  LxcTemplate
+	template  *LxcTemplate
 	hostname  string
 	state     State
 	cores     int
@@ -37,13 +37,6 @@ func (op *ensureLxcOp) Check(
 	_ source.Source,
 	tgt target.Target,
 ) (spec.CheckResult, []spec.DriftDetail, error) {
-	if op.state == StateAbsent {
-		return spec.CheckUnsatisfied, nil, UnsupportedStateError{
-			State:  stateAbsent,
-			Source: op.step.Fields["state"].Value,
-		}
-	}
-
 	cmdr := target.Must[target.Command](ensureLxcID, tgt)
 
 	if err := op.checkNode(ctx, cmdr); err != nil {
@@ -53,6 +46,18 @@ func (op *ensureLxcOp) Check(
 	exists, status, err := op.inspectExists(ctx, cmdr)
 	if err != nil {
 		return spec.CheckUnsatisfied, nil, err
+	}
+
+	// Absent: satisfied if container doesn't exist.
+	if op.state == StateAbsent {
+		if !exists {
+			return spec.CheckSatisfied, nil, nil
+		}
+		return spec.CheckUnsatisfied, []spec.DriftDetail{{
+			Field:   "state",
+			Current: "present",
+			Desired: stateAbsent,
+		}}, nil
 	}
 
 	if !exists {
@@ -113,6 +118,14 @@ func (op *ensureLxcOp) Execute(
 	exists, status, err := op.inspectExists(ctx, cmdr)
 	if err != nil {
 		return spec.Result{}, err
+	}
+
+	// Absent: shutdown if running, then destroy.
+	if op.state == StateAbsent {
+		if !exists {
+			return spec.Result{}, nil
+		}
+		return op.executeDestroy(ctx, cmdr, status)
 	}
 
 	if !exists {
@@ -380,8 +393,27 @@ func valueOrNone(s string) string {
 	return s
 }
 
+func templateStr(t *LxcTemplate) string {
+	if t == nil {
+		return "(none)"
+	}
+	return t.templatePath()
+}
+
 // Execute helpers
 // -----------------------------------------------------------------------------
+
+func (op *ensureLxcOp) executeDestroy(ctx context.Context, cmdr target.Command, status string) (spec.Result, error) {
+	if status == stateRunning {
+		if err := op.runCmd(ctx, cmdr, "shutdown", fmt.Sprintf("pct shutdown %d --timeout 30", op.id)); err != nil {
+			return spec.Result{}, err
+		}
+	}
+	if err := op.runCmd(ctx, cmdr, "destroy", fmt.Sprintf("pct destroy %d --purge", op.id)); err != nil {
+		return spec.Result{}, err
+	}
+	return spec.Result{Changed: true}, nil
+}
 
 func (op *ensureLxcOp) executeCreate(ctx context.Context, cmdr target.Command) (spec.Result, error) {
 	// Create container (template already ensured by downloadTemplateOp)
@@ -465,7 +497,7 @@ func (op *ensureLxcOp) Inspect() []spec.InspectField {
 		{Label: "node", Value: op.node},
 		{Label: "hostname", Value: op.hostname},
 		{Label: "state", Value: op.state.String()},
-		{Label: "template", Value: op.template.templatePath()},
+		{Label: "template", Value: templateStr(op.template)},
 		{Label: "cores", Value: fmt.Sprintf("%d", op.cores)},
 		{Label: "memory", Value: fmt.Sprintf("%d MiB", op.memoryMiB)},
 		{Label: "storage", Value: op.storage},

@@ -44,7 +44,7 @@ pub type LxcNet {
 pub decl lxc(
   id:        int
   node:      string
-  template:  Template
+  template:  Template?
   hostname:  string
   state:     LxcState = LxcState.running
   cores:     int = 1

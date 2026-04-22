@@ -72,8 +72,14 @@ func (op *rebootLxcOp) Execute(
 ) (spec.Result, error) {
 	cmdr := target.Must[target.Command](rebootLxcID, tgt)
 
+	// Re-check: container may have been stopped by ensureLxcOp since Check ran.
+	result, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct status %d", op.id))
+	if err == nil && parsePctStatus(result.Stdout) != stateRunning {
+		return spec.Result{}, nil
+	}
+
 	cmd := fmt.Sprintf("pct reboot %d --timeout 30", op.id)
-	result, err := cmdr.RunPrivileged(ctx, cmd)
+	result, err = cmdr.RunPrivileged(ctx, cmd)
 	if err != nil {
 		return spec.Result{}, op.cmdErr(err.Error())
 	}
