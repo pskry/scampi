@@ -58,12 +58,18 @@ func parsePctStatus(output string) string {
 	return status
 }
 
-// formatNet0 builds the --net0 value for pct create/set.
+// formatNet builds the --netN value for pct create/set.
 //
 //	name=eth0,bridge=vmbr0,ip=10.10.10.10/24,gw=10.10.10.1,type=veth
-func formatNet0(net LxcNet) string {
+func formatNet(idx int, net LxcNet) string {
 	var b strings.Builder
-	b.WriteString("name=eth0")
+
+	name := net.Name
+	if name == "" {
+		name = fmt.Sprintf("eth%d", idx)
+	}
+	b.WriteString("name=")
+	b.WriteString(name)
 
 	bridge := net.Bridge
 	if bridge == "" {
@@ -96,15 +102,28 @@ type pctConfig struct {
 	Features     LxcFeatures
 	Tags         string // semicolon-separated
 	Description  string
-	Storage      string // rootfs storage pool
-	Size         string // rootfs size with unit (e.g. "4G")
-	Net          parsedNet
+	Storage      string      // rootfs storage pool
+	Size         string      // rootfs size with unit (e.g. "4G")
+	Nets         []parsedNet // indexed by net0, net1, ...
 }
 
 type parsedNet struct {
+	Name   string
 	Bridge string
 	IP     string
 	Gw     string
+}
+
+// parseNetKey extracts the index from "net0", "net1", etc.
+func parseNetKey(key string) (int, bool) {
+	if !strings.HasPrefix(key, "net") {
+		return 0, false
+	}
+	idx, err := strconv.Atoi(key[3:])
+	if err != nil {
+		return 0, false
+	}
+	return idx, true
 }
 
 // parsePctConfig parses the key: value output of `pct config <id>`.
@@ -145,8 +164,13 @@ func parsePctConfig(output string) pctConfig {
 			cfg.Features = parseFeatures(val)
 		case "rootfs":
 			cfg.Storage, cfg.Size = parseRootfs(val)
-		case "net0":
-			cfg.Net = parseNet0Value(val)
+		default:
+			if idx, ok := parseNetKey(key); ok {
+				for len(cfg.Nets) <= idx {
+					cfg.Nets = append(cfg.Nets, parsedNet{})
+				}
+				cfg.Nets[idx] = parseNetValue(val)
+			}
 		}
 	}
 	return cfg
@@ -172,10 +196,10 @@ func parseRootfs(val string) (storage, size string) {
 	return storage, size
 }
 
-// parseNet0Value parses the comma-separated key=value net0 config value.
+// parseNetValue parses the comma-separated key=value netN config value.
 //
 //	"name=eth0,bridge=vmbr0,hwaddr=...,ip=10.10.10.10/24,gw=10.10.10.1,type=veth"
-func parseNet0Value(val string) parsedNet {
+func parseNetValue(val string) parsedNet {
 	var net parsedNet
 	for kv := range strings.SplitSeq(val, ",") {
 		k, v, ok := strings.Cut(kv, "=")
@@ -183,6 +207,8 @@ func parseNet0Value(val string) parsedNet {
 			continue
 		}
 		switch k {
+		case "name":
+			net.Name = v
 		case "bridge":
 			net.Bridge = v
 		case "ip":
@@ -245,7 +271,6 @@ func buildCreateCmd(cfg lxcAction) string {
 		" --memory %d"+
 		" --swap %d"+
 		" --rootfs %s:%d"+
-		" --net0 %s"+
 		" --unprivileged %d",
 		cfg.id, cfg.template.templatePath(),
 		cfg.hostname,
@@ -253,9 +278,11 @@ func buildCreateCmd(cfg lxcAction) string {
 		cfg.memoryMiB,
 		cfg.swapMiB,
 		cfg.storage, cfg.sizeGiB,
-		formatNet0(cfg.network),
 		boolToInt(!cfg.privileged),
 	)
+	for i, net := range cfg.networks {
+		cmd += fmt.Sprintf(" --net%d %s", i, formatNet(i, net))
+	}
 	if cfg.password != "" {
 		cmd += " --password " + shellQuote(cfg.password)
 	}

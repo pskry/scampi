@@ -28,7 +28,7 @@ type createLxcOp struct {
 	storage       string
 	sizeGiB       int
 	privileged    bool
-	network       LxcNet
+	networks      []LxcNet
 	tags          []string
 	sshPublicKeys []string
 }

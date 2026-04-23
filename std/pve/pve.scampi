@@ -65,8 +65,11 @@ pub type Features {
   mount:        list[string] = []
 }
 
-// Network configuration for a single LXC interface (net0).
+// Network interface configuration. List index determines the PVE
+// net index (first element → net0, second → net1, etc.).
 pub type LxcNet {
+  // Interface name inside the container. Defaults to ethN.
+  name:   string?
   bridge: string = "vmbr0"
   ip:     string
   gw:     string?
@@ -93,7 +96,7 @@ pub decl lxc(
   privileged:      bool = false
   features:        Features?
   startup:         Startup?
-  network:         LxcNet
+  networks:        list[LxcNet] = []
   tags:            list[string] = []
   // Root password set on create. Cannot be changed after creation.
   password:        string?

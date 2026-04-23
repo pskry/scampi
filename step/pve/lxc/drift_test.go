@@ -3,6 +3,7 @@
 package lxc
 
 import (
+	"strings"
 	"testing"
 
 	"scampi.dev/scampi/spec"
@@ -14,7 +15,7 @@ func TestConfigDrift(t *testing.T) {
 		cores:     2,
 		memoryMiB: 512,
 		storage:   "local-zfs",
-		network:   LxcNet{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+		networks:  []LxcNet{{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"}},
 	}
 
 	tests := []struct {
@@ -30,7 +31,7 @@ func TestConfigDrift(t *testing.T) {
 				Memory:   512,
 				Storage:  "local-zfs",
 				Size:     "4G",
-				Net:      parsedNet{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+				Nets:     []parsedNet{{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"}},
 			},
 			wantDrift: nil,
 		},
@@ -42,7 +43,7 @@ func TestConfigDrift(t *testing.T) {
 				Memory:   512,
 				Storage:  "local-zfs",
 				Size:     "4G",
-				Net:      parsedNet{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+				Nets:     []parsedNet{{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"}},
 			},
 			wantDrift: []string{"cores"},
 		},
@@ -54,7 +55,7 @@ func TestConfigDrift(t *testing.T) {
 				Memory:   256,
 				Storage:  "local-zfs",
 				Size:     "4G",
-				Net:      parsedNet{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+				Nets:     []parsedNet{{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"}},
 			},
 			wantDrift: []string{"memory"},
 		},
@@ -66,7 +67,7 @@ func TestConfigDrift(t *testing.T) {
 				Memory:   512,
 				Storage:  "local-zfs",
 				Size:     "4G",
-				Net:      parsedNet{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+				Nets:     []parsedNet{{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"}},
 			},
 			wantDrift: []string{"hostname"},
 		},
@@ -78,9 +79,9 @@ func TestConfigDrift(t *testing.T) {
 				Memory:   512,
 				Storage:  "local-zfs",
 				Size:     "4G",
-				Net:      parsedNet{Bridge: "vmbr0", IP: "192.168.1.5/24", Gw: "10.10.10.1"},
+				Nets:     []parsedNet{{Bridge: "vmbr0", IP: "192.168.1.5/24", Gw: "10.10.10.1"}},
 			},
-			wantDrift: []string{"network.ip"},
+			wantDrift: []string{"network[0]"},
 		},
 		{
 			name: "network gw added",
@@ -90,9 +91,9 @@ func TestConfigDrift(t *testing.T) {
 				Memory:   512,
 				Storage:  "local-zfs",
 				Size:     "4G",
-				Net:      parsedNet{Bridge: "vmbr0", IP: "10.10.10.10/24"},
+				Nets:     []parsedNet{{Bridge: "vmbr0", IP: "10.10.10.10/24"}},
 			},
-			wantDrift: []string{"network.gw"},
+			wantDrift: []string{"network[0]"},
 		},
 		{
 			name: "multiple drifts",
@@ -102,9 +103,36 @@ func TestConfigDrift(t *testing.T) {
 				Memory:   1024,
 				Storage:  "local-zfs",
 				Size:     "4G",
-				Net:      parsedNet{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+				Nets:     []parsedNet{{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"}},
 			},
 			wantDrift: []string{"cores", "memory", "hostname"},
+		},
+		{
+			name: "nic added",
+			cfg: pctConfig{
+				Hostname: "pihole",
+				Cores:    2,
+				Memory:   512,
+				Storage:  "local-zfs",
+				Size:     "4G",
+				Nets:     []parsedNet{},
+			},
+			wantDrift: []string{"network[0]"},
+		},
+		{
+			name: "nic removed",
+			cfg: pctConfig{
+				Hostname: "pihole",
+				Cores:    2,
+				Memory:   512,
+				Storage:  "local-zfs",
+				Size:     "4G",
+				Nets: []parsedNet{
+					{Name: "eth0", Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+					{Name: "eth1", Bridge: "vmbr1", IP: "192.168.1.5/24"},
+				},
+			},
+			wantDrift: []string{"network[1]"},
 		},
 	}
 
@@ -225,14 +253,104 @@ func TestFilterSetDrift(t *testing.T) {
 	}
 }
 
+func TestMultiNicDrift(t *testing.T) {
+	op := &configLxcOp{
+		hostname:  "pihole",
+		cores:     2,
+		memoryMiB: 512,
+		storage:   "local-zfs",
+		networks: []LxcNet{
+			{Bridge: "vmbr0", IP: "10.0.0.1/24", Gw: "10.0.0.1"},
+			{Bridge: "vmbr1", IP: "192.168.1.5/24"},
+		},
+	}
+
+	t.Run("both match", func(t *testing.T) {
+		cfg := pctConfig{
+			Hostname: "pihole", Cores: 2, Memory: 512, Storage: "local-zfs",
+			Nets: []parsedNet{
+				{Name: "eth0", Bridge: "vmbr0", IP: "10.0.0.1/24", Gw: "10.0.0.1"},
+				{Name: "eth1", Bridge: "vmbr1", IP: "192.168.1.5/24"},
+			},
+		}
+		drift := op.configDrift(cfg)
+		if hasNetworkDrift(drift) {
+			t.Errorf("expected no network drift, got %v", drift)
+		}
+	})
+
+	t.Run("reordered", func(t *testing.T) {
+		cfg := pctConfig{
+			Hostname: "pihole", Cores: 2, Memory: 512, Storage: "local-zfs",
+			Nets: []parsedNet{
+				{Name: "eth0", Bridge: "vmbr1", IP: "192.168.1.5/24"},
+				{Name: "eth1", Bridge: "vmbr0", IP: "10.0.0.1/24", Gw: "10.0.0.1"},
+			},
+		}
+		drift := op.configDrift(cfg)
+		var netDrift []string
+		for _, d := range drift {
+			if strings.HasPrefix(d.Field, "network[") {
+				netDrift = append(netDrift, d.Field)
+			}
+		}
+		if len(netDrift) != 2 {
+			t.Fatalf("expected 2 network drifts, got %v", netDrift)
+		}
+	})
+
+	t.Run("second nic added", func(t *testing.T) {
+		cfg := pctConfig{
+			Hostname: "pihole", Cores: 2, Memory: 512, Storage: "local-zfs",
+			Nets: []parsedNet{
+				{Name: "eth0", Bridge: "vmbr0", IP: "10.0.0.1/24", Gw: "10.0.0.1"},
+			},
+		}
+		drift := op.configDrift(cfg)
+		var netDrift []string
+		for _, d := range drift {
+			if strings.HasPrefix(d.Field, "network[") {
+				netDrift = append(netDrift, d.Field)
+			}
+		}
+		if len(netDrift) != 1 || netDrift[0] != "network[1]" {
+			t.Fatalf("expected network[1] drift, got %v", netDrift)
+		}
+	})
+
+	t.Run("second nic removed", func(t *testing.T) {
+		oneNicOp := &configLxcOp{
+			hostname: "pihole", cores: 2, memoryMiB: 512, storage: "local-zfs",
+			networks: []LxcNet{{Bridge: "vmbr0", IP: "10.0.0.1/24", Gw: "10.0.0.1"}},
+		}
+		cfg := pctConfig{
+			Hostname: "pihole", Cores: 2, Memory: 512, Storage: "local-zfs",
+			Nets: []parsedNet{
+				{Name: "eth0", Bridge: "vmbr0", IP: "10.0.0.1/24", Gw: "10.0.0.1"},
+				{Name: "eth1", Bridge: "vmbr1", IP: "192.168.1.5/24"},
+			},
+		}
+		drift := oneNicOp.configDrift(cfg)
+		var netDrift []string
+		for _, d := range drift {
+			if strings.HasPrefix(d.Field, "network[") {
+				netDrift = append(netDrift, d.Field)
+			}
+		}
+		if len(netDrift) != 1 || netDrift[0] != "network[1]" {
+			t.Fatalf("expected network[1] removal drift, got %v", netDrift)
+		}
+	})
+}
+
 func TestHasNetworkDrift(t *testing.T) {
 	if hasNetworkDrift([]spec.DriftDetail{{Field: "cores"}}) {
 		t.Error("cores should not be network drift")
 	}
-	if !hasNetworkDrift([]spec.DriftDetail{{Field: "network.ip"}}) {
-		t.Error("network.ip should be network drift")
+	if !hasNetworkDrift([]spec.DriftDetail{{Field: "network[0]"}}) {
+		t.Error("network[0] should be network drift")
 	}
-	if !hasNetworkDrift([]spec.DriftDetail{{Field: "network.gw"}}) {
-		t.Error("network.gw should be network drift")
+	if !hasNetworkDrift([]spec.DriftDetail{{Field: "network[1]"}}) {
+		t.Error("network[1] should be network drift")
 	}
 }

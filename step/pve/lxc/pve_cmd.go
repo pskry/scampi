@@ -88,11 +88,15 @@ func filterSetDrift(drift []spec.DriftDetail) []spec.DriftDetail {
 
 func hasNetworkDrift(drift []spec.DriftDetail) bool {
 	for _, d := range drift {
-		if strings.HasPrefix(d.Field, "network.") {
+		if strings.HasPrefix(d.Field, "network[") {
 			return true
 		}
 	}
 	return false
+}
+
+func parsedToLxcNet(p parsedNet) LxcNet {
+	return LxcNet(p)
 }
 
 func parseSizeGiB(s string) int {

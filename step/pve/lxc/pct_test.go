@@ -91,9 +91,10 @@ func TestParsePctStatus(t *testing.T) {
 	}
 }
 
-func TestFormatNet0(t *testing.T) {
+func TestFormatNet(t *testing.T) {
 	tests := []struct {
 		name string
+		idx  int
 		net  LxcNet
 		want string
 	}{
@@ -103,25 +104,26 @@ func TestFormatNet0(t *testing.T) {
 			want: "name=eth0,bridge=vmbr0,ip=10.10.10.10/24,gw=10.10.10.1,type=veth",
 		},
 		{
-			name: "ip only",
+			name: "custom bridge index 1",
+			idx:  1,
+			net:  LxcNet{Bridge: "vmbr1", IP: "192.168.1.5/24", Gw: "192.168.1.1"},
+			want: "name=eth1,bridge=vmbr1,ip=192.168.1.5/24,gw=192.168.1.1,type=veth",
+		},
+		{
+			name: "custom name",
+			net:  LxcNet{Name: "mgmt", Bridge: "vmbr0", IP: "10.0.0.1/24"},
+			want: "name=mgmt,bridge=vmbr0,ip=10.0.0.1/24,type=veth",
+		},
+		{
+			name: "dhcp",
 			net:  LxcNet{Bridge: "vmbr0", IP: "dhcp"},
 			want: "name=eth0,bridge=vmbr0,ip=dhcp,type=veth",
-		},
-		{
-			name: "custom bridge",
-			net:  LxcNet{Bridge: "vmbr1", IP: "192.168.1.5/24", Gw: "192.168.1.1"},
-			want: "name=eth0,bridge=vmbr1,ip=192.168.1.5/24,gw=192.168.1.1,type=veth",
-		},
-		{
-			name: "empty bridge defaults to vmbr0",
-			net:  LxcNet{IP: "10.0.0.1/24"},
-			want: "name=eth0,bridge=vmbr0,ip=10.0.0.1/24,type=veth",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatNet0(tt.net)
+			got := formatNet(tt.idx, tt.net)
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
@@ -141,7 +143,7 @@ func TestBuildCreateCmd(t *testing.T) {
 		storage:    "local-zfs",
 		sizeGiB:    4,
 		privileged: true,
-		network:    LxcNet{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"},
+		networks:   []LxcNet{{Bridge: "vmbr0", IP: "10.10.10.10/24", Gw: "10.10.10.1"}},
 	}
 
 	got := buildCreateCmd(cfg)
@@ -151,8 +153,8 @@ func TestBuildCreateCmd(t *testing.T) {
 		" --memory 512" +
 		" --swap 512" +
 		" --rootfs local-zfs:4" +
-		" --net0 name=eth0,bridge=vmbr0,ip=10.10.10.10/24,gw=10.10.10.1,type=veth" +
-		" --unprivileged 0"
+		" --unprivileged 0" +
+		" --net0 name=eth0,bridge=vmbr0,ip=10.10.10.10/24,gw=10.10.10.1,type=veth"
 	if got != want {
 		t.Errorf("buildCreateCmd:\n got: %s\nwant: %s", got, want)
 	}
@@ -201,14 +203,17 @@ unprivileged: 1
 	if cfg.Size != "4G" {
 		t.Errorf("size: got %q, want %q", cfg.Size, "4G")
 	}
-	if cfg.Net.Bridge != "vmbr0" {
-		t.Errorf("net.bridge: got %q, want %q", cfg.Net.Bridge, "vmbr0")
+	if len(cfg.Nets) != 1 {
+		t.Fatalf("nets: got %d, want 1", len(cfg.Nets))
 	}
-	if cfg.Net.IP != "10.10.10.10/24" {
-		t.Errorf("net.ip: got %q, want %q", cfg.Net.IP, "10.10.10.10/24")
+	if cfg.Nets[0].Bridge != "vmbr0" {
+		t.Errorf("net0.bridge: got %q, want %q", cfg.Nets[0].Bridge, "vmbr0")
 	}
-	if cfg.Net.Gw != "10.10.10.1" {
-		t.Errorf("net.gw: got %q, want %q", cfg.Net.Gw, "10.10.10.1")
+	if cfg.Nets[0].IP != "10.10.10.10/24" {
+		t.Errorf("net0.ip: got %q, want %q", cfg.Nets[0].IP, "10.10.10.10/24")
+	}
+	if cfg.Nets[0].Gw != "10.10.10.1" {
+		t.Errorf("net0.gw: got %q, want %q", cfg.Nets[0].Gw, "10.10.10.1")
 	}
 }
 

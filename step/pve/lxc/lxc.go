@@ -77,7 +77,7 @@ type (
 		Privileged    bool         `step:"Run as privileged container (less secure)" default:"false"`
 		Features      *LxcFeatures `step:"Advanced LXC features" optional:"true"`
 		Startup       *LxcStartup  `step:"Startup/shutdown ordering" optional:"true"`
-		Network       LxcNet       `step:"Network configuration"`
+		Networks      []LxcNet     `step:"Network interfaces" optional:"true"`
 		Tags          []string     `step:"PVE tags" optional:"true"`
 		Password      string       `step:"Root password (create-only)" optional:"true"`
 		SSHPublicKeys []string     `step:"SSH public keys for root" optional:"true"`
@@ -88,6 +88,7 @@ type (
 		Name    string `step:"Template filename" example:"debian-12-standard_12.7-1_amd64.tar.zst"`
 	}
 	LxcNet struct {
+		Name   string `step:"Interface name inside container" optional:"true"`
 		Bridge string `step:"Bridge interface" default:"vmbr0"`
 		IP     string `step:"IP address in CIDR or dhcp" example:"10.10.10.10/24"`
 		Gw     string `step:"Gateway" optional:"true" example:"10.10.10.1"`
@@ -146,7 +147,7 @@ func (LXC) Plan(step spec.StepInstance) (spec.Action, error) {
 		privileged:    cfg.Privileged,
 		features:      cfg.Features,
 		startup:       cfg.Startup,
-		network:       cfg.Network,
+		networks:      cfg.Networks,
 		tags:          cfg.Tags,
 		password:      cfg.Password,
 		sshPublicKeys: cfg.SSHPublicKeys,
@@ -281,12 +282,27 @@ func (c *LxcConfig) validate(step spec.StepInstance) error {
 			Source: step.Fields["size"].Value,
 		}
 	}
-	if c.Network.IP == "" {
-		return InvalidConfigError{
-			Field:  "network.ip",
-			Reason: "network IP address is required",
-			Source: step.Fields["network"].Value,
+	names := make(map[string]bool)
+	for i, net := range c.Networks {
+		if net.IP == "" {
+			return InvalidConfigError{
+				Field:  fmt.Sprintf("networks[%d].ip", i),
+				Reason: "IP address is required",
+				Source: step.Fields["networks"].Value,
+			}
 		}
+		name := net.Name
+		if name == "" {
+			name = fmt.Sprintf("eth%d", i)
+		}
+		if names[name] {
+			return InvalidConfigError{
+				Field:  fmt.Sprintf("networks[%d].name", i),
+				Reason: fmt.Sprintf("duplicate interface name %q", name),
+				Source: step.Fields["networks"].Value,
+			}
+		}
+		names[name] = true
 	}
 	if sizeUnit != "M" && sizeMiB%1024 != 0 {
 		return SizeTruncatedWarning{
@@ -317,7 +333,7 @@ type lxcAction struct {
 	privileged    bool
 	features      *LxcFeatures
 	startup       *LxcStartup
-	network       LxcNet
+	networks      []LxcNet
 	tags          []string
 	password      string
 	sshPublicKeys []string
@@ -341,7 +357,7 @@ func (a *lxcAction) Ops() []spec.Op {
 		storage:       a.storage,
 		sizeGiB:       a.sizeGiB,
 		privileged:    a.privileged,
-		network:       a.network,
+		networks:      a.networks,
 		tags:          a.tags,
 		sshPublicKeys: a.sshPublicKeys,
 	}
@@ -371,7 +387,7 @@ func (a *lxcAction) Ops() []spec.Op {
 		privileged: a.privileged,
 		features:   a.features,
 		startup:    a.startup,
-		network:    a.network,
+		networks:   a.networks,
 		tags:       a.tags,
 	}
 	cfgOp.SetAction(a)
