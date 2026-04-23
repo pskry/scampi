@@ -105,6 +105,7 @@ type pctConfig struct {
 	Storage      string      // rootfs storage pool
 	Size         string      // rootfs size with unit (e.g. "4G")
 	Nets         []parsedNet // indexed by net0, net1, ...
+	Devs         []parsedDev // indexed by dev0, dev1, ...
 }
 
 type parsedNet struct {
@@ -112,6 +113,11 @@ type parsedNet struct {
 	Bridge string
 	IP     string
 	Gw     string
+}
+
+type parsedDev struct {
+	Path string
+	Mode string
 }
 
 // parseNetKey extracts the index from "net0", "net1", etc.
@@ -124,6 +130,70 @@ func parseNetKey(key string) (int, bool) {
 		return 0, false
 	}
 	return idx, true
+}
+
+// parseDevKey extracts the index from "dev0", "dev1", etc.
+func parseDevKey(key string) (int, bool) {
+	if !strings.HasPrefix(key, "dev") {
+		return 0, false
+	}
+	idx, err := strconv.Atoi(key[3:])
+	if err != nil {
+		return 0, false
+	}
+	return idx, true
+}
+
+// parseDevValue parses a PVE device config value.
+//
+//	"/dev/dri/renderD128,mode=0666"
+//	"/dev/kfd"
+func parseDevValue(val string) parsedDev {
+	var dev parsedDev
+	parts := strings.SplitN(val, ",", 2)
+	dev.Path = strings.TrimSpace(parts[0])
+	if len(parts) < 2 {
+		return dev
+	}
+	for kv := range strings.SplitSeq(parts[1], ",") {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		if k == "mode" {
+			dev.Mode = v
+		}
+	}
+	return dev
+}
+
+// formatDev builds the --devN value for pct create/set.
+//
+//	"/dev/dri/renderD128,mode=0666"
+func formatDev(dev LxcDevice) string {
+	var b strings.Builder
+	b.WriteString(dev.Path)
+	mode := dev.Mode
+	if mode == "" {
+		mode = "0666"
+	}
+	b.WriteString(",mode=")
+	b.WriteString(mode)
+	return b.String()
+}
+
+// devicesFingerprint produces a canonical string for device list comparison.
+// Returns "(none)" for empty lists so the reboot check runner's
+// empty-string guard (which means "probe failed") doesn't swallow it.
+func devicesFingerprint(devs []LxcDevice) string {
+	if len(devs) == 0 {
+		return "(none)"
+	}
+	var parts []string
+	for i, d := range devs {
+		parts = append(parts, fmt.Sprintf("dev%d=%s", i, formatDev(d)))
+	}
+	return strings.Join(parts, ";")
 }
 
 // parsePctConfig parses the key: value output of `pct config <id>`.
@@ -170,6 +240,11 @@ func parsePctConfig(output string) pctConfig {
 					cfg.Nets = append(cfg.Nets, parsedNet{})
 				}
 				cfg.Nets[idx] = parseNetValue(val)
+			} else if idx, ok := parseDevKey(key); ok {
+				for len(cfg.Devs) <= idx {
+					cfg.Devs = append(cfg.Devs, parsedDev{})
+				}
+				cfg.Devs[idx] = parseDevValue(val)
 			}
 		}
 	}
@@ -302,6 +377,9 @@ func buildCreateCmd(cfg lxcAction) string {
 		if s := formatStartup(cfg.startup); s != "" {
 			cmd += " --startup " + shellQuote(s)
 		}
+	}
+	for i, dev := range cfg.devices {
+		cmd += fmt.Sprintf(" --dev%d %s", i, formatDev(dev))
 	}
 	return cmd
 }

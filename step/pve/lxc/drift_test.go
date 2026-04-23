@@ -343,6 +343,92 @@ func TestMultiNicDrift(t *testing.T) {
 	})
 }
 
+func TestDeviceDrift(t *testing.T) {
+	base := func(devs []LxcDevice) *configLxcOp {
+		return &configLxcOp{
+			hostname:  "gpu-box",
+			cores:     4,
+			memoryMiB: 4096,
+			storage:   "local-zfs",
+			devices:   devs,
+		}
+	}
+
+	t.Run("no drift", func(t *testing.T) {
+		op := base([]LxcDevice{{Path: "/dev/dri/renderD128", Mode: "0666"}})
+		cfg := pctConfig{
+			Hostname: "gpu-box", Cores: 4, Memory: 4096, Storage: "local-zfs",
+			Devs: []parsedDev{{Path: "/dev/dri/renderD128", Mode: "0666"}},
+		}
+		drift := op.configDrift(cfg)
+		if hasDeviceDrift(drift) {
+			t.Errorf("expected no device drift, got %v", drift)
+		}
+	})
+
+	t.Run("device added", func(t *testing.T) {
+		op := base([]LxcDevice{{Path: "/dev/dri/renderD128", Mode: "0666"}})
+		cfg := pctConfig{
+			Hostname: "gpu-box", Cores: 4, Memory: 4096, Storage: "local-zfs",
+		}
+		drift := op.configDrift(cfg)
+		if !hasDeviceDrift(drift) {
+			t.Fatal("expected device drift")
+		}
+	})
+
+	t.Run("device removed", func(t *testing.T) {
+		op := base(nil)
+		cfg := pctConfig{
+			Hostname: "gpu-box", Cores: 4, Memory: 4096, Storage: "local-zfs",
+			Devs: []parsedDev{{Path: "/dev/dri/renderD128", Mode: "0666"}},
+		}
+		drift := op.configDrift(cfg)
+		if !hasDeviceDrift(drift) {
+			t.Fatal("expected device drift for removal")
+		}
+	})
+
+	t.Run("mode changed", func(t *testing.T) {
+		op := base([]LxcDevice{{Path: "/dev/dri/renderD128", Mode: "0660"}})
+		cfg := pctConfig{
+			Hostname: "gpu-box", Cores: 4, Memory: 4096, Storage: "local-zfs",
+			Devs: []parsedDev{{Path: "/dev/dri/renderD128", Mode: "0666"}},
+		}
+		drift := op.configDrift(cfg)
+		if !hasDeviceDrift(drift) {
+			t.Fatal("expected device drift for mode change")
+		}
+	})
+
+	t.Run("multiple devices", func(t *testing.T) {
+		op := base([]LxcDevice{
+			{Path: "/dev/dri/renderD128", Mode: "0666"},
+			{Path: "/dev/kfd", Mode: "0660"},
+		})
+		cfg := pctConfig{
+			Hostname: "gpu-box", Cores: 4, Memory: 4096, Storage: "local-zfs",
+			Devs: []parsedDev{
+				{Path: "/dev/dri/renderD128", Mode: "0666"},
+				{Path: "/dev/kfd", Mode: "0660"},
+			},
+		}
+		drift := op.configDrift(cfg)
+		if hasDeviceDrift(drift) {
+			t.Errorf("expected no device drift, got %v", drift)
+		}
+	})
+}
+
+func TestHasDeviceDrift(t *testing.T) {
+	if hasDeviceDrift([]spec.DriftDetail{{Field: "cores"}}) {
+		t.Error("cores should not be device drift")
+	}
+	if !hasDeviceDrift([]spec.DriftDetail{{Field: "device[0]"}}) {
+		t.Error("device[0] should be device drift")
+	}
+}
+
 func TestHasNetworkDrift(t *testing.T) {
 	if hasNetworkDrift([]spec.DriftDetail{{Field: "cores"}}) {
 		t.Error("cores should not be network drift")

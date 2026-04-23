@@ -164,3 +164,209 @@ func TestRebootOpCheck_FeaturesMatch(t *testing.T) {
 		t.Errorf("got %d drift entries, want 0", len(drift))
 	}
 }
+
+func TestRebootOpCheck_DeviceAdded(t *testing.T) {
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			return target.CommandResult{Stdout: "hostname: pihole\n"}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+		devices:  []LxcDevice{{Path: "/dev/dri/renderD128", Mode: "0666"}},
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckUnsatisfied {
+		t.Errorf("got %v, want CheckUnsatisfied", result)
+	}
+	if len(drift) != 1 || drift[0].Field != "devices (reboot)" {
+		t.Errorf("got drift %v, want devices (reboot)", drift)
+	}
+}
+
+func TestRebootOpCheck_DeviceRemoved(t *testing.T) {
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			return target.CommandResult{
+				Stdout: "hostname: pihole\n" +
+					"dev0: /dev/dri/renderD128,mode=0666\n",
+			}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckUnsatisfied {
+		t.Errorf("got %v, want CheckUnsatisfied", result)
+	}
+	if len(drift) != 1 || drift[0].Field != "devices (reboot)" {
+		t.Errorf("got drift %v, want devices (reboot)", drift)
+	}
+}
+
+func TestRebootOpCheck_DevicesConverged(t *testing.T) {
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			return target.CommandResult{
+				Stdout: "hostname: pihole\n" +
+					"dev0: /dev/dri/renderD128,mode=0666\n",
+			}, nil
+		case "pct exec 100 -- test -e '/dev/dri/renderD128'":
+			return target.CommandResult{ExitCode: 0}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+		devices:  []LxcDevice{{Path: "/dev/dri/renderD128", Mode: "0666"}},
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckSatisfied {
+		t.Errorf("got %v, want CheckSatisfied", result)
+	}
+	if len(drift) != 0 {
+		t.Errorf("got %d drift entries, want 0", len(drift))
+	}
+}
+
+func TestRebootOpCheck_DeviceInterrupted(t *testing.T) {
+	// Config matches desired but device isn't inside container
+	// (interrupted run: cfgOp wrote config, reboot didn't fire).
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			return target.CommandResult{
+				Stdout: "hostname: pihole\n" +
+					"dev0: /dev/dri/renderD128,mode=0666\n",
+			}, nil
+		case "pct exec 100 -- test -e '/dev/dri/renderD128'":
+			return target.CommandResult{ExitCode: 1}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+		devices:  []LxcDevice{{Path: "/dev/dri/renderD128", Mode: "0666"}},
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckUnsatisfied {
+		t.Errorf("got %v, want CheckUnsatisfied", result)
+	}
+	if len(drift) != 1 || drift[0].Field != "devices (reboot)" {
+		t.Errorf("got drift %v, want devices (reboot)", drift)
+	}
+}
+
+func TestRebootOpCheck_StaleDevice(t *testing.T) {
+	// Config and desired both empty, but /dev/dri exists inside
+	// container from a previous config (interrupted removal).
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			return target.CommandResult{Stdout: "hostname: pihole\n"}, nil
+		case "pct exec 100 -- test -d /dev/dri":
+			return target.CommandResult{ExitCode: 0}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckUnsatisfied {
+		t.Errorf("got %v, want CheckUnsatisfied", result)
+	}
+	if len(drift) != 1 || drift[0].Field != "devices (reboot)" {
+		t.Errorf("got drift %v, want devices (reboot)", drift)
+	}
+}
+
+func TestRebootOpCheck_NoDevicesClean(t *testing.T) {
+	// No devices desired, no devices in config, no /dev/dri in
+	// container — fully clean, no reboot.
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			return target.CommandResult{Stdout: "hostname: pihole\n"}, nil
+		case "pct exec 100 -- test -d /dev/dri":
+			return target.CommandResult{ExitCode: 1}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckSatisfied {
+		t.Errorf("got %v, want CheckSatisfied", result)
+	}
+	if len(drift) != 0 {
+		t.Errorf("got %d drift entries, want 0", len(drift))
+	}
+}

@@ -609,3 +609,120 @@ func TestBuildDownloadCmd(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+// Device parse/format tests
+// -----------------------------------------------------------------------------
+
+func TestParseDevKey(t *testing.T) {
+	tests := []struct {
+		key     string
+		wantIdx int
+		wantOk  bool
+	}{
+		{"dev0", 0, true},
+		{"dev1", 1, true},
+		{"dev12", 12, true},
+		{"net0", 0, false},
+		{"dev", 0, false},
+		{"devX", 0, false},
+	}
+	for _, tt := range tests {
+		idx, ok := parseDevKey(tt.key)
+		if ok != tt.wantOk || idx != tt.wantIdx {
+			t.Errorf("parseDevKey(%q) = (%d, %v), want (%d, %v)",
+				tt.key, idx, ok, tt.wantIdx, tt.wantOk)
+		}
+	}
+}
+
+func TestParseDevValue(t *testing.T) {
+	tests := []struct {
+		val  string
+		want parsedDev
+	}{
+		{
+			"/dev/dri/renderD128",
+			parsedDev{Path: "/dev/dri/renderD128"},
+		},
+		{
+			"/dev/dri/renderD128,mode=0666",
+			parsedDev{Path: "/dev/dri/renderD128", Mode: "0666"},
+		},
+		{
+			"/dev/kfd,mode=0660",
+			parsedDev{Path: "/dev/kfd", Mode: "0660"},
+		},
+		{
+			"/dev/nvidia0",
+			parsedDev{Path: "/dev/nvidia0"},
+		},
+	}
+	for _, tt := range tests {
+		got := parseDevValue(tt.val)
+		if got != tt.want {
+			t.Errorf("parseDevValue(%q) = %+v, want %+v",
+				tt.val, got, tt.want)
+		}
+	}
+}
+
+func TestFormatDev(t *testing.T) {
+	tests := []struct {
+		dev  LxcDevice
+		want string
+	}{
+		{
+			LxcDevice{Path: "/dev/dri/renderD128"},
+			"/dev/dri/renderD128,mode=0666",
+		},
+		{
+			LxcDevice{Path: "/dev/dri/renderD128", Mode: "0666"},
+			"/dev/dri/renderD128,mode=0666",
+		},
+		{
+			LxcDevice{Path: "/dev/kfd", Mode: "0660"},
+			"/dev/kfd,mode=0660",
+		},
+	}
+	for _, tt := range tests {
+		got := formatDev(tt.dev)
+		if got != tt.want {
+			t.Errorf("formatDev(%+v) = %q, want %q",
+				tt.dev, got, tt.want)
+		}
+	}
+}
+
+func TestDeviceRoundtrip(t *testing.T) {
+	cases := []string{
+		"/dev/dri/renderD128,mode=0666",
+		"/dev/kfd,mode=0660",
+		"/dev/nvidia0,mode=0666",
+	}
+	for _, val := range cases {
+		parsed := parseDevValue(val)
+		dev := parsedToLxcDevice(parsed)
+		formatted := formatDev(dev)
+		if formatted != val {
+			t.Errorf("roundtrip %q → %+v → %q", val, dev, formatted)
+		}
+	}
+}
+
+func TestParsePctConfigDevices(t *testing.T) {
+	output := "arch: amd64\n" +
+		"cores: 2\n" +
+		"dev0: /dev/dri/renderD128,mode=0666\n" +
+		"dev1: /dev/kfd,mode=0660\n" +
+		"hostname: gpu-box\n"
+	cfg := parsePctConfig(output)
+	if len(cfg.Devs) != 2 {
+		t.Fatalf("got %d devs, want 2", len(cfg.Devs))
+	}
+	if cfg.Devs[0].Path != "/dev/dri/renderD128" {
+		t.Errorf("dev0 path = %q", cfg.Devs[0].Path)
+	}
+	if cfg.Devs[1].Path != "/dev/kfd" {
+		t.Errorf("dev1 path = %q", cfg.Devs[1].Path)
+	}
+}

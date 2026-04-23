@@ -29,6 +29,7 @@ type createLxcOp struct {
 	sizeGiB       int
 	privileged    bool
 	networks      []LxcNet
+	devices       []LxcDevice
 	tags          []string
 	sshPublicKeys []string
 }

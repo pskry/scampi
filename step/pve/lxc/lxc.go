@@ -71,13 +71,14 @@ type (
 		State         string       `step:"Desired state" default:"running"`
 		Cores         int          `step:"CPU cores" default:"1"`
 		Memory        string       `step:"Memory with unit (e.g. 512M, 2G)" default:"512M"`
-		Swap          string       `step:"Swap with unit (e.g. 512M, 2G) — defaults to memory value" optional:"true"`
+		Swap          string       `step:"Swap with unit — defaults to memory value" optional:"true"`
 		Storage       string       `step:"Storage pool for rootfs" default:"local-zfs"`
 		Size          string       `step:"Root disk size with unit (e.g. 8G, 500M)" default:"8G"`
 		Privileged    bool         `step:"Run as privileged container (less secure)" default:"false"`
 		Features      *LxcFeatures `step:"Advanced LXC features" optional:"true"`
 		Startup       *LxcStartup  `step:"Startup/shutdown ordering" optional:"true"`
 		Networks      []LxcNet     `step:"Network interfaces" optional:"true"`
+		Devices       []LxcDevice  `step:"Device passthrough (PVE 8.1+)" optional:"true"`
 		Tags          []string     `step:"PVE tags" optional:"true"`
 		Password      string       `step:"Root password (create-only)" optional:"true"`
 		SSHPublicKeys []string     `step:"SSH public keys for root" optional:"true"`
@@ -92,6 +93,10 @@ type (
 		Bridge string `step:"Bridge interface" default:"vmbr0"`
 		IP     string `step:"IP address in CIDR or dhcp" example:"10.10.10.10/24"`
 		Gw     string `step:"Gateway" optional:"true" example:"10.10.10.1"`
+	}
+	LxcDevice struct {
+		Path string `step:"Host device path" example:"/dev/dri/renderD128"`
+		Mode string `step:"Permission mode" default:"0666"`
 	}
 	LxcStartup struct {
 		OnBoot bool `step:"Start on host boot" default:"false"`
@@ -148,6 +153,7 @@ func (LXC) Plan(step spec.StepInstance) (spec.Action, error) {
 		features:      cfg.Features,
 		startup:       cfg.Startup,
 		networks:      cfg.Networks,
+		devices:       cfg.Devices,
 		tags:          cfg.Tags,
 		password:      cfg.Password,
 		sshPublicKeys: cfg.SSHPublicKeys,
@@ -304,6 +310,31 @@ func (c *LxcConfig) validate(step spec.StepInstance) error {
 		}
 		names[name] = true
 	}
+	devPaths := make(map[string]bool)
+	for i, dev := range c.Devices {
+		if dev.Path == "" {
+			return InvalidConfigError{
+				Field:  fmt.Sprintf("devices[%d].path", i),
+				Reason: "device path is required",
+				Source: step.Fields["devices"].Value,
+			}
+		}
+		if !strings.HasPrefix(dev.Path, "/dev/") {
+			return InvalidConfigError{
+				Field:  fmt.Sprintf("devices[%d].path", i),
+				Reason: fmt.Sprintf("device path %q must start with /dev/", dev.Path),
+				Source: step.Fields["devices"].Value,
+			}
+		}
+		if devPaths[dev.Path] {
+			return InvalidConfigError{
+				Field:  fmt.Sprintf("devices[%d].path", i),
+				Reason: fmt.Sprintf("duplicate device path %q", dev.Path),
+				Source: step.Fields["devices"].Value,
+			}
+		}
+		devPaths[dev.Path] = true
+	}
 	if sizeUnit != "M" && sizeMiB%1024 != 0 {
 		return SizeTruncatedWarning{
 			Input:   c.Size,
@@ -334,6 +365,7 @@ type lxcAction struct {
 	features      *LxcFeatures
 	startup       *LxcStartup
 	networks      []LxcNet
+	devices       []LxcDevice
 	tags          []string
 	password      string
 	sshPublicKeys []string
@@ -358,6 +390,7 @@ func (a *lxcAction) Ops() []spec.Op {
 		sizeGiB:       a.sizeGiB,
 		privileged:    a.privileged,
 		networks:      a.networks,
+		devices:       a.devices,
 		tags:          a.tags,
 		sshPublicKeys: a.sshPublicKeys,
 	}
@@ -388,6 +421,7 @@ func (a *lxcAction) Ops() []spec.Op {
 		features:   a.features,
 		startup:    a.startup,
 		networks:   a.networks,
+		devices:    a.devices,
 		tags:       a.tags,
 	}
 	cfgOp.SetAction(a)
@@ -407,11 +441,13 @@ func (a *lxcAction) Ops() []spec.Op {
 	keysOp.SetAction(a)
 	keysOp.AddDependency(createOp)
 
-	// Reboot depends on config (hostname/features changes need reboot).
+	// Reboot depends on config (hostname/features/device changes
+	// need a reboot to take effect in the running container).
 	rebootOp := &rebootLxcOp{
 		pveCmd:   cmd,
 		hostname: a.hostname,
 		features: a.features,
+		devices:  a.devices,
 	}
 	rebootOp.SetAction(a)
 	rebootOp.AddDependency(cfgOp)
@@ -422,7 +458,6 @@ func (a *lxcAction) Ops() []spec.Op {
 		state:  a.state,
 	}
 	stOp.SetAction(a)
-	stOp.AddDependency(cfgOp)
 	stOp.AddDependency(resizeOp)
 	stOp.AddDependency(rebootOp)
 

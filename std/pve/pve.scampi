@@ -75,6 +75,15 @@ pub type LxcNet {
   gw:     string?
 }
 
+// Host device passthrough (PVE 8.1+). List index determines the
+// PVE dev index (first element → dev0, second → dev1, etc.).
+pub type Device {
+  // Absolute path to the device on the PVE host.
+  path: string
+  // Permission mode for the device node inside the container.
+  mode: string = "0666"
+}
+
 // Steps
 // -----------------------------------------------------------------------------
 
@@ -97,6 +106,8 @@ pub decl lxc(
   features:        Features?
   startup:         Startup?
   networks:        list[LxcNet] = []
+  // Host device passthrough via PVE 8.1+ devN: syntax.
+  devices:         list[Device] = []
   tags:            list[string] = []
   // Root password set on create. Cannot be changed after creation.
   password:        string?

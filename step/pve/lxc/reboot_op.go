@@ -60,6 +60,62 @@ func buildRebootChecks(op *rebootLxcOp) []rebootCheck {
 		})
 	}
 
+	// Devices: devN entries are read at container start. Compare
+	// what the config says (pre-cfgOp state during Check) against
+	// what's actually inside the running container. Catches:
+	//  - additions: config has no dev, desired does → cfgOp will add,
+	//    reboot needed (config ≠ desired at Check time)
+	//  - removals: config has dev, desired doesn't → cfgOp will delete,
+	//    reboot needed (config ≠ desired at Check time)
+	//  - interrupted runs: config already matches desired but the
+	//    container wasn't rebooted → probe running state to verify
+	{
+		checks = append(checks, rebootCheck{
+			field:   "devices",
+			desired: devicesFingerprint(op.devices),
+			probe: func(ctx context.Context, cmdr target.Command, id int) string {
+				// First compare config vs desired (catches pending
+				// cfgOp changes before they're applied).
+				cfg, err := op.inspectConfig(ctx, cmdr)
+				if err != nil {
+					return ""
+				}
+				var live []LxcDevice
+				for _, d := range cfg.Devs {
+					live = append(live, parsedToLxcDevice(d))
+				}
+				configFP := devicesFingerprint(live)
+				desiredFP := devicesFingerprint(op.devices)
+				if configFP != desiredFP {
+					return configFP
+				}
+				// Config matches desired — verify the running
+				// container actually reflects it (catches interrupted
+				// runs where config was updated but reboot didn't fire).
+				for _, d := range op.devices {
+					cmd := fmt.Sprintf("pct exec %d -- test -e %s", id, shellQuote(d.Path))
+					r, err := cmdr.RunPrivileged(ctx, cmd)
+					if err != nil || r.ExitCode != 0 {
+						return "stale (device missing)"
+					}
+				}
+				// If desired is empty and config is empty, check
+				// common device paths that might be stale.
+				if len(op.devices) == 0 && len(cfg.Devs) == 0 {
+					// We can't enumerate — but /dev/dri is the most
+					// common passthrough path. Check if it exists
+					// when it shouldn't.
+					cmd := fmt.Sprintf("pct exec %d -- test -d /dev/dri", id)
+					r, err := cmdr.RunPrivileged(ctx, cmd)
+					if err == nil && r.ExitCode == 0 {
+						return "stale (device remnant)"
+					}
+				}
+				return desiredFP
+			},
+		})
+	}
+
 	return checks
 }
 
@@ -68,6 +124,7 @@ type rebootLxcOp struct {
 	pveCmd
 	hostname string
 	features *LxcFeatures
+	devices  []LxcDevice
 }
 
 func (op *rebootLxcOp) Check(

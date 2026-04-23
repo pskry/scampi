@@ -99,6 +99,19 @@ func parsedToLxcNet(p parsedNet) LxcNet {
 	return LxcNet(p)
 }
 
+func hasDeviceDrift(drift []spec.DriftDetail) bool {
+	for _, d := range drift {
+		if strings.HasPrefix(d.Field, "device[") {
+			return true
+		}
+	}
+	return false
+}
+
+func parsedToLxcDevice(p parsedDev) LxcDevice {
+	return LxcDevice(p)
+}
+
 func parseSizeGiB(s string) int {
 	s = strings.TrimRight(s, "GgTt")
 	n, _ := strconv.Atoi(s)
