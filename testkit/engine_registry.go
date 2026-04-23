@@ -2,7 +2,11 @@
 
 package testkit
 
-import "scampi.dev/scampi/spec"
+import (
+	"reflect"
+
+	"scampi.dev/scampi/spec"
+)
 
 // BaseRegistry is the lookup surface the test runner needs from a
 // base engine registry. Exactly the shape of linker.Registry —
@@ -11,6 +15,7 @@ import "scampi.dev/scampi/spec"
 type BaseRegistry interface {
 	StepType(kind string) (spec.StepType, bool)
 	TargetType(kind string) (spec.TargetType, bool)
+	ConverterFor(reflect.Type) (spec.TypeConverter, bool)
 }
 
 // EngineRegistry wraps a BaseRegistry and overlays the two test
@@ -37,6 +42,11 @@ func NewEngineRegistry(base BaseRegistry, tests *TestRegistry) *EngineRegistry {
 // StepType delegates to the base registry — no overlay.
 func (r *EngineRegistry) StepType(kind string) (spec.StepType, bool) {
 	return r.base.StepType(kind)
+}
+
+// ConverterFor delegates to the base registry.
+func (r *EngineRegistry) ConverterFor(t reflect.Type) (spec.TypeConverter, bool) {
+	return r.base.ConverterFor(t)
 }
 
 // TargetType returns a test target type for the two known test

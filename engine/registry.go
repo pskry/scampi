@@ -3,6 +3,8 @@
 package engine
 
 import (
+	"maps"
+	"reflect"
 	"slices"
 
 	"scampi.dev/scampi/spec"
@@ -17,6 +19,7 @@ import (
 	steprest "scampi.dev/scampi/step/rest"
 	"scampi.dev/scampi/step/run"
 	"scampi.dev/scampi/step/service"
+	"scampi.dev/scampi/step/sharedops"
 	"scampi.dev/scampi/step/symlink"
 	"scampi.dev/scampi/step/sysctl"
 	"scampi.dev/scampi/step/template"
@@ -30,6 +33,7 @@ import (
 type Registry struct {
 	stepTypes   map[string]spec.StepType
 	targetTypes map[string]spec.TargetType
+	converters  map[reflect.Type]spec.TypeConverter
 }
 
 func NewRegistry() *Registry {
@@ -63,12 +67,24 @@ func NewRegistry() *Registry {
 	r := &Registry{
 		stepTypes:   make(map[string]spec.StepType),
 		targetTypes: make(map[string]spec.TargetType),
+		converters:  make(map[reflect.Type]spec.TypeConverter),
 	}
 	for _, st := range stepTypes {
 		r.stepTypes[st.Kind()] = st
 	}
 	for _, t := range targetTypes {
 		r.targetTypes[t.Kind()] = t
+	}
+
+	// Register type converters from owning packages.
+	for _, cm := range []spec.ConverterMap{
+		sharedops.Converters(),
+		pkg.Converters(),
+		steprest.Converters(),
+		rest.Converters(),
+		container.Converters(),
+	} {
+		maps.Copy(r.converters, cm)
 	}
 
 	return r
@@ -94,6 +110,11 @@ func (r *Registry) StepTypes() []spec.StepType {
 		return 0
 	})
 	return stepTypes
+}
+
+func (r *Registry) ConverterFor(t reflect.Type) (spec.TypeConverter, bool) {
+	c, ok := r.converters[t]
+	return c, ok
 }
 
 func (r *Registry) TargetType(kind string) (spec.TargetType, bool) {

@@ -3,6 +3,7 @@
 package testkit
 
 import (
+	"reflect"
 	"testing"
 
 	"scampi.dev/scampi/spec"
@@ -26,6 +27,10 @@ func (s *stubBase) TargetType(kind string) (spec.TargetType, bool) {
 	if t, ok := s.targetTypes[kind]; ok {
 		return t, true
 	}
+	return nil, false
+}
+
+func (s *stubBase) ConverterFor(reflect.Type) (spec.TypeConverter, bool) {
 	return nil, false
 }
 

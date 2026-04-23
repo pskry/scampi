@@ -21,15 +21,17 @@ import (
 type Registry interface {
 	StepType(kind string) (spec.StepType, bool)
 	TargetType(kind string) (spec.TargetType, bool)
+	ConverterFor(reflect.Type) (spec.TypeConverter, bool)
 }
 
 // LinkOption configures the linker.
 type LinkOption func(*linkConfig)
 
 type linkConfig struct {
-	ctx     context.Context
-	cfgPath string
-	src     source.Source
+	ctx          context.Context
+	cfgPath      string
+	src          source.Source
+	converterFor func(reflect.Type) (spec.TypeConverter, bool)
 }
 
 // WithSourceResolver enables source resolution (inline caching,
@@ -50,6 +52,7 @@ func Link(result *eval.Result, reg Registry, path string, opts ...LinkOption) (s
 	for _, o := range opts {
 		o(&lc)
 	}
+	lc.converterFor = reg.ConverterFor
 	cfg := spec.Config{
 		Path:    path,
 		Targets: make(map[string]spec.TargetInstance),

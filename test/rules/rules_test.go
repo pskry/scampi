@@ -77,7 +77,11 @@ func TestImportCapabilities(t *testing.T) {
 			allowedImports: "net/http,os,os/exec",
 		},
 		{
-			pattern:        "linker/fields.go",
+			pattern:        "step/sharedops/convert.go",
+			allowedImports: "crypto/sha256",
+		},
+		{
+			pattern:        "step/pkg/convert.go",
 			allowedImports: "crypto/sha256,net/url",
 		},
 		{

@@ -3,20 +3,13 @@
 package linker
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"net/url"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"scampi.dev/scampi/lang/eval"
 	"scampi.dev/scampi/spec"
-	steprest "scampi.dev/scampi/step/rest"
 	"scampi.dev/scampi/target"
-	"scampi.dev/scampi/target/rest"
 )
 
 // mapFields maps eval.Value fields onto a Go config struct pointer
@@ -97,9 +90,9 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 		switch {
 		case dst.Kind() == reflect.String:
 			dst.SetString(sv.V)
-		case dst.Type() == reflect.TypeOf(target.Port{}):
+		case dst.Type() == reflect.TypeFor[target.Port]():
 			dst.Set(reflect.ValueOf(convertPort(sv.V)))
-		case dst.Type() == reflect.TypeOf(target.Mount{}):
+		case dst.Type() == reflect.TypeFor[target.Mount]():
 			dst.Set(reflect.ValueOf(convertMount(sv.V)))
 		}
 	case *eval.IntVal:
@@ -163,29 +156,28 @@ func setValue(dst reflect.Value, src eval.Value, lc *linkConfig) error {
 // setStructVal handles StructVal → Go type conversion.
 func setStructVal(dst reflect.Value, sv *eval.StructVal, lc *linkConfig) error {
 	dstType := dst.Type()
+
+	// Check registered type converters first.
+	if lc.converterFor != nil {
+		if converter, ok := lc.converterFor(dstType); ok {
+			cc := spec.ConvertContext{
+				CfgPath: lc.cfgPath,
+				Src:     lc.src,
+				Ctx:     lc.ctx,
+			}
+			result, err := converter(sv.TypeName, sv.Fields, cc)
+			if err != nil {
+				return err
+			}
+			if result != nil {
+				dst.Set(reflect.ValueOf(result))
+			}
+			return nil
+		}
+	}
+
+	// Generic fallback for interfaces, pointers, and plain structs.
 	switch {
-	case dstType == reflect.TypeOf(spec.SourceRef{}):
-		dst.Set(reflect.ValueOf(convertSourceRef(sv, lc)))
-	case dstType == reflect.TypeOf(spec.PkgSourceRef{}):
-		dst.Set(reflect.ValueOf(convertPkgSourceRef(sv)))
-	case dstType == reflect.TypeOf((*rest.AuthConfig)(nil)).Elem():
-		dst.Set(reflect.ValueOf(convertAuth(sv)))
-	case dstType == reflect.TypeOf((*rest.TLSConfig)(nil)).Elem():
-		dst.Set(reflect.ValueOf(convertTLS(sv)))
-	case dstType == reflect.TypeOf((*steprest.BodyConfig)(nil)).Elem():
-		if b := convertBody(sv); b != nil {
-			dst.Set(reflect.ValueOf(b))
-		}
-	case dstType == reflect.TypeOf((*steprest.CheckConfig)(nil)).Elem():
-		if c := convertCheck(sv); c != nil {
-			dst.Set(reflect.ValueOf(c))
-		}
-	case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(steprest.JQBinding{}):
-		if b := convertBinding(sv); b != nil {
-			dst.Set(reflect.ValueOf(b))
-		}
-	case dst.Kind() == reflect.Pointer && dstType.Elem() == reflect.TypeOf(target.Healthcheck{}):
-		dst.Set(reflect.ValueOf(convertHealthcheck(sv)))
 	case dst.Kind() == reflect.Interface:
 		if dstType == reflect.TypeFor[any]() {
 			dst.Set(reflect.ValueOf(structValToMap(sv)))
@@ -204,86 +196,6 @@ func setStructVal(dst reflect.Value, sv *eval.StructVal, lc *linkConfig) error {
 		}
 	}
 	return nil
-}
-
-// Composable type converters
-// -----------------------------------------------------------------------------
-
-func convertSourceRef(sv *eval.StructVal, lc *linkConfig) spec.SourceRef {
-	ref := spec.SourceRef{}
-	switch sv.TypeName {
-	case "source_local":
-		ref.Kind = spec.SourceLocal
-		if p, ok := sv.Fields["path"].(*eval.StringVal); ok {
-			ref.Path = p.V
-		}
-	case "source_inline":
-		ref.Kind = spec.SourceInline
-		if c, ok := sv.Fields["content"].(*eval.StringVal); ok {
-			ref.Content = c.V
-			// Write to cache so the engine can read the file.
-			// EnsureDir before write — the cache dir won't exist on a
-			// fresh tree (test temp dirs, CI checkouts, ...) and a
-			// silent WriteFile failure here surfaces downstream as a
-			// confusing "source file does not exist" engine error.
-			if lc != nil && lc.src != nil {
-				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(c.V)))[:12]
-				cacheDir := filepath.Join(filepath.Dir(lc.cfgPath), ".scampi-cache")
-				cachePath := filepath.Join(cacheDir, "inline-"+hash)
-				_ = lc.src.EnsureDir(lc.ctx, cacheDir)
-				_ = lc.src.WriteFile(lc.ctx, cachePath, []byte(c.V))
-				ref.Path = cachePath
-			}
-		}
-	case "source_remote":
-		ref.Kind = spec.SourceRemote
-		if u, ok := sv.Fields["url"].(*eval.StringVal); ok {
-			ref.URL = u.V
-			if lc != nil {
-				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(u.V)))[:12]
-				cacheDir := filepath.Join(filepath.Dir(lc.cfgPath), ".scampi-cache")
-				ref.Path = filepath.Join(cacheDir, "remote-"+hash)
-			}
-		}
-	}
-	return ref
-}
-
-func convertPkgSourceRef(sv *eval.StructVal) spec.PkgSourceRef {
-	ref := spec.PkgSourceRef{}
-	switch sv.TypeName {
-	case "pkg_system":
-		ref.Kind = spec.PkgSourceNative
-	case "pkg_apt_repo":
-		ref.Kind = spec.PkgSourceApt
-		if u, ok := sv.Fields["url"].(*eval.StringVal); ok {
-			ref.URL = u.V
-			ref.Name = repoSlug(u.V)
-		}
-		if k, ok := sv.Fields["key_url"].(*eval.StringVal); ok {
-			ref.KeyURL = k.V
-		}
-		if c, ok := sv.Fields["components"].(*eval.ListVal); ok {
-			for _, item := range c.Items {
-				if s, ok := item.(*eval.StringVal); ok {
-					ref.Components = append(ref.Components, s.V)
-				}
-			}
-		}
-		if s, ok := sv.Fields["suite"].(*eval.StringVal); ok {
-			ref.Suite = s.V
-		}
-	case "pkg_dnf_repo":
-		ref.Kind = spec.PkgSourceDnf
-		if u, ok := sv.Fields["url"].(*eval.StringVal); ok {
-			ref.URL = u.V
-			ref.Name = repoSlug(u.V)
-		}
-		if k, ok := sv.Fields["key_url"].(*eval.StringVal); ok {
-			ref.KeyURL = k.V
-		}
-	}
-	return ref
 }
 
 // applyDefault sets a struct field to its default value from the tag.
@@ -344,20 +256,6 @@ func evalMapToGo(mv *eval.MapVal) map[string]any {
 		}
 	}
 	return m
-}
-
-func repoSlug(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		h := sha256.Sum256([]byte(rawURL))
-		return hex.EncodeToString(h[:8])
-	}
-	host := strings.ReplaceAll(u.Hostname(), ".", "-")
-	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(parts) > 0 && parts[0] != "" {
-		return host + "-" + parts[0]
-	}
-	return host
 }
 
 // ToSnake converts GoFieldName to snake_case. Exported because the
