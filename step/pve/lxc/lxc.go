@@ -472,18 +472,16 @@ func (a *lxcAction) Ops() []spec.Op {
 	keysOp.SetAction(a)
 	keysOp.AddDependency(createOp)
 
-	// Reboot depends on all config ops (must run after they write
-	// the conf file so the reboot picks up the new values).
-	rebootOp := &rebootLxcOp{
-		pveCmd:   cmd,
-		hostname: a.hostname,
-		features: a.features,
-		dns:      a.dns,
-		devices:  a.devices,
+	// Reboot collects checks from all reboot-aware ops and runs
+	// after them so the conf file reflects the new values.
+	rebootOp := &rebootLxcOp{pveCmd: cmd}
+	for _, o := range []spec.Op{cfgOp, netOp, devOp} {
+		if ra, ok := o.(rebootAware); ok {
+			rebootOp.checks = append(rebootOp.checks, ra.RebootChecks()...)
+		}
+		rebootOp.AddDependency(o)
 	}
 	rebootOp.SetAction(a)
-	rebootOp.AddDependency(cfgOp)
-	rebootOp.AddDependency(devOp)
 
 	// State depends on reboot + resize — runs after those settle.
 	stOp := &stateLxcOp{pveCmd: cmd, state: a.state}

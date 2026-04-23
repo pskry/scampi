@@ -157,6 +157,43 @@ func (op *deviceLxcOp) applyDeviceDrift(
 	return nil
 }
 
+func (op *deviceLxcOp) RebootChecks() []rebootCheck {
+	return []rebootCheck{{
+		field:   "devices",
+		desired: devicesFingerprint(op.devices),
+		probe: func(ctx context.Context, cmdr target.Command, id int) string {
+			cfg, err := op.inspectConfig(ctx, cmdr)
+			if err != nil {
+				return ""
+			}
+			var live []LxcDevice
+			for _, d := range cfg.Devs {
+				live = append(live, parsedToLxcDevice(d))
+			}
+			configFP := devicesFingerprint(live)
+			desiredFP := devicesFingerprint(op.devices)
+			if configFP != desiredFP {
+				return configFP
+			}
+			for _, d := range op.devices {
+				cmd := fmt.Sprintf("pct exec %d -- test -e %s", id, shellQuote(d.Path))
+				r, err := cmdr.RunPrivileged(ctx, cmd)
+				if err != nil || r.ExitCode != 0 {
+					return "stale (device missing)"
+				}
+			}
+			if len(op.devices) == 0 && len(cfg.Devs) == 0 {
+				cmd := fmt.Sprintf("pct exec %d -- test -d /dev/dri", id)
+				r, err := cmdr.RunPrivileged(ctx, cmd)
+				if err == nil && r.ExitCode == 0 {
+					return "stale (device remnant)"
+				}
+			}
+			return desiredFP
+		},
+	}}
+}
+
 func (deviceLxcOp) RequiredCapabilities() capability.Capability {
 	return capability.PVE | capability.Command
 }

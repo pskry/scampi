@@ -254,6 +254,58 @@ func (op *configLxcOp) configDrift(cfg pctConfig) []spec.DriftDetail {
 	return drift
 }
 
+func (op *configLxcOp) RebootChecks() []rebootCheck {
+	checks := []rebootCheck{
+		{
+			field:   "hostname",
+			desired: op.hostname,
+			probe: func(ctx context.Context, cmdr target.Command, id int) string {
+				r, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct exec %d -- hostname", id))
+				if err != nil || r.ExitCode != 0 {
+					return ""
+				}
+				return strings.TrimSpace(r.Stdout)
+			},
+		},
+	}
+	if op.features != nil {
+		checks = append(checks, rebootCheck{
+			field:   "features",
+			desired: formatFeatures(op.features),
+			probe: func(ctx context.Context, cmdr target.Command, _ int) string {
+				cfg, err := op.inspectConfig(ctx, cmdr)
+				if err != nil {
+					return ""
+				}
+				return formatFeatures(&cfg.Features)
+			},
+		})
+	}
+	checks = append(checks, rebootCheck{
+		field:   "nameserver",
+		desired: dnsFingerprint(op.dns.Nameserver),
+		probe: func(ctx context.Context, cmdr target.Command, _ int) string {
+			cfg, err := op.inspectConfig(ctx, cmdr)
+			if err != nil {
+				return ""
+			}
+			return dnsFingerprint(cfg.Nameserver)
+		},
+	})
+	checks = append(checks, rebootCheck{
+		field:   "searchdomain",
+		desired: dnsFingerprint(op.dns.Searchdomain),
+		probe: func(ctx context.Context, cmdr target.Command, _ int) string {
+			cfg, err := op.inspectConfig(ctx, cmdr)
+			if err != nil {
+				return ""
+			}
+			return dnsFingerprint(cfg.Searchdomain)
+		},
+	})
+	return checks
+}
+
 func (configLxcOp) RequiredCapabilities() capability.Capability {
 	return capability.PVE | capability.Command
 }
