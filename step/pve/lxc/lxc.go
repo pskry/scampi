@@ -75,6 +75,7 @@ type (
 		Storage       string       `step:"Storage pool for rootfs" default:"local-zfs"`
 		Size          string       `step:"Root disk size with unit (e.g. 8G, 500M)" default:"8G"`
 		Privileged    bool         `step:"Run as privileged container (less secure)" default:"false"`
+		Features      *LxcFeatures `step:"Advanced LXC features" optional:"true"`
 		Network       LxcNet       `step:"Network configuration"`
 		Tags          []string     `step:"PVE tags" optional:"true"`
 		SSHPublicKeys []string     `step:"SSH public keys for root" optional:"true"`
@@ -88,6 +89,14 @@ type (
 		Bridge string `step:"Bridge interface" default:"vmbr0"`
 		IP     string `step:"IP address in CIDR or dhcp" example:"10.10.10.10/24"`
 		Gw     string `step:"Gateway" optional:"true" example:"10.10.10.1"`
+	}
+	LxcFeatures struct {
+		Nesting    bool     `step:"Allow nesting (required by systemd)" default:"false"`
+		Keyctl     bool     `step:"Allow keyctl syscall (required for Docker)" default:"false"`
+		Fuse       bool     `step:"Allow FUSE filesystems" default:"false"`
+		Mknod      bool     `step:"Allow mknod for device nodes" default:"false"`
+		ForceRwSys bool     `step:"Mount /sys as rw in unprivileged containers" default:"false"`
+		Mount      []string `step:"Allowed mount filesystem types" optional:"true"`
 	}
 )
 
@@ -127,6 +136,7 @@ func (LXC) Plan(step spec.StepInstance) (spec.Action, error) {
 		storage:       cfg.Storage,
 		sizeGiB:       sizeToGiB(cfg.Size),
 		privileged:    cfg.Privileged,
+		features:      cfg.Features,
 		network:       cfg.Network,
 		tags:          cfg.Tags,
 		sshPublicKeys: cfg.SSHPublicKeys,
@@ -295,6 +305,7 @@ type lxcAction struct {
 	storage       string
 	sizeGiB       int
 	privileged    bool
+	features      *LxcFeatures
 	network       LxcNet
 	tags          []string
 	sshPublicKeys []string
@@ -346,6 +357,7 @@ func (a *lxcAction) Ops() []spec.Op {
 		swapMiB:    a.swapMiB,
 		storage:    a.storage,
 		privileged: a.privileged,
+		features:   a.features,
 		network:    a.network,
 		tags:       a.tags,
 	}
@@ -366,10 +378,11 @@ func (a *lxcAction) Ops() []spec.Op {
 	keysOp.SetAction(a)
 	keysOp.AddDependency(createOp)
 
-	// Reboot depends on config (hostname changes need reboot).
+	// Reboot depends on config (hostname/features changes need reboot).
 	rebootOp := &rebootLxcOp{
 		pveCmd:   cmd,
 		hostname: a.hostname,
+		features: a.features,
 	}
 	rebootOp.SetAction(a)
 	rebootOp.AddDependency(cfgOp)

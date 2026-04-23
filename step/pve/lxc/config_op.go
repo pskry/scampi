@@ -27,6 +27,7 @@ type configLxcOp struct {
 	swapMiB    int
 	storage    string
 	privileged bool
+	features   *LxcFeatures
 	network    LxcNet
 	tags       []string
 }
@@ -168,6 +169,16 @@ func (op *configLxcOp) configDrift(cfg pctConfig) []spec.DriftDetail {
 			Field:   "description",
 			Current: valueOrNone(cfg.Description),
 			Desired: valueOrNone(op.step.Desc),
+		})
+	}
+
+	desiredFeat := formatFeatures(op.features)
+	currentFeat := formatFeatures(&cfg.Features)
+	if currentFeat != desiredFeat {
+		drift = append(drift, spec.DriftDetail{
+			Field:   "features",
+			Current: valueOrNone(currentFeat),
+			Desired: valueOrNone(desiredFeat),
 		})
 	}
 

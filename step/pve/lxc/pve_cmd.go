@@ -79,7 +79,7 @@ func filterSetDrift(drift []spec.DriftDetail) []spec.DriftDetail {
 	var set []spec.DriftDetail
 	for _, d := range drift {
 		switch d.Field {
-		case "cores", "memory", "swap", "hostname", "tags", "description":
+		case "cores", "memory", "swap", "hostname", "tags", "description", "features":
 			set = append(set, d)
 		}
 	}

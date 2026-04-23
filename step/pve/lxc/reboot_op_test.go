@@ -97,3 +97,70 @@ func TestRebootOpCheck_ContainerStopped(t *testing.T) {
 		t.Errorf("got %v, want CheckSatisfied (no reboot for stopped container)", result)
 	}
 }
+
+func TestRebootOpCheck_FeaturesDrift(t *testing.T) {
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			// Current config has nesting=1 but desired also wants keyctl.
+			return target.CommandResult{
+				Stdout: "hostname: pihole\nfeatures: nesting=1\n",
+			}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+		features: &LxcFeatures{Nesting: true, Keyctl: true},
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckUnsatisfied {
+		t.Errorf("got %v, want CheckUnsatisfied", result)
+	}
+	if len(drift) != 1 || drift[0].Field != "features (reboot)" {
+		t.Errorf("got drift %v, want features (reboot)", drift)
+	}
+}
+
+func TestRebootOpCheck_FeaturesMatch(t *testing.T) {
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		switch cmd {
+		case "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case "pct exec 100 -- hostname":
+			return target.CommandResult{Stdout: "pihole\n"}, nil
+		case "pct config 100":
+			return target.CommandResult{
+				Stdout: "hostname: pihole\nfeatures: nesting=1,keyctl=1\n",
+			}, nil
+		default:
+			return target.CommandResult{ExitCode: 1}, nil
+		}
+	}}
+
+	op := &rebootLxcOp{
+		pveCmd:   pveCmd{id: 100},
+		hostname: "pihole",
+		features: &LxcFeatures{Nesting: true, Keyctl: true},
+	}
+	result, drift, err := op.checkWith(context.Background(), cmdr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != spec.CheckSatisfied {
+		t.Errorf("got %v, want CheckSatisfied", result)
+	}
+	if len(drift) != 0 {
+		t.Errorf("got %d drift entries, want 0", len(drift))
+	}
+}

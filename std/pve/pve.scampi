@@ -28,6 +28,30 @@ pub type Template {
   name:    string
 }
 
+// Advanced LXC features. All disabled by default.
+// Changing features on a running container triggers a reboot.
+pub type Features {
+  // Allow nesting containers or running systemd inside the LXC.
+  // Required by most systemd-based distributions.
+  nesting:      bool = false
+  // Allow the keyctl() syscall. Required for running Docker
+  // inside an unprivileged container.
+  keyctl:       bool = false
+  // Allow FUSE filesystem mounts. May cause I/O deadlocks
+  // with the freezer cgroup — use with caution.
+  fuse:         bool = false
+  // Allow mknod() for device nodes in unprivileged containers.
+  // Requires kernel 5.3+ with seccomp trap support. Experimental.
+  mknod:        bool = false
+  // Mount /sys as read-write instead of mixed in unprivileged
+  // containers. Can break systemd-networkd >= v245.
+  force_rw_sys: bool = false
+  // Filesystem types the container is allowed to mount (e.g.
+  // ["nfs", "cifs"]). Does not mount anything — only whitelists
+  // the types for use with mount(2) inside the container.
+  mount:        list[string] = []
+}
+
 // Network configuration for a single LXC interface (net0).
 pub type LxcNet {
   bridge: string = "vmbr0"
@@ -54,6 +78,7 @@ pub decl lxc(
   storage:         string = "local-zfs"
   size:            string = "8G"
   privileged:      bool = false
+  features:        Features?
   network:         LxcNet
   tags:            list[string] = []
   ssh_public_keys: list[string] = []

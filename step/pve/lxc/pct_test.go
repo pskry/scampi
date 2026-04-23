@@ -451,6 +451,85 @@ func TestSSHKeyDrift_StoppedContainer(t *testing.T) {
 	}
 }
 
+func TestFormatFeatures(t *testing.T) {
+	tests := []struct {
+		name string
+		feat *LxcFeatures
+		want string
+	}{
+		{"nil", nil, ""},
+		{"empty", &LxcFeatures{}, ""},
+		{"nesting only", &LxcFeatures{Nesting: true}, "nesting=1"},
+		{
+			"multiple bools",
+			&LxcFeatures{Nesting: true, Keyctl: true, Fuse: true},
+			"nesting=1,keyctl=1,fuse=1",
+		},
+		{"mount only", &LxcFeatures{Mount: []string{"nfs", "cifs"}}, "mount=nfs;cifs"},
+		{
+			"everything",
+			&LxcFeatures{
+				Nesting: true, Keyctl: true, Fuse: true,
+				Mknod: true, ForceRwSys: true, Mount: []string{"nfs"},
+			},
+			"nesting=1,keyctl=1,fuse=1,mknod=1,force_rw_sys=1,mount=nfs",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatFeatures(tt.feat)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseFeatures(t *testing.T) {
+	tests := []struct {
+		name string
+		val  string
+		want LxcFeatures
+	}{
+		{"empty", "", LxcFeatures{}},
+		{"nesting", "nesting=1", LxcFeatures{Nesting: true}},
+		{"multiple", "nesting=1,keyctl=1", LxcFeatures{Nesting: true, Keyctl: true}},
+		{"mount", "mount=nfs;cifs", LxcFeatures{Mount: []string{"nfs", "cifs"}}},
+		{
+			"full",
+			"nesting=1,keyctl=1,fuse=1,mknod=1,force_rw_sys=1,mount=nfs",
+			LxcFeatures{
+				Nesting: true, Keyctl: true, Fuse: true,
+				Mknod: true, ForceRwSys: true, Mount: []string{"nfs"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseFeatures(tt.val)
+			if formatFeatures(&got) != formatFeatures(&tt.want) {
+				t.Errorf("got %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFeaturesRoundtrip(t *testing.T) {
+	orig := LxcFeatures{
+		Nesting: true,
+		Keyctl:  true,
+		Mount:   []string{"nfs", "cifs"},
+	}
+	formatted := formatFeatures(&orig)
+	parsed := parseFeatures(formatted)
+	if formatFeatures(&parsed) != formatted {
+		t.Errorf(
+			"roundtrip failed: %q → %+v → %q",
+			formatted, parsed, formatFeatures(&parsed),
+		)
+	}
+}
+
 func TestBuildDownloadCmd(t *testing.T) {
 	got := buildDownloadCmd("local", "debian-12-standard_12.7-1_amd64.tar.zst")
 	want := "pveam download local debian-12-standard_12.7-1_amd64.tar.zst"

@@ -17,10 +17,57 @@ import (
 
 const rebootLxcID = "step.pve.lxc.reboot"
 
+// rebootCheck probes the running container for a field that needs a reboot
+// to take effect. Returns nil if the field is already converged.
+type rebootCheck struct {
+	field   string
+	desired string
+	probe   func(ctx context.Context, cmdr target.Command, id int) string
+}
+
+// rebootChecks lists all fields that are written to config immediately
+// but only take effect after a container reboot.
+func buildRebootChecks(op *rebootLxcOp) []rebootCheck {
+	checks := []rebootCheck{
+		{
+			field:   "hostname",
+			desired: op.hostname,
+			probe: func(ctx context.Context, cmdr target.Command, id int) string {
+				r, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct exec %d -- hostname", id))
+				if err != nil || r.ExitCode != 0 {
+					return ""
+				}
+				return strings.TrimSpace(r.Stdout)
+			},
+		},
+	}
+
+	// Features: compare running config's features against desired.
+	// pct config shows the written value; the running container may
+	// still have the old one. We compare desired vs current config
+	// and if they differ, the container needs a reboot.
+	if op.features != nil {
+		checks = append(checks, rebootCheck{
+			field:   "features",
+			desired: formatFeatures(op.features),
+			probe: func(ctx context.Context, cmdr target.Command, _ int) string {
+				cfg, err := op.inspectConfig(ctx, cmdr)
+				if err != nil {
+					return ""
+				}
+				return formatFeatures(&cfg.Features)
+			},
+		})
+	}
+
+	return checks
+}
+
 type rebootLxcOp struct {
 	sharedops.BaseOp
 	pveCmd
 	hostname string
+	features *LxcFeatures
 }
 
 func (op *rebootLxcOp) Check(
@@ -45,17 +92,16 @@ func (op *rebootLxcOp) checkWith(
 	}
 
 	var drift []spec.DriftDetail
-
-	result, err = cmdr.RunPrivileged(ctx, fmt.Sprintf("pct exec %d -- hostname", op.id))
-	if err == nil && result.ExitCode == 0 {
-		running := strings.TrimSpace(result.Stdout)
-		if running != op.hostname {
-			drift = append(drift, spec.DriftDetail{
-				Field:   "hostname (reboot)",
-				Current: running,
-				Desired: op.hostname,
-			})
+	for _, check := range buildRebootChecks(op) {
+		current := check.probe(ctx, cmdr, op.id)
+		if current == "" || current == check.desired {
+			continue
 		}
+		drift = append(drift, spec.DriftDetail{
+			Field:   check.field + " (reboot)",
+			Current: current,
+			Desired: check.desired,
+		})
 	}
 
 	if len(drift) == 0 {
@@ -71,7 +117,7 @@ func (op *rebootLxcOp) Execute(
 ) (spec.Result, error) {
 	cmdr := target.Must[target.Command](rebootLxcID, tgt)
 
-	// Re-check: container may have been stopped by stateLxcOp since Check ran.
+	// Re-check: container may have been stopped since Check ran.
 	result, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct status %d", op.id))
 	if err == nil && parsePctStatus(result.Stdout) != stateRunning {
 		return spec.Result{}, nil
@@ -89,7 +135,10 @@ func (op *rebootLxcOp) Execute(
 	return spec.Result{Changed: true}, nil
 }
 
-func (op *rebootLxcOp) waitRunning(ctx context.Context, cmdr target.Command) error {
+func (op *rebootLxcOp) waitRunning(
+	ctx context.Context,
+	cmdr target.Command,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -99,13 +148,13 @@ func (op *rebootLxcOp) waitRunning(ctx context.Context, cmdr target.Command) err
 	for {
 		select {
 		case <-ctx.Done():
-			return op.cmdErr("reboot", "container did not come back after reboot within 60s")
+			return op.cmdErr("reboot", "container did not come back within 60s")
 		case <-ticker.C:
-			result, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct status %d", op.id))
-			if err != nil || result.ExitCode != 0 {
+			r, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct status %d", op.id))
+			if err != nil || r.ExitCode != 0 {
 				continue
 			}
-			if parsePctStatus(result.Stdout) == stateRunning {
+			if parsePctStatus(r.Stdout) == stateRunning {
 				return nil
 			}
 		}

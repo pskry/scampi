@@ -90,7 +90,8 @@ type pctConfig struct {
 	Cores        int
 	Memory       int
 	Swap         int
-	Unprivileged int    // 0 or 1
+	Unprivileged int // 0 or 1
+	Features     LxcFeatures
 	Tags         string // semicolon-separated
 	Description  string
 	Storage      string // rootfs storage pool
@@ -134,6 +135,8 @@ func parsePctConfig(output string) pctConfig {
 			cfg.Tags = val
 		case "description":
 			cfg.Description = val
+		case "features":
+			cfg.Features = parseFeatures(val)
 		case "rootfs":
 			cfg.Storage, cfg.Size = parseRootfs(val)
 		case "net0":
@@ -209,6 +212,9 @@ func buildSetCmd(vmid int, drift []spec.DriftDetail) string {
 		case "description":
 			b.WriteString(" --description ")
 			b.WriteString(shellQuote(d.Desired))
+		case "features":
+			b.WriteString(" --features ")
+			b.WriteString(shellQuote(d.Desired))
 		}
 	}
 	return b.String()
@@ -240,6 +246,9 @@ func buildCreateCmd(cfg lxcAction) string {
 	}
 	if cfg.desc != "" {
 		cmd += " --description " + shellQuote(cfg.desc)
+	}
+	if feat := formatFeatures(cfg.features); feat != "" {
+		cmd += " --features " + shellQuote(feat)
 	}
 	return cmd
 }
@@ -275,6 +284,65 @@ func buildAuthorizedKeys(keys []string) string {
 	}
 	b.WriteString("# --- END PVE ---\n")
 	return b.String()
+}
+
+// formatFeatures builds the --features value for pct create/set.
+//
+//	"nesting=1,keyctl=1,mount=nfs;cifs"
+func formatFeatures(f *LxcFeatures) string {
+	if f == nil {
+		return ""
+	}
+	var parts []string
+	if f.Nesting {
+		parts = append(parts, "nesting=1")
+	}
+	if f.Keyctl {
+		parts = append(parts, "keyctl=1")
+	}
+	if f.Fuse {
+		parts = append(parts, "fuse=1")
+	}
+	if f.Mknod {
+		parts = append(parts, "mknod=1")
+	}
+	if f.ForceRwSys {
+		parts = append(parts, "force_rw_sys=1")
+	}
+	if len(f.Mount) > 0 {
+		parts = append(parts, "mount="+strings.Join(f.Mount, ";"))
+	}
+	return strings.Join(parts, ",")
+}
+
+// parseFeatures parses the features value from pct config.
+func parseFeatures(val string) LxcFeatures {
+	var f LxcFeatures
+	for kv := range strings.SplitSeq(val, ",") {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		switch k {
+		case "nesting":
+			f.Nesting = v == "1"
+		case "keyctl":
+			f.Keyctl = v == "1"
+		case "fuse":
+			f.Fuse = v == "1"
+		case "mknod":
+			f.Mknod = v == "1"
+		case "force_rw_sys":
+			f.ForceRwSys = v == "1"
+		case "mount":
+			for fs := range strings.SplitSeq(v, ";") {
+				if fs != "" {
+					f.Mount = append(f.Mount, fs)
+				}
+			}
+		}
+	}
+	return f
 }
 
 func shellQuote(s string) string {
