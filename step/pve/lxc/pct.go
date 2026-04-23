@@ -246,8 +246,7 @@ func buildCreateCmd(cfg lxcAction) string {
 		" --swap %d"+
 		" --rootfs %s:%d"+
 		" --net0 %s"+
-		" --unprivileged %d"+
-		" --password yolo123",
+		" --unprivileged %d",
 		cfg.id, cfg.template.templatePath(),
 		cfg.hostname,
 		cfg.cores,
@@ -257,6 +256,9 @@ func buildCreateCmd(cfg lxcAction) string {
 		formatNet0(cfg.network),
 		boolToInt(!cfg.privileged),
 	)
+	if cfg.password != "" {
+		cmd += " --password " + shellQuote(cfg.password)
+	}
 	if len(cfg.tags) > 0 {
 		cmd += " --tags " + shellQuote(strings.Join(cfg.tags, ";"))
 	}

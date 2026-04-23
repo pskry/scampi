@@ -95,6 +95,8 @@ pub decl lxc(
   startup:         Startup?
   network:         LxcNet
   tags:            list[string] = []
+  // Root password set on create. Cannot be changed after creation.
+  password:        string?
   ssh_public_keys: list[string] = []
   desc:            string?
   on_change:       list[std.Step] = []

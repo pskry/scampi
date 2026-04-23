@@ -79,6 +79,7 @@ type (
 		Startup       *LxcStartup  `step:"Startup/shutdown ordering" optional:"true"`
 		Network       LxcNet       `step:"Network configuration"`
 		Tags          []string     `step:"PVE tags" optional:"true"`
+		Password      string       `step:"Root password (create-only)" optional:"true"`
 		SSHPublicKeys []string     `step:"SSH public keys for root" optional:"true"`
 		Desc          string       `step:"Human-readable description" optional:"true"`
 	}
@@ -147,6 +148,7 @@ func (LXC) Plan(step spec.StepInstance) (spec.Action, error) {
 		startup:       cfg.Startup,
 		network:       cfg.Network,
 		tags:          cfg.Tags,
+		password:      cfg.Password,
 		sshPublicKeys: cfg.SSHPublicKeys,
 		step:          step,
 	}
@@ -317,6 +319,7 @@ type lxcAction struct {
 	startup       *LxcStartup
 	network       LxcNet
 	tags          []string
+	password      string
 	sshPublicKeys []string
 	step          spec.StepInstance
 }

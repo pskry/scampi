@@ -152,10 +152,23 @@ func TestBuildCreateCmd(t *testing.T) {
 		" --swap 512" +
 		" --rootfs local-zfs:4" +
 		" --net0 name=eth0,bridge=vmbr0,ip=10.10.10.10/24,gw=10.10.10.1,type=veth" +
-		" --unprivileged 0" +
-		" --password yolo123"
+		" --unprivileged 0"
 	if got != want {
 		t.Errorf("buildCreateCmd:\n got: %s\nwant: %s", got, want)
+	}
+
+	// With password.
+	cfg.password = "secret"
+	got = buildCreateCmd(cfg)
+	if !strings.Contains(got, "--password 'secret'") {
+		t.Errorf("expected --password in command, got: %s", got)
+	}
+
+	// Without password — no --password flag.
+	cfg.password = ""
+	got = buildCreateCmd(cfg)
+	if strings.Contains(got, "--password") {
+		t.Errorf("unexpected --password in command, got: %s", got)
 	}
 }
 
