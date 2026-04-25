@@ -14,5 +14,5 @@ func b() X {
 
 func bb() string {
   let x = b()
-  x.‸
+  x.$0
 }

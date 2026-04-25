@@ -7,6 +7,6 @@ std.deploy(name = "x", targets = []) {
   posix.copy {
     src = posix.source_local { path = "/etc/passwd" }
     dest = "/tmp/p"
-    pe‸rm = "0644"
+    pe$0rm = "0644"
   }
 }

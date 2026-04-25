@@ -1,0 +1,6 @@
+{
+  "request": "hover",
+  "expect": {
+    "empty": true
+  }
+}

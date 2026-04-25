@@ -179,11 +179,39 @@ func formatSymbolDoc(sym *check.Symbol) string {
 	case check.SymParam:
 		return fencedSymbolDoc(sym.Name + typeSuffix(sym))
 	case check.SymType:
-		return fencedSymbolDoc("type " + sym.Name)
+		return formatTypeDoc(sym)
 	case check.SymEnum:
 		return fencedSymbolDoc("enum " + sym.Name)
 	}
 	return ""
+}
+
+// formatTypeDoc renders hover documentation for a user-defined type.
+// For struct types, shows the field listing with types and
+// required/optional status.
+func formatTypeDoc(sym *check.Symbol) string {
+	st, ok := sym.Type.(*check.StructType)
+	if !ok || len(st.Fields) == 0 {
+		return fencedSymbolDoc("type " + sym.Name)
+	}
+
+	var b strings.Builder
+	b.WriteString("```scampi\ntype " + sym.Name + " {\n")
+	nameW := 0
+	for _, f := range st.Fields {
+		if l := len(f.Name); l > nameW {
+			nameW = l
+		}
+	}
+	for _, f := range st.Fields {
+		req := ""
+		if f.HasDef {
+			req = "  // has default"
+		}
+		_, _ = fmt.Fprintf(&b, "  %-*s  %s%s\n", nameW, f.Name+":", f.Type.String(), req)
+	}
+	b.WriteString("}\n```\n\n---\n")
+	return b.String()
 }
 
 func typeSuffix(sym *check.Symbol) string {

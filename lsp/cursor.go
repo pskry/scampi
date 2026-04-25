@@ -221,10 +221,15 @@ func analyzeBraceContext(text string, bracePos, offset int, ctx CursorContext) C
 	ctx.InCall = true
 	ctx.FuncName = funcName
 
-	inside := text[bracePos+1 : offset]
-	ctx.PresentKwargs = extractFieldNames(inside)
-	ctx.ActiveParam = countTopLevelCommas(inside)
-	ctx.ActiveKwarg = activeField(inside)
+	beforeCursor := text[bracePos+1 : offset]
+	ctx.ActiveParam = countTopLevelCommas(beforeCursor)
+	ctx.ActiveKwarg = activeField(beforeCursor)
+
+	// For PresentKwargs, scan the entire block (not just up to the
+	// cursor) so fields defined after the cursor are also excluded
+	// from completion.
+	fullBody := extractBraceBody(text, bracePos)
+	ctx.PresentKwargs = extractFieldNames(fullBody)
 
 	return ctx
 }
@@ -268,16 +273,142 @@ func isFunctionBodyBrace(text string, bracePos int) bool {
 	return pos >= 0 && text[pos] == ')'
 }
 
-// extractFieldNames finds field names (word =) in struct-lit context.
-// Similar to extractKwargNames but also matches "word =" (with spaces).
+// extractBraceBody returns the content between the opening brace at
+// bracePos and its matching closing brace, tracking nesting. Returns
+// the text up to EOF if no matching brace is found.
+func extractBraceBody(text string, bracePos int) string {
+	depth := 1
+	inStr := byte(0)
+	for i := bracePos + 1; i < len(text); i++ {
+		ch := text[i]
+		if inStr != 0 {
+			if ch == inStr {
+				inStr = 0
+			}
+			continue
+		}
+		if ch == '"' || ch == '\'' {
+			inStr = ch
+			continue
+		}
+		switch ch {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return text[bracePos+1 : i]
+			}
+		}
+	}
+	return text[bracePos+1:]
+}
+
+// extractFieldNames finds top-level field names (word =) in a
+// struct-literal body. Unlike extractKwargNames, this tracks bracket
+// depth so that fields inside nested { }, [ ], or ( ) are not
+// returned as top-level fields.
 func extractFieldNames(s string) []string {
-	return extractKwargNames(s)
+	var names []string
+	depth := 0
+	inStr := byte(0)
+	i := 0
+	for i < len(s) {
+		ch := s[i]
+		if inStr != 0 {
+			if ch == inStr {
+				inStr = 0
+			}
+			i++
+			continue
+		}
+		if ch == '"' || ch == '\'' {
+			inStr = ch
+			i++
+			continue
+		}
+		switch ch {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			if depth > 0 {
+				depth--
+			}
+		case '=':
+			if depth == 0 && i+1 < len(s) && s[i+1] != '=' {
+				// Extract identifier before '='.
+				end := i
+				for end > 0 && s[end-1] == ' ' {
+					end--
+				}
+				start := end
+				for start > 0 {
+					r := rune(s[start-1])
+					if r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) {
+						start--
+					} else {
+						break
+					}
+				}
+				if start < end {
+					names = append(names, s[start:end])
+				}
+			}
+		}
+		i++
+	}
+	return names
 }
 
 // activeField returns the field name whose value is being typed.
-// Works for both "name = value" and "name=value" syntax.
+// Unlike activeKwarg (which uses commas only), this treats newlines
+// as top-level separators too — scampi struct literals use newlines
+// as statement separators in brace-delimited blocks.
 func activeField(inside string) string {
-	return activeKwarg(inside)
+	last := lastTopLevelSeparator(inside)
+	segment := inside[last:]
+	segment = strings.TrimSpace(segment)
+
+	eq := strings.IndexByte(segment, '=')
+	if eq < 0 {
+		return ""
+	}
+	if eq+1 < len(segment) && segment[eq+1] == '=' {
+		return ""
+	}
+	name := strings.TrimSpace(segment[:eq])
+	if name == "" || strings.ContainsAny(name, " \t\n") {
+		return ""
+	}
+	return name
+}
+
+// lastTopLevelSeparator returns the index just after the last top-level
+// comma or newline, or 0 if there is none. Used for brace-delimited
+// struct literals where newlines act as statement separators.
+func lastTopLevelSeparator(s string) int {
+	depth := 0
+	inStr := rune(0)
+	last := 0
+	for i, r := range s {
+		switch {
+		case inStr != 0:
+			if r == inStr {
+				inStr = 0
+			}
+		case r == '"' || r == '\'':
+			inStr = r
+		case r == '(' || r == '[' || r == '{':
+			depth++
+		case r == ')' || r == ']' || r == '}':
+			if depth > 0 {
+				depth--
+			}
+		case (r == ',' || r == '\n') && depth == 0:
+			last = i + 1
+		}
+	}
+	return last
 }
 
 func analyzeListContext(text string, bracketPos, _ int, ctx CursorContext) CursorContext {
@@ -312,6 +443,8 @@ func analyzeListContext(text string, bracketPos, _ int, ctx CursorContext) Curso
 }
 
 // offsetFromPosition converts a 0-based line/col to a byte offset.
+// Clamps col to the actual line length so a cursor position past
+// EOL doesn't bleed into the next line.
 func offsetFromPosition(text string, line, col uint32) int {
 	off := 0
 	for l := uint32(0); l < line; l++ {
@@ -321,7 +454,16 @@ func offsetFromPosition(text string, line, col uint32) int {
 		}
 		off += idx + 1
 	}
-	off += int(col)
+	// Clamp col to the current line length.
+	lineEnd := strings.IndexByte(text[off:], '\n')
+	if lineEnd < 0 {
+		lineEnd = len(text) - off
+	}
+	c := int(col)
+	if c > lineEnd {
+		c = lineEnd
+	}
+	off += c
 	if off > len(text) {
 		off = len(text)
 	}

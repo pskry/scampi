@@ -1,6 +1,6 @@
 module main
 
-type X‸ {
+type X$0 {
   X: string
 }
 

@@ -13,4 +13,4 @@ func shout(s: string) string {
 }
 
 let n = 5
-n.‸
+n.$0

@@ -1,3 +1,3 @@
 module main
 
-import "std/pos‸ix"
+import "std/pos$0ix"

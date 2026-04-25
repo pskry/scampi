@@ -3,4 +3,4 @@ module main
 import "std"
 
 let n = 5
-n.‸
+n.$0

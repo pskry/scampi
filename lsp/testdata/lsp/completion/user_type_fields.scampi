@@ -1,0 +1,11 @@
+module main
+
+type Container {
+  id:       int
+  hostname: string
+  cores:    int = 1
+}
+
+let c = Container {
+  $0
+}

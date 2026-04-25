@@ -1,0 +1,6 @@
+{
+  "request": "hover",
+  "expect": {
+    "contains": ["Container", "id", "hostname", "cores", "int", "string", "has default"]
+  }
+}

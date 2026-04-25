@@ -1,0 +1,6 @@
+{
+  "request": "completion",
+  "expect": {
+    "labels_exclude": ["src", "dest", "owner"]
+  }
+}

@@ -1,0 +1,7 @@
+module main
+
+type $0Container {
+  id:       int
+  hostname: string
+  cores:    int = 1
+}

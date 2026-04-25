@@ -4,4 +4,4 @@ func add(a: int, b: int) int {
   return a + b
 }
 
-let result = ad‸d(1, 2)
+let result = ad$0d(1, 2)

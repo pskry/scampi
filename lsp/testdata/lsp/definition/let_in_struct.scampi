@@ -5,5 +5,5 @@ import "std/local"
 
 let host = local.target { name = "h" }
 
-std.deploy(name = "t", targets = [ho‸st]) {
+std.deploy(name = "t", targets = [ho$0st]) {
 }

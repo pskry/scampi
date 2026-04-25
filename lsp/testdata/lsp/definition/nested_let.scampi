@@ -12,6 +12,6 @@ std.deploy(name = "t", targets = [host]) {
   posix.copy {
     src = posix.source_local { path = "./nginx.conf" }
     dest = "/etc/nginx/nginx.conf"
-    on_change = [sv‸c]
+    on_change = [sv$0c]
   }
 }

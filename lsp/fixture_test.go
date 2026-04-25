@@ -36,7 +36,7 @@ import (
 // have to enumerate every catalog item — they just pin the things
 // that matter.
 
-const cursorMarker = "‸"
+const cursorMarker = "$0"
 
 type fixtureSpec struct {
 	Request string          `json:"request"`
@@ -50,13 +50,15 @@ type cursorPosition struct {
 }
 
 type completionExpect struct {
+	Labels        []string `json:"labels,omitempty"`
 	LabelsInclude []string `json:"labels_include,omitempty"`
 	LabelsExclude []string `json:"labels_exclude,omitempty"`
 }
 
 type hoverExpect struct {
-	Contains []string `json:"contains,omitempty"`
-	Empty    bool     `json:"empty,omitempty"`
+	Contains    []string `json:"contains,omitempty"`
+	NotContains []string `json:"not_contains,omitempty"`
+	Empty       bool     `json:"empty,omitempty"`
 }
 
 type definitionExpect struct {
@@ -145,7 +147,7 @@ func runFixture(t *testing.T, scampiPath, jsonPath string) {
 	case spec.Cursor != nil:
 		line, char = spec.Cursor.Line, spec.Cursor.Char
 	case cursorRequired:
-		t.Fatal("fixture must contain a ‸ marker or a cursor field in JSON")
+		t.Fatal("fixture must contain a $0 marker or a cursor field in JSON")
 	}
 
 	s := testServer()
@@ -191,19 +193,36 @@ func runCompletionFixture(
 	if err != nil {
 		t.Fatalf("Completion: %v", err)
 	}
-	labels := make(map[string]bool)
+	labelSet := make(map[string]bool)
 	if result != nil {
 		for _, item := range result.Items {
-			labels[item.Label] = true
+			labelSet[item.Label] = true
 		}
 	}
-	for _, want := range exp.LabelsInclude {
-		if !labels[want] {
-			t.Errorf("expected completion label %q in result; got %v", want, sortedLabels(labels))
+	// Exact match: labels must match the result set exactly.
+	if len(exp.Labels) > 0 {
+		want := make(map[string]bool, len(exp.Labels))
+		for _, l := range exp.Labels {
+			want[l] = true
+		}
+		for l := range labelSet {
+			if !want[l] {
+				t.Errorf("unexpected completion label %q", l)
+			}
+		}
+		for l := range want {
+			if !labelSet[l] {
+				t.Errorf("missing completion label %q; got %v", l, sortedLabels(labelSet))
+			}
+		}
+	}
+	for _, w := range exp.LabelsInclude {
+		if !labelSet[w] {
+			t.Errorf("expected completion label %q in result; got %v", w, sortedLabels(labelSet))
 		}
 	}
 	for _, banned := range exp.LabelsExclude {
-		if labels[banned] {
+		if labelSet[banned] {
 			t.Errorf("completion label %q should NOT be present", banned)
 		}
 	}
@@ -241,6 +260,11 @@ func runHoverFixture(
 	for _, want := range exp.Contains {
 		if !strings.Contains(result.Contents.Value, want) {
 			t.Errorf("expected hover to contain %q; got:\n%s", want, result.Contents.Value)
+		}
+	}
+	for _, banned := range exp.NotContains {
+		if strings.Contains(result.Contents.Value, banned) {
+			t.Errorf("hover should NOT contain %q; got:\n%s", banned, result.Contents.Value)
 		}
 	}
 }

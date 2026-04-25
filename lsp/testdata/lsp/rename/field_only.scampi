@@ -1,7 +1,7 @@
 module main
 
 type Cfg {
-  na‸me: string
+  na$0me: string
 }
 
 let c = Cfg { name = "hello" }

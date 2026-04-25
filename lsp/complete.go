@@ -53,14 +53,17 @@ func (s *Server) Completion(
 		}
 	case cur.InString:
 		// Inside a string literal but not in a call — no completions.
+	case isDotPrefix(cur.WordUnderCursor):
+		// Dot-prefix completion works everywhere: top-level, inside
+		// calls/struct-lits, inside lists. Offers module members,
+		// struct fields, and UFCS-eligible functions.
+		items = s.completeModule(params.TextDocument.URI, cur.WordUnderCursor)
 	case cur.InCall && cur.ActiveKwarg != "":
 		items = s.completeKwargValue(params.TextDocument.URI, cur)
 	case cur.InList:
 		items = s.completeTopLevel(params.TextDocument.URI, cur.WordUnderCursor)
 	case cur.InCall:
 		items = s.completeKwargs(params.TextDocument.URI, cur)
-	case isDotPrefix(cur.WordUnderCursor):
-		items = s.completeModule(params.TextDocument.URI, cur.WordUnderCursor)
 	default:
 		items = s.completeTopLevel(params.TextDocument.URI, cur.WordUnderCursor)
 	}
@@ -316,6 +319,26 @@ func (s *Server) completeUFCS(
 	var items []protocol.CompletionItem
 	seen := make(map[string]bool)
 
+	// Struct field completion — if the receiver is a struct type,
+	// offer its fields before UFCS functions.
+	if st, ok := recvType.(*check.StructType); ok {
+		for _, f := range st.Fields {
+			if prefix != "" && !strings.HasPrefix(f.Name, prefix) {
+				continue
+			}
+			seen[f.Name] = true
+			detail := f.Type.String()
+			if !f.HasDef {
+				detail += "  (required)"
+			}
+			items = append(items, protocol.CompletionItem{
+				Label:  f.Name,
+				Kind:   protocol.CompletionItemKindField,
+				Detail: detail,
+			})
+		}
+	}
+
 	add := func(name string, fnSym *check.Symbol) {
 		if seen[name] {
 			return
@@ -411,7 +434,8 @@ func tolerantCheck(
 func (s *Server) completeKwargs(docURI protocol.DocumentURI, cur CursorContext) []protocol.CompletionItem {
 	f, ok := s.lookupFunc(docURI, cur.FuncName)
 	if !ok {
-		return nil
+		// Not a catalog func or user func — try user-defined types.
+		return s.completeUserTypeFields(docURI, cur)
 	}
 
 	present := make(map[string]bool, len(cur.PresentKwargs))
@@ -444,6 +468,52 @@ func (s *Server) completeKwargs(docURI protocol.DocumentURI, cur CursorContext) 
 			Detail:        detail,
 			InsertText:    p.Name + " = ",
 			Documentation: doc,
+		})
+	}
+	return items
+}
+
+// completeUserTypeFields offers field completions for user-defined
+// struct types (e.g. inside `Container { | }`). Falls back to the
+// checker's scope to resolve the type when the catalog doesn't know
+// about it.
+func (s *Server) completeUserTypeFields(docURI protocol.DocumentURI, cur CursorContext) []protocol.CompletionItem {
+	doc, ok := s.docs.Get(docURI)
+	if !ok {
+		return nil
+	}
+	c := tolerantCheck(uriToPath(docURI), []byte(doc.Content), s.modules)
+	if c == nil {
+		return nil
+	}
+	sym := c.FileScope().Lookup(cur.FuncName)
+	if sym == nil || sym.Kind != check.SymType {
+		return nil
+	}
+	st, ok := sym.Type.(*check.StructType)
+	if !ok {
+		return nil
+	}
+
+	present := make(map[string]bool, len(cur.PresentKwargs))
+	for _, k := range cur.PresentKwargs {
+		present[k] = true
+	}
+
+	var items []protocol.CompletionItem
+	for _, f := range st.Fields {
+		if present[f.Name] {
+			continue
+		}
+		detail := f.Type.String()
+		if !f.HasDef {
+			detail += " (required)"
+		}
+		items = append(items, protocol.CompletionItem{
+			Label:      f.Name,
+			Kind:       protocol.CompletionItemKindProperty,
+			Detail:     detail,
+			InsertText: f.Name + " = ",
 		})
 	}
 	return items

@@ -9,5 +9,5 @@ func b() X {
 }
 
 func bb() string {
-  b‸
+  b$0
 }
