@@ -114,7 +114,7 @@ std.deploy(name = "bench", targets = [host]) {
     posix.copy {
       desc = "step-${i}"
       src = posix.source_local { path = "/src.txt" }
-      dest = "/dest.txt"
+      dest = "/dest-${i}.txt"
       perm = "0644"
       owner = "perf-owner"
       group = "perf-group"
@@ -127,7 +127,9 @@ std.deploy(name = "bench", targets = [host]) {
 			tgt := target.NewMemTarget()
 
 			src.Files["/src.txt"] = []byte("hello")
-			tgt.Files["/dest.txt"] = []byte("hello")
+			for j := range size {
+				tgt.Files[fmt.Sprintf("/dest-%d.txt", j)] = []byte("hello")
+			}
 			src.Files["/config.scampi"] = []byte(cfgStr)
 
 			rec := &harness.RecordingDisplayer{}
@@ -179,7 +181,7 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "bench", targets = [host]) {
   for i in std.range(%d) {
-    posix.symlink { target = "/target.txt", link = "/link.txt" }
+    posix.symlink { target = "/target.txt", link = "/link-${i}.txt" }
   }
 }
 `, size)
@@ -188,7 +190,9 @@ std.deploy(name = "bench", targets = [host]) {
 			tgt := target.NewMemTarget()
 
 			src.Files["/config.scampi"] = []byte(cfgStr)
-			tgt.Symlinks["/link.txt"] = "/target.txt"
+			for j := range size {
+				tgt.Symlinks[fmt.Sprintf("/link-%d.txt", j)] = "/target.txt"
+			}
 
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -239,7 +243,7 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "bench", targets = [host]) {
   for i in std.range(%d) {
-    posix.dir { path = "/mydir" }
+    posix.dir { path = "/mydir-${i}" }
   }
 }
 `, size)
@@ -248,7 +252,9 @@ std.deploy(name = "bench", targets = [host]) {
 			tgt := target.NewMemTarget()
 
 			src.Files["/config.scampi"] = []byte(cfgStr)
-			tgt.Dirs["/mydir"] = 0o755
+			for j := range size {
+				tgt.Dirs[fmt.Sprintf("/mydir-%d", j)] = 0o755
+			}
 
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -302,14 +308,14 @@ std.deploy(name = "bench", targets = [host]) {
     posix.copy {
       desc = "copy-${i}"
       src = posix.source_local { path = "/src.txt" }
-      dest = "/dest.txt"
+      dest = "/dest-${i}.txt"
       perm = "0644"
       owner = "perf-owner"
       group = "perf-group"
     }
   }
   for i in std.range(%d) {
-    posix.symlink { target = "/target.txt", link = "/link.txt" }
+    posix.symlink { target = "/target.txt", link = "/link-${i}.txt" }
   }
 }
 `, size, size)
@@ -319,8 +325,10 @@ std.deploy(name = "bench", targets = [host]) {
 
 			src.Files["/src.txt"] = []byte("hello")
 			src.Files["/config.scampi"] = []byte(cfgStr)
-			tgt.Files["/dest.txt"] = []byte("hello")
-			tgt.Symlinks["/link.txt"] = "/target.txt"
+			for j := range size {
+				tgt.Files[fmt.Sprintf("/dest-%d.txt", j)] = []byte("hello")
+				tgt.Symlinks[fmt.Sprintf("/link-%d.txt", j)] = "/target.txt"
+			}
 
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -374,7 +382,7 @@ std.deploy(name = "bench", targets = [host]) {
     posix.template {
       desc = "tmpl-${i}"
       src = posix.source_inline { content = "server {{ .name }} port={{ .port }}" }
-      dest = "/out.conf"
+      dest = "/out-${i}.conf"
       perm = "0644"
       owner = "perf-owner"
       group = "perf-group"
@@ -388,7 +396,9 @@ std.deploy(name = "bench", targets = [host]) {
 			tgt := target.NewMemTarget()
 
 			src.Files["/config.scampi"] = []byte(cfgStr)
-			tgt.Files["/out.conf"] = []byte("server bench port=8080")
+			for j := range size {
+				tgt.Files[fmt.Sprintf("/out-%d.conf", j)] = []byte("server bench port=8080")
+			}
 
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -560,7 +570,7 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "bench", targets = [host]) {
   for i in std.range(%d) {
-    posix.group { name = "deploy" }
+    posix.group { name = "deploy-${i}" }
   }
 }
 `, size)
@@ -569,7 +579,10 @@ std.deploy(name = "bench", targets = [host]) {
 			tgt := target.NewMemTarget()
 
 			src.Files["/config.scampi"] = []byte(cfgStr)
-			tgt.Groups["deploy"] = target.GroupInfo{Name: "deploy"}
+			for j := range size {
+				name := fmt.Sprintf("deploy-%d", j)
+				tgt.Groups[name] = target.GroupInfo{Name: name}
+			}
 
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
@@ -620,7 +633,7 @@ let host = local.target { name = "local" }
 
 std.deploy(name = "bench", targets = [host]) {
   for i in std.range(%d) {
-    posix.user { name = "deploy", shell = "/bin/bash", groups = ["sudo"] }
+    posix.user { name = "deploy-${i}", shell = "/bin/bash", groups = ["sudo"] }
   }
 }
 `, size)
@@ -629,10 +642,13 @@ std.deploy(name = "bench", targets = [host]) {
 			tgt := target.NewMemTarget()
 
 			src.Files["/config.scampi"] = []byte(cfgStr)
-			tgt.Users["deploy"] = target.UserInfo{
-				Name:   "deploy",
-				Shell:  "/bin/bash",
-				Groups: []string{"sudo"},
+			for j := range size {
+				name := fmt.Sprintf("deploy-%d", j)
+				tgt.Users[name] = target.UserInfo{
+					Name:   name,
+					Shell:  "/bin/bash",
+					Groups: []string{"sudo"},
+				}
 			}
 
 			rec := &harness.RecordingDisplayer{}
