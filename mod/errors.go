@@ -196,6 +196,35 @@ func (e *InitError) EventTemplate() event.Template {
 	}
 }
 
+// InitStatError
+// -----------------------------------------------------------------------------
+
+// InitStatError is raised when scampi mod init cannot stat the target
+// scampi.mod path (e.g. permission denied on the parent directory).
+//
+// Uses structured fields + a literal-template EventTemplate so dynamic
+// content cannot leak through {{.Detail}}-style interpolation.
+type InitStatError struct {
+	diagnostic.FatalError
+	Path  string
+	Cause error
+}
+
+func (e *InitStatError) Error() string {
+	return fmt.Sprintf("could not stat %q: %v", e.Path, e.Cause)
+}
+
+func (e *InitStatError) Unwrap() error { return e.Cause }
+
+func (e *InitStatError) EventTemplate() event.Template {
+	return event.Template{
+		ID:   CodeInitStatError,
+		Text: `could not stat "{{.Path}}"`,
+		Hint: "check directory permissions",
+		Data: e,
+	}
+}
+
 // TidyError
 // -----------------------------------------------------------------------------
 

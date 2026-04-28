@@ -31,7 +31,11 @@ func Init(ctx context.Context, src source.Source, dir string, modulePath string)
 	}
 
 	dest := filepath.Join(dir, "scampi.mod")
-	if _, err := src.Stat(ctx, dest); err == nil {
+	meta, err := src.Stat(ctx, dest)
+	if err != nil {
+		return &InitStatError{Path: dest, Cause: err}
+	}
+	if meta.Exists {
 		return &InitError{
 			Detail: "scampi.mod already exists",
 			Hint:   "delete it first or edit it directly",

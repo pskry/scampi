@@ -113,6 +113,53 @@ std.deploy(name = "test", targets = [host]) {
 	}
 }
 
+// Module init integration tests
+// -----------------------------------------------------------------------------
+
+// TestModInit_CreatesScampiModInEmptyDir verifies the happy path: in an
+// empty directory, mod.Init writes scampi.mod with the given module path.
+func TestModInit_CreatesScampiModInEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	src := source.LocalPosixSource{}
+
+	if err := mod.Init(context.Background(), src, dir, "codeberg.org/test/myproj"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "scampi.mod"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(data) != "module codeberg.org/test/myproj\n" {
+		t.Errorf("scampi.mod content = %q", string(data))
+	}
+}
+
+// TestModInit_RejectsExistingScampiMod verifies #239: a second init on
+// the same directory must fail with "already exists" instead of being a
+// no-op or overwriting.
+func TestModInit_RejectsExistingScampiMod(t *testing.T) {
+	dir := t.TempDir()
+	src := source.LocalPosixSource{}
+	if err := mod.Init(context.Background(), src, dir, "codeberg.org/test/myproj"); err != nil {
+		t.Fatalf("first init: %v", err)
+	}
+
+	err := mod.Init(context.Background(), src, dir, "codeberg.org/test/other")
+	if err == nil {
+		t.Fatal("expected error on second init, got nil")
+	}
+	if !errContains(err, "already exists") {
+		t.Errorf("error = %v, want substring 'already exists'", err)
+	}
+
+	// First call's content must still be there.
+	data, _ := os.ReadFile(filepath.Join(dir, "scampi.mod"))
+	if string(data) != "module codeberg.org/test/myproj\n" {
+		t.Errorf("existing scampi.mod was overwritten: got %q", string(data))
+	}
+}
+
 // TestModuleLoad_Subpath verifies that a subpath import
 // (e.g. codeberg.org/user/mod/sub/path) resolves correctly within the cache.
 // TODO(#xxx): loadLocalSubmodules only runs for the self-module, not for

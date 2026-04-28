@@ -15,6 +15,7 @@ const (
 	CodeInfo            errs.Code = "mod.Info"
 	CodeWriteError      errs.Code = "mod.WriteError"
 	CodeInitError       errs.Code = "mod.InitError"
+	CodeInitStatError   errs.Code = "mod.InitStatError"
 	CodeTidyError       errs.Code = "mod.TidyError"
 	CodeSumError        errs.Code = "mod.SumError"
 	CodeFetchError      errs.Code = "mod.FetchError"
