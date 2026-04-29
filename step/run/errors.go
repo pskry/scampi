@@ -26,7 +26,8 @@ func (e ApplyError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeApplyFailed,
 		Text:   `apply command failed: {{.Cmd}}`,
-		Hint:   `stderr: {{.Stderr}}`,
+		Hint:   `inspect the stderr output below; verify {{.Cmd}} is correct and runnable on the target`,
+		Help:   `{{.Stderr}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -47,9 +48,11 @@ func (e PostApplyCheckError) Error() string {
 
 func (e PostApplyCheckError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     CodePostApplyCheckFailed,
-		Text:   `post-apply check failed: {{.CheckCmd}}`,
-		Hint:   `apply ran ({{.ApplyCmd}}) but check still fails: {{.Stderr}}`,
+		ID:   CodePostApplyCheckFailed,
+		Text: `post-apply check failed: {{.CheckCmd}}`,
+		Hint: `apply ran ({{.ApplyCmd}}) but the check still fails — ` +
+			`confirm the apply step actually achieves the condition that {{.CheckCmd}} tests for`,
+		Help:   `{{.Stderr}}`,
 		Data:   e,
 		Source: &e.Source,
 	}

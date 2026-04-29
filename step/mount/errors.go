@@ -25,7 +25,8 @@ func (e MountCommandError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeCommandFailed,
 		Text: "{{.Op}} {{.Dest}} failed",
-		Hint: "{{.Stderr}}",
+		Hint: `confirm the source path is reachable and that scampi has privileges to {{.Op}} {{.Dest}}`,
+		Help: "{{.Stderr}}",
 		Data: e,
 	}
 }

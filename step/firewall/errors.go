@@ -43,7 +43,8 @@ func (e RuleCheckError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeRuleCheckFailed,
 		Text: `failed to check firewall rule for port {{.Port}}`,
-		Hint: `stderr: {{.Stderr}}`,
+		Hint: `confirm the firewall backend is installed and that scampi has privileges to query it`,
+		Help: `{{.Stderr}}`,
 		Data: e,
 	}
 }
@@ -64,7 +65,8 @@ func (e RuleApplyError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeRuleApplyFailed,
 		Text: `failed to {{.Action}} port {{.Port}}`,
-		Hint: `stderr: {{.Stderr}}`,
+		Hint: `verify the firewall backend accepts {{.Action}} and that scampi has privileges to modify rules`,
+		Help: `{{.Stderr}}`,
 		Data: e,
 	}
 }

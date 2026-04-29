@@ -24,7 +24,8 @@ func (e ReadError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeReadFailed,
 		Text: `sysctl read failed for key "{{.Key}}"`,
-		Hint: `check that "{{.Key}}" is a valid sysctl parameter: {{.Stderr}}`,
+		Hint: `verify "{{.Key}}" is a valid sysctl parameter on this kernel; check the spelling and namespace`,
+		Help: `{{.Stderr}}`,
 		Data: e,
 	}
 }
@@ -45,7 +46,8 @@ func (e WriteError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeWriteFailed,
 		Text: `sysctl write failed for "{{.Key}}" = "{{.Value}}"`,
-		Hint: `stderr: {{.Stderr}}`,
+		Hint: `confirm scampi has privileges to write sysctl values and that "{{.Value}}" is valid for "{{.Key}}"`,
+		Help: `{{.Stderr}}`,
 		Data: e,
 	}
 }

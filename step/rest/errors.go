@@ -25,7 +25,9 @@ func (e RequestError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeRequestError,
 		Text: "{{.Method}} {{.Path}}: status {{.Status}}",
-		Hint: "the API returned an error response",
+		Hint: `the {{.Method}} returned status {{.Status}} — verify the request body ` +
+			`and that the endpoint accepts {{.Method}}`,
+		Help: "{{.Body}}",
 		Data: e,
 	}
 }
@@ -48,7 +50,8 @@ func (e HTTPError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeHTTPError,
 		Text: "{{.Phase}} {{.Method}} {{.Path}} failed",
-		Hint: "{{.Err}}",
+		Hint: `verify the REST target is reachable and the {{.Method}} on "{{.Path}}" is supported`,
+		Help: "{{.Err}}",
 		Data: e,
 	}
 }
@@ -73,7 +76,8 @@ func (e ResourceQueryError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeResourceQueryError,
 		Text: "resource query {{.Method}} {{.Path}} failed",
-		Hint: "{{.Err}}",
+		Hint: `verify the REST target is reachable and that "{{.Path}}" is a queryable resource endpoint`,
+		Help: "{{.Err}}",
 		Data: e,
 	}
 }
