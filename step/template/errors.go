@@ -47,7 +47,7 @@ func (e TemplateSourceMissingError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeSourceMissing,
 		Text:   `template source "{{.Path}}" does not exist`,
-		Hint:   "ensure the template file exists and is readable",
+		Hint:   `add "{{.Path}}" to the source tree, or fix the path passed to source_local(...)`,
 		Help:   "the template action cannot proceed without a readable source file",
 		Data:   e,
 		Source: &e.Source,

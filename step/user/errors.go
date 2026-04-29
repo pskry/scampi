@@ -28,7 +28,8 @@ func (e UserCreateError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeCreateFailed,
 		Text:   `failed to create user "{{.Name}}"`,
-		Hint:   "check that the username is valid and no conflicting user exists",
+		Hint:   `verify "{{.Name}}" is a valid username and no conflicting user/uid already exists`,
+		Help:   `{{.Err}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -52,7 +53,8 @@ func (e UserModifyError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeModifyFailed,
 		Text:   `failed to modify user "{{.Name}}"`,
-		Hint:   "check that the user exists and the target values are valid",
+		Hint:   `confirm user "{{.Name}}" exists on the target and the requested groups/shell/home are valid`,
+		Help:   `{{.Err}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -76,7 +78,8 @@ func (e UserDeleteError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeDeleteFailed,
 		Text:   `failed to delete user "{{.Name}}"`,
-		Hint:   "check that no running processes belong to this user",
+		Hint:   `confirm no running processes belong to "{{.Name}}"; run: ps -u {{.Name}}`,
+		Help:   `{{.Err}}`,
 		Data:   e,
 		Source: &e.Source,
 	}

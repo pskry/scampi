@@ -55,7 +55,8 @@ func (e LinkReadError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeLinkRead,
 		Text:   `cannot read link "{{.Path}}"`,
-		Hint:   "check file permissions and ensure the path is accessible",
+		Hint:   `verify the parent directory of "{{.Path}}" exists and scampi has read permission on it`,
+		Help:   `{{.Err}}`,
 		Data:   e,
 		Source: &e.Source,
 	}

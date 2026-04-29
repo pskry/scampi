@@ -26,10 +26,11 @@ func (e PkgInstallError) Error() string {
 
 func (e PkgInstallError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     CodeInstallFailed,
-		Text:   `failed to install pkgs [{{.Pkgs}}]: {{.Stderr}}`,
-		Hint:   "check that the package names are correct and the package manager cache is up to date",
-		Help:   "the package manager command exited with a non-zero status",
+		ID:   CodeInstallFailed,
+		Text: `failed to install pkgs [{{.Pkgs}}]`,
+		Hint: `verify the package names in [{{.Pkgs}}] exist in the ` +
+			`configured repos and the package cache is current`,
+		Help:   `{{.Stderr}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -51,9 +52,9 @@ func (e PkgRemoveError) Error() string {
 func (e PkgRemoveError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeRemoveFailed,
-		Text:   `failed to remove pkgs [{{.Pkgs}}]: {{.Stderr}}`,
-		Hint:   "check that the packages are installed and can be removed",
-		Help:   "the package manager command exited with a non-zero status",
+		Text:   `failed to remove pkgs [{{.Pkgs}}]`,
+		Hint:   `confirm packages in [{{.Pkgs}}] are installed and not held by another package`,
+		Help:   `{{.Stderr}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -95,8 +96,9 @@ func (e RepoKeyInstallError) Error() string {
 func (e RepoKeyInstallError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeRepoKeyInstallFailed,
-		Text: `failed to install signing key for "{{.Name}}": {{.Detail}}`,
-		Hint: "check that the key URL is correct and the target is reachable",
+		Text: `failed to install signing key for "{{.Name}}"`,
+		Hint: `verify the key_url for "{{.Name}}" is reachable from the target and serves a valid GPG key`,
+		Help: `{{.Detail}}`,
 		Data: e,
 	}
 }
@@ -115,8 +117,10 @@ func (e RepoConfigError) Error() string {
 func (e RepoConfigError) EventTemplate() event.Template {
 	return event.Template{
 		ID:   CodeRepoConfigFailed,
-		Text: `failed to configure repo "{{.Name}}": {{.Detail}}`,
-		Hint: "check target write permissions for the package manager config directory",
+		Text: `failed to configure repo "{{.Name}}"`,
+		Hint: `verify scampi can write the repo config for "{{.Name}}" ` +
+			`(e.g. /etc/apt/sources.list.d/, /etc/yum.repos.d/)`,
+		Help: `{{.Detail}}`,
 		Data: e,
 	}
 }

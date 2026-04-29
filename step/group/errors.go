@@ -28,7 +28,8 @@ func (e GroupCreateError) EventTemplate() event.Template {
 	return event.Template{
 		ID:     CodeCreateFailed,
 		Text:   `failed to create group "{{.Name}}"`,
-		Hint:   "check that the group name is valid and no conflicting group exists",
+		Hint:   `verify "{{.Name}}" is a valid group name and no conflicting group exists on the target`,
+		Help:   `{{.Err}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
@@ -50,9 +51,11 @@ func (e GroupDeleteError) Unwrap() error { return e.Err }
 
 func (e GroupDeleteError) EventTemplate() event.Template {
 	return event.Template{
-		ID:     CodeDeleteFailed,
-		Text:   `failed to delete group "{{.Name}}"`,
-		Hint:   "check that no users have this as their primary group",
+		ID:   CodeDeleteFailed,
+		Text: `failed to delete group "{{.Name}}"`,
+		Hint: `confirm no users have "{{.Name}}" as their primary group ` +
+			`(getent passwd | awk -F: '$4 == "<gid>"')`,
+		Help:   `{{.Err}}`,
 		Data:   e,
 		Source: &e.Source,
 	}
