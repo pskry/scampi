@@ -235,6 +235,7 @@ func (NoDeployBlocksError) EventTemplate() event.Template {
 type NoTargetsInDeployError struct {
 	diagnostic.FatalError
 	Deploy string
+	Source spec.SourceSpan
 }
 
 func (e NoTargetsInDeployError) Error() string {
@@ -243,10 +244,11 @@ func (e NoTargetsInDeployError) Error() string {
 
 func (e NoTargetsInDeployError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   CodeNoTargetsInDeploy,
-		Text: `deploy block "{{.Deploy}}" has no targets`,
-		Hint: "add at least one target to the deploy block's targets list",
-		Data: e,
+		ID:     CodeNoTargetsInDeploy,
+		Text:   `deploy block "{{.Deploy}}" has no targets`,
+		Hint:   "add at least one target to the deploy block's targets list",
+		Data:   e,
+		Source: &e.Source,
 	}
 }
 
@@ -254,6 +256,7 @@ type UnknownTargetError struct {
 	diagnostic.FatalError
 	Name   string
 	Deploy string
+	Source spec.SourceSpan
 }
 
 func (e UnknownTargetError) Error() string {
@@ -262,10 +265,11 @@ func (e UnknownTargetError) Error() string {
 
 func (e UnknownTargetError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   CodeUnknownTarget,
-		Text: `unknown target "{{.Name}}" referenced in deploy block "{{.Deploy}}"`,
-		Hint: "check that the target is defined in the targets map",
-		Data: e,
+		ID:     CodeUnknownTarget,
+		Text:   `unknown target "{{.Name}}" referenced in deploy block "{{.Deploy}}"`,
+		Hint:   "check that the target is defined in the targets map",
+		Data:   e,
+		Source: &e.Source,
 	}
 }
 
@@ -273,6 +277,7 @@ type TargetNotInDeployError struct {
 	diagnostic.FatalError
 	Target string
 	Deploy string
+	Source spec.SourceSpan
 }
 
 func (e TargetNotInDeployError) Error() string {
@@ -281,10 +286,11 @@ func (e TargetNotInDeployError) Error() string {
 
 func (e TargetNotInDeployError) EventTemplate() event.Template {
 	return event.Template{
-		ID:   CodeTargetNotInDeploy,
-		Text: `target "{{.Target}}" is not in deploy block "{{.Deploy}}"'s target list`,
-		Hint: "add the target to the deploy block's targets list or select a different target",
-		Data: e,
+		ID:     CodeTargetNotInDeploy,
+		Text:   `target "{{.Target}}" is not in deploy block "{{.Deploy}}"'s target list`,
+		Hint:   "add the target to the deploy block's targets list or select a different target",
+		Data:   e,
+		Source: &e.Source,
 	}
 }
 

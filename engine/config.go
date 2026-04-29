@@ -94,7 +94,7 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 		}
 
 		if len(targetNames) == 0 {
-			return nil, NoTargetsInDeployError{Deploy: deployName}
+			return nil, NoTargetsInDeployError{Deploy: deployName, Source: block.Source}
 		}
 
 		for _, targetName := range targetNames {
@@ -103,6 +103,7 @@ func ResolveMultiple(cfg spec.Config, opts spec.ResolveOptions) ([]spec.Resolved
 				return nil, UnknownTargetError{
 					Name:   targetName,
 					Deploy: deployName,
+					Source: block.Source,
 				}
 			}
 
@@ -145,7 +146,10 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 
 	if targetName == "" {
 		if len(block.Targets) == 0 {
-			return spec.ResolvedConfig{}, NoTargetsInDeployError{Deploy: deployName}
+			return spec.ResolvedConfig{}, NoTargetsInDeployError{
+				Deploy: deployName,
+				Source: block.Source,
+			}
 		}
 		targetName = block.Targets[0]
 	}
@@ -155,6 +159,7 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 		return spec.ResolvedConfig{}, UnknownTargetError{
 			Name:   targetName,
 			Deploy: deployName,
+			Source: block.Source,
 		}
 	}
 
@@ -162,6 +167,7 @@ func Resolve(cfg spec.Config, deployName, targetName string) (spec.ResolvedConfi
 		return spec.ResolvedConfig{}, TargetNotInDeployError{
 			Target: targetName,
 			Deploy: deployName,
+			Source: block.Source,
 		}
 	}
 
