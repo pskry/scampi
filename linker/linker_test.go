@@ -183,6 +183,104 @@ std.deploy(name = "test", targets = [host]) {
 	}
 }
 
+func TestLinkPopulatesSpans(t *testing.T) {
+	src := `module main
+import "std"
+import "std/posix"
+import "std/ssh"
+
+let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
+
+std.deploy(name = "web", targets = [vps]) {
+  posix.dir { path = "/var/www" }
+}
+`
+	modules, err := check.BootstrapModules(std.FS)
+	if err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+	data := []byte(src)
+	l := lex.New("test.scampi", data)
+	p := parse.New(l)
+	f := p.Parse()
+	if errs := l.Errors(); len(errs) > 0 {
+		t.Fatalf("lex: %v", errs)
+	}
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse: %v", errs)
+	}
+	c := check.New(modules)
+	c.Check(f)
+	if errs := c.Errors(); len(errs) > 0 {
+		t.Fatalf("check: %v", errs)
+	}
+	r, evalErrs := eval.Eval(f, data, eval.WithStubs(std.FS))
+	if len(evalErrs) > 0 {
+		t.Fatalf("eval: %v", evalErrs)
+	}
+	reg := engine.NewRegistry()
+	cfg, err := linker.Link(r, reg, "test.scampi", linker.WithSource(data))
+	if err != nil {
+		t.Fatalf("link: %v", err)
+	}
+
+	// Target spans
+	ti, ok := cfg.Targets["vps"]
+	if !ok {
+		t.Fatal("target 'vps' not found")
+	}
+	if ti.Source.StartLine == 0 {
+		t.Errorf("target Source.StartLine: got 0, want non-zero")
+	}
+	if ti.Source.Filename != "test.scampi" {
+		t.Errorf("target Source.Filename: got %q, want %q", ti.Source.Filename, "test.scampi")
+	}
+	if fs, ok := ti.Fields["host"]; !ok {
+		t.Error("target Fields[host]: missing")
+	} else if fs.Value.StartLine == 0 {
+		t.Errorf("target Fields[host].Value.StartLine: got 0, want non-zero")
+	}
+
+	// Step spans
+	if len(cfg.Deploy) == 0 || len(cfg.Deploy[0].Steps) == 0 {
+		t.Fatal("no steps in deploy")
+	}
+	step := cfg.Deploy[0].Steps[0]
+	if step.Source.StartLine == 0 {
+		t.Errorf("step Source.StartLine: got 0, want non-zero")
+	}
+	if fs, ok := step.Fields["path"]; !ok {
+		t.Error("step Fields[path]: missing")
+	} else if fs.Value.StartLine == 0 {
+		t.Errorf("step Fields[path].Value.StartLine: got 0, want non-zero")
+	}
+}
+
+// TestLinkZeroSpansWithoutSource verifies that without WithSource(),
+// linked instances carry zero-valued spans — the back-compat path for
+// callers that don't plumb source bytes.
+func TestLinkZeroSpansWithoutSource(t *testing.T) {
+	cfg := evalAndLink(t, `module main
+import "std"
+import "std/posix"
+import "std/ssh"
+
+let vps = ssh.target { name = "vps", host = "10.0.0.1", user = "root" }
+
+std.deploy(name = "web", targets = [vps]) {
+  posix.dir { path = "/var/www" }
+}
+`)
+	if cfg.Targets["vps"].Source.StartLine != 0 {
+		t.Errorf("expected zero StartLine without WithSource, got %d",
+			cfg.Targets["vps"].Source.StartLine)
+	}
+	if len(cfg.Targets["vps"].Fields) != 0 {
+		t.Errorf("expected nil Fields without WithSource, got %d entries",
+			len(cfg.Targets["vps"].Fields))
+	}
+}
+
 func evalAndLink(t *testing.T, src string) spec.Config {
 	t.Helper()
 	modules, err := check.BootstrapModules(std.FS)

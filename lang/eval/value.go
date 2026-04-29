@@ -6,7 +6,11 @@
 // typed configuration language into values the caller interprets.
 package eval
 
-import "fmt"
+import (
+	"fmt"
+
+	"scampi.dev/scampi/lang/token"
+)
 
 // Value is a runtime value produced by evaluation. All values are
 // immutable once created except for map/list contents inside func
@@ -91,11 +95,19 @@ func (v *MapVal) Set(key string, val Value) {
 // StructVal is a runtime value produced by a decl invocation or a type
 // literal. It carries the declaration's return type so the linker can
 // interpret it without reparsing stubs.
+//
+// SrcSpan and FieldSpans carry the call-site source ranges so the
+// linker can anchor diagnostics at the user's source. SrcSpan is the
+// whole `Type { ... }` literal; FieldSpans[name] is the field's value
+// expression. Both are zero when the StructVal is synthesised
+// (e.g. wrapper-decl fallback) rather than produced from a literal.
 type StructVal struct {
-	TypeName string // leaf decl name ("copy", "ssh", "secrets")
-	QualName string // qualified name ("posix.copy", "ssh.target")
-	RetType  string // return type from stubs ("Step", "Target", etc.)
-	Fields   map[string]Value
+	TypeName   string // leaf decl name ("copy", "ssh", "secrets")
+	QualName   string // qualified name ("posix.copy", "ssh.target")
+	RetType    string // return type from stubs ("Step", "Target", etc.)
+	Fields     map[string]Value
+	SrcSpan    token.Span
+	FieldSpans map[string]token.Span
 }
 
 func (*StructVal) valueTag() {}

@@ -31,6 +31,7 @@ type linkConfig struct {
 	ctx          context.Context
 	cfgPath      string
 	src          source.Source
+	source       []byte
 	converterFor func(reflect.Type) (spec.TypeConverter, bool)
 }
 
@@ -44,11 +45,21 @@ func WithSourceResolver(ctx context.Context, cfgPath string, src source.Source) 
 	}
 }
 
+// WithSource provides the raw source bytes of the entry-point config
+// file. Required for translating eval-side token offsets into
+// line/col coordinates on StepInstance.Source and StepInstance.Fields.
+// Without it, linked instances carry zero-valued spans.
+func WithSource(data []byte) LinkOption {
+	return func(lc *linkConfig) {
+		lc.source = data
+	}
+}
+
 // Link converts a lang eval result into a spec.Config by walking all
 // values, interpreting them based on RetType/TypeName, and resolving
 // step and target names against the engine registry.
 func Link(result *eval.Result, reg Registry, path string, opts ...LinkOption) (spec.Config, error) {
-	var lc linkConfig
+	lc := linkConfig{cfgPath: path}
 	for _, o := range opts {
 		o(&lc)
 	}
@@ -116,6 +127,44 @@ func linkBlockResult(bv *eval.BlockResultVal, reg Registry, cfg *spec.Config, lc
 	return nil
 }
 
+// structValSpans converts the eval-side token spans on a StructVal
+// into a (Source, Fields) pair the engine can use for diagnostics. If
+// the link config has no source bytes, returns zero values — callers
+// that only care about Type/Config see the same StepInstance shape as
+// before this plumbing existed.
+func structValSpans(sv *eval.StructVal, lc *linkConfig) (spec.SourceSpan, map[string]spec.FieldSpan) {
+	if len(lc.source) == 0 {
+		return spec.SourceSpan{}, nil
+	}
+	source := spec.SourceSpan{Filename: lc.cfgPath}
+	if sv.SrcSpan.End > 0 {
+		sLine, sCol := offsetToLineCol(lc.source, int(sv.SrcSpan.Start))
+		eLine, eCol := offsetToLineCol(lc.source, int(sv.SrcSpan.End))
+		source.StartLine = sLine
+		source.StartCol = sCol
+		source.EndLine = eLine
+		source.EndCol = eCol
+	}
+	fields := make(map[string]spec.FieldSpan, len(sv.FieldSpans))
+	for name, span := range sv.FieldSpans {
+		if span.End == 0 {
+			continue
+		}
+		sLine, sCol := offsetToLineCol(lc.source, int(span.Start))
+		eLine, eCol := offsetToLineCol(lc.source, int(span.End))
+		fields[name] = spec.FieldSpan{
+			Value: spec.SourceSpan{
+				Filename:  lc.cfgPath,
+				StartLine: sLine,
+				StartCol:  sCol,
+				EndLine:   eLine,
+				EndCol:    eCol,
+			},
+		}
+	}
+	return source, fields
+}
+
 func linkTarget(sv *eval.StructVal, reg Registry, lc *linkConfig) (spec.TargetInstance, error) {
 	// Try leaf name (e.g. "ssh"), qualified (e.g. "rest.target"),
 	// then module prefix (e.g. "rest" from "rest.target").
@@ -134,9 +183,12 @@ func linkTarget(sv *eval.StructVal, reg Registry, lc *linkConfig) (spec.TargetIn
 	if err := mapFields(sv.Fields, cfg, lc); err != nil {
 		return spec.TargetInstance{}, err
 	}
+	source, fields := structValSpans(sv, lc)
 	return spec.TargetInstance{
 		Type:   tt,
 		Config: cfg,
+		Source: source,
+		Fields: fields,
 	}, nil
 }
 
@@ -301,9 +353,12 @@ func linkStep(sv *eval.StructVal, reg Registry, lc *linkConfig) (spec.StepInstan
 		desc = d.V
 	}
 
+	source, fields := structValSpans(sv, lc)
 	return spec.StepInstance{
 		Type:   st,
 		Config: cfg,
 		Desc:   desc,
+		Source: source,
+		Fields: fields,
 	}, nil
 }

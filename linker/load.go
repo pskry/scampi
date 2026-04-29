@@ -185,7 +185,13 @@ func LoadConfig(
 	if err != nil {
 		return spec.Config{}, err
 	}
-	return Link(a.Result, reg, cfgPath, WithSourceResolver(ctx, cfgPath, src))
+	return Link(
+		a.Result,
+		reg,
+		cfgPath,
+		WithSource(a.Source),
+		WithSourceResolver(ctx, cfgPath, src),
+	)
 }
 
 // secretFromAge returns a BuiltinFunc for secrets.from_age(path).

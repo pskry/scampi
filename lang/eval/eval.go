@@ -1270,8 +1270,10 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 
 func (ev *Evaluator) evalStructLit(lit *ast.StructLit) Value {
 	fields := make(map[string]Value, len(lit.Fields))
+	fieldSpans := make(map[string]token.Span, len(lit.Fields))
 	for _, f := range lit.Fields {
 		fields[f.Name.Name] = ev.evalExpr(f.Value)
+		fieldSpans[f.Name.Name] = f.Value.Span()
 	}
 
 	typeName := structLitTypeName(lit)
@@ -1313,10 +1315,12 @@ func (ev *Evaluator) evalStructLit(lit *ast.StructLit) Value {
 	ev.applyTypeDefaults(typeName, qualName, fields)
 
 	return &StructVal{
-		TypeName: typeName,
-		QualName: qualName,
-		RetType:  retType,
-		Fields:   fields,
+		TypeName:   typeName,
+		QualName:   qualName,
+		RetType:    retType,
+		Fields:     fields,
+		SrcSpan:    lit.SrcSpan,
+		FieldSpans: fieldSpans,
 	}
 }
 
