@@ -268,6 +268,17 @@ func withDisplayer(opts globalOpts, store *diagnostic.SourceStore) (render.Displ
 	}
 }
 
+// cliPolicy returns the standard diagnostic policy for CLI commands:
+// caller verbosity, dedup enabled, no warnings-as-errors. Special
+// cases (inspect's --diff suppressing plan output) mutate the
+// returned value before passing it to diagnostic.NewEmitter.
+func cliPolicy(opts globalOpts) diagnostic.Policy {
+	return diagnostic.Policy{
+		Verbosity:        opts.verbosity,
+		DedupDiagnostics: true,
+	}
+}
+
 // Resolve options
 // -----------------------------------------------------------------------------
 

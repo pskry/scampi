@@ -37,7 +37,7 @@ func testCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, store)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 			src := source.LocalPosixSource{}
 

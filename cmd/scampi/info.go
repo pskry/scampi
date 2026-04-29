@@ -34,10 +34,7 @@ shown, including fields, behavior, and examples.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			pol := diagnostic.Policy{
-				WarningsAsErrors: false,
-				Verbosity:        opts.verbosity,
-			}
+			pol := cliPolicy(opts)
 
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()

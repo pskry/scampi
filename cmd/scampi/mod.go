@@ -67,7 +67,7 @@ func modInitCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			dir, err := os.Getwd()
@@ -99,7 +99,7 @@ func modTidyCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			dir, err := os.Getwd()
@@ -155,7 +155,7 @@ func modAddCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			dir, err := os.Getwd()
@@ -207,7 +207,7 @@ func modDownloadCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			dir, err := os.Getwd()
@@ -347,7 +347,7 @@ func modUpdateCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			dir, err := os.Getwd()
@@ -384,7 +384,7 @@ func modVerifyCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			dir, err := os.Getwd()
@@ -452,7 +452,7 @@ func modCacheCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			emitModInfo(em, mod.DefaultCacheDir())
@@ -475,7 +475,7 @@ func modCleanCmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{Verbosity: opts.verbosity}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			cacheDir := mod.DefaultCacheDir()

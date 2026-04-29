@@ -69,11 +69,8 @@ Falls back to plain diff(1).`,
 				return cli.Exit("--interactive requires --diff", exitUserError)
 			}
 
-			pol := diagnostic.Policy{
-				WarningsAsErrors: false,
-				Verbosity:        opts.verbosity,
-				SuppressPlan:     isDiff && diffPath == "" && !interactive,
-			}
+			pol := cliPolicy(opts)
+			pol.SuppressPlan = isDiff && diffPath == "" && !interactive
 
 			store := diagnostic.NewSourceStore()
 

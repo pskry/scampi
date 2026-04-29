@@ -92,9 +92,7 @@ func genAPICmd() *cli.Command {
 			displ, cleanup := withDisplayer(opts, nil)
 			defer cleanup()
 
-			pol := diagnostic.Policy{
-				Verbosity: opts.verbosity,
-			}
+			pol := cliPolicy(opts)
 			em := diagnostic.NewEmitter(pol, displ)
 
 			outPath := output

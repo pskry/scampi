@@ -41,10 +41,7 @@ changes when the current state differs from the declared state.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			pol := diagnostic.Policy{
-				WarningsAsErrors: false,
-				Verbosity:        opts.verbosity,
-			}
+			pol := cliPolicy(opts)
 
 			store := diagnostic.NewSourceStore()
 
@@ -91,10 +88,7 @@ the actual system state.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			pol := diagnostic.Policy{
-				WarningsAsErrors: false,
-				Verbosity:        opts.verbosity,
-			}
+			pol := cliPolicy(opts)
 
 			store := diagnostic.NewSourceStore()
 
@@ -140,10 +134,7 @@ does not inspect or modify the target system.`,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			pol := diagnostic.Policy{
-				WarningsAsErrors: false,
-				Verbosity:        opts.verbosity,
-			}
+			pol := cliPolicy(opts)
 
 			store := diagnostic.NewSourceStore()
 
