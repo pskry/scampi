@@ -258,6 +258,11 @@ func (p *printer) typeDecl(d *ast.TypeDecl) {
 	maxName := maxFieldNameLen(d.Fields)
 	for _, f := range d.Fields {
 		p.emitCommentsBefore(f.SrcSpan.Start)
+		for _, attr := range f.Attributes {
+			p.writeIndent()
+			p.attribute(attr)
+			p.newline()
+		}
 		p.field(f, maxName)
 	}
 	p.out()
@@ -290,6 +295,11 @@ func (p *printer) attrTypeDecl(d *ast.AttrTypeDecl) {
 	p.in()
 	maxName := maxFieldNameLen(d.Fields)
 	for _, f := range d.Fields {
+		for _, attr := range f.Attributes {
+			p.writeIndent()
+			p.attribute(attr)
+			p.newline()
+		}
 		p.field(f, maxName)
 	}
 	p.out()

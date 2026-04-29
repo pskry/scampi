@@ -1,0 +1,17 @@
+module main
+
+import "std"
+
+pub type Color {
+  @std.nonempty
+  name: string
+  @std.pattern(regex="#[0-9a-fA-F]{6}")
+  hex:  string
+}
+
+type @bounded {
+  @std.min(value=0)
+  low:  int
+  @std.max(value=100)
+  high: int
+}
