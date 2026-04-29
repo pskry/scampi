@@ -82,10 +82,18 @@ type StaticCheckContext struct {
 	ParamName string
 
 	// ParamArg is the user's call-site argument expression bound to
-	// the annotated parameter. May be a literal that the behaviour
-	// can validate eagerly, or any other expression for which the
-	// behaviour should defer to the runtime check.
+	// the annotated parameter. Set by the AST-walk dispatch path
+	// (UFCS calls, plain func calls) for behaviours that read AST
+	// shape; nil on the eval-walk path. Behaviours should prefer
+	// Resolved over ParamArg when both are available.
 	ParamArg ast.Expr
+
+	// Resolved is the eval-time concrete Go value of the annotated
+	// parameter. Set by the eval-walk dispatch path (decl/target
+	// invocations); nil on the AST-walk path or when the value
+	// couldn't be resolved (cross-step refs, eval errors). Helpers
+	// like literalString/literalInt prefer this over ParamArg.
+	Resolved any
 
 	// UseSpan is the source span of the call-site argument, for
 	// anchoring diagnostics.

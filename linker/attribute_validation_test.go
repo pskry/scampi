@@ -31,6 +31,19 @@ func newAttrCtx(name, paramName string, arg ast.Expr, args map[string]any) Stati
 	}
 }
 
+// newResolvedCtx mirrors newAttrCtx but populates Resolved instead of
+// ParamArg, exercising the eval-walk dispatch path.
+func newResolvedCtx(name, paramName string, resolved any, args map[string]any) StaticCheckContext {
+	return StaticCheckContext{
+		Linker:    &linkContext{},
+		AttrName:  name,
+		AttrArgs:  args,
+		ParamName: paramName,
+		Resolved:  resolved,
+		UseSpan:   spec.SourceSpan{},
+	}
+}
+
 func diags(ctx StaticCheckContext) int {
 	return len(ctx.Linker.(*linkContext).diags)
 }
@@ -87,6 +100,85 @@ func TestNonEmpty_ComputedSkipped(t *testing.T) {
 	NonEmptyAttribute{}.StaticCheck(ctx)
 	if diags(ctx) != 0 {
 		t.Errorf("expected no diagnostics for computed expr, got %d", diags(ctx))
+	}
+}
+
+// Resolved-path coverage — eval-walk hands Resolved to the behaviour
+// instead of an AST literal. These cases verify the fallback chain
+// works without a ParamArg AST node.
+// -----------------------------------------------------------------------------
+
+func TestNonEmpty_ResolvedStringEmpty(t *testing.T) {
+	ctx := newResolvedCtx("std.@nonempty", "name", "", nil)
+	NonEmptyAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 1 {
+		t.Errorf("expected 1 diagnostic for empty resolved string, got %d", diags(ctx))
+	}
+}
+
+func TestNonEmpty_ResolvedStringNonEmpty(t *testing.T) {
+	ctx := newResolvedCtx("std.@nonempty", "name", "nginx", nil)
+	NonEmptyAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 0 {
+		t.Errorf("expected no diagnostics for resolved non-empty, got %d", diags(ctx))
+	}
+}
+
+func TestNonEmpty_ResolvedSliceEmpty(t *testing.T) {
+	ctx := newResolvedCtx("std.@nonempty", "packages", []string{}, nil)
+	NonEmptyAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 1 {
+		t.Errorf("expected 1 diagnostic for empty resolved slice, got %d", diags(ctx))
+	}
+}
+
+func TestNonEmpty_ResolvedSliceNonEmpty(t *testing.T) {
+	ctx := newResolvedCtx("std.@nonempty", "packages", []string{"nginx"}, nil)
+	NonEmptyAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 0 {
+		t.Errorf("expected no diagnostics for non-empty resolved slice, got %d", diags(ctx))
+	}
+}
+
+func TestMin_ResolvedBelowRange(t *testing.T) {
+	ctx := newResolvedCtx("std.@min", "port", int64(0), map[string]any{"value": int64(1)})
+	MinAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 1 {
+		t.Errorf("expected 1 diagnostic for resolved int below min, got %d", diags(ctx))
+	}
+}
+
+func TestMin_ResolvedInRangeIntKind(t *testing.T) {
+	// Resolved values from reflection may arrive as int (not int64).
+	// Helper must accept both.
+	ctx := newResolvedCtx("std.@min", "port", 100, map[string]any{"value": int64(1)})
+	MinAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 0 {
+		t.Errorf("expected no diagnostics for int-kind resolved in range, got %d", diags(ctx))
+	}
+}
+
+func TestSize_ResolvedInvalid(t *testing.T) {
+	ctx := newResolvedCtx("std.@size", "memory", "12g", nil)
+	SizeAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 1 {
+		t.Errorf("expected 1 diagnostic for resolved invalid size, got %d", diags(ctx))
+	}
+}
+
+func TestSize_ResolvedValid(t *testing.T) {
+	ctx := newResolvedCtx("std.@size", "memory", "512M", nil)
+	SizeAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 0 {
+		t.Errorf("expected no diagnostics for resolved valid size, got %d", diags(ctx))
+	}
+}
+
+func TestPath_ResolvedRelativeWithAbsolute(t *testing.T) {
+	ctx := newResolvedCtx("std.@path", "dest", "etc/foo", map[string]any{"absolute": true})
+	PathAttribute{}.StaticCheck(ctx)
+	if diags(ctx) != 1 {
+		t.Errorf("expected 1 diagnostic for resolved relative path with absolute=true, got %d", diags(ctx))
 	}
 }
 

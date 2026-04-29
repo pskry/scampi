@@ -4,6 +4,7 @@ package linker
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -23,14 +24,17 @@ import (
 // so anything dynamic just runs as the program intends and any
 // failures surface from the actual op when it executes.
 
-// literalString extracts a literal string value from an expression.
-// Returns (value, true) if the expression is a single-segment string
-// literal; (\"\", false) for any other shape (computed strings,
-// interpolation, function calls, etc.). The boolean is what lets
-// behaviours like @nonempty distinguish "literal empty string" from
-// "non-literal expression".
-func literalString(e ast.Expr) (string, bool) {
-	sl, ok := e.(*ast.StringLit)
+// literalString extracts a literal string value for an annotated
+// param. Prefers ctx.Resolved (eval-walk path) over ctx.ParamArg
+// (AST-walk path). Returns (value, true) when a string can be
+// recovered; (\"\", false) for any other shape (computed strings,
+// non-string types, missing both inputs). The boolean lets behaviours
+// distinguish "literal empty" from "non-literal expression".
+func literalString(ctx StaticCheckContext) (string, bool) {
+	if s, ok := ctx.Resolved.(string); ok {
+		return s, true
+	}
+	sl, ok := ctx.ParamArg.(*ast.StringLit)
 	if !ok || len(sl.Parts) != 1 {
 		return "", false
 	}
@@ -39,6 +43,22 @@ func literalString(e ast.Expr) (string, bool) {
 		return "", false
 	}
 	return text.Raw, true
+}
+
+// literalList reports the length of a list-shaped annotated param.
+// Prefers ctx.Resolved (any Go slice via reflection) over a literal
+// AST list. Returns (length, true) when a list shape is recognised.
+func literalList(ctx StaticCheckContext) (int, bool) {
+	if ctx.Resolved != nil {
+		rv := reflect.ValueOf(ctx.Resolved)
+		if rv.IsValid() && rv.Kind() == reflect.Slice {
+			return rv.Len(), true
+		}
+	}
+	if list, ok := ctx.ParamArg.(*ast.ListLit); ok {
+		return len(list.Items), true
+	}
+	return 0, false
 }
 
 // NonEmptyAttribute fails when the annotated parameter binds to a
@@ -50,7 +70,7 @@ func literalString(e ast.Expr) (string, bool) {
 type NonEmptyAttribute struct{}
 
 func (NonEmptyAttribute) StaticCheck(ctx StaticCheckContext) {
-	if v, ok := literalString(ctx.ParamArg); ok {
+	if v, ok := literalString(ctx); ok {
 		if v == "" {
 			ctx.Linker.Emit(newAttrDocError(
 				ctx,
@@ -59,13 +79,11 @@ func (NonEmptyAttribute) StaticCheck(ctx StaticCheckContext) {
 		}
 		return
 	}
-	if list, ok := ctx.ParamArg.(*ast.ListLit); ok {
-		if len(list.Items) == 0 {
-			ctx.Linker.Emit(newAttrDocError(
-				ctx,
-				fmt.Sprintf("%s must not be empty", ctx.ParamName),
-			))
-		}
+	if n, ok := literalList(ctx); ok && n == 0 {
+		ctx.Linker.Emit(newAttrDocError(
+			ctx,
+			fmt.Sprintf("%s must not be empty", ctx.ParamName),
+		))
 	}
 }
 
@@ -78,7 +96,7 @@ func (NonEmptyAttribute) StaticCheck(ctx StaticCheckContext) {
 type FileModeAttribute struct{}
 
 func (FileModeAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalString(ctx.ParamArg)
+	v, ok := literalString(ctx)
 	if !ok {
 		return
 	}
@@ -97,7 +115,7 @@ type SizeAttribute struct{}
 var sizeRegex = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?[BKMGT]?$`)
 
 func (SizeAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalString(ctx.ParamArg)
+	v, ok := literalString(ctx)
 	if !ok {
 		return
 	}
@@ -113,7 +131,7 @@ func (SizeAttribute) StaticCheck(ctx StaticCheckContext) {
 type PatternAttribute struct{}
 
 func (PatternAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalString(ctx.ParamArg)
+	v, ok := literalString(ctx)
 	if !ok {
 		return
 	}
@@ -146,7 +164,7 @@ func (PatternAttribute) StaticCheck(ctx StaticCheckContext) {
 type OneOfAttribute struct{}
 
 func (OneOfAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalString(ctx.ParamArg)
+	v, ok := literalString(ctx)
 	if !ok {
 		return
 	}
@@ -191,9 +209,19 @@ type SinceAttribute struct{}
 
 func (SinceAttribute) StaticCheck(_ StaticCheckContext) {}
 
-// literalInt extracts a literal integer value from an expression.
-func literalInt(e ast.Expr) (int64, bool) {
-	il, ok := e.(*ast.IntLit)
+// literalInt extracts a literal int64 for an annotated param. Prefers
+// ctx.Resolved (any concrete int kind) over ctx.ParamArg AST literal.
+func literalInt(ctx StaticCheckContext) (int64, bool) {
+	if ctx.Resolved != nil {
+		rv := reflect.ValueOf(ctx.Resolved)
+		if rv.IsValid() {
+			switch rv.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				return rv.Int(), true
+			}
+		}
+	}
+	il, ok := ctx.ParamArg.(*ast.IntLit)
 	if !ok {
 		return 0, false
 	}
@@ -205,7 +233,7 @@ func literalInt(e ast.Expr) (int64, bool) {
 type MinAttribute struct{}
 
 func (MinAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalInt(ctx.ParamArg)
+	v, ok := literalInt(ctx)
 	if !ok {
 		return
 	}
@@ -223,7 +251,7 @@ func (MinAttribute) StaticCheck(ctx StaticCheckContext) {
 type MaxAttribute struct{}
 
 func (MaxAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalInt(ctx.ParamArg)
+	v, ok := literalInt(ctx)
 	if !ok {
 		return
 	}
@@ -244,7 +272,7 @@ func (MaxAttribute) StaticCheck(ctx StaticCheckContext) {
 type PathAttribute struct{}
 
 func (PathAttribute) StaticCheck(ctx StaticCheckContext) {
-	v, ok := literalString(ctx.ParamArg)
+	v, ok := literalString(ctx)
 	if !ok {
 		return
 	}
