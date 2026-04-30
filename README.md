@@ -2,7 +2,10 @@
 
 # scampi
 
-[![CI](https://codeberg.org/scampi-dev/scampi/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/scampi-dev/scampi/actions?workflow=ci.yml) [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](https://codeberg.org/scampi-dev/scampi/src/branch/main/LICENSE)
+[![CI](https://codeberg.org/scampi-dev/scampi/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/scampi-dev/scampi/actions?workflow=ci.yml) [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](https://codeberg.org/scampi-dev/scampi/src/branch/main/LICENSE) [![Security Policy](https://img.shields.io/badge/security-policy-critical?logo=gnuprivacyguard&logoColor=white)](SECURITY.md)
+
+> [!IMPORTANT]
+> **Found a security issue?** Please follow the [security policy](SECURITY.md) — don't open a public issue. Sensitive reports can be PGP-encrypted; the key is published in `SECURITY.md`.
 
 > [!NOTE]
 > **scampi is developed on [Codeberg](https://codeberg.org/scampi-dev/scampi).**
