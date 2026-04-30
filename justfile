@@ -19,8 +19,8 @@ ldflags  := "-s -w -X main.version=" + version
 [doc("Build scampi and scampls binaries")]
 build:
   mkdir -p {{bin_dir}}
-  CGO_ENABLED=0 go build -ldflags '{{ldflags}}' -o {{bin_dir}}/scampi  ./cmd/scampi
-  CGO_ENABLED=0 go build -ldflags '{{ldflags}}' -o {{bin_dir}}/scampls ./cmd/scampls
+  CGO_ENABLED=0 go build -trimpath -ldflags '{{ldflags}}' -o {{bin_dir}}/scampi  ./cmd/scampi
+  CGO_ENABLED=0 go build -trimpath -ldflags '{{ldflags}}' -o {{bin_dir}}/scampls ./cmd/scampls
 
 [doc("Cross-compile for all supported platforms (outdir=DIR)")]
 cross outdir=bin_dir:
@@ -33,7 +33,7 @@ cross outdir=bin_dir:
     for bin in scampi scampls; do
       out="{{outdir}}/${bin}-${os}-${arch}"
       printf "  %-20s → %s\n" "${bin} ${os}/${arch}" "$out"
-      CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -ldflags '{{ldflags}}' -o "$out" ./cmd/${bin}
+      CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags '{{ldflags}}' -o "$out" ./cmd/${bin}
     done
   done
 

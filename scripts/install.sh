@@ -32,6 +32,12 @@ REPO="scampi-dev/scampi"
 API="https://codeberg.org/api/v1/repos/${REPO}"
 DL="https://codeberg.org/${REPO}/releases/download"
 
+# Release signing key — embedded so verification works offline.
+# To rotate: regenerate the keypair, push a new install.sh with the new
+# pubkey, and re-sign existing releases.
+SCAMPI_RELEASE_PUBKEY='releases@scampi.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEDBbJOSWyfk9kJhHjUmSJVIax9lxGnOjwpL4dSheQfu'
+SCAMPI_RELEASE_PRINCIPAL='releases@scampi.dev'
+
 setup_colors() {
   if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ]; then
     R='\033[0m' B='\033[1m' DIM='\033[2m'
@@ -108,11 +114,38 @@ fetch_version() {
 
 download_checksums() {
   SUMS_URL="${DL}/${VERSION}/SHA256SUMS"
+  SIG_URL="${DL}/${VERSION}/SHA256SUMS.sig"
   TMPDIR=$(mktemp -d)
   trap 'rm -rf "${TMPDIR}"' EXIT
 
   curl -fsSL -o "${TMPDIR}/SHA256SUMS" "${SUMS_URL}" ||
     fatal "could not download checksums"
+
+  # Pre-signing releases lack SHA256SUMS.sig; tolerate that for backward
+  # compatibility. Any signature that IS present must verify.
+  if curl -fsSL -o "${TMPDIR}/SHA256SUMS.sig" "${SIG_URL}" 2>/dev/null; then
+    verify_signature
+  else
+    warn "release ${VERSION} is unsigned (no SHA256SUMS.sig)"
+  fi
+}
+
+verify_signature() {
+  if ! command -v ssh-keygen >/dev/null 2>&1; then
+    fatal "release is signed but 'ssh-keygen' not found; install OpenSSH or download manually from ${DL}/${VERSION}/"
+  fi
+
+  printf '%s\n' "${SCAMPI_RELEASE_PUBKEY}" > "${TMPDIR}/allowed_signers"
+
+  if ! ssh-keygen -Y verify \
+      -f "${TMPDIR}/allowed_signers" \
+      -I "${SCAMPI_RELEASE_PRINCIPAL}" \
+      -n file \
+      -s "${TMPDIR}/SHA256SUMS.sig" \
+      < "${TMPDIR}/SHA256SUMS" >/dev/null 2>&1; then
+    fatal "SHA256SUMS signature verification FAILED — refusing to install"
+  fi
+  ok "SHA256SUMS signature verified (${SCAMPI_RELEASE_PRINCIPAL})"
 }
 
 install_one() {

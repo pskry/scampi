@@ -30,6 +30,16 @@ jobs:
           (cd release && sha256sum * | tee SHA256SUMS)
           ls -lh release/
 
+      - name: Sign SHA256SUMS
+        env:
+          SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 0600 /dev/stdin /tmp/release-signing.key <<<"$SIGNING_KEY"
+          ssh-keygen -Y sign -f /tmp/release-signing.key -n file release/SHA256SUMS
+          rm /tmp/release-signing.key
+          ls -lh release/SHA256SUMS.sig
+
       - name: Extract release notes from CHANGELOG.md
         run: |
           set -euo pipefail

@@ -41,8 +41,9 @@ curl get.scampi.dev | sh
 ```
 
 Downloads the latest release of **both `scampi` and `scampls`** (the LSP
-server), verifies SHA256 checksums, and installs to `~/.local/bin` (or
-`/usr/local/bin` if it doesn't exist).
+server), verifies the release SSH signature on `SHA256SUMS`, checks each
+binary's SHA256, and installs to `~/.local/bin` (or `/usr/local/bin` if
+it doesn't exist).
 
 **Just the CLI** (e.g. CI runners):
 
@@ -78,7 +79,48 @@ Requires Go {{< go-version >}}+.
 Prebuilt binaries for all supported platforms are available on
 [Codeberg releases](https://codeberg.org/scampi-dev/scampi/releases).
 
-Download the binary for your platform, verify against `SHA256SUMS`, and place it on your `PATH`.
+Download the binary for your platform, verify against `SHA256SUMS` (and ideally
+the [signature](#verify-a-release) too), and place it on your `PATH`.
+
+## Verify a release
+
+Releases are signed with an Ed25519 SSH key (`releases@scampi.dev`). Each
+release ships `SHA256SUMS` plus `SHA256SUMS.sig` — the install one-liner
+verifies both automatically. To verify by hand:
+
+```bash
+# 1. Pick a release tag
+TAG=v0.1.0-alpha.7
+
+# 2. Download SHA256SUMS, signature, and the binary you want
+curl -fLO "https://codeberg.org/scampi-dev/scampi/releases/download/${TAG}/SHA256SUMS"
+curl -fLO "https://codeberg.org/scampi-dev/scampi/releases/download/${TAG}/SHA256SUMS.sig"
+curl -fLO "https://codeberg.org/scampi-dev/scampi/releases/download/${TAG}/scampi-linux-amd64"
+
+# 3. Verify the signature on SHA256SUMS
+cat > allowed_signers <<'EOF'
+releases@scampi.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEDBbJOSWyfk9kJhHjUmSJVIax9lxGnOjwpL4dSheQfu
+EOF
+
+ssh-keygen -Y verify \
+  -f allowed_signers \
+  -I releases@scampi.dev \
+  -n file \
+  -s SHA256SUMS.sig \
+  < SHA256SUMS
+
+# 4. Verify the binary against SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+```
+
+If the signature verification fails, **don't run the binary**. File a
+report via the [security policy](https://codeberg.org/scampi-dev/scampi/src/branch/main/SECURITY.md) —
+it could mean the release was tampered with, or that the key was rotated
+and your `allowed_signers` line is stale.
+
+The signing pubkey is also embedded in the
+[install.sh](https://codeberg.org/scampi-dev/scampi/src/branch/main/scripts/install.sh)
+source if you want to grab it from there.
 
 ## Build from source
 
