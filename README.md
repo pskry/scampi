@@ -2,7 +2,12 @@
 
 # scampi
 
-[![CI](https://codeberg.org/scampi-dev/scampi/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/scampi-dev/scampi/actions?workflow=ci.yml) [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](https://codeberg.org/scampi-dev/scampi/src/branch/main/LICENSE) [![Security Policy](https://img.shields.io/badge/security-policy-critical?logo=gnuprivacyguard&logoColor=white)](SECURITY.md)
+[![CI](https://codeberg.org/scampi-dev/scampi/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/scampi-dev/scampi/actions?workflow=ci.yml)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue)](https://codeberg.org/scampi-dev/scampi/src/branch/main/LICENSE)
+[![Security Policy](https://img.shields.io/badge/security-policy-critical?logo=gnuprivacyguard&logoColor=white)](SECURITY.md)
+[![Latest Release](https://img.shields.io/gitea/v/release/scampi-dev/scampi?gitea_url=https%3A%2F%2Fcodeberg.org&include_prereleases&label=release&color=blue)](https://codeberg.org/scampi-dev/scampi/releases)
+[![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos%20%7C%20freebsd-lightgrey)](https://codeberg.org/scampi-dev/scampi/releases/latest)
+[![Install](https://img.shields.io/badge/install-get.scampi.dev-2ea44f)](https://get.scampi.dev)
 
 > [!IMPORTANT]
 > **Found a security issue?** Please follow the [security policy](SECURITY.md) — don't open a public issue. Sensitive reports can be PGP-encrypted; the key is published in `SECURITY.md`.
@@ -21,6 +26,76 @@ Think Ansible or Terraform, but with:
 - **Own language** instead of YAML/HCL (actual programming, not templating hell)
 - **Built-in steps** instead of plugin sprawl (batteries included)
 - **Deterministic execution** with fail-fast semantics (no half-applied mystery states)
+
+## Quick Start
+
+Install scampi (one-time):
+
+```bash
+curl https://get.scampi.dev | sh
+```
+
+Then write a config and run it:
+
+```bash
+# Create a config that renders a template
+cat > hello.scampi <<EOF
+module main
+
+import "std"
+import "std/posix"
+import "std/local"
+
+let my_machine = local.target { name = "local" }
+
+std.deploy(name = "hello", targets = [my_machine]) {
+  posix.template {
+    desc  = "render a greeting"
+    src   = posix.source_inline { content = "Hello {{ .my_val }}!" }
+    dest  = "/tmp/scampi-hello.txt"
+    data  = { "values": { "my_val": "world" } }
+    perm  = "0644"
+    owner = "$(id -un)"
+    group = "$(id -gn)"
+  }
+}
+EOF
+
+# Show scampi's execution plan
+scampi plan hello.scampi
+
+# Check what would happen
+scampi check hello.scampi
+
+# Punch it
+scampi apply hello.scampi
+
+# Apply a second time — idempotent, nothing to do
+scampi apply hello.scampi
+
+# Verify
+cat /tmp/scampi-hello.txt
+```
+
+Stack `-v` flags on any of those for more detail — `-v` (why), `-vv` (how), `-vvv` (everything). Quiet → `-vvv` is a *brutal* jump; add as many `v`s as you can stomach.
+
+## From source
+
+Prefer building from a checkout? You'll need [Go](https://go.dev) and [`just`](https://github.com/casey/just):
+
+```bash
+git clone https://codeberg.org/scampi-dev/scampi
+cd scampi
+just build           # produces ./build/bin/scampi and ./build/bin/scampls
+```
+
+For ongoing development, `just scampi <args>` is a rebuild-on-change wrapper that always runs the latest source.
+
+## Why does this exist?
+
+Because configuration drift is inevitable, but suffering through YAML isn't.
+
+**scampi** ensures your systems stay in the state you declared — idempotent, deterministic, and with error messages that actually help you fix things instead of sending you on a documentation scavenger hunt.
 
 ## Why "scampi"?
 
@@ -41,74 +116,19 @@ scampi check
 If you're a tech lead who needs to sell your favorite IaC tool to corporate suits, here are some handy backronyms for **SCAMPI**:
 
 - **S**ystem **C**onfiguration **A**nd **M**anagement **P**latform for **I**nfrastructure
-- **S**tate **C**onvergence **A**utomation and **M**aintenance **P**latform **I**nterface
-- **S**calable **C**onfiguration **A**pplication **M**anagement **P**latform **I**nfrastructure
-- **S**erver **C**ompliance **A**nd **M**aintenance **P**latform **I**T
+- **S**ecure **C**ontinuous **A**utomation & **M**ulti-cloud **P**rovisioning for **I**nfrastructure
+- **S**caled **C**onvergence **A**ssurance **M**iddleware **P**latform **I**ntegration
+- **S**oftware-defined **C**ompliance **A**utomation **M**onitoring **P**ipeline for **I**T
 
 Or just own it: "We've standardized on **scampi** for infrastructure convergence." Watch them nod seriously while you're internally screaming about shrimp.
 
-## Quick Start
-
-```bash
-# Create a config that renders a template
-cat > hello.scampi <<EOF
-target.local(name="local")
-
-deploy(name="demo", targets=["local"], steps=[
-    template(
-        src=inline("Hello {{ .user }}! Your shell: {{ .shell }}"),
-        dest="/tmp/scampi-hello.txt",
-        data={
-            "values": {
-                "user": "world",
-                "shell": "/bin/sh",
-            },
-            "env": {
-                "USER": "user",
-                "SHELL": "shell",
-            },
-        },
-        perm="0644",
-        owner="$(id -un)",
-        group="$(id -gn)",
-    ),
-])
-EOF
-
-# Check what would happen
-just scampi plan hello.scampi
-
-# Make it so
-just scampi apply hello.scampi
-
-# Verify
-cat /tmp/scampi-hello.txt
-```
-
-## Why does this exist?
-
-Because configuration drift is inevitable, but suffering through YAML isn't.
-
-**scampi** ensures your systems stay in the state you declared — idempotent, deterministic, and with error messages that actually help you fix things instead of sending you on a documentation scavenger hunt.
-
 ## Development
 
-See the docs:
-- `doc/design/naming.md` — terminology and concepts
-- `doc/design/units-targets-vars.md` — configuration model
-- `doc/design/cli-semantics.md` — CLI output and verbosity
-
-Commands:
-```bash
-just build       # Build CLI to ./build/bin/scampi
-just test        # Run all tests
-just lint        # Run golangci-lint
-just fmt         # Format code
-```
+Want to hack on scampi? See [`CONTRIBUTING.md`](CONTRIBUTING.md) — covers the build/test workflow, the design docs under `doc/design/`, the commit style, and the project's code conventions.
 
 ## License
 
-See [LICENSE](LICENSE)
+See [LICENSE](LICENSE).
 
 ---
 
