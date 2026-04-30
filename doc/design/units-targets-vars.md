@@ -43,14 +43,17 @@ Two fundamentally different concepts:
 
 A **target** describes how to reach a machine. Nothing more.
 
-```python
-target.local(name="laptop")
+```scampi
+import "std/local"
+import "std/ssh"
 
-target.ssh(
-    name="web1",
-    host="10.0.0.1",
-    user="deploy",
-)
+let laptop = local.target { name = "laptop" }
+
+let web1 = ssh.target {
+  name = "web1"
+  host = "10.0.0.1"
+  user = "deploy"
+}
 ```
 
 ### What a Target Is NOT
@@ -62,24 +65,24 @@ target.ssh(
 
 ### Target Types
 
-| Type    | Builtin                                  | Use case                 |
-| ------- | ---------------------------------------- | ------------------------ |
-| `local` | `target.local(name)`                     | Local machine execution  |
-| `ssh`   | `target.ssh(name, host, user, ...)`      | Remote execution via SSH |
-| `rest`  | `target.rest(name, base_url, auth, ...)` | API-driven services      |
+| Type    | Builtin            | Use case                 |
+| ------- | ------------------ | ------------------------ |
+| `local` | `local.target {}`  | Local machine execution  |
+| `ssh`   | `ssh.target {}`    | Remote execution via SSH |
+| `rest`  | `rest.target {}`   | API-driven services      |
 
-SSH targets accept additional keyword arguments:
+SSH targets accept additional fields:
 
-```python
-target.ssh(
-    name="web1",
-    host="10.0.0.1",
-    user="deploy",
-    port=2222,              # optional
-    key="~/.ssh/id_rsa",    # optional
-    insecure=True,          # optional: skip host key verification
-    timeout="10s",          # optional: connection timeout
-)
+```scampi
+ssh.target {
+  name     = "web1"
+  host     = "10.0.0.1"
+  user     = "deploy"
+  port     = 2222              // optional, default 22
+  key      = "~/.ssh/id_rsa"   // optional
+  insecure = true              // optional: skip host key verification
+  timeout  = "10s"             // optional, default "5s"
+}
 ```
 
 ---
@@ -103,50 +106,77 @@ Planned steps: see `scampi index` for the current list
 
 ### Step Builtins
 
-```python
-copy(src=local("./app.conf"), dest="/etc/app.conf", perm="0644", owner="root", group="root")
+```scampi
+posix.copy {
+  src   = posix.source_local { path = "./app.conf" }
+  dest  = "/etc/app.conf"
+  owner = "root"
+  group = "root"
+  perm  = "0644"
+}
 
-dir(path="/var/app", perm="0755", owner="app", group="app")
+posix.dir {
+  path  = "/var/app"
+  owner = "app"
+  group = "app"
+  perm  = "0755"
+}
 
-symlink(target="/etc/app.conf", link="/opt/app/config")
+posix.symlink {
+  target = "/etc/app.conf"
+  link   = "/opt/app/config"
+}
 
-template(
-    src=local("./nginx.conf.tmpl"),  # or src=inline("{{ .template }}")
-    dest="/etc/nginx/nginx.conf",
-    perm="0644",
-    owner="root",
-    group="root",
-    data={"values": {"workers": 4, "port": 80}},
-)
+posix.template {
+  src   = posix.source_local { path = "./nginx.conf.tmpl" }
+  // or: src = posix.source_inline { content = "{{ .template }}" }
+  dest  = "/etc/nginx/nginx.conf"
+  owner = "root"
+  group = "root"
+  perm  = "0644"
+  data  = { "values": { "workers": 4, "port": 80 } }
+}
 
-pkg(packages=["nginx", "curl"], state="present", source=system())  # present | latest | absent
+posix.pkg {
+  packages = ["nginx", "curl"]
+  source   = posix.pkg_system()
+  state    = posix.PkgState.present  // present | absent | latest
+}
 ```
 
-Every step accepts an optional `desc` keyword for human-readable descriptions.
+Every step accepts an optional `desc` field for human-readable descriptions.
 
 ---
 
 ## Deploy Blocks
 
-A **deploy block** binds targets to an ordered sequence of steps.
+A **deploy block** binds targets to an ordered sequence of steps. Steps
+appear as bare expressions inside the deploy body.
 
-```python
-deploy(
-    name="web",
-    targets=["web1", "web2"],
-    steps=[
-        copy(src=local("./motd.txt"), dest="/etc/motd", perm="0644", owner="root", group="root"),
-        pkg(packages=["nginx"], source=system()),
-        template(
-            src=local("./nginx.conf.tmpl"),
-            dest="/etc/nginx/nginx.conf",
-            perm="0644",
-            owner="root",
-            group="root",
-            data={"values": {"workers": 4}},
-        ),
-    ],
-)
+```scampi
+std.deploy(name = "web", targets = [web1, web2]) {
+  posix.copy {
+    src   = posix.source_local { path = "./motd.txt" }
+    dest  = "/etc/motd"
+    owner = "root"
+    group = "root"
+    perm  = "0644"
+  }
+
+  posix.pkg {
+    packages = ["nginx"]
+    source   = posix.pkg_system()
+  }
+
+  posix.template {
+    src   = posix.source_local { path = "./nginx.conf.tmpl" }
+    dest  = "/etc/nginx/nginx.conf"
+    owner = "root"
+    group = "root"
+    perm  = "0644"
+    data  = { "values": { "workers": 4 } }
+  }
+}
 ```
 
 Reading order matches execution: "On web1 and web2, run: copy, pkg, template."
@@ -160,47 +190,53 @@ Reading order matches execution: "On web1 and web2, run: copy, pkg, template."
 Ansible has 22 levels of variable precedence. "Where did this value come from?"
 is often unanswerable.
 
-### scampi Approach: `env()`
+### scampi Approach: `std.env()`
 
-The `env()` builtin reads environment variables with optional defaults and type
-coercion:
+The `std.env()` builtin reads environment variables with an optional default:
 
-```python
-# Required — errors if not set
-db_host = env("DB_HOST")
+```scampi
+import "std"
 
-# With default — returns default if not set
-port = env("SSH_PORT", 2222)         # coerces to int
-debug = env("DEBUG", False)          # coerces to bool
-level = env("LOG_LEVEL", "info")     # string
+// Required — errors if not set
+let db_host = std.env("DB_HOST")
+
+// With default — returns default if the env var is not set
+let log_level = std.env("LOG_LEVEL", default = "info")
 ```
 
-Type coercion follows the default value's type:
-- **int**: parses the env var as an integer
-- **bool**: `"true"`, `"1"`, `"yes"` → True; `"false"`, `"0"`, `"no"`, `""` → False
-- **string**: no coercion
+`std.env` returns a string. If you need an integer or boolean, parse the
+result yourself — keeping coercion in the config file rather than the
+builtin makes the type explicit at the call site.
 
 ### Provenance is Obvious
 
-Every value is either a literal in your `.scampi` file or an explicit `env()` call.
-There's no layering, no precedence, no hidden override mechanism. You can always
-answer "where did this value come from?" by reading the code.
+Every value is either a literal in your `.scampi` file or an explicit
+`std.env()` call. There's no layering, no precedence, no hidden override
+mechanism. You can always answer "where did this value come from?" by
+reading the code.
 
 ### Secrets
 
-The `secret()` builtin resolves sensitive values at eval time from a pluggable
-backend. Secrets are always required (no default value).
+Secret resolvers are values. Create one with `secrets.from_age` or
+`secrets.from_file`, then look up keys via UFCS — `resolver.get("key")`.
 
-```python
-db_password = secret("postgres.admin.password")
-api_token = secret("npm.api_token")
+```scampi
+import "std/secrets"
+
+let store = secrets.from_age(path = "secrets.age.json")
+
+let db_password = store.get("postgres.admin.password")
+let api_token   = store.get("npm.api_token")
 ```
 
-V1 ships with an `unencrypted_file` backend that reads a flat JSON
-`secrets.json` next to the config file. Additional backends (age, Bitwarden,
-Vault, etc.) are planned — the backend is selected by the user, not by scampi.
+Built-in resolvers:
 
-Secret values never appear in diagnostic output — only key names.
+- `secrets.from_age(path)` — age-encrypted JSON. Identity resolved from
+  `$SCAMPI_AGE_KEY`, `$SCAMPI_AGE_KEY_FILE`, or `~/.config/scampi/age.key`.
+- `secrets.from_file(path)` — unencrypted JSON. For development.
+
+The linker validates literal keys against the resolver's backend at link
+time. Secret values never appear in diagnostic output — only key names.
 
 ---
 
@@ -210,40 +246,41 @@ Secret values never appear in diagnostic output — only key names.
 
 Standard `import` splits configs across files:
 
-```python
-# config.scampi
+```scampi
+// config.scampi
 module main
 
+import "std"
 import "myproject/targets"
-import "myproject/steps/web"
 
-deploy(name="web", targets=targets.web_targets, steps=web.web_steps)
+std.deploy(name = "web", targets = targets.web_hosts) {
+  // ... steps ...
+}
 ```
 
-```python
-# targets.scampi
+```scampi
+// targets.scampi
 module myproject/targets
 
-import "std"
+import "std/ssh"
 
-pub web_targets = ["web1", "web2"]
-pub db_targets  = ["db1"]
+pub let web1 = ssh.target { name = "web1", host = "10.0.0.1", user = "deploy" }
+pub let web2 = ssh.target { name = "web2", host = "10.0.0.2", user = "deploy" }
 
-std.target.ssh(name="web1", host="10.0.0.1", user="deploy")
-std.target.ssh(name="web2", host="10.0.0.2", user="deploy")
+pub let web_hosts = [web1, web2]
 ```
 
-Imported modules expose names via `pub`. `target.*()` and `deploy()` calls
-in imported files register globally with the engine.
+Imported modules expose names via `pub`. Targets bound to `pub let`
+identifiers can be referenced from any importing module.
 
 ### Target Grouping
 
 Groups are plain lists. Composition is just list operations:
 
-```python
-web = ["web1", "web2"]
-db = ["db1"]
-all = web + db
+```scampi
+let web = [web1, web2]
+let db  = [db1]
+let all = web + db
 ```
 
 No special group abstraction needed — scampi is a real language.
@@ -258,18 +295,20 @@ Start with one file. Split when it hurts.
 
 ### Minimal (Single File)
 
-```python
-# dotfiles.scampi
-target.local(name="laptop")
+```scampi
+// dotfiles.scampi
+module main
 
-deploy(
-    name="dotfiles",
-    targets=["laptop"],
-    steps=[
-        symlink(target="bashrc", link="~/.bashrc"),
-        symlink(target="vimrc", link="~/.vimrc"),
-    ],
-)
+import "std"
+import "std/posix"
+import "std/local"
+
+let laptop = local.target { name = "laptop" }
+
+std.deploy(name = "dotfiles", targets = [laptop]) {
+  posix.symlink { target = "bashrc", link = "~/.bashrc" }
+  posix.symlink { target = "vimrc",  link = "~/.vimrc" }
+}
 ```
 
 ```bash
@@ -278,18 +317,21 @@ scampi apply dotfiles.scampi
 
 ### Small (One File, Multiple Targets)
 
-```python
-# config.scampi
-target.local(name="laptop")
-target.ssh(name="server", host="myserver.com", user="me")
+```scampi
+// config.scampi
+module main
 
-deploy(
-    name="dotfiles",
-    targets=["laptop", "server"],
-    steps=[
-        symlink(target="bashrc", link="~/.bashrc"),
-    ],
-)
+import "std"
+import "std/posix"
+import "std/local"
+import "std/ssh"
+
+let laptop = local.target { name = "laptop" }
+let server = ssh.target { name = "server", host = "myserver.com", user = "me" }
+
+std.deploy(name = "dotfiles", targets = [laptop, server]) {
+  posix.symlink { target = "bashrc", link = "~/.bashrc" }
+}
 ```
 
 ### Medium (Split Files)
@@ -382,15 +424,15 @@ inspection is a liability, not an optimization.
 
 ## Summary
 
-| Concept       | How                                     | Key property                    |
-| ------------- | --------------------------------------- | ------------------------------- |
-| Steps         | Built-in functions (`copy`, `dir`, ...) | Batteries included              |
-| Targets       | `target.local()`, `target.ssh()`        | Pure identity                   |
-| Deploy blocks | `deploy(name, targets, steps)`          | Host-centric: "on X run Y"      |
-| Environment   | `env(key, default?)`                    | Explicit, no precedence         |
-| Secrets       | `secret(key)`                           | Pluggable backend, never logged |
-| Multi-file    | `import`                                | Standard scampi                 |
-| Groups        | Plain lists                             | Just scampi                     |
+| Concept       | How                                       | Key property                    |
+| ------------- | ----------------------------------------- | ------------------------------- |
+| Steps         | `posix.copy { ... }`, `posix.dir { ... }`, ... | Batteries included              |
+| Targets       | `local.target { ... }`, `ssh.target { ... }`   | Pure identity                   |
+| Deploy blocks | `std.deploy(name, targets) { ... }`       | Host-centric: "on X run Y"      |
+| Environment   | `std.env(key, default?)`                  | Explicit, no precedence         |
+| Secrets       | `secrets.from_age(...).get(key)`          | Pluggable backend, never logged |
+| Multi-file    | `import`                                  | Standard scampi                 |
+| Groups        | Plain lists                               | Just scampi                     |
 
 Complexity scales from one file to full layout. Explicit over implicit.
 Target is truth.

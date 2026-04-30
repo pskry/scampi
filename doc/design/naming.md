@@ -48,15 +48,14 @@ scampi is the user-facing, declarative language. Go adapts to scampi concepts �
 
 A **step** is a single declarative unit of work defined by the user.
 
-```python
-steps = [
-    copy(
-        src="./src.yml",
-        dest="/etc/app/config.yml",
-        owner="root",
-        perm="0640",
-    ),
-]
+```scampi
+posix.copy {
+  src   = posix.source_local { path = "./src.yml" }
+  dest  = "/etc/app/config.yml"
+  owner = "root"
+  group = "root"
+  perm  = "0640"
+}
 ```
 
 ### Kind
@@ -82,7 +81,7 @@ A **StepType** represents a step kind in Go. It defines how to decode configurat
 type StepType interface {
     Kind() string
     NewConfig() any
-    Plan(idx int, step StepInstance) (Action, error)
+    Plan(step StepInstance) (Action, error)
 }
 ```
 
@@ -100,11 +99,13 @@ A **StepInstance** represents one concrete step declared by the user.
 
 ```go
 type StepInstance struct {
-    Desc   string
-    Type   StepType
-    Config any
-    Source SourceSpan
-    Fields map[string]FieldSpan
+    ID       StepID                    // unique identifier, assigned during eval
+    Desc     string                    // optional human description
+    Type     StepType
+    Config   any
+    OnChange []string                  // hook IDs to notify when this step changes
+    Source   SourceSpan
+    Fields   map[string]FieldSpan
 }
 ```
 
@@ -112,6 +113,7 @@ type StepInstance struct {
 - Couples user data with its StepType
 - Exists only during planning
 - `Desc` is the human-readable description
+- `OnChange` lists hook IDs to fire when this step changes state
 - `Source` and `Fields` carry scampi source locations for diagnostics
 
 ### TargetType
@@ -474,14 +476,14 @@ Extensibility is achieved by **clear boundaries**, not abstractions.
 | -------------------- | --------------------------- | ------------------------------------- |
 | Declarative work     | step builtin (copy, dir, …) | StepInstance                          |
 | Semantic category    | kind                        | StepType                              |
-| Target definition    | target.ssh / target.local   | TargetInstance                        |
+| Target definition    | ssh.target / local.target   | TargetInstance                        |
 | Target category      | target type                 | TargetType                            |
 | Planned execution    | —                           | Action                                |
 | Executable unit      | —                           | Op                                    |
 | Execution graph      | —                           | Plan / Unit                           |
 | Data origin          | —                           | Source                                |
 | Change destination   | —                           | Target (capability-based)             |
-| Configuration        | deploy()                    | Config / DeployBlock / ResolvedConfig |
+| Configuration        | std.deploy(...) { ... }     | Config / DeployBlock / ResolvedConfig |
 | Check outcome        | —                           | CheckResult                           |
 | Op self-description  | —                           | OpDescriber / PlanTemplate            |
 | Dependency inference | —                           | Promiser                              |

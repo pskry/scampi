@@ -28,12 +28,12 @@ A bare `run: "do the thing"` step blows up the engine's guarantees:
 The escape hatch should preserve the engine's check/execute model by requiring
 the user to provide both halves of the contract:
 
-```python
-run(
-    name = "enable ip forwarding",
-    check = "sysctl net.ipv4.ip_forward | grep -q '= 1'",
-    apply = "sysctl -w net.ipv4.ip_forward=1",
-)
+```scampi
+posix.run {
+  desc  = "enable ip forwarding"
+  check = "sysctl net.ipv4.ip_forward | grep -q '= 1'"
+  apply = "sysctl -w net.ipv4.ip_forward=1"
+}
 ```
 
 **check** (exit 0 = already correct): the engine runs this first. If it
@@ -51,12 +51,12 @@ This gives us:
 If the user genuinely can't write a check (side-effect-only commands, scripts
 with no observable state), they should be able to opt in explicitly:
 
-```python
-run(
-    name = "refresh something",
-    apply = "do-the-thing",
-    always = True,
-)
+```scampi
+posix.run {
+  desc   = "refresh something"
+  apply  = "do-the-thing"
+  always = true
+}
 ```
 
 This always runs, always reports as "changed." The engine doesn't pretend to
@@ -69,7 +69,7 @@ fully-declarative steps. A different glyph, a dim annotation — something that
 makes it obvious at a glance which parts of your config are verified-convergent
 and which are "trust me" territory.
 
-Steps with `always = True` should be even more visually flagged. The goal is a
+Steps with `always = true` should be even more visually flagged. The goal is a
 gentle nudge: if you see a lot of always-run steps, maybe some of them deserve
 a proper step type.
 
@@ -87,22 +87,22 @@ The escape hatch isn't just an emergency exit — it's the adoption path. Asking
 users to rewrite their entire setup before they can use scampi is a non-starter.
 The `run` step lets people start with what they have:
 
-```python
-run(
-    name = "legacy ansible setup",
-    check = "ansible-playbook site.yml --check | grep -q 'changed=0'",
-    apply = "ansible-playbook site.yml",
-)
+```scampi
+posix.run {
+  desc  = "legacy ansible setup"
+  check = "ansible-playbook site.yml --check | grep -q 'changed=0'"
+  apply = "ansible-playbook site.yml"
+}
 ```
 
 Or wrapping Terraform:
 
-```python
-run(
-    name = "infrastructure",
-    check = "terraform plan -detailed-exitcode",  # exit 2 = changes needed
-    apply = "terraform apply -auto-approve",
-)
+```scampi
+posix.run {
+  desc  = "infrastructure"
+  check = "terraform plan -detailed-exitcode"  // exit 2 = changes needed
+  apply = "terraform apply -auto-approve"
+}
 ```
 
 Users start here, then peel off steps one at a time. Each conversion from `run`
