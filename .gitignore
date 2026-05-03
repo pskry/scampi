@@ -5,6 +5,10 @@
 !.golangci.yml
 !.gomarklint.json
 
+# Template / example files want to be committed regardless of where
+# they live (covers .env.example, .config.example, etc.).
+!*.example
+
 # CI
 !/.forgejo/
 !/.github/

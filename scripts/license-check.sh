@@ -33,7 +33,7 @@ done < <(find . -name '*.go' -not -path './vendor/*')
 # Shell scripts: SPDX on line 2 (after shebang)
 while IFS= read -r f; do
   check_file "$f" 2
-done < <(find . -name '*.sh' -not -path './vendor/*' -not -path './build/*' -not -path './.dev/*' -not -name 'license-check.sh')
+done < <(find . -name '*.sh' -not -path './vendor/*' -not -path './build/*' -not -path './.dev/*' -not -path './bench/ansible/venv/*' -not -name 'license-check.sh')
 
 # Scampi-lang files: SPDX on line 1
 while IFS= read -r f; do
