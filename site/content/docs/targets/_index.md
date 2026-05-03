@@ -24,11 +24,12 @@ bind them to different deploy blocks.
 
 Each target type lives in its own module under `std/`:
 
-| Module      | Target         | Use for                                    |
-| ----------- | -------------- | ------------------------------------------ |
-| `std/local` | `local.target` | Steps that run on the machine scampi is on |
-| `std/ssh`   | `ssh.target`   | Steps that run on a remote host over SSH   |
-| `std/rest`  | `rest.target`  | HTTP requests against a REST API           |
+| Module      | Target           | Use for                                       |
+| ----------- | ---------------- | --------------------------------------------- |
+| `std/local` | `local.target`   | Steps that run on the machine scampi is on    |
+| `std/ssh`   | `ssh.target`     | Steps that run on a remote host over SSH      |
+| `std/rest`  | `rest.target`    | HTTP requests against a REST API              |
+| `std/pve`   | `pve.lxc_target` | Steps that run inside an LXC container on PVE |
 
 ## Available targets
 
@@ -36,4 +37,5 @@ Each target type lives in its own module under `std/`:
   {{< card link="local" title="local" subtitle="Run steps on the local machine" >}}
   {{< card link="ssh" title="ssh" subtitle="Run steps on a remote host via SSH" >}}
   {{< card link="rest" title="rest" subtitle="Make HTTP requests against a REST API" >}}
+  {{< card link="pve" title="pve" subtitle="Run posix.* steps inside an LXC container via pct exec" >}}
 {{< /cards >}}

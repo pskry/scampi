@@ -53,6 +53,7 @@ scampi leaves it alone. If you want scampi to manage it, set it explicitly.
   {{< card link="group" title="group" subtitle="Manage system groups" >}}
   {{< card link="mount" title="mount" subtitle="Manage filesystem mounts and fstab entries" >}}
   {{< card link="pkg" title="pkg" subtitle="Manage system packages" >}}
+  {{< card link="pve" title="pve" subtitle="Proxmox VE hosts and LXC containers" >}}
   {{< card link="rest" title="rest" subtitle="HTTP requests against a REST API" >}}
   {{< card link="run" title="run" subtitle="Run arbitrary shell commands" >}}
   {{< card link="service" title="service" subtitle="Manage services (systemd, OpenRC, launchctl)" >}}
