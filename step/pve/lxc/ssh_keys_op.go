@@ -80,51 +80,22 @@ func (op *sshKeysLxcOp) Execute(
 }
 
 func (op *sshKeysLxcOp) sshKeyDrift(ctx context.Context, cmdr target.Command) *spec.DriftDetail {
-	// Check if the file exists before pulling — avoids PVE task log errors.
-	testCmd := fmt.Sprintf("pct exec %d -- test -f /root/.ssh/authorized_keys", op.id)
-	result, err := cmdr.RunPrivileged(ctx, testCmd)
-	if err != nil || result.ExitCode != 0 {
-		// File doesn't exist.
-		if len(op.sshPublicKeys) == 0 {
-			return nil
-		}
-		return &spec.DriftDetail{
-			Field:   "ssh_public_keys",
-			Current: "0 key(s)",
-			Desired: fmt.Sprintf("%d key(s)", len(op.sshPublicKeys)),
-		}
+	// Read authorized_keys from inside the container in a single round-trip.
+	// `cat` exits non-zero when the file is missing or unreadable — treated
+	// as "no keys present", which is correct for both:
+	//   - desired keys empty → no drift
+	//   - desired keys non-empty → drift (apply will create the file)
+	//
+	// This intentionally does no temp-file pull/cat/rm dance: Check must be
+	// read-only on the target, and `pct exec … cat …` mutates nothing.
+	catCmd := fmt.Sprintf("pct exec %d -- cat /root/.ssh/authorized_keys", op.id)
+	result, err := cmdr.RunPrivileged(ctx, catCmd)
+
+	var current []string
+	if err == nil && result.ExitCode == 0 {
+		current = parsePVEKeys(result.Stdout)
 	}
 
-	// File exists — pull and compare.
-	tmpFile := fmt.Sprintf("/tmp/.scampi-ssh-read-%d", op.id)
-	pullCmd := fmt.Sprintf("pct pull %d /root/.ssh/authorized_keys %s", op.id, shellQuote(tmpFile))
-	result, err = cmdr.RunPrivileged(ctx, pullCmd)
-	if err != nil || result.ExitCode != 0 {
-		if len(op.sshPublicKeys) == 0 {
-			return nil
-		}
-		return &spec.DriftDetail{
-			Field:   "ssh_public_keys",
-			Current: "0 key(s)",
-			Desired: fmt.Sprintf("%d key(s)", len(op.sshPublicKeys)),
-		}
-	}
-
-	// Read the pulled file, then clean up.
-	result, err = cmdr.RunCommand(ctx, "cat "+shellQuote(tmpFile))
-	_, _ = cmdr.RunCommand(ctx, "rm -f "+shellQuote(tmpFile))
-	if err != nil || result.ExitCode != 0 {
-		if len(op.sshPublicKeys) == 0 {
-			return nil
-		}
-		return &spec.DriftDetail{
-			Field:   "ssh_public_keys",
-			Current: "0 key(s)",
-			Desired: fmt.Sprintf("%d key(s)", len(op.sshPublicKeys)),
-		}
-	}
-
-	current := parsePVEKeys(result.Stdout)
 	if slicesEqual(current, op.sshPublicKeys) {
 		return nil
 	}

@@ -79,7 +79,7 @@ func (op *configLxcOp) Execute(
 ) (spec.Result, error) {
 	cmdr := target.Must[target.Command](configLxcID, tgt)
 
-	exists, status, err := op.inspectExists(ctx, cmdr)
+	exists, _, err := op.inspectExists(ctx, cmdr)
 	if err != nil || !exists {
 		return spec.Result{}, err
 	}
@@ -90,7 +90,6 @@ func (op *configLxcOp) Execute(
 	}
 
 	changed := false
-	needsReboot := false
 
 	drift := op.configDrift(cfg)
 	setDrift := filterSetDrift(drift)
@@ -99,20 +98,12 @@ func (op *configLxcOp) Execute(
 			return spec.Result{}, err
 		}
 		changed = true
-		if hasDNSDrift(drift) {
-			needsReboot = true
-		}
 	}
 
-	// DNS changes take effect on container restart (PVE writes
-	// resolv.conf at start). Reboot inline because the reboot op
-	// can't reliably detect stale DNS when desired is empty.
-	if needsReboot && status == stateRunning {
-		cmd := fmt.Sprintf("pct reboot %d --timeout 30", op.id)
-		if err := op.runCmd(ctx, cmdr, "reboot", cmd); err != nil {
-			return spec.Result{}, err
-		}
-	}
+	// Reboot is rebootLxcOp's responsibility: its DNS RebootChecks probe
+	// the running container's /etc/resolv.conf, so it correctly detects
+	// stale DNS even after `pct set --nameserver=""` (config matches
+	// desired, but the running container hasn't reloaded yet).
 
 	return spec.Result{Changed: changed}, nil
 }
@@ -281,26 +272,22 @@ func (op *configLxcOp) RebootChecks() []rebootCheck {
 			},
 		})
 	}
+	// Probe the container's /etc/resolv.conf rather than `pct config`.
+	// `pct set --nameserver=X` updates the config file immediately, but
+	// the container's resolv.conf is only refreshed on (re)start. Probing
+	// the runtime state lets the reboot op detect drift even when desired
+	// matches what's already in `pct config`.
 	checks = append(checks, rebootCheck{
-		field:   "nameserver",
-		desired: dnsFingerprint(op.dns.Nameserver),
-		probe: func(ctx context.Context, cmdr target.Command, _ int) string {
-			cfg, err := op.inspectConfig(ctx, cmdr)
-			if err != nil {
+		field:   "dns",
+		desired: dnsFingerprint(op.dns.Nameserver) + "|" + dnsFingerprint(op.dns.Searchdomain),
+		probe: func(ctx context.Context, cmdr target.Command, id int) string {
+			r, err := cmdr.RunPrivileged(ctx, fmt.Sprintf("pct exec %d -- cat /etc/resolv.conf", id))
+			if err != nil || r.ExitCode != 0 {
 				return ""
 			}
-			return dnsFingerprint(cfg.Nameserver)
-		},
-	})
-	checks = append(checks, rebootCheck{
-		field:   "searchdomain",
-		desired: dnsFingerprint(op.dns.Searchdomain),
-		probe: func(ctx context.Context, cmdr target.Command, _ int) string {
-			cfg, err := op.inspectConfig(ctx, cmdr)
-			if err != nil {
-				return ""
-			}
-			return dnsFingerprint(cfg.Searchdomain)
+			ns := dnsFingerprint(parseResolvConfNameserver(r.Stdout))
+			sd := dnsFingerprint(parseResolvConfSearchdomain(r.Stdout))
+			return ns + "|" + sd
 		},
 	})
 	return checks

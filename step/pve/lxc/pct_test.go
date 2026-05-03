@@ -11,6 +11,53 @@ import (
 	"scampi.dev/scampi/target"
 )
 
+func TestParseResolvConfNameserver(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"empty", "", ""},
+		{"only comments", "# auto-generated\n# by PVE\n", ""},
+		{"single nameserver", "nameserver 1.1.1.1\n", "1.1.1.1"},
+		{"with search and trailing newline", "search lan\nnameserver 10.0.0.1\n", "10.0.0.1"},
+		{"first wins", "nameserver 1.1.1.1\nnameserver 8.8.8.8\n", "1.1.1.1"},
+		{"comment before nameserver", "# header\nnameserver 9.9.9.9\n", "9.9.9.9"},
+		{"no nameserver line", "search lan\noptions edns0\n", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseResolvConfNameserver(tt.input)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseResolvConfSearchdomain(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"empty", "", ""},
+		{"single domain", "search lan\n", "lan"},
+		{"multi-domain preserved", "search foo.com bar.com\nnameserver 1.1.1.1\n", "foo.com bar.com"},
+		{"first wins", "search a.com\nsearch b.com\n", "a.com"},
+		{"comment before search", "# header\nsearch lan\n", "lan"},
+		{"no search line", "nameserver 1.1.1.1\n", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseResolvConfSearchdomain(tt.input)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParsePctList(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -443,21 +490,13 @@ func TestSSHKeyDrift(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
-				switch {
-				case strings.Contains(cmd, "test -f"):
+				if strings.HasPrefix(cmd, "pct exec 100 -- cat /root/.ssh/authorized_keys") {
 					if tt.catFails {
 						return target.CommandResult{ExitCode: 1}, nil
 					}
-					return target.CommandResult{}, nil
-				case strings.Contains(cmd, "pct pull"):
-					return target.CommandResult{}, nil
-				case strings.HasPrefix(cmd, "cat "):
 					return target.CommandResult{Stdout: tt.catOutput}, nil
-				case strings.HasPrefix(cmd, "rm "):
-					return target.CommandResult{}, nil
-				default:
-					return target.CommandResult{ExitCode: 1}, nil
 				}
+				return target.CommandResult{ExitCode: 1}, nil
 			}}
 
 			op := &sshKeysLxcOp{pveCmd: pveCmd{id: 100}, sshPublicKeys: tt.desired}

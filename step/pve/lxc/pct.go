@@ -58,6 +58,38 @@ func parsePctStatus(output string) string {
 	return status
 }
 
+// parseResolvConfNameserver returns the first "nameserver X" value
+// from /etc/resolv.conf output, or empty if none found. Comment lines
+// (leading #) and other directives are ignored.
+func parseResolvConfNameserver(output string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(line, "nameserver "); ok {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return ""
+}
+
+// parseResolvConfSearchdomain returns the value of the first "search"
+// line from /etc/resolv.conf output, preserving multi-domain spacing
+// (PVE writes searchdomain values back verbatim). Empty if none found.
+func parseResolvConfSearchdomain(output string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(line, "search "); ok {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return ""
+}
+
 // formatNet builds the --netN value for pct create/set.
 //
 //	name=eth0,bridge=vmbr0,ip=10.10.10.10/24,gw=10.10.10.1,type=veth

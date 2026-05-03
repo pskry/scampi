@@ -101,15 +101,6 @@ func parsedToLxcNet(p parsedNet) LxcNet {
 	return LxcNet(p)
 }
 
-func hasDNSDrift(drift []spec.DriftDetail) bool {
-	for _, d := range drift {
-		if d.Field == "nameserver" || d.Field == "searchdomain" {
-			return true
-		}
-	}
-	return false
-}
-
 func hasDeviceDrift(drift []spec.DriftDetail) bool {
 	for _, d := range drift {
 		if strings.HasPrefix(d.Field, "device[") {

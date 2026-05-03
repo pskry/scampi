@@ -4,6 +4,7 @@ package lxc
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"scampi.dev/scampi/capability"
@@ -161,26 +162,116 @@ func TestConfigOp_RebootChecks_DNS(t *testing.T) {
 	}
 	checks := op.RebootChecks()
 
-	var ns, sd bool
+	var found bool
 	for _, c := range checks {
-		if c.field == "nameserver" {
-			ns = true
-			if c.desired != "1.1.1.1" {
-				t.Errorf("nameserver desired = %q", c.desired)
-			}
-		}
-		if c.field == "searchdomain" {
-			sd = true
-			if c.desired != "local" {
-				t.Errorf("searchdomain desired = %q", c.desired)
+		if c.field == "dns" {
+			found = true
+			if c.desired != "1.1.1.1|local" {
+				t.Errorf("dns desired = %q, want 1.1.1.1|local", c.desired)
 			}
 		}
 	}
-	if !ns {
-		t.Error("no nameserver check")
+	if !found {
+		t.Error("no dns check")
 	}
-	if !sd {
-		t.Error("no searchdomain check")
+}
+
+// TestConfigOp_RebootChecks_DNS_ProbesResolvConf is the design check
+// for #242: the DNS reboot probe must read the running container's
+// /etc/resolv.conf, not `pct config`. Otherwise `pct set --nameserver=""`
+// would update the config file (which the probe would then read as
+// matching desired), and the reboot op would skip — leaving the
+// container with stale resolv.conf until next manual reboot.
+func TestConfigOp_RebootChecks_DNS_ProbesResolvConf(t *testing.T) {
+	var probedCmds []string
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		probedCmds = append(probedCmds, cmd)
+		if cmd == "pct exec 100 -- cat /etc/resolv.conf" {
+			return target.CommandResult{
+				Stdout: "search lan\nnameserver 1.1.1.1\n",
+			}, nil
+		}
+		return target.CommandResult{ExitCode: 1}, nil
+	}}
+
+	op := &configLxcOp{
+		pveCmd: pveCmd{id: 100},
+		dns:    LxcDNS{Nameserver: "8.8.8.8", Searchdomain: "wan"},
+	}
+
+	var dnsCheck *rebootCheck
+	for i, c := range op.RebootChecks() {
+		if c.field == "dns" {
+			dnsCheck = &op.RebootChecks()[i]
+			break
+		}
+	}
+	if dnsCheck == nil {
+		t.Fatal("no dns reboot check")
+	}
+
+	current := dnsCheck.probe(context.Background(), cmdr, 100)
+
+	if current != "1.1.1.1|lan" {
+		t.Errorf("probed = %q, want 1.1.1.1|lan", current)
+	}
+	if dnsCheck.desired != "8.8.8.8|wan" {
+		t.Errorf("desired = %q, want 8.8.8.8|wan", dnsCheck.desired)
+	}
+	// Critical: probe must not have touched `pct config` — that path is
+	// the one that misses runtime drift after a `pct set --nameserver=""`.
+	for _, cmd := range probedCmds {
+		if cmd == "pct config 100" {
+			t.Errorf("DNS probe queried pct config — should probe runtime resolv.conf instead")
+		}
+	}
+}
+
+// TestConfigOp_Execute_NoReboot is the regression for #242: configLxcOp
+// must not issue `pct reboot` from Execute. Reboot is rebootLxcOp's
+// responsibility, wired via RebootChecks().
+func TestConfigOp_Execute_NoReboot(t *testing.T) {
+	var commands []string
+	cmdr := &mockTarget{handler: func(cmd string) (target.CommandResult, error) {
+		commands = append(commands, cmd)
+		switch {
+		case cmd == "pct list":
+			return target.CommandResult{
+				Stdout: "VMID Status Lock Name\n100 running    test\n",
+			}, nil
+		case cmd == "pct status 100":
+			return target.CommandResult{Stdout: "status: running\n"}, nil
+		case cmd == "pct config 100":
+			// hostname matches; only DNS drifts.
+			return target.CommandResult{
+				Stdout: "hostname: test\nnameserver: 1.1.1.1\n",
+			}, nil
+		case strings.HasPrefix(cmd, "pct set "):
+			return target.CommandResult{}, nil
+		}
+		return target.CommandResult{ExitCode: 1}, nil
+	}}
+
+	op := &configLxcOp{
+		pveCmd: pveCmd{
+			id:   100,
+			step: spec.StepInstance{Fields: map[string]spec.FieldSpan{}},
+		},
+		hostname:  "test",
+		cpu:       LxcCPU{Cores: 1},
+		memoryMiB: 512,
+		storage:   "local-zfs",
+		dns:       LxcDNS{Nameserver: "8.8.8.8"},
+	}
+
+	if _, err := op.Execute(context.Background(), nil, cmdr); err != nil {
+		t.Logf("Execute error (expected for partial mock): %v", err)
+	}
+
+	for _, cmd := range commands {
+		if strings.Contains(cmd, "pct reboot") {
+			t.Errorf("configLxcOp.Execute issued reboot — should be left to rebootLxcOp: %q", cmd)
+		}
 	}
 }
 
