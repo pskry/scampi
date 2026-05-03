@@ -23,7 +23,7 @@ your-module/
 The module path is the repository URL without `https://` and `.git`:
 
 ```text
-codeberg.org/scampi-modules/npm
+scampi.dev/modules/npm
 github.com/yourname/scampi-webserver
 ```
 
@@ -36,8 +36,8 @@ Multiple modules can live in subdirectories of a single git repository.
 The module path extends beyond the repo path:
 
 ```text
-codeberg.org/yourname/scampi-modules/npm       → repo/npm/
-codeberg.org/yourname/scampi-modules/authelia   → repo/authelia/
+codeberg.org/yourname/modules/npm       → repo/npm/
+codeberg.org/yourname/modules/authelia   → repo/authelia/
 ```
 
 scampi resolves this automatically — it probes progressively shorter
@@ -56,7 +56,7 @@ the path to the real repository:
 
 ```html
 <meta name="scampi-import"
-      content="scampi.dev/modules git https://codeberg.org/scampi-dev/scampi-modules.git">
+      content="scampi.dev/modules git https://codeberg.org/scampi-dev/modules.git">
 ```
 
 The `content` attribute has three space-separated fields:
@@ -141,7 +141,7 @@ If your module depends on other modules, include a `scampi.mod`:
 module codeberg.org/yourname/my-module
 
 require (
-    codeberg.org/scampi-modules/helpers v1.0.0
+    scampi.dev/modules/helpers v1.0.0
 )
 ```
 

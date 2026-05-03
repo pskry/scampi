@@ -19,7 +19,7 @@ of a version:
 module codeberg.org/yourname/yourproject
 
 require (
-    codeberg.org/scampi-modules/npm v1.0.0
+    scampi.dev/modules/npm v1.0.0
     my/helpers ./modules/helpers
 )
 ```

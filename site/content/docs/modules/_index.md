@@ -13,7 +13,7 @@ Add a module to your project:
 
 ```bash
 scampi mod init codeberg.org/yourname/yourproject
-scampi mod add codeberg.org/scampi-modules/npm
+scampi mod add scampi.dev/modules/npm
 ```
 
 Use it in your config:
@@ -23,7 +23,7 @@ module main
 
 import "std"
 import "std/local"
-import "codeberg.org/scampi-modules/npm"
+import "scampi.dev/modules/npm"
 
 let server = local.target { name = "server" }
 

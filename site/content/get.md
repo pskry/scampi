@@ -62,7 +62,7 @@ curl get.scampi.dev/lsp | sh
 **Custom path:**
 
 ```bash
-curl get.scampi.dev | sh -s -- -o ~/.local/bin
+curl get.scampi.dev | sh -s -- -d ~/.local/bin
 ```
 
 Supported platforms: Linux, macOS, and FreeBSD (amd64/arm64).
@@ -92,7 +92,7 @@ The install one-liner already verifies the release signature for you.
 This section is for the rest — the people who'd rather download
 manually and check before running.
 
-Since `v0.1.0-alpha.8`, every release ships a signed `SHA256SUMS`
+Every release after `v0.1.0-alpha.7` ships a signed `SHA256SUMS`
 manifest.[^pre-signing] The signing identity is `releases@scampi.dev`.
 Verification needs only `ssh-keygen` — the binary that comes with
 OpenSSH on every Linux, macOS, and BSD install — no gpg, no cosign,

@@ -12,8 +12,8 @@ module path and lists dependencies.
 module codeberg.org/yourname/yourproject
 
 require (
-    codeberg.org/scampi-modules/npm v1.0.0
-    codeberg.org/scampi-modules/authelia v0.3.2
+    scampi.dev/modules/npm v1.0.0
+    scampi.dev/modules/authelia v0.3.2
 )
 ```
 
@@ -41,11 +41,11 @@ dependencies, not by your project itself), scampi marks it with a
 module codeberg.org/yourname/yourproject
 
 require (
-    codeberg.org/scampi-modules/npm v1.0.0
+    scampi.dev/modules/npm v1.0.0
 )
 
 require (
-    codeberg.org/scampi-modules/helpers v2.1.0 // indirect
+    scampi.dev/modules/helpers v2.1.0 // indirect
 )
 ```
 
@@ -66,7 +66,7 @@ module codeberg.org/yourname/yourproject
 
 require (
     // Nginx Proxy Manager API wrappers
-    codeberg.org/scampi-modules/npm v1.0.0
+    scampi.dev/modules/npm v1.0.0
 )
 ```
 
@@ -76,8 +76,8 @@ require (
 modules. It ensures that cached modules haven't been tampered with.
 
 ```scampi-mod {filename="scampi.sum"}
-codeberg.org/scampi-modules/npm v1.0.0 h1:abc123...
-codeberg.org/scampi-modules/authelia v0.3.2 h1:def456...
+scampi.dev/modules/npm v1.0.0 h1:abc123...
+scampi.dev/modules/authelia v0.3.2 h1:def456...
 ```
 
 Commit `scampi.sum` to version control. It's verified on every `scampi mod download`

@@ -17,7 +17,7 @@ import "std/ssh"
 import "std/secrets"
 ```
 
-Every file starts with `module` + imports. Comments are `#` line-only.
+Every file starts with `module` + imports. Comments are `//` line and `/* … */` block.
 
 ## Standard library namespaces
 
@@ -35,17 +35,17 @@ Every file starts with `module` + imports. Comments are `#` line-only.
 ## Bindings and types
 
 ```scampi
-let version = "1.2.3"                         # immutable
-let url = "https://example.com/v${version}"   # interpolation
-let pkgs = ["nginx", "curl"]                  # list
-let env = {"PORT": "8080"}                    # map
+let version = "1.2.3"                         // immutable
+let url = "https://example.com/v${version}"   // interpolation
+let pkgs = ["nginx", "curl"]                  // list
+let env = {"PORT": "8080"}                    // map
 
 type User {
   name:   string
-  groups: list[string] = []       # default
+  groups: list[string] = []       // default
   shell:  string       = "/bin/bash"
   admin:  bool         = false
-  bio:    string?                 # optional (accepts none)
+  bio:    string?                 // optional (accepts none)
 }
 
 enum PkgState { present, absent, latest }
@@ -56,15 +56,15 @@ let alice = User { name = "alice", admin = true }
 ## Two call syntaxes
 
 ```scampi
-# Decl call — braces + field assignments (steps, targets, sources)
+// Decl call — braces + field assignments (steps, targets, sources)
 posix.dir { path = "/srv/app", perm = "0755" }
 
-# Function call — parentheses (computed values)
+// Function call — parentheses (computed values)
 let key = age.get("vps.host")
 
-# Trailing-block function — block[T] return
+// Trailing-block function — block[T] return
 std.deploy(name = "web", targets = [vps]) {
-  # steps here
+  // steps here
 }
 ```
 
@@ -99,17 +99,17 @@ let by_name = {u.name: u for u in users}
 
 Any `f(x, y)` can be written `x.f(y)`:
 ```scampi
-let token = age.get("key")  # same as secrets.get(age, "key")
+let token = age.get("key")  // same as secrets.get(age, "key")
 ```
 
 ## Deploy blocks
 
 ```scampi
 std.deploy(name = "webserver", targets = [web]) {
-  # bare invocation = desired state
+  // bare invocation = desired state
   posix.pkg { packages = ["nginx"], source = posix.pkg_system {} }
 
-  # let-bound = value for on_change (not desired state itself)
+  // let-bound = value for on_change (not desired state itself)
   let reload = posix.service { name = "nginx", state = posix.ServiceState.reloaded }
 
   posix.copy {
@@ -124,16 +124,16 @@ std.deploy(name = "webserver", targets = [web]) {
 ## Targets
 
 ```scampi
-# Local
+// Local
 let machine = local.target { name = "my-machine" }
 
-# SSH
+// SSH
 let vps = ssh.target {
   name = "vps", host = "192.168.1.10", user = "deploy"
   port = 22, key = "~/.ssh/id_ed25519", timeout = "5s"
 }
 
-# REST
+// REST
 let api = rest.target {
   name = "api"
   base_url = "https://api.example.com"

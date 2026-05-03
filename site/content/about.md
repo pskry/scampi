@@ -107,8 +107,8 @@ std.deploy(name = "webserver", targets = [web]) {
   }
 
   posix.service { name = "nginx", state = posix.ServiceState.running, enabled = true }
-  posix.firewall { port = "80/tcp" }
-  posix.firewall { port = "443/tcp" }
+  posix.firewall { port = 80 }
+  posix.firewall { port = 443 }
 }
 ```
 
