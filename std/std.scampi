@@ -165,6 +165,14 @@ pub func trim_prefix(s: string, prefix: string) string
 //   std.trim_suffix("file.bak", ".bak")   // "file"
 pub func trim_suffix(s: string, suffix: string) string
 
+// parse a string as a base-10 integer
+//
+//   std.parse_int("42")                          // 42
+//   std.parse_int(std.env("BENCH_VMID_BASE"))    // 950
+//
+// errors if the string isn't a valid integer.
+pub func parse_int(s: string) int
+
 // Deploy configuration
 // -----------------------------------------------------------------------------
 

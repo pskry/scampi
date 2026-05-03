@@ -4,6 +4,7 @@ package eval
 
 import (
 	"io/fs"
+	"strconv"
 	"strings"
 
 	"scampi.dev/scampi/errs"
@@ -1088,6 +1089,16 @@ func (ev *Evaluator) callTrimSuffix(positional []Value, kwargs map[string]Value)
 	return &StringVal{V: strings.TrimSuffix(s, suffix)}
 }
 
+func (ev *Evaluator) callParseInt(positional []Value, kwargs map[string]Value, span token.Span) Value {
+	s := stringArg(positional, kwargs, "s", 0)
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		ev.errAt(span, check.CodeCallError, "parse_int: cannot parse "+strconv.Quote(s)+" as int")
+		return &IntVal{V: 0}
+	}
+	return &IntVal{V: n}
+}
+
 func stringArg(positional []Value, kwargs map[string]Value, name string, idx int) string {
 	if idx < len(positional) {
 		if sv, ok := positional[idx].(*StringVal); ok {
@@ -1199,6 +1210,8 @@ func (ev *Evaluator) callFunc(fv *FuncVal, positional []Value, kwargs map[string
 			return ev.callTrimPrefix(positional, kwargs)
 		case "trim_suffix":
 			return ev.callTrimSuffix(positional, kwargs)
+		case "parse_int":
+			return ev.callParseInt(positional, kwargs, callSpan)
 		}
 
 		if strings.HasPrefix(fv.RetType, "block[") && strings.HasSuffix(fv.RetType, "]") {

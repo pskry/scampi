@@ -166,18 +166,21 @@ src = posix.source_remote { url = "https://...", checksum = "sha256:abc..." }
 
 ## Built-in functions
 
-| Function                      | Description                   |
-| ----------------------------- | ----------------------------- |
-| `std.env(name)`               | Read env var (error if unset) |
-| `std.env(name, default = "")` | Read env var with fallback    |
-| `std.range(n)`                | `[0, 1, ..., n-1]`            |
-| `std.ref(step, expr)`         | Cross-step jq reference       |
-| `std.deploy(name, targets)`   | Declare a deploy block        |
-| `secrets.from_age(path)`      | Age-encrypted JSON resolver   |
-| `secrets.from_file(path)`     | Plain JSON resolver           |
-| `resolver.get(key)`           | Look up secret key (UFCS)     |
-| `len(coll)`                   | Collection length             |
-| `int(s)`                      | Parse string to int           |
+| Function                      | Description                         |
+| ----------------------------- | ----------------------------------- |
+| `std.env(name)`               | Read env var (error if unset)       |
+| `std.env(name, default = "")` | Read env var with fallback          |
+| `std.range(n)`                | `[0, 1, ..., n-1]`                  |
+| `std.parse_int(s)`            | Parse base-10 int from string       |
+| `std.join(items, sep = " ")`  | Join list of strings with separator |
+| `std.trim_prefix(s, prefix)`  | Strip leading prefix if present     |
+| `std.trim_suffix(s, suffix)`  | Strip trailing suffix if present    |
+| `std.ref(step, expr)`         | Cross-step jq reference             |
+| `std.deploy(name, targets)`   | Declare a deploy block              |
+| `secrets.from_age(path)`      | Age-encrypted JSON resolver         |
+| `secrets.from_file(path)`     | Plain JSON resolver                 |
+| `resolver.get(key)`           | Look up secret key (UFCS)           |
+| `len(coll)`                   | Collection length                   |
 
 ## Step quick-reference
 
