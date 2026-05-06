@@ -208,9 +208,15 @@ func IsAssignableTo(src, dst Type) bool {
 		}
 		return IsAssignableTo(src, opt.Inner)
 	}
-	// Structural equality for collections.
+	// Structural equality for collections. An empty list literal `[]`
+	// types as `list[any]` because there's no element to inspect — let
+	// it flow into any concrete `list[T]` (#228). Non-empty lists go
+	// through the recursive element-type check.
 	if sl, ok := src.(*List); ok {
 		if dl, ok := dst.(*List); ok {
+			if sl.Elem == AnyType {
+				return true
+			}
 			return IsAssignableTo(sl.Elem, dl.Elem)
 		}
 	}

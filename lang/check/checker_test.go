@@ -293,6 +293,12 @@ func TestIsAssignableTo(t *testing.T) {
 		{"none to T", NoneType, StringType, false},
 		{"anything to any", IntType, AnyType, true},
 		{"T to different T?", IntType, &Optional{Inner: StringType}, false},
+		// #228: empty list literal types as list[any] from checkListLit;
+		// must flow into any concrete list[T].
+		{"list[any] to list[string]", &List{Elem: AnyType}, &List{Elem: StringType}, true},
+		{"list[any] to list[int]", &List{Elem: AnyType}, &List{Elem: IntType}, true},
+		{"list[string] to list[string]", &List{Elem: StringType}, &List{Elem: StringType}, true},
+		{"list[int] to list[string]", &List{Elem: IntType}, &List{Elem: StringType}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
