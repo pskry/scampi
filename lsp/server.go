@@ -152,6 +152,7 @@ func (s *Server) Initialize(
 			},
 			DocumentFormattingProvider: &protocol.DocumentFormattingOptions{},
 			DocumentHighlightProvider:  &protocol.DocumentHighlightOptions{},
+			ColorProvider:              &protocol.DocumentColorOptions{},
 			CodeLensProvider:           &protocol.CodeLensOptions{},
 			CodeActionProvider: &protocol.CodeActionOptions{
 				CodeActionKinds: []protocol.CodeActionKind{
@@ -435,16 +436,25 @@ func (s *Server) DidChangeWorkspaceFolders(
 	return nil
 }
 func (s *Server) DocumentColor(
-	context.Context,
-	*protocol.DocumentColorParams,
+	_ context.Context,
+	params *protocol.DocumentColorParams,
 ) ([]protocol.ColorInformation, error) {
-	return nil, nil
+	doc, ok := s.docs.Get(params.TextDocument.URI)
+	if !ok {
+		return nil, nil
+	}
+	src := []byte(doc.Content)
+	f, _ := Parse(uriToPath(params.TextDocument.URI), src)
+	return scanHexColors(src, f), nil
 }
+
 func (s *Server) ColorPresentation(
-	context.Context,
-	*protocol.ColorPresentationParams,
+	_ context.Context,
+	params *protocol.ColorPresentationParams,
 ) ([]protocol.ColorPresentation, error) {
-	return nil, nil
+	return []protocol.ColorPresentation{{
+		Label: hexFromColor(params.Color),
+	}}, nil
 }
 func (s *Server) DocumentHighlight(
 	_ context.Context,
