@@ -81,16 +81,23 @@ std.deploy(name = "create-box", targets = [pve_host]) {
 
 ```scampi
 pve.LxcNet {
-  name     = "eth0"           // optional; defaults to ethN
+  name     = "eth0"               // optional; defaults to ethN
   bridge   = "vmbr0"
-  ip       = "10.0.0.20/24"   // CIDR or "dhcp"
-  gw       = "10.0.0.1"       // optional
-  vlan_tag = 0                // 0 = no VLAN
+  ip       = "10.0.0.20/24"       // CIDR or "dhcp"
+  gw       = "10.0.0.1"           // optional
+  vlan_tag = 0                    // 0 = no VLAN
+  mac      = "BE:EF:CA:FE:00:01"  // optional; pin the hardware address
 }
 ```
 
 List index determines the PVE net index — first element becomes `net0`,
 second `net1`, and so on.
+
+Pinning `mac` is useful when you need to reserve the IP on an upstream
+DHCP server **before** the LXC is created — otherwise PVE generates a
+random MAC and the reservation can't match. Comparison is
+case-insensitive; the value is normalised to uppercase to match what
+PVE stores.
 
 ### `Cpu` — CPU configuration
 

@@ -101,6 +101,7 @@ type (
 		IP      string `step:"IP address in CIDR or dhcp" example:"10.10.10.10/24|dhcp"`
 		Gw      string `step:"Gateway" optional:"true" example:"10.10.10.1"`
 		VlanTag int    `step:"VLAN tag" optional:"true"`
+		Mac     string `step:"Pin a specific MAC address" optional:"true" example:"BE:EF:CA:FE:00:01"`
 	}
 	LxcDevice struct {
 		Path string `step:"Host device path" example:"/dev/dri/renderD128"`

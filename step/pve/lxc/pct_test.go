@@ -176,6 +176,16 @@ func TestFormatNet(t *testing.T) {
 			net:  LxcNet{Bridge: "vmbr0", IP: "dhcp", VlanTag: 200},
 			want: "name=eth0,bridge=vmbr0,ip=dhcp,tag=200,type=veth",
 		},
+		{
+			name: "with pinned mac",
+			net:  LxcNet{Bridge: "vmbr0", IP: "dhcp", Mac: "BE:EF:CA:FE:00:01"},
+			want: "name=eth0,bridge=vmbr0,ip=dhcp,hwaddr=BE:EF:CA:FE:00:01,type=veth",
+		},
+		{
+			name: "lowercase mac normalised to upper",
+			net:  LxcNet{Bridge: "vmbr0", IP: "10.0.0.5/24", Mac: "be:ef:ca:fe:00:01"},
+			want: "name=eth0,bridge=vmbr0,ip=10.0.0.5/24,hwaddr=BE:EF:CA:FE:00:01,type=veth",
+		},
 	}
 
 	for _, tt := range tests {
@@ -205,6 +215,22 @@ func TestParseNetValue_DHCP(t *testing.T) {
 	}
 	if net.Gw != "" {
 		t.Errorf("gw should be empty for DHCP, got %q", net.Gw)
+	}
+}
+
+func TestParseNetValue_HwAddr(t *testing.T) {
+	// PVE returns hwaddr in any case but our normalisation should
+	// always store it uppercase, so a config with `mac = "be:ef:..."`
+	// matches the parsed `BE:EF:...` and doesn't trigger drift.
+	cases := []string{
+		"name=eth0,bridge=vmbr0,hwaddr=BE:EF:CA:FE:00:01,ip=dhcp,type=veth",
+		"name=eth0,bridge=vmbr0,hwaddr=be:ef:ca:fe:00:01,ip=dhcp,type=veth",
+	}
+	for _, in := range cases {
+		net := parseNetValue(in)
+		if net.Mac != "BE:EF:CA:FE:00:01" {
+			t.Errorf("mac = %q, want uppercase BE:EF:CA:FE:00:01", net.Mac)
+		}
 	}
 }
 

@@ -76,6 +76,11 @@ pub type LxcNet {
   gw:       string?
   // VLAN tag. 0 or unset means no VLAN tagging.
   vlan_tag: int = 0
+  // Pin a specific hardware address. Useful for reserving the IP
+  // on an upstream DHCP server before the LXC is created. PVE
+  // generates a random MAC if unset.
+  @std.pattern("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
+  mac:      string?
 }
 
 // Host device passthrough (PVE 8.1+). List index determines the

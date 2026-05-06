@@ -122,6 +122,15 @@ func formatNet(idx int, net LxcNet) string {
 		_, _ = fmt.Fprintf(&b, ",tag=%d", net.VlanTag)
 	}
 
+	// hwaddr= sits before type= so the formatted string matches PVE's
+	// own canonical ordering (PVE writes net config alphabetically by
+	// key, modulo the synthesised name= prefix). Keeping our format
+	// identical to PVE's avoids spurious drift on re-check.
+	if net.Mac != "" {
+		b.WriteString(",hwaddr=")
+		b.WriteString(strings.ToUpper(net.Mac))
+	}
+
 	b.WriteString(",type=veth")
 	return b.String()
 }
@@ -155,6 +164,7 @@ type parsedNet struct {
 	IP      string
 	Gw      string
 	VlanTag int
+	Mac     string
 }
 
 type parsedDev struct {
@@ -448,6 +458,11 @@ func parseNetValue(val string) parsedNet {
 			net.Gw = v
 		case "tag":
 			net.VlanTag, _ = strconv.Atoi(v)
+		case "hwaddr":
+			// Normalise to uppercase so case-only differences between
+			// what the user wrote and what PVE returns don't trigger
+			// drift. PVE itself stores the value uppercase.
+			net.Mac = strings.ToUpper(v)
 		}
 	}
 	return net
