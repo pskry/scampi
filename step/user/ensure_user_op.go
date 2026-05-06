@@ -4,6 +4,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 
@@ -75,10 +76,54 @@ func (op *ensureUserOp) Check(
 		})
 	}
 
+	// Home-directory ownership: the user record can match while the
+	// filesystem still has /home/<name> owned by someone else (#265).
+	// Common cause: a posix.dir step with `path = "/home/<name>/.ssh"`
+	// runs `mkdir -p`, which silently materialises the parent as
+	// root before posix.user gets a chance.
+	if op.home != "" {
+		homeDrift, err := op.checkHomeOwnership(ctx, tgt)
+		if err != nil {
+			return spec.CheckUnsatisfied, nil, err
+		}
+		drift = append(drift, homeDrift...)
+	}
+
 	if len(drift) > 0 {
 		return spec.CheckUnsatisfied, drift, nil
 	}
 	return spec.CheckSatisfied, nil, nil
+}
+
+// checkHomeOwnership returns a drift entry if op.home exists on the
+// target with the wrong owner. Missing-home is not drift — useradd
+// -m -d will materialise it on Execute. Targets that don't expose
+// ownership are silently ignored (e.g. a hypothetical Windows or
+// non-POSIX target — the step would have errored earlier anyway).
+func (op *ensureUserOp) checkHomeOwnership(ctx context.Context, tgt target.Target) ([]spec.DriftDetail, error) {
+	fsTgt, fsOk := tgt.(target.Filesystem)
+	ownTgt, ownOk := tgt.(target.Ownership)
+	if !fsOk || !ownOk {
+		return nil, nil
+	}
+	if _, err := fsTgt.Stat(ctx, op.home); err != nil {
+		if errors.Is(err, target.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	owner, err := ownTgt.GetOwner(ctx, op.home)
+	if err != nil {
+		return nil, err
+	}
+	if owner.User == op.name && owner.Group == op.name {
+		return nil, nil
+	}
+	return []spec.DriftDetail{{
+		Field:   "home_ownership",
+		Current: owner.User + ":" + owner.Group,
+		Desired: op.name + ":" + op.name,
+	}}, nil
 }
 
 func (op *ensureUserOp) Execute(
@@ -102,6 +147,8 @@ func (op *ensureUserOp) Execute(
 		Groups:   op.groups,
 	}
 
+	changed := false
+
 	if !exists {
 		if err := um.CreateUser(ctx, info); err != nil {
 			return spec.Result{}, UserCreateError{
@@ -110,32 +157,75 @@ func (op *ensureUserOp) Execute(
 				Source: op.nameSource,
 			}
 		}
-		return spec.Result{Changed: true}, nil
-	}
+		changed = true
+	} else {
+		// Check if modification is needed
+		current, err := um.GetUser(ctx, op.name)
+		if err != nil {
+			return spec.Result{}, err
+		}
 
-	// Check if modification is needed
-	current, err := um.GetUser(ctx, op.name)
-	if err != nil {
-		return spec.Result{}, err
-	}
+		needsModify := (op.shell != "" && current.Shell != op.shell) ||
+			(op.home != "" && current.Home != op.home) ||
+			(op.groups != nil && !groupsEqual(current.Groups, op.groups)) ||
+			op.password != ""
 
-	needsModify := (op.shell != "" && current.Shell != op.shell) ||
-		(op.home != "" && current.Home != op.home) ||
-		(op.groups != nil && !groupsEqual(current.Groups, op.groups)) ||
-		op.password != ""
-
-	if !needsModify {
-		return spec.Result{Changed: false}, nil
-	}
-
-	if err := um.ModifyUser(ctx, info); err != nil {
-		return spec.Result{}, UserModifyError{
-			Name:   op.name,
-			Err:    err,
-			Source: op.nameSource,
+		if needsModify {
+			if err := um.ModifyUser(ctx, info); err != nil {
+				return spec.Result{}, UserModifyError{
+					Name:   op.name,
+					Err:    err,
+					Source: op.nameSource,
+				}
+			}
+			changed = true
 		}
 	}
-	return spec.Result{Changed: true}, nil
+
+	// Reconcile home-directory ownership if the home path is
+	// managed by us and the dir exists with a different owner.
+	// useradd -m -d already gets ownership right on create when
+	// it materialises the home dir, but a pre-existing home (e.g.
+	// from a parallel posix.dir step) won't have been touched.
+	// See #265 + the bench bootstrap saga.
+	if op.home != "" {
+		homeChanged, err := op.reconcileHomeOwnership(ctx, tgt)
+		if err != nil {
+			return spec.Result{Changed: changed}, err
+		}
+		changed = changed || homeChanged
+	}
+
+	return spec.Result{Changed: changed}, nil
+}
+
+// reconcileHomeOwnership chowns op.home to <name>:<name> when the dir
+// exists with a different owner. Returns whether the chown was
+// applied. Missing dir / no-ownership-target → no-op.
+func (op *ensureUserOp) reconcileHomeOwnership(ctx context.Context, tgt target.Target) (bool, error) {
+	fsTgt, fsOk := tgt.(target.Filesystem)
+	ownTgt, ownOk := tgt.(target.Ownership)
+	if !fsOk || !ownOk {
+		return false, nil
+	}
+	if _, err := fsTgt.Stat(ctx, op.home); err != nil {
+		if errors.Is(err, target.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	desired := target.Owner{User: op.name, Group: op.name}
+	owner, err := ownTgt.GetOwner(ctx, op.home)
+	if err != nil {
+		return false, err
+	}
+	if owner.User == desired.User && owner.Group == desired.Group {
+		return false, nil
+	}
+	if err := ownTgt.Chown(ctx, op.home, desired); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (ensureUserOp) RequiredCapabilities() capability.Capability {

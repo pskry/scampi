@@ -1,0 +1,16 @@
+module main
+
+import "std"
+import "std/posix"
+import "std/local"
+
+let host = local.target { name = "local" }
+
+std.deploy(name = "test", targets = [host]) {
+  posix.user {
+    desc  = "ensure home is owned by the user even if the dir was already there"
+    name  = "hal9000"
+    home  = "/home/hal9000"
+    shell = "/bin/bash"
+  }
+}

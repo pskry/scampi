@@ -181,6 +181,21 @@ func (d *MemDriver) Verify(t *testing.T, expect E2EFiles) {
 		}
 	}
 
+	// Verify ownership of any path the fixture explicitly asserts.
+	// Covers files AND directories — the in-mem target stores them
+	// in the same Owners map keyed by path.
+	for path, want := range expect.Owners {
+		got, ok := d.tgt.Owners[path]
+		if !ok {
+			t.Errorf("expected ownership recorded for %q", path)
+			continue
+		}
+		if got.User != want.User || got.Group != want.Group {
+			t.Errorf("ownership for %q: got %s:%s, want %s:%s",
+				path, got.User, got.Group, want.User, want.Group)
+		}
+	}
+
 	// Verify permissions
 	for path, wantPermStr := range expect.Perms {
 		wantPerm := parsePermOrDie(t, wantPermStr)
