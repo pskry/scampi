@@ -20,7 +20,10 @@ import (
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
+	"scampi.dev/scampi/target/ctrmgr"
+	"scampi.dev/scampi/target/pkgmgr"
 	"scampi.dev/scampi/target/posix"
+	"scampi.dev/scampi/target/svcmgr"
 )
 
 const knownHostsFile = "~/.ssh/known_hosts"
@@ -91,6 +94,18 @@ func (LXC) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	}
 	t.Runner = t.runInContainer
 
+	// Detect host-side escalation FIRST: pct requires root, and every
+	// in-container probe below goes through pctPrefix(). If we ran
+	// detection before this, every pct exec would silently fail for
+	// non-root SSH users and backends would stay nil.
+	hostRunner := func(ctx context.Context, cmd string) (target.CommandResult, error) {
+		return t.runOnHost(ctx, cmd)
+	}
+	if r, err := hostRunner(ctx, "id -u"); err == nil {
+		t.hostIsRoot = strings.TrimSpace(r.Stdout) == "0"
+	}
+	t.hostEscalate = posix.DetectEscalation(ctx, hostRunner, t.hostIsRoot)
+
 	// Detect platform inside the container so step code can dispatch.
 	// Fall back to Linux/Debian — PVE LXCs are Linux.
 	if r, err := t.runInContainer(ctx, "uname -s"); err == nil {
@@ -100,14 +115,22 @@ func (LXC) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 		}
 	}
 
-	// Detect host-side escalation needed for pct (it requires root).
-	hostRunner := func(ctx context.Context, cmd string) (target.CommandResult, error) {
-		return t.runOnHost(ctx, cmd)
+	// Backend detection mirrors target/ssh/ssh.go — pct exec is the
+	// runner inside the container, so apt/systemctl/etc. all work the
+	// same way as over SSH. Without these the LXC target only
+	// advertises POSIX, which means posix.pkg / posix.service /
+	// container.* fail at plan time even though the runtime is fine.
+	// See #273.
+	t.PkgBackend = pkgmgr.Detect(t.OSInfo.Platform)
+	detectCmd := func(cmd string) (int, error) {
+		r, err := t.runInContainer(ctx, cmd)
+		if err != nil {
+			return -1, err
+		}
+		return r.ExitCode, nil
 	}
-	if r, err := hostRunner(ctx, "id -u"); err == nil {
-		t.hostIsRoot = strings.TrimSpace(r.Stdout) == "0"
-	}
-	t.hostEscalate = posix.DetectEscalation(ctx, hostRunner, t.hostIsRoot)
+	t.SvcBackend = svcmgr.Detect(detectCmd)
+	t.CtrBackend = ctrmgr.Detect(detectCmd)
 
 	// Inside the container we run as root (pct exec is root by default),
 	// so no escalation needed for in-container ops.
