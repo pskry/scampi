@@ -104,8 +104,23 @@ func (t *LXCTarget) runInContainer(ctx context.Context, cmd string) (target.Comm
 // -----------------------------------------------------------------------------
 
 func (t *LXCTarget) ReadFile(ctx context.Context, path string) ([]byte, error) {
-	// pct pull writes the file to a host path; we then SFTP-read it
-	// and clean up. This avoids stdout binary-corruption issues.
+	// Probe existence first via `pct exec test -e`. A missing file is
+	// a normal check-phase outcome (e.g. the sudoers file we're about
+	// to create), but `pct pull` on a missing file registers a noisy
+	// "Error pull file" entry in PVE's cluster task log — looks like
+	// a real failure to anyone reading the log. Test-then-pull keeps
+	// the actual read on the proven-safe pct-pull-then-SFTP path
+	// while staying silent on the missing-file path.
+	probe, err := t.runInContainer(ctx,
+		fmt.Sprintf("test -e %s", target.ShellQuote(path)))
+	if err != nil {
+		return nil, err
+	}
+	if probe.ExitCode != 0 {
+		return nil, errs.WrapErrf(target.ErrNotExist, "%q", path)
+	}
+
+	// File exists — proceed with pct pull dance for safe binary read.
 	tmp, err := t.hostTempPath()
 	if err != nil {
 		return nil, err
