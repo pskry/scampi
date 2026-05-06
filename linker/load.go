@@ -33,7 +33,8 @@ type Analysis struct {
 type AnalyzeOption func(*analyzeOpts)
 
 type analyzeOpts struct {
-	lenient bool
+	lenient  bool
+	redactor *secret.Redactor
 }
 
 // WithLenient enables tolerant evaluation: builtins that would
@@ -43,6 +44,14 @@ type analyzeOpts struct {
 // reflect the real apply-time values. See #264.
 func WithLenient() AnalyzeOption {
 	return func(o *analyzeOpts) { o.lenient = true }
+}
+
+// WithRedactor wires a secret.Redactor into eval so every value
+// returned by `secrets.get(...)` registers as a secret to redact in
+// downstream rendered output. The same redactor must be passed to
+// the renderer for the substitution to actually apply (see #281).
+func WithRedactor(r *secret.Redactor) AnalyzeOption {
+	return func(o *analyzeOpts) { o.redactor = r }
 }
 
 // Analyze runs the full lang pipeline (lex → parse → check → eval →
@@ -124,7 +133,7 @@ func Analyze(ctx context.Context, cfgPath string, src source.Source, opts ...Ana
 		eval.WithEnv(src.LookupEnv),
 		eval.WithBuiltinFunc("secrets.from_age", secretFromAge(configDir, src.LookupEnv, readFile)),
 		eval.WithBuiltinFunc("secrets.from_file", secretFromFile(configDir, readFile)),
-		eval.WithBuiltinFunc("secrets.get", secretGetBuiltin()),
+		eval.WithBuiltinFunc("secrets.get", secretGetBuiltin(o.redactor)),
 	}
 	if o.lenient {
 		evalOpts = append(evalOpts, eval.WithLenient())
@@ -218,8 +227,9 @@ func LoadConfig(
 	cfgPath string,
 	src source.Source,
 	reg Registry,
+	opts ...AnalyzeOption,
 ) (spec.Config, error) {
-	a, err := Analyze(ctx, cfgPath, src)
+	a, err := Analyze(ctx, cfgPath, src, opts...)
 	if err != nil {
 		return spec.Config{}, err
 	}
@@ -306,7 +316,11 @@ func secretFromFile(
 }
 
 // secretGetBuiltin returns a BuiltinFunc for secrets.get(resolver, key).
-func secretGetBuiltin() eval.BuiltinFunc {
+// Every successful lookup registers the resolved value with redactor
+// (when non-nil) so downstream renderers can substitute the value
+// with a mask and avoid leaking secrets through inspect / diagnostics.
+// See #281.
+func secretGetBuiltin(redactor *secret.Redactor) eval.BuiltinFunc {
 	return func(positional []eval.Value, kwargs map[string]eval.Value) (eval.Value, string) {
 		if len(positional) == 0 {
 			return nil, "secrets.get requires a resolver and key"
@@ -327,6 +341,7 @@ func secretGetBuiltin() eval.BuiltinFunc {
 		if !found {
 			return nil, "secret key " + key + " not found"
 		}
+		redactor.Add(v)
 		return &eval.StringVal{V: v}, ""
 	}
 }

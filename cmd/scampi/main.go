@@ -23,6 +23,7 @@ import (
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/osutil"
 	clir "scampi.dev/scampi/render/cli"
+	"scampi.dev/scampi/secret"
 	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
@@ -123,7 +124,13 @@ func main() {
 				verbosity: verbosity,
 			}
 
-			return context.WithValue(ctx, ctxGlobalOpts, opts), nil
+			ctx = context.WithValue(ctx, ctxGlobalOpts, opts)
+			// Attach a redactor so any secret resolved during link
+			// (via secrets.get) gets registered for output redaction.
+			// Both engine.LoadConfig and newDisplayer pull it back
+			// off the context. See #281.
+			ctx = secret.WithRedactor(ctx, secret.NewRedactor())
+			return ctx, nil
 		},
 	}
 
@@ -241,12 +248,13 @@ func mustGlobalOpts(ctx context.Context) globalOpts {
 // Displayer
 // -----------------------------------------------------------------------------
 
-func newDisplayer(opts globalOpts, store *diagnostic.SourceStore) diagnostic.Displayer {
+func newDisplayer(ctx context.Context, opts globalOpts, store *diagnostic.SourceStore) diagnostic.Displayer {
 	d := clir.New(
 		clir.Options{
 			ColorMode:  opts.colorMode,
 			Verbosity:  opts.verbosity,
 			ForceASCII: opts.ascii,
+			Redactor:   secret.FromContext(ctx),
 		},
 		store,
 	)
@@ -259,8 +267,8 @@ func newDisplayer(opts globalOpts, store *diagnostic.SourceStore) diagnostic.Dis
 // withDisplayer creates a displayer and returns a cleanup function that
 // should be deferred. The cleanup function closes the displayer and
 // recovers from panics.
-func withDisplayer(opts globalOpts, store *diagnostic.SourceStore) (diagnostic.Displayer, func()) {
-	d := newDisplayer(opts, store)
+func withDisplayer(ctx context.Context, opts globalOpts, store *diagnostic.SourceStore) (diagnostic.Displayer, func()) {
+	d := newDisplayer(ctx, opts, store)
 	return d, func() {
 		d.Close()
 		recoverAndReport(recover())

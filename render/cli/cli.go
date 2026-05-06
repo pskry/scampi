@@ -16,6 +16,7 @@ import (
 	"scampi.dev/scampi/model"
 	"scampi.dev/scampi/render/ansi"
 	"scampi.dev/scampi/render/layout"
+	"scampi.dev/scampi/secret"
 	"scampi.dev/scampi/signal"
 	"scampi.dev/scampi/spec"
 )
@@ -25,6 +26,10 @@ type Options struct {
 	ColorMode  signal.ColorMode
 	Verbosity  signal.Verbosity
 	ForceASCII bool
+	// Redactor, if non-nil, is consulted at render time to mask
+	// secret values registered during eval (typically via
+	// secrets.get). See #281.
+	Redactor *secret.Redactor
 }
 
 type cli struct {
@@ -66,7 +71,7 @@ func New(opts Options, store *diagnostic.SourceStore) diagnostic.Displayer {
 
 	isTTY := term.IsTerminal(os.Stdout.Fd())
 	useColor := shouldUseColor(opts.ColorMode, isTTY)
-	fmt := newFormatter(glyphs, useColor, store)
+	fmt := newFormatter(glyphs, useColor, store, opts.Redactor)
 	plan := newPlanRenderer(glyphs, width, opts.Verbosity, fmt)
 
 	return &cli{
@@ -99,6 +104,12 @@ func (c *cli) shouldRender(chatty event.Chattiness) bool {
 
 func (c *cli) commitRenderEvents(events []renderEvent) {
 	for i := range events {
+		// Redact at the central choke point so every line — diagnostic,
+		// inspect, plan render, status update — passes through the
+		// secret mask. Targeted redaction inside fmtTemplate /
+		// EmitInspect is intentional defense-in-depth; this catches
+		// anything that builds a renderEvent directly. See #281.
+		events[i].line = c.formatter.redact(events[i].line)
 		events[i].line = strings.NewReplacer("\n", " ", "\r", "").Replace(events[i].line)
 		if !events[i].wrap {
 			events[i].line = layout.FitLine(events[i].line, c.width, c.glyphs.ellipsis)
@@ -283,7 +294,7 @@ func (c *cli) EmitInspect(e event.InspectEvent) {
 			label := f.fmtfMsg(ansi.BrightBlack(), "%-12s", field.Label)
 			out = append(out, renderEvent{
 				stream: streamOut,
-				line:   "      " + label + " " + field.Value,
+				line:   "      " + label + " " + f.redact(field.Value),
 			})
 		}
 		out = append(out, renderEvent{stream: streamOut, line: ""})

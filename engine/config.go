@@ -10,6 +10,7 @@ import (
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/errs"
 	"scampi.dev/scampi/linker"
+	"scampi.dev/scampi/secret"
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 )
@@ -22,6 +23,7 @@ func LoadConfig(
 	cfgPath string,
 	store *diagnostic.SourceStore,
 	src source.Source,
+	opts ...linker.AnalyzeOption,
 ) (spec.Config, error) {
 	cfgPath, absErr := filepath.Abs(cfgPath)
 	if absErr != nil {
@@ -35,8 +37,15 @@ func LoadConfig(
 		}
 	}
 
+	// Auto-attach the redactor from ctx as a linker option so secret
+	// values flow into render-time redaction without callers having
+	// to pass it through every engine entry point.
+	if r := secret.FromContext(ctx); r != nil {
+		opts = append(opts, linker.WithRedactor(r))
+	}
+
 	reg := NewRegistry()
-	cfg, err := linker.LoadConfig(ctx, cfgPath, src, reg)
+	cfg, err := linker.LoadConfig(ctx, cfgPath, src, reg, opts...)
 	if err != nil {
 		_, emitted := emitEngineDiagnostic(em, cfgPath, err)
 		if !emitted {

@@ -36,7 +36,7 @@ shown, including fields, behavior, and examples.`,
 
 			pol := cliPolicy(opts)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			em := diagnostic.NewEmitter(pol, displ)
@@ -75,7 +75,7 @@ func legendCmd() *cli.Command {
 and color semantics used in scampi CLI output.`,
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 			displ.EmitLegend()
 			return nil

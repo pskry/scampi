@@ -34,7 +34,7 @@ func testCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 			store := diagnostic.NewSourceStore()
-			displ, cleanup := withDisplayer(opts, store)
+			displ, cleanup := withDisplayer(ctx, opts, store)
 			defer cleanup()
 
 			pol := cliPolicy(opts)

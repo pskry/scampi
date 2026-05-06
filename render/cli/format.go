@@ -12,6 +12,7 @@ import (
 	"scampi.dev/scampi/diagnostic/event"
 	"scampi.dev/scampi/render/ansi"
 	"scampi.dev/scampi/render/template"
+	"scampi.dev/scampi/secret"
 	"scampi.dev/scampi/spec"
 )
 
@@ -28,10 +29,20 @@ type formatter struct {
 	glyphs   glyphSet
 	useColor bool
 	store    *diagnostic.SourceStore
+	redactor *secret.Redactor
 }
 
-func newFormatter(glyphs glyphSet, useColor bool, store *diagnostic.SourceStore) *formatter {
-	return &formatter{glyphs: glyphs, useColor: useColor, store: store}
+func newFormatter(glyphs glyphSet, useColor bool, store *diagnostic.SourceStore, redactor *secret.Redactor) *formatter {
+	return &formatter{glyphs: glyphs, useColor: useColor, store: store, redactor: redactor}
+}
+
+// redact returns s with any registered secret values replaced by the
+// redactor's mask. A nil formatter or nil redactor returns s unchanged.
+func (f *formatter) redact(s string) string {
+	if f == nil {
+		return s
+	}
+	return f.redactor.Redact(s)
 }
 
 func (f *formatter) fmtMsg(color ansi.ANSI, msg string) string {
@@ -74,16 +85,16 @@ func (f *formatter) fmtTemplate(
 	var buf strings.Builder
 
 	if text, ok := template.Render(tmpl.TextField()); ok {
-		f.fmtfMsgTo(&buf, txtCol, "[%s]%s %s%s", prefix, glyphR(glyph), text, msg)
+		f.fmtfMsgTo(&buf, txtCol, "[%s]%s %s%s", prefix, glyphR(glyph), f.redact(text), msg)
 	}
 
 	if snippet, ok := f.renderSnippet(tmpl.Source); ok {
 		buf.WriteString("\n")
-		buf.WriteString(snippet)
+		buf.WriteString(f.redact(snippet))
 	}
 
 	if hint, ok := template.Render(tmpl.HintField()); ok {
-		hint = strings.TrimSpace(hint)
+		hint = strings.TrimSpace(f.redact(hint))
 		if hint != "" {
 			buf.WriteString("\n    ")
 			f.fmtfMsgTo(&buf, helpCol, "%s hint:", glyphL(f.glyphs.hint))
@@ -95,7 +106,7 @@ func (f *formatter) fmtTemplate(
 	}
 
 	if help, ok := template.Render(tmpl.HelpField()); ok {
-		help = strings.TrimSpace(help)
+		help = strings.TrimSpace(f.redact(help))
 		if help != "" {
 			buf.WriteString("\n    ")
 			f.fmtfMsgTo(&buf, helpCol, "%s help:", glyphL(f.glyphs.help))

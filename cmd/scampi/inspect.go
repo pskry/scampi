@@ -74,7 +74,7 @@ Falls back to plain diff(1).`,
 
 			store := diagnostic.NewSourceStore()
 
-			displ, cleanup := withDisplayer(opts, store)
+			displ, cleanup := withDisplayer(ctx, opts, store)
 			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)

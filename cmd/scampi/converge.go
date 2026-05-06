@@ -45,7 +45,7 @@ changes when the current state differs from the declared state.`,
 
 			store := diagnostic.NewSourceStore()
 
-			displ, cleanup := withDisplayer(opts, store)
+			displ, cleanup := withDisplayer(ctx, opts, store)
 			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)
@@ -92,7 +92,7 @@ the actual system state.`,
 
 			store := diagnostic.NewSourceStore()
 
-			displ, cleanup := withDisplayer(opts, store)
+			displ, cleanup := withDisplayer(ctx, opts, store)
 			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)
@@ -138,7 +138,7 @@ does not inspect or modify the target system.`,
 
 			store := diagnostic.NewSourceStore()
 
-			displ, cleanup := withDisplayer(opts, store)
+			displ, cleanup := withDisplayer(ctx, opts, store)
 			defer cleanup()
 
 			resolveOpts := parseResolveOpts(cmd)

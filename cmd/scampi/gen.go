@@ -89,7 +89,7 @@ func genAPICmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)

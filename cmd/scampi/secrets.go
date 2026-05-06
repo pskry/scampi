@@ -55,7 +55,7 @@ func emitSecretsInfo(em diagnostic.Emitter, detail string) {
 
 func secretsEmitter(ctx context.Context) (diagnostic.Emitter, func()) {
 	opts := mustGlobalOpts(ctx)
-	displ, cleanup := withDisplayer(opts, nil)
+	displ, cleanup := withDisplayer(ctx, opts, nil)
 	pol := cliPolicy(opts)
 	em := diagnostic.NewEmitter(pol, displ)
 	return em, cleanup

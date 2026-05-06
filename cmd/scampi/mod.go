@@ -64,7 +64,7 @@ func modInitCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
@@ -96,7 +96,7 @@ func modTidyCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
@@ -152,7 +152,7 @@ func modAddCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
@@ -204,7 +204,7 @@ func modDownloadCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
@@ -344,7 +344,7 @@ func modUpdateCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
@@ -381,7 +381,7 @@ func modVerifyCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
@@ -449,7 +449,7 @@ func modCacheCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
@@ -472,7 +472,7 @@ func modCleanCmd() *cli.Command {
 		Action: func(ctx context.Context, _ *cli.Command) error {
 			opts := mustGlobalOpts(ctx)
 
-			displ, cleanup := withDisplayer(opts, nil)
+			displ, cleanup := withDisplayer(ctx, opts, nil)
 			defer cleanup()
 
 			pol := cliPolicy(opts)
