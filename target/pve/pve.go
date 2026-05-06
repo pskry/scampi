@@ -20,10 +20,7 @@ import (
 	"scampi.dev/scampi/source"
 	"scampi.dev/scampi/spec"
 	"scampi.dev/scampi/target"
-	"scampi.dev/scampi/target/ctrmgr"
-	"scampi.dev/scampi/target/pkgmgr"
 	"scampi.dev/scampi/target/posix"
-	"scampi.dev/scampi/target/svcmgr"
 )
 
 const knownHostsFile = "~/.ssh/known_hosts"
@@ -106,31 +103,12 @@ func (LXC) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	}
 	t.hostEscalate = posix.DetectEscalation(ctx, hostRunner, t.hostIsRoot)
 
-	// Detect platform inside the container so step code can dispatch.
-	// Fall back to Linux/Debian — PVE LXCs are Linux.
-	if r, err := t.runInContainer(ctx, "uname -s"); err == nil {
-		t.OSInfo.Platform = target.ParseKernel(strings.TrimSpace(r.Stdout))
-		if osr, err := t.ReadFile(ctx, "/etc/os-release"); err == nil {
-			t.OSInfo = target.ResolveLinuxPlatform(osr)
-		}
-	}
-
-	// Backend detection mirrors target/ssh/ssh.go — pct exec is the
-	// runner inside the container, so apt/systemctl/etc. all work the
-	// same way as over SSH. Without these the LXC target only
-	// advertises POSIX, which means posix.pkg / posix.service /
-	// container.* fail at plan time even though the runtime is fine.
-	// See #273.
-	t.PkgBackend = pkgmgr.Detect(t.OSInfo.Platform)
-	detectCmd := func(cmd string) (int, error) {
-		r, err := t.runInContainer(ctx, cmd)
-		if err != nil {
-			return -1, err
-		}
-		return r.ExitCode, nil
-	}
-	t.SvcBackend = svcmgr.Detect(detectCmd)
-	t.CtrBackend = ctrmgr.Detect(detectCmd)
+	// Best-effort backend detection at Create time. If probes fail
+	// because the LXC isn't reachable yet (typical for create-then-
+	// configure flows where one deploy block creates the LXC and a
+	// sibling block configures it), backends stay nil and we retry
+	// lazily on first use — see ensureBackends in caps.go and #274.
+	t.detectBackends(ctx)
 
 	// Inside the container we run as root (pct exec is root by default),
 	// so no escalation needed for in-container ops.

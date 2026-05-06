@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 	"strings"
+	"sync"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -35,6 +36,13 @@ type LXCTarget struct {
 	// Host-side escalation (for invoking pct as root from a non-root user).
 	hostIsRoot   bool
 	hostEscalate string
+
+	// detectMu guards lazy backend re-detection. Detection runs once at
+	// Create time; if probes failed because the LXC wasn't reachable
+	// yet (typical for create-then-configure flows where one deploy
+	// block creates the LXC and a sibling block configures it), the
+	// in-container method overrides retry detection on first use.
+	detectMu sync.Mutex
 }
 
 func (t *LXCTarget) Close() {
