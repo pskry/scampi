@@ -51,7 +51,7 @@ blockquote { border-left: 4px solid #d0d7de; padding: 0 1em; color: #57606a; mar
 </body></html>`))
 
 func main() {
-	dir := flag.String("dir", ".sandbox", "root directory to serve")
+	dir := flag.String("dir", ".", "root directory to serve")
 	addr := flag.String("addr", ":7080", "listen address")
 	flag.Parse()
 
