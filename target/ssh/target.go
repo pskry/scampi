@@ -133,7 +133,7 @@ func (t *SSHTarget) ReadFile(ctx context.Context, path string) ([]byte, error) {
 				return t.escalatedReadFile(ctx, path)
 			}
 			if !t.IsRoot {
-				return nil, target.NoEscalationError{Op: "read", Path: path}
+				return nil, t.NoEscalation("read", path)
 			}
 		}
 		return nil, normalizeError(err)
@@ -164,7 +164,7 @@ func (t *SSHTarget) WriteFile(ctx context.Context, path string, data []byte) err
 				return t.escalatedWriteFile(ctx, path, data)
 			}
 			if !t.IsRoot {
-				return target.NoEscalationError{Op: "write", Path: path}
+				return t.NoEscalation("write", path)
 			}
 		}
 		return normalizeError(err)
@@ -193,7 +193,7 @@ func (t *SSHTarget) Remove(ctx context.Context, path string) error {
 			return t.escalatedRemove(ctx, path)
 		}
 		if !t.IsRoot {
-			return target.NoEscalationError{Op: "remove", Path: path}
+			return t.NoEscalation("remove", path)
 		}
 	}
 	return normalizeError(err)
@@ -207,7 +207,7 @@ func (t *SSHTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) er
 				return t.escalatedMkdir(ctx, path, mode)
 			}
 			if !t.IsRoot {
-				return target.NoEscalationError{Op: "mkdir", Path: path}
+				return t.NoEscalation("mkdir", path)
 			}
 		}
 		return normalizeError(err)
@@ -218,7 +218,7 @@ func (t *SSHTarget) Mkdir(ctx context.Context, path string, mode fs.FileMode) er
 				return t.escalatedMkdir(ctx, path, mode)
 			}
 			if !t.IsRoot {
-				return target.NoEscalationError{Op: "chmod", Path: path}
+				return t.NoEscalation("chmod", path)
 			}
 		}
 		return normalizeError(err)
@@ -236,7 +236,7 @@ func (t *SSHTarget) Chmod(ctx context.Context, path string, mode fs.FileMode) er
 			return t.escalatedChmod(ctx, path, mode)
 		}
 		if !t.IsRoot {
-			return target.NoEscalationError{Op: "chmod", Path: path}
+			return t.NoEscalation("chmod", path)
 		}
 	}
 	return normalizeError(err)
@@ -268,7 +268,7 @@ func (t *SSHTarget) Symlink(ctx context.Context, tgt, link string) error {
 			return t.escalatedSymlink(ctx, tgt, link)
 		}
 		if !t.IsRoot {
-			return target.NoEscalationError{Op: "symlink", Path: link}
+			return t.NoEscalation("symlink", link)
 		}
 	}
 	return normalizeError(err)
@@ -324,7 +324,7 @@ func (t *SSHTarget) Chown(ctx context.Context, path string, owner target.Owner) 
 			return t.escalatedChown(ctx, path, owner)
 		}
 		if !t.IsRoot {
-			return target.NoEscalationError{Op: "chown", Path: path}
+			return t.NoEscalation("chown", path)
 		}
 	}
 	return normalizeError(err)

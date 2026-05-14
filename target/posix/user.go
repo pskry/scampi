@@ -54,7 +54,7 @@ func (b Base) GetUser(ctx context.Context, name string) (target.UserInfo, error)
 
 func (b Base) CreateUser(ctx context.Context, info target.UserInfo) error {
 	if b.NeedsEscalation() {
-		return target.NoEscalationError{Op: "useradd"}
+		return b.NoEscalation("useradd", "")
 	}
 
 	cmd := "useradd"
@@ -92,7 +92,7 @@ func (b Base) CreateUser(ctx context.Context, info target.UserInfo) error {
 
 func (b Base) ModifyUser(ctx context.Context, info target.UserInfo) error {
 	if b.NeedsEscalation() {
-		return target.NoEscalationError{Op: "usermod"}
+		return b.NoEscalation("usermod", "")
 	}
 
 	cmd := "usermod"
@@ -127,7 +127,7 @@ func (b Base) ModifyUser(ctx context.Context, info target.UserInfo) error {
 
 func (b Base) DeleteUser(ctx context.Context, name string) error {
 	if b.NeedsEscalation() {
-		return target.NoEscalationError{Op: "userdel"}
+		return b.NoEscalation("userdel", "")
 	}
 
 	cmd := "userdel " + target.ShellQuote(name)
@@ -170,7 +170,7 @@ func (b Base) GetGroup(ctx context.Context, name string) (target.GroupInfo, erro
 
 func (b Base) CreateGroup(ctx context.Context, info target.GroupInfo) error {
 	if b.NeedsEscalation() {
-		return target.NoEscalationError{Op: "groupadd"}
+		return b.NoEscalation("groupadd", "")
 	}
 
 	cmd := "groupadd"
@@ -199,7 +199,7 @@ func (b Base) CreateGroup(ctx context.Context, info target.GroupInfo) error {
 
 func (b Base) DeleteGroup(ctx context.Context, name string) error {
 	if b.NeedsEscalation() {
-		return target.NoEscalationError{Op: "groupdel"}
+		return b.NoEscalation("groupdel", "")
 	}
 
 	cmd := "groupdel " + target.ShellQuote(name)

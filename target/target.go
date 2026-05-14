@@ -300,15 +300,40 @@ func (e EscalationError) Error() string {
 	)
 }
 
+// EscalateReason describes the outcome of probing for non-interactive
+// privilege escalation on a target. Callers store this alongside the
+// detected tool (if any) so diagnostics can distinguish "no sudo/doas
+// installed" from "sudo present but won't escalate without a password"
+// (#314 — the latter case used to hang silently on the first escalated op).
+type EscalateReason int
+
+const (
+	EscalateOK               EscalateReason = iota // tool available and runs non-interactively
+	EscalateRoot                                   // running as root; no tool needed
+	EscalateMissing                                // no sudo/doas found
+	EscalateRequiresPassword                       // tool present but `tool -n true` failed
+)
+
 // NoEscalationError is returned when an operation requires root
-// but the user is not root and no escalation tool (sudo/doas) was found.
+// but the user is not root and no escalation tool (sudo/doas) is
+// usable. Reason distinguishes the cause so the diagnostic can
+// point the user at the right fix.
 type NoEscalationError struct {
-	Op   string // "read", "write", "chmod", "apk install", …
-	Path string
+	Op     string // "read", "write", "chmod", "apk install", …
+	Path   string
+	Reason EscalateReason
 }
 
 func (e NoEscalationError) Error() string {
-	return fmt.Sprintf("%s %s: no escalation tool found (sudo/doas)", e.Op, e.Path)
+	switch e.Reason {
+	case EscalateRequiresPassword:
+		return fmt.Sprintf(
+			"%s %s: sudo/doas requires a password — configure NOPASSWD or run scampi as root",
+			e.Op, e.Path,
+		)
+	default:
+		return fmt.Sprintf("%s %s: no escalation tool found (sudo/doas)", e.Op, e.Path)
+	}
 }
 
 // StagingError is returned when writing a temp file for

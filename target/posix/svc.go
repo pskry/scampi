@@ -63,7 +63,7 @@ func (b Base) DaemonReload(ctx context.Context) error {
 		return nil
 	}
 	if b.SvcBackend.NeedsRoot() && b.NeedsEscalation() {
-		return target.NoEscalationError{Op: b.SvcBackend.Name() + " daemon-reload"}
+		return b.NoEscalation(b.SvcBackend.Name()+" daemon-reload", "")
 	}
 	if b.SvcBackend.NeedsRoot() && b.Escalate != "" {
 		cmd = b.Escalate + " " + cmd
@@ -84,7 +84,7 @@ func (b Base) DaemonReload(ctx context.Context) error {
 
 func (b Base) runSvcCommand(ctx context.Context, cmd, op string) error {
 	if b.SvcBackend.NeedsRoot() && b.NeedsEscalation() {
-		return target.NoEscalationError{Op: b.SvcBackend.Name() + " " + op}
+		return b.NoEscalation(b.SvcBackend.Name()+" "+op, "")
 	}
 	if b.SvcBackend.NeedsRoot() && b.Escalate != "" {
 		cmd = b.Escalate + " " + cmd

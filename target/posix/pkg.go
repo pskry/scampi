@@ -27,7 +27,7 @@ func (b Base) IsInstalled(ctx context.Context, pkg string) (bool, error) {
 
 func (b Base) InstallPkgs(ctx context.Context, pkgs []string) error {
 	if b.PkgBackend.NeedsRoot && b.NeedsEscalation() {
-		return target.NoEscalationError{Op: b.PkgBackend.Kind.String() + " install"}
+		return b.NoEscalation(b.PkgBackend.Kind.String()+" install", "")
 	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
@@ -53,7 +53,7 @@ func (b Base) InstallPkgs(ctx context.Context, pkgs []string) error {
 
 func (b Base) RemovePkgs(ctx context.Context, pkgs []string) error {
 	if b.PkgBackend.NeedsRoot && b.NeedsEscalation() {
-		return target.NoEscalationError{Op: b.PkgBackend.Kind.String() + " remove"}
+		return b.NoEscalation(b.PkgBackend.Kind.String()+" remove", "")
 	}
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
@@ -88,7 +88,7 @@ func (b Base) UpdateCache(ctx context.Context) error {
 		)
 	}
 	if b.PkgBackend.CacheNeedsRoot && b.NeedsEscalation() {
-		return target.NoEscalationError{Op: b.PkgBackend.Kind.String() + " update-cache"}
+		return b.NoEscalation(b.PkgBackend.Kind.String()+" update-cache", "")
 	}
 	cmd := b.PkgBackend.UpdateCache
 	if b.PkgBackend.CacheNeedsRoot && b.Escalate != "" {

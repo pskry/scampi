@@ -177,7 +177,7 @@ func (SSH) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	if result, err := sshTgt.RunCommand(ctx, "id -u"); err == nil {
 		sshTgt.IsRoot = strings.TrimSpace(result.Stdout) == "0"
 	}
-	sshTgt.Escalate = posix.DetectEscalation(ctx, sshTgt.RunCommand, sshTgt.IsRoot)
+	sshTgt.Escalate, sshTgt.EscalateReason = posix.DetectEscalation(ctx, sshTgt.RunCommand, sshTgt.IsRoot)
 
 	return sshTgt, nil
 }

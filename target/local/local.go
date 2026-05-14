@@ -54,7 +54,7 @@ func (Local) Create(ctx context.Context, _ source.Source, _ spec.TargetInstance)
 
 	// Privilege escalation detection.
 	tgt.IsRoot = os.Getuid() == 0
-	tgt.Escalate = posix.DetectEscalation(ctx, tgt.RunCommand, tgt.IsRoot)
+	tgt.Escalate, tgt.EscalateReason = posix.DetectEscalation(ctx, tgt.RunCommand, tgt.IsRoot)
 
 	return tgt, nil
 }

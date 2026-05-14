@@ -113,7 +113,7 @@ func (LXC) Create(ctx context.Context, src source.Source, tgt spec.TargetInstanc
 	if r, err := hostRunner(ctx, "id -u"); err == nil {
 		t.hostIsRoot = strings.TrimSpace(r.Stdout) == "0"
 	}
-	t.hostEscalate = posix.DetectEscalation(ctx, hostRunner, t.hostIsRoot)
+	t.hostEscalate, t.hostEscalateReason = posix.DetectEscalation(ctx, hostRunner, t.hostIsRoot)
 
 	// Best-effort backend detection at Create time. If probes fail
 	// because the LXC isn't reachable yet (typical for create-then-

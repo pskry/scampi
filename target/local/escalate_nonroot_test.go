@@ -24,11 +24,11 @@ import (
 func TestDetectEscalation(t *testing.T) {
 	var tgt POSIXTarget
 	tgt.Runner = tgt.RunCommand
-	result := posix.DetectEscalation(context.Background(), tgt.RunCommand, false)
-	switch result {
+	tool, _ := posix.DetectEscalation(context.Background(), tgt.RunCommand, false)
+	switch tool {
 	case "sudo", "doas", "":
 	default:
-		t.Fatalf("unexpected escalation tool: %q", result)
+		t.Fatalf("unexpected escalation tool: %q", tool)
 	}
 }
 

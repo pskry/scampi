@@ -34,8 +34,9 @@ type LXCTarget struct {
 	vmid       int
 
 	// Host-side escalation (for invoking pct as root from a non-root user).
-	hostIsRoot   bool
-	hostEscalate string
+	hostIsRoot         bool
+	hostEscalate       string
+	hostEscalateReason target.EscalateReason
 
 	// detectMu guards lazy backend re-detection. Detection runs once at
 	// Create time; if probes failed because the LXC wasn't reachable
