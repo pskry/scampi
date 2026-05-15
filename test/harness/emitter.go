@@ -74,8 +74,8 @@ func (r *RecordingDisplayer) EmitIndexStep(e event.IndexStepEvent) {
 
 func (r *RecordingDisplayer) EmitInspect(_ event.InspectEvent) {}
 
-func (r *RecordingDisplayer) EmitGraph(_ event.GraphEvent)         {}
-func (r *RecordingDisplayer) EmitPlanOutput(_ event.PlanEvent)     {}
+func (r *RecordingDisplayer) EmitGraph(_ event.GraphEvent)     {}
+func (r *RecordingDisplayer) EmitPlanOutput(_ event.PlanEvent) {}
 
 func (r *RecordingDisplayer) EmitDiagnostic(e event.Diagnostic) {
 	r.mu.Lock()

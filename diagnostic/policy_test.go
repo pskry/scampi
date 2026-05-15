@@ -234,11 +234,11 @@ type concurrentDisplayer struct {
 	engine []event.EngineDiagnostic
 }
 
-func (c *concurrentDisplayer) EmitIndexAll(event.IndexAllEvent)      {}
-func (c *concurrentDisplayer) EmitIndexStep(event.IndexStepEvent)    {}
-func (c *concurrentDisplayer) EmitInspect(event.InspectEvent)        {}
-func (c *concurrentDisplayer) EmitGraph(event.GraphEvent)            {}
-func (c *concurrentDisplayer) EmitLegend()                           {}
+func (c *concurrentDisplayer) EmitIndexAll(event.IndexAllEvent)   {}
+func (c *concurrentDisplayer) EmitIndexStep(event.IndexStepEvent) {}
+func (c *concurrentDisplayer) EmitInspect(event.InspectEvent)     {}
+func (c *concurrentDisplayer) EmitGraph(event.GraphEvent)         {}
+func (c *concurrentDisplayer) EmitLegend()                        {}
 func (c *concurrentDisplayer) EmitEngineDiagnostic(e event.EngineDiagnostic) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -6,21 +6,11 @@ import "scampi.dev/scampi/render/ansi"
 
 // Semantic colors for CLI output.
 var (
-	colEngineStarted           = ansi.Green().Dim()
-	colEngineFinishedUnchanged = ansi.Green()
-	colEngineFinishedChanged   = ansi.Yellow()
-	colEngineFinishedFailed    = ansi.Red()
-	colEngineFinishedFatal     = ansi.BrightRed().Bold()
+	colEngineStarted       = ansi.Green().Dim()
+	colEngineFinishedFatal = ansi.BrightRed().Bold()
 
-	colPlanHeader             = ansi.Magenta().Bold()
-	colPlanRail               = ansi.Magenta().Dim()
-	colPlanStarted            = ansi.Blue()
-	colPlanStartedUnit        = ansi.Blue().Bold()
-	colPlanFinishedOK         = ansi.Blue().Dim()
-	colPlanFinishedOKUnit     = ansi.Blue().Dim().Bold()
-	colPlanFinishedFailed     = ansi.Red()
-	colPlanFinishedFailedUnit = ansi.Red().Bold()
-	colPlanStepPlanned        = ansi.BrightBlack().Dim()
+	colPlanHeader = ansi.Magenta().Bold()
+	colPlanRail   = ansi.Magenta().Dim()
 
 	colActionKind              = ansi.Cyan().Bold()
 	colActionDesc              = ansi.Cyan()
@@ -28,14 +18,11 @@ var (
 	colActionOps               = ansi.Cyan().Dim()
 	colActionFinishedUnchanged = ansi.Green().Dim()
 	colActionFinishedChanged   = ansi.Yellow()
-	colActionFinishedFailed    = ansi.Red()
 
 	colOpHeader           = ansi.BrightBlack()
 	colOpRail             = ansi.BrightBlack().Dim()
 	colOpDesc             = ansi.BrightBlack().Dim()
-	colOpCheckSatisfied   = ansi.BrightBlack().Dim()
 	colOpCheckUnsatisfied = ansi.BrightBlack().Dim()
-	colOpDrift            = ansi.BrightBlack().Dim()
 	colOpCheckUnknown     = ansi.Yellow()
 	colOpExecChanged      = ansi.BrightBlack()
 	colOpExecFailed       = ansi.Red()

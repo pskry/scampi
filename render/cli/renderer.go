@@ -228,6 +228,11 @@ func (r *renderer) emitEvents(events []renderEvent) {
 	}
 }
 
+// sendLive enqueues a live-region mutation. Unused after lifecycle deletion;
+// kept because the live-update plumbing (loop/drawLive/clearLive) will be the
+// backbone of the upcoming CLI rethink's TTY status line.
+//
+//nolint:unused
 func (r *renderer) sendLive(u liveUpdate) {
 	select {
 	case r.ch <- renderEvent{live: &u}:
