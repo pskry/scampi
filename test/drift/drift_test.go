@@ -112,11 +112,9 @@ func TestCheckPlan_SatisfiedNoDrift(t *testing.T) {
 		t.Fatalf("CheckPlan: %v", err)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpChecked && ev.CheckDetail != nil {
-			if len(ev.CheckDetail.Drift) > 0 {
-				t.Fatal("satisfied op should have no drift")
-			}
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangePlanned {
+			t.Fatal("satisfied op should have no Change(Planned) events")
 		}
 	}
 }
@@ -154,11 +152,9 @@ func TestExecutePlan_NoDrift(t *testing.T) {
 		t.Fatalf("ExecutePlan: %v", err)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpChecked && ev.CheckDetail != nil {
-			if len(ev.CheckDetail.Drift) > 0 {
-				t.Fatal("apply mode should not emit drift")
-			}
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangePlanned {
+			t.Fatal("apply mode should not emit Change(Planned) events")
 		}
 	}
 }

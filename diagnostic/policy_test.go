@@ -107,20 +107,6 @@ func TestPolicyEmitter_DedupDisabled(t *testing.T) {
 	}
 }
 
-func TestPolicyEmitter_LifecycleNotDeduped(t *testing.T) {
-	rec := &recordingDisplayer{}
-	em := NewEmitter(Policy{DedupDiagnostics: true}, rec)
-
-	ev := event.EngineEvent{Severity: signal.Info}
-	em.EmitEngineLifecycle(ev)
-	em.EmitEngineLifecycle(ev)
-	em.EmitEngineLifecycle(ev)
-
-	if got := len(rec.engineLifecycle); got != 3 {
-		t.Errorf("expected 3 lifecycle events even with dedup on, got %d", got)
-	}
-}
-
 // TestPolicyEmitter_ConcurrentDedup_Race is the regression test for #329.
 // Engine/plan/action/op diagnostics are emitted from concurrent goroutines
 // (op pool, plan workers); the dedup slice must tolerate that. Run with
@@ -203,13 +189,9 @@ func makeTemplate(id, text string) event.Template {
 // recordingDisplayer is a minimal Displayer that captures
 // each emission for later inspection.
 type recordingDisplayer struct {
-	engineLifecycle []event.EngineEvent
-	planLifecycle   []event.PlanEvent
-	actionLifecycle []event.ActionEvent
-	opLifecycle     []event.OpEvent
-	indexAll        []event.IndexAllEvent
-	indexStep       []event.IndexStepEvent
-	inspect         []event.InspectEvent
+	indexAll  []event.IndexAllEvent
+	indexStep []event.IndexStepEvent
+	inspect   []event.InspectEvent
 
 	engine []event.EngineDiagnostic
 	plan   []event.PlanDiagnostic
@@ -217,18 +199,6 @@ type recordingDisplayer struct {
 	op     []event.OpDiagnostic
 }
 
-func (r *recordingDisplayer) EmitEngineLifecycle(e event.EngineEvent) {
-	r.engineLifecycle = append(r.engineLifecycle, e)
-}
-func (r *recordingDisplayer) EmitPlanLifecycle(e event.PlanEvent) {
-	r.planLifecycle = append(r.planLifecycle, e)
-}
-func (r *recordingDisplayer) EmitActionLifecycle(e event.ActionEvent) {
-	r.actionLifecycle = append(r.actionLifecycle, e)
-}
-func (r *recordingDisplayer) EmitOpLifecycle(e event.OpEvent) {
-	r.opLifecycle = append(r.opLifecycle, e)
-}
 func (r *recordingDisplayer) EmitIndexAll(e event.IndexAllEvent) { r.indexAll = append(r.indexAll, e) }
 func (r *recordingDisplayer) EmitIndexStep(e event.IndexStepEvent) {
 	r.indexStep = append(r.indexStep, e)
@@ -263,10 +233,6 @@ type concurrentDisplayer struct {
 	engine []event.EngineDiagnostic
 }
 
-func (c *concurrentDisplayer) EmitEngineLifecycle(event.EngineEvent) {}
-func (c *concurrentDisplayer) EmitPlanLifecycle(event.PlanEvent)     {}
-func (c *concurrentDisplayer) EmitActionLifecycle(event.ActionEvent) {}
-func (c *concurrentDisplayer) EmitOpLifecycle(event.OpEvent)         {}
 func (c *concurrentDisplayer) EmitIndexAll(event.IndexAllEvent)      {}
 func (c *concurrentDisplayer) EmitIndexStep(event.IndexStepEvent)    {}
 func (c *concurrentDisplayer) EmitInspect(event.InspectEvent)        {}

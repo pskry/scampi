@@ -52,16 +52,13 @@ func (w *causeEmitter) EmitProgress(e event.Progress) {
 	w.inner.EmitProgress(e)
 }
 
-// Old surface passes through. These methods stay until phase 6.
+// Legacy diagnostic envelopes pass through untouched. They have no
+// Cause field; this wrapper is a no-op for them. They die with phase 5.
 
-func (w *causeEmitter) EmitEngineLifecycle(e event.EngineEvent) { w.inner.EmitEngineLifecycle(e) }
-func (w *causeEmitter) EmitPlanLifecycle(e event.PlanEvent)     { w.inner.EmitPlanLifecycle(e) }
-func (w *causeEmitter) EmitActionLifecycle(e event.ActionEvent) { w.inner.EmitActionLifecycle(e) }
-func (w *causeEmitter) EmitOpLifecycle(e event.OpEvent)         { w.inner.EmitOpLifecycle(e) }
-func (w *causeEmitter) EmitIndexAll(e event.IndexAllEvent)      { w.inner.EmitIndexAll(e) }
-func (w *causeEmitter) EmitIndexStep(e event.IndexStepEvent)    { w.inner.EmitIndexStep(e) }
-func (w *causeEmitter) EmitInspect(e event.InspectEvent)        { w.inner.EmitInspect(e) }
-func (w *causeEmitter) EmitGraph(e event.GraphEvent)            { w.inner.EmitGraph(e) }
+func (w *causeEmitter) EmitIndexAll(e event.IndexAllEvent)   { w.inner.EmitIndexAll(e) }
+func (w *causeEmitter) EmitIndexStep(e event.IndexStepEvent) { w.inner.EmitIndexStep(e) }
+func (w *causeEmitter) EmitInspect(e event.InspectEvent)     { w.inner.EmitInspect(e) }
+func (w *causeEmitter) EmitGraph(e event.GraphEvent)         { w.inner.EmitGraph(e) }
 func (w *causeEmitter) EmitEngineDiagnostic(e event.EngineDiagnostic) {
 	w.inner.EmitEngineDiagnostic(e)
 }

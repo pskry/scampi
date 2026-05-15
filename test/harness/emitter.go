@@ -12,10 +12,6 @@ import (
 )
 
 type (
-	EngineEvents       []event.EngineEvent
-	PlanEvents         []event.PlanEvent
-	ActionEvents       []event.ActionEvent
-	OpEvents           []event.OpEvent
 	IndexAllEvents     []event.IndexAllEvent
 	EngineDiagnostics  []event.EngineDiagnostic
 	PlanDiagnostics    []event.PlanDiagnostic
@@ -27,10 +23,6 @@ type (
 	ProgressEvents     []event.Progress
 	RecordingDisplayer struct {
 		mu                sync.Mutex
-		EngineEvents      EngineEvents
-		PlanEvents        PlanEvents
-		ActionEvents      ActionEvents
-		OpEvents          OpEvents
 		EngineDiagnostics EngineDiagnostics
 		PlanDiagnostics   PlanDiagnostics
 		ActionDiagnostics ActionDiagnostics
@@ -43,30 +35,6 @@ type (
 	}
 	NoopEmitter struct{}
 )
-
-func (r *RecordingDisplayer) EmitEngineLifecycle(e event.EngineEvent) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.EngineEvents = append(r.EngineEvents, e)
-}
-
-func (r *RecordingDisplayer) EmitPlanLifecycle(e event.PlanEvent) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.PlanEvents = append(r.PlanEvents, e)
-}
-
-func (r *RecordingDisplayer) EmitActionLifecycle(e event.ActionEvent) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.ActionEvents = append(r.ActionEvents, e)
-}
-
-func (r *RecordingDisplayer) EmitOpLifecycle(e event.OpEvent) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.OpEvents = append(r.OpEvents, e)
-}
 
 func (r *RecordingDisplayer) EmitEngineDiagnostic(e event.EngineDiagnostic) {
 	r.mu.Lock()
@@ -133,16 +101,15 @@ func (r *RecordingDisplayer) Interrupt() {}
 func (r *RecordingDisplayer) Close() {}
 
 func (r *RecordingDisplayer) String() string {
-	return r.EngineEvents.String() + "\n" +
-		r.PlanEvents.String() + "\n" +
-		r.ActionEvents.String() + "\n" +
-		r.OpEvents.String() + "\n" +
-		r.IndexAllEvents.String() + "\n" +
+	return r.IndexAllEvents.String() + "\n" +
 		r.IndexStepEvents.String() + "\n" +
 		r.EngineDiagnostics.String() + "\n" +
 		r.PlanDiagnostics.String() + "\n" +
 		r.ActionDiagnostics.String() + "\n" +
-		r.OpDiagnostics.String()
+		r.OpDiagnostics.String() + "\n" +
+		r.Diagnostics.String() + "\n" +
+		r.Changes.String() + "\n" +
+		r.ProgressEvents.String()
 }
 
 func (r *RecordingDisplayer) Dump(w io.Writer) {
@@ -184,10 +151,6 @@ func MarshalSection(header string, v any) string {
 	return "----- " + header + " -----\n" + string(j)
 }
 
-func (e EngineEvents) String() string      { return MarshalSection("ENGINE EVENTS", e) }
-func (e PlanEvents) String() string        { return MarshalSection("PLAN EVENTS", e) }
-func (e ActionEvents) String() string      { return MarshalSection("ACTION EVENTS", e) }
-func (e OpEvents) String() string          { return MarshalSection("OP EVENTS", e) }
 func (e IndexAllEvents) String() string    { return MarshalSection("INDEX_ALL EVENTS", e) }
 func (e IndexStepEvents) String() string   { return MarshalSection("INDEX_STEP EVENTS", e) }
 func (e EngineDiagnostics) String() string { return MarshalSection("ENGINE DIAGNOSTICS", e) }
@@ -198,10 +161,6 @@ func (e Diagnostics) String() string       { return MarshalSection("DIAGNOSTICS"
 func (e Changes) String() string           { return MarshalSection("CHANGES", e) }
 func (e ProgressEvents) String() string    { return MarshalSection("PROGRESS", e) }
 
-func (NoopEmitter) EmitEngineLifecycle(event.EngineEvent)       {}
-func (NoopEmitter) EmitPlanLifecycle(event.PlanEvent)           {}
-func (NoopEmitter) EmitActionLifecycle(event.ActionEvent)       {}
-func (NoopEmitter) EmitOpLifecycle(event.OpEvent)               {}
 func (NoopEmitter) EmitEngineDiagnostic(event.EngineDiagnostic) {}
 func (NoopEmitter) EmitPlanDiagnostic(event.PlanDiagnostic)     {}
 func (NoopEmitter) EmitActionDiagnostic(event.ActionDiagnostic) {}

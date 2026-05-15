@@ -21,10 +21,6 @@ type nopDisplayer struct {
 	diagnostics []event.EngineDiagnostic
 }
 
-func (d *nopDisplayer) EmitEngineLifecycle(event.EngineEvent) {}
-func (d *nopDisplayer) EmitPlanLifecycle(event.PlanEvent)     {}
-func (d *nopDisplayer) EmitActionLifecycle(event.ActionEvent) {}
-func (d *nopDisplayer) EmitOpLifecycle(event.OpEvent)         {}
 func (d *nopDisplayer) EmitIndexAll(event.IndexAllEvent)      {}
 func (d *nopDisplayer) EmitIndexStep(event.IndexStepEvent)    {}
 func (d *nopDisplayer) EmitInspect(event.InspectEvent)        {}

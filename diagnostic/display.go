@@ -10,11 +10,6 @@ import "scampi.dev/scampi/diagnostic/event"
 // because it is the public consumption contract for diagnostic
 // output — not because rendering is part of the diagnostic package.
 type Displayer interface {
-	EmitEngineLifecycle(e event.EngineEvent)
-	EmitPlanLifecycle(e event.PlanEvent)
-	EmitActionLifecycle(e event.ActionEvent)
-	EmitOpLifecycle(e event.OpEvent)
-
 	EmitIndexAll(e event.IndexAllEvent)
 	EmitIndexStep(e event.IndexStepEvent)
 	EmitInspect(e event.InspectEvent)
@@ -27,7 +22,6 @@ type Displayer interface {
 	EmitActionDiagnostic(e event.ActionDiagnostic)
 	EmitOpDiagnostic(e event.OpDiagnostic)
 
-	// New diagnostic surface - see doc/design/diagnostics.md.
 	EmitDiagnostic(e event.Diagnostic)
 	EmitChange(e event.Change)
 	EmitProgress(e event.Progress)
