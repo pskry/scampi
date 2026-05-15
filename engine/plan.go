@@ -26,11 +26,12 @@ func Plan(
 }
 
 func (e *Engine) Plan(ctx context.Context) error {
-	plan, _, _, err := plan(e.cfg, e.em, e.tgt.Capabilities())
+	plan, actionDeps, _, err := plan(e.cfg, e.em, e.tgt.Capabilities())
 	if err != nil {
 		return err
 	}
 	e.storeSourcePaths(ctx, plan)
+	e.em.EmitPlanOutput(diagnostic.PlanProduced(plan, actionDeps))
 	return nil
 }
 

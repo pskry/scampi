@@ -59,6 +59,7 @@ func (w *causeEmitter) EmitIndexAll(e event.IndexAllEvent)   { w.inner.EmitIndex
 func (w *causeEmitter) EmitIndexStep(e event.IndexStepEvent) { w.inner.EmitIndexStep(e) }
 func (w *causeEmitter) EmitInspect(e event.InspectEvent)     { w.inner.EmitInspect(e) }
 func (w *causeEmitter) EmitGraph(e event.GraphEvent)         { w.inner.EmitGraph(e) }
+func (w *causeEmitter) EmitPlanOutput(e event.PlanEvent)     { w.inner.EmitPlanOutput(e) }
 func (w *causeEmitter) EmitEngineDiagnostic(e event.EngineDiagnostic) {
 	w.inner.EmitEngineDiagnostic(e)
 }

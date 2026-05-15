@@ -7,13 +7,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/charmbracelet/x/term"
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/diagnostic/event"
 	"scampi.dev/scampi/errs"
-	"scampi.dev/scampi/model"
 	"scampi.dev/scampi/render/ansi"
 	"scampi.dev/scampi/render/layout"
 	"scampi.dev/scampi/secret"
@@ -33,21 +31,16 @@ type Options struct {
 }
 
 type cli struct {
-	opts    Options
-	render  *renderer
-	glyphs  glyphSet
-	store   *diagnostic.SourceStore
-	actions sync.Map // map[string]*actionState
+	opts   Options
+	render *renderer
+	glyphs glyphSet
+	store  *diagnostic.SourceStore
 
 	isTTY bool
 	width int
 
 	planRenderer *planRenderer
 	formatter    *formatter
-}
-
-type actionState struct {
-	id string
 }
 
 // New creates a new CLI renderer.
@@ -72,7 +65,6 @@ func New(opts Options, store *diagnostic.SourceStore) diagnostic.Displayer {
 	isTTY := term.IsTerminal(os.Stdout.Fd())
 	useColor := shouldUseColor(opts.ColorMode, isTTY)
 	fmt := newFormatter(glyphs, useColor, store, opts.Redactor)
-	plan := newPlanRenderer(glyphs, width, opts.Verbosity, fmt)
 
 	return &cli{
 		opts:         opts,
@@ -81,7 +73,7 @@ func New(opts Options, store *diagnostic.SourceStore) diagnostic.Displayer {
 		glyphs:       glyphs,
 		isTTY:        isTTY,
 		width:        width,
-		planRenderer: plan,
+		planRenderer: newPlanRenderer(glyphs, width, opts.Verbosity, fmt),
 		formatter:    fmt,
 	}
 }
@@ -119,6 +111,10 @@ func (c *cli) commitRenderEvents(events []renderEvent) {
 		}
 	}
 	c.render.emitEvents(events)
+}
+
+func (c *cli) EmitPlanOutput(e event.PlanEvent) {
+	c.commitRenderEvents(c.planRenderer.renderPlan(e))
 }
 
 func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
@@ -603,199 +599,6 @@ func (c *cli) Close() {
 	c.render.close()
 }
 
-func (c *cli) renderEngineStarted(_ event.EngineEvent) []renderEvent {
-	return []renderEvent{{
-		stream: streamOut,
-		line:   c.formatter.fmtfMsg(colEngineStarted, "[engine] started"),
-	}}
-}
-
-func (c *cli) renderEngineConnecting(e event.EngineEvent) []renderEvent {
-	d := e.ConnectingDetail
-	return []renderEvent{{
-		stream: streamOut,
-		line:   c.formatter.fmtfMsg(colEngineStarted, "[engine] connecting to %s (%s)", d.TargetName, d.TargetKind),
-	}}
-}
-
-func (c *cli) renderEngineFinished(e event.EngineEvent) []renderEvent {
-	d := *e.Detail
-	if d.Err != nil {
-		return []renderEvent{{
-			stream: streamErr,
-			line: c.formatter.fmtfMsg(colEngineFinishedFatal,
-				"[engine]%s failed: %v", glyphR(c.glyphs.fatal), d.Err),
-		}}
-	}
-
-	if d.Cancelled {
-		var parts []string
-		parts = append(parts, fmt.Sprintf("%d changed", d.ChangedCount))
-		parts = append(parts, fmt.Sprintf("%d step%s completed", d.TotalCount, layout.Plural(d.TotalCount)))
-		parts = append(parts, d.Duration.String())
-		summary := strings.Join(parts, ", ")
-		return []renderEvent{{
-			stream: streamOut,
-			line:   c.formatter.fmtfMsg(colEngineFinishedChanged, "[engine] interrupted (%s)", summary),
-		}}
-	}
-
-	color := colEngineFinishedUnchanged
-	if d.FailedCount > 0 {
-		color = colEngineFinishedFailed
-	} else if d.ChangedCount > 0 || d.WouldChangeCount > 0 {
-		color = colEngineFinishedChanged
-	}
-
-	var parts []string
-	if d.CheckOnly {
-		parts = append(parts, fmt.Sprintf("%d would change", d.WouldChangeCount))
-	} else {
-		parts = append(parts, fmt.Sprintf("%d changed", d.ChangedCount))
-	}
-	parts = append(parts, fmt.Sprintf("%d failed", d.FailedCount))
-	parts = append(parts, fmt.Sprintf("%d hook%s fired", d.HooksFired, layout.Plural(d.HooksFired)))
-	parts = append(parts, fmt.Sprintf("%d step%s", d.TotalCount, layout.Plural(d.TotalCount)))
-	parts = append(parts, d.Duration.String())
-
-	return []renderEvent{{
-		stream: streamOut,
-		line:   c.formatter.fmtfMsg(color, "[engine] finished (%s)", strings.Join(parts, ", ")),
-	}}
-}
-
-func fmtSummary(s model.ActionSummary) string {
-	switch {
-	case s.Failed > 0 || s.Aborted > 0:
-		return fmt.Sprintf("failed (%d failed, %d aborted)", s.Failed, s.Aborted)
-	case s.Changed > 0:
-		return fmt.Sprintf("%d/%d ops changed", s.Changed, s.Total)
-	case s.WouldChange > 0:
-		return fmt.Sprintf("%d/%d ops would change", s.WouldChange, s.Total)
-	default:
-		return "up-to-date"
-	}
-}
-
-func (c *cli) summaryStyle(s model.ActionSummary) (ansi.ANSI, string) {
-	switch {
-	case s.Failed > 0 || s.Aborted > 0:
-		return colActionFinishedFailed, c.glyphs.fatal
-	case s.Changed > 0 || s.WouldChange > 0:
-		return colActionFinishedChanged, c.glyphs.change
-	default:
-		return colActionFinishedUnchanged, c.glyphs.ok
-	}
-}
-
-func (c *cli) renderActionFinished(e event.ActionEvent) []renderEvent {
-	d := *e.Detail
-	st := c.ensureActionFromStep(e.Step)
-	color, glyph := c.summaryStyle(d.Summary)
-
-	line := c.formatter.fmtfMsg(color, "[%s]%s", st.id, glyphR(glyph))
-	if e.Step.StepDesc != "" {
-		line += c.formatter.fmtfMsg(color, " %s %s", e.Step.StepDesc, c.glyphs.emDash)
-	}
-	line += c.formatter.fmtfMsg(color, " %s (%s)", fmtSummary(d.Summary), d.Duration)
-
-	return []renderEvent{{stream: streamOut, line: line}}
-}
-
-func (c *cli) renderHookTriggered(e event.ActionEvent) []renderEvent {
-	h := e.HookDetail
-	color, glyph := c.summaryStyle(h.Summary)
-
-	line := c.formatter.fmtfMsg(color, "[hook:%s]%s %s %s %s (%s)",
-		h.HookID, glyphR(glyph), h.TriggerBy, c.glyphs.emDash, fmtSummary(h.Summary), h.Duration)
-
-	return []renderEvent{{stream: streamOut, line: line}}
-}
-
-func (c *cli) renderOpChecked(e event.OpEvent) []renderEvent {
-	d := *e.CheckDetail
-	st := c.ensureActionFromStep(e.Step)
-
-	switch d.Result {
-	case spec.CheckSatisfied:
-		events := []renderEvent{{
-			stream: streamOut,
-			line: c.formatter.fmtfMsg(colOpCheckSatisfied,
-				"[%s]%s %s - up-to-date", st.id, glyphR(c.glyphs.ok), e.DisplayID),
-		}}
-		for _, dd := range d.Drift {
-			if c.opts.Verbosity < dd.Verbosity {
-				continue
-			}
-			events = append(events, renderEvent{
-				stream: streamOut,
-				line:   c.formatter.fmtfMsg(colOpDrift, "         %s: %s", dd.Field, dd.Current),
-			})
-		}
-		return events
-	case spec.CheckUnsatisfied:
-		events := []renderEvent{{
-			stream: streamOut,
-			line: c.formatter.fmtfMsg(colOpCheckUnsatisfied,
-				"[%s]%s %s - needs change", st.id, glyphR(c.glyphs.change), e.DisplayID),
-		}}
-		if c.opts.Verbosity >= signal.V && len(d.Drift) > 0 {
-			for _, dd := range d.Drift {
-				if c.opts.Verbosity < dd.Verbosity {
-					continue
-				}
-				current := dd.Current
-				if current == "" {
-					current = "(missing)"
-				}
-				if dd.Desired == "" {
-					events = append(events, renderEvent{
-						stream: streamOut,
-						line: c.formatter.fmtfMsg(colOpDrift,
-							"         %s: %s", dd.Field, current),
-					})
-				} else {
-					events = append(events, renderEvent{
-						stream: streamOut,
-						line: c.formatter.fmtfMsg(colOpDrift,
-							"         %s: %s %s %s", dd.Field, current, c.glyphs.arrow, dd.Desired),
-					})
-				}
-			}
-		}
-		return events
-	case spec.CheckUnknown:
-		return []renderEvent{{
-			stream: streamErr,
-			line: c.formatter.fmtfMsg(colOpCheckUnknown,
-				"[%s]%s %s - unknown: %v", st.id, glyphR(c.glyphs.warn), e.DisplayID, d.Err),
-		}}
-	}
-	return nil
-}
-
-func (c *cli) renderOpExecuted(e event.OpEvent) []renderEvent {
-	d := *e.ExecuteDetail
-	st := c.ensureActionFromStep(e.Step)
-
-	switch {
-	case d.Err != nil:
-		return []renderEvent{{
-			stream: streamErr,
-			line: c.formatter.fmtfMsg(colOpExecFailed,
-				"[%s]%s '%s' failed: %v", st.id, glyphR(c.glyphs.fatal), e.DisplayID, d.Err),
-		}}
-	case d.Changed:
-		return []renderEvent{{
-			stream: streamOut,
-			line: c.formatter.fmtfMsg(colOpExecChanged,
-				"[%s]%s '%s' changed (%s)", st.id, glyphR(c.glyphs.exec), e.DisplayID, d.Duration),
-		}}
-	default:
-		return nil
-	}
-}
-
 func (c *cli) EmitEngineDiagnostic(e event.EngineDiagnostic) {
 	if !c.shouldRender(e.Chattiness) {
 		return
@@ -964,17 +767,6 @@ func (c *cli) renderDiagnostic(sev signal.Severity, scope, msg string, tmpl even
 		events = append(events, renderEvent{stream: streamErr, line: l, wrap: true})
 	}
 	c.commitRenderEvents(events)
-}
-
-func (c *cli) ensureActionFromStep(step event.StepDetail) *actionState {
-	var key string
-	if step.HookID != "" {
-		key = fmt.Sprintf("hook:%s][%s", step.HookID, step.StepKind)
-	} else {
-		key = fmt.Sprintf("%s:%d", step.StepKind, step.StepIndex)
-	}
-	st, _ := c.actions.LoadOrStore(key, &actionState{id: key})
-	return st.(*actionState)
 }
 
 func (c *cli) shouldUseColor() bool {

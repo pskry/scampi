@@ -56,6 +56,7 @@ type (
 		EmitIndexStep(e event.IndexStepEvent)
 		EmitInspect(e event.InspectEvent)
 		EmitGraph(e event.GraphEvent)
+		EmitPlanOutput(e event.PlanEvent)
 
 		// Legacy diagnostic envelopes. Producers migrate to
 		// EmitDiagnostic during phase 5 (bare-error migration); the
@@ -116,6 +117,73 @@ func (d Diagnostics) Error() string {
 
 // ActionDeps maps action index to indices of actions it depends on.
 type ActionDeps [][]int
+
+// PlanProduced constructs the event payload for `scampi plan` output -
+// a structural view of the planned actions, their ops, and the
+// inter-op dependency edges. This is command output, not lifecycle:
+// it fires once per `scampi plan` invocation and carries the data the
+// CLI renders as the plan tree.
+func PlanProduced(plan spec.Plan, actionDeps ActionDeps) event.PlanEvent {
+	// Flatten all ops and assign global indices.
+	var allOps []spec.Op
+	opIndex := make(map[spec.Op]int)
+	actionOpBase := make(map[int]int) // action index -> first op index
+	for i, act := range plan.Unit.Actions {
+		actionOpBase[i] = len(allOps)
+		for _, op := range act.Ops() {
+			opIndex[op] = len(allOps)
+			allOps = append(allOps, op)
+		}
+	}
+
+	// Build PlannedOps with dependency indices.
+	plannedOps := make([]event.PlannedOp, len(allOps))
+	for i, op := range allOps {
+		var tmpl *spec.PlanTemplate
+		if d, ok := op.(spec.OpDescriber); ok {
+			if desc := d.OpDescription(); desc != nil {
+				t := desc.PlanTemplate()
+				tmpl = &t
+			}
+		}
+		var deps []int
+		for _, dep := range op.DependsOn() {
+			deps = append(deps, opIndex[dep])
+		}
+		plannedOps[i] = event.PlannedOp{
+			Index:     i,
+			DisplayID: OpDisplayID(op),
+			DependsOn: deps,
+			Template:  tmpl, // nil = fallback
+		}
+	}
+
+	// Re-slice ops back into PlannedActions.
+	var detail event.PlanDetail
+	for i, act := range plan.Unit.Actions {
+		start := actionOpBase[i]
+		end := start + len(act.Ops())
+		var deps []int
+		if actionDeps != nil && i < len(actionDeps) {
+			deps = actionDeps[i]
+		}
+		detail.Actions = append(detail.Actions, event.PlannedAction{
+			Index:     i,
+			Desc:      act.Desc(),
+			Kind:      act.Kind(),
+			DependsOn: deps,
+			Ops:       plannedOps[start:end],
+		})
+	}
+
+	return event.PlanEvent{
+		Time:       time.Now(),
+		Kind:       event.PlanProduced,
+		Detail:     &detail,
+		Severity:   signal.Notice,
+		Chattiness: event.Subtle,
+	}
+}
 
 // Inspect
 // -----------------------------------------------------------------------------

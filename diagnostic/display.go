@@ -14,6 +14,7 @@ type Displayer interface {
 	EmitIndexStep(e event.IndexStepEvent)
 	EmitInspect(e event.InspectEvent)
 	EmitGraph(e event.GraphEvent)
+	EmitPlanOutput(e event.PlanEvent)
 
 	EmitLegend()
 
