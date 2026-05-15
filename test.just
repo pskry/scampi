@@ -4,9 +4,17 @@ bench_dir := "./benchmarks"
 # ##############################################################################
 
 [default]
-[doc("Run all tests")]
-all:
-  go test ./...
+[doc("Run all tests (pass 'quiet' to suppress passing output)")]
+all mode='':
+  #!/usr/bin/env bash
+  case "{{mode}}" in
+    quiet) just test _q 'go test ./...' ;;
+    *)     go test ./... ;;
+  esac
+
+[doc("Shortcut for 'just test all quiet'")]
+quiet:
+  just test all quiet
 
 [doc("Run unit tests (per-package, excludes integration)")]
 unit:
@@ -24,19 +32,55 @@ race:
 containers:
   SCAMPI_TEST_CONTAINERS=1 go test -v ./test/...
 
-[doc("Run everything except container-gated tests (pre-commit gate)")]
-nocontainers:
-  go test -race -v ./...
-  just test testkit
-  go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x
-  just test fuzz 5s
+[doc("Run everything except container-gated tests (pre-commit gate; pass 'quiet' to suppress passing output)")]
+nocontainers mode='':
+  #!/usr/bin/env bash
+  set -e
+  case "{{mode}}" in
+    quiet)
+      just test _q 'go test -race -v ./...'
+      just test _q 'just test testkit'
+      just test _q 'go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x'
+      just test _q 'just test fuzz 5s'
+      ;;
+    *)
+      go test -race -v ./...
+      just test testkit
+      go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x
+      just test fuzz 5s
+      ;;
+  esac
 
-[doc("Run all tests with race-detector and containers (pre-push gate)")]
-everything:
-  SCAMPI_TEST_CONTAINERS=1 go test -race -v ./...
-  just test testkit
-  go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x
-  just test fuzz 5s
+[doc("Run all tests with race-detector and containers (pre-push gate; pass 'quiet' to suppress passing output)")]
+everything mode='':
+  #!/usr/bin/env bash
+  set -e
+  case "{{mode}}" in
+    quiet)
+      just test _q 'SCAMPI_TEST_CONTAINERS=1 go test -race -v ./...'
+      just test _q 'just test testkit'
+      just test _q 'go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x'
+      just test _q 'just test fuzz 5s'
+      ;;
+    *)
+      SCAMPI_TEST_CONTAINERS=1 go test -race -v ./...
+      just test testkit
+      go test ./test/integration -bench=. -benchmem -count=1 -benchtime=1x
+      just test fuzz 5s
+      ;;
+  esac
+
+# Run a command and show output only on failure. Used by the quiet
+# variants above.
+[private]
+_q cmd:
+  #!/usr/bin/env bash
+  out=$(eval '{{cmd}}' 2>&1)
+  rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "$out" | grep -E '^(FAIL|---|panic|\s+--- FAIL|\s+\S+\.go:|\s+Error:|\s+Got:|\s+Want:)' || true
+  fi
+  exit $rc
 
 # Focused
 # ##############################################################################
