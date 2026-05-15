@@ -67,6 +67,10 @@ lint severity='warning':
   just license-check
   just _gopls-hints {{severity}}
 
+[doc("Find suspicious unicode characters in code/docs")]
+find-unicode:
+  ./scripts/find-unicode.py
+
 [private]
 _gopls-hints severity:
   #!/usr/bin/env bash
