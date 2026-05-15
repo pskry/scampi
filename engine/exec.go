@@ -95,6 +95,59 @@ func (s *scheduler) emitOp(e event.OpEvent) {
 	s.em.EmitOpLifecycle(e)
 }
 
+// emitChanges fires v2 Change events for each drift item discovered
+// by Check. Phase indicates whether this is a would-change report
+// (check-only) or a did-change report (after apply). One Change per
+// drift entry preserves field-level granularity in the consumer.
+func (s *scheduler) emitChanges(displayID string, phase event.ChangePhase, drift []spec.DriftDetail) {
+	if len(drift) == 0 {
+		return
+	}
+	step := event.StepRef{
+		Index: s.actIdx,
+		Kind:  s.actKind,
+		Desc:  s.actDesc,
+	}
+	cause := event.Cause{}
+	if s.hookID != "" {
+		cause = event.Cause{Kind: event.CauseHook, Ref: s.hookID}
+	}
+	for _, d := range drift {
+		s.em.EmitChange(event.Change{
+			Time:      time.Now(),
+			Phase:     phase,
+			Step:      step,
+			DisplayID: displayID,
+			Drift:     d,
+			Cause:     cause,
+		})
+	}
+}
+
+// emitExecuted fires a v2 Change event for an op that actually mutated
+// state during Apply. Drift content is empty here - the op signalled
+// "I changed something" without a per-field diff. Phase 3 callers
+// rendering this stay readable because they fall back to a signal-
+// only line when Drift.Field == "".
+func (s *scheduler) emitExecuted(displayID string) {
+	step := event.StepRef{
+		Index: s.actIdx,
+		Kind:  s.actKind,
+		Desc:  s.actDesc,
+	}
+	cause := event.Cause{}
+	if s.hookID != "" {
+		cause = event.Cause{Kind: event.CauseHook, Ref: s.hookID}
+	}
+	s.em.EmitChange(event.Change{
+		Time:      time.Now(),
+		Phase:     event.ChangeExecuted,
+		Step:      step,
+		DisplayID: displayID,
+		Cause:     cause,
+	})
+}
+
 func (s *scheduler) schedule(n *opNode) {
 	if n.satisfied {
 		return
@@ -125,6 +178,9 @@ func (s *scheduler) schedule(n *opNode) {
 			time.Since(start),
 			err,
 		))
+		if err == nil && res.Changed {
+			s.emitExecuted(displayID)
+		}
 
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -235,6 +291,9 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 				s.checkOnly,
 				drift,
 			))
+			if s.checkOnly && res == spec.CheckUnsatisfied {
+				s.emitChanges(displayID, event.ChangePlanned, drift)
+			}
 
 			s.mu.Lock()
 			if res == spec.CheckSatisfied {
