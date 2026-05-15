@@ -139,9 +139,10 @@ std.deploy(name = "test", targets = [host]) {
 
 	// Second run: should be idempotent
 	rec := applyContainerConfig(t, cfgStr, tgt)
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions on idempotent run")
+			break
 		}
 	}
 

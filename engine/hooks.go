@@ -4,9 +4,7 @@ package engine
 
 import (
 	"context"
-	"time"
 
-	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/model"
 	"scampi.dev/scampi/spec"
 )
@@ -69,8 +67,6 @@ func (e *Engine) executeHooks(
 			continue
 		}
 
-		hookStart := time.Now()
-		var aggregate model.ActionSummary
 		anyChanged := false
 		var hookErr error
 
@@ -86,7 +82,6 @@ func (e *Engine) executeHooks(
 			}
 
 			hookReports = append(hookReports, ar)
-			addSummary(&aggregate, ar.Summary)
 
 			if actionChanged(ar, checkOnly) {
 				anyChanged = true
@@ -97,8 +92,6 @@ func (e *Engine) executeHooks(
 				break
 			}
 		}
-
-		e.em.EmitActionLifecycle(diagnostic.HookTriggered(hookID, triggerBy[hookID], aggregate, time.Since(hookStart)))
 
 		if hookErr != nil {
 			return model.ExecutionReport{
@@ -123,25 +116,7 @@ func (e *Engine) executeHooks(
 		}
 	}
 
-	// Emit HookSkipped for hooks that were defined but never notified
-	for id := range hp.actions {
-		if !notified[id] {
-			e.em.EmitActionLifecycle(diagnostic.HookSkipped(id))
-		}
-	}
-
 	return model.ExecutionReport{Actions: hookReports}, nil
-}
-
-// addSummary accumulates src into dst.
-func addSummary(dst *model.ActionSummary, src model.ActionSummary) {
-	dst.Total += src.Total
-	dst.Succeeded += src.Succeeded
-	dst.Failed += src.Failed
-	dst.Aborted += src.Aborted
-	dst.Skipped += src.Skipped
-	dst.Changed += src.Changed
-	dst.WouldChange += src.WouldChange
 }
 
 // actionChanged returns true if an action report indicates something changed

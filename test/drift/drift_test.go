@@ -59,17 +59,11 @@ func TestCheckPlan_DriftEmitted(t *testing.T) {
 	}
 
 	var found bool
-	for _, ev := range rec.OpEvents {
-		if ev.Kind != event.OpChecked || ev.CheckDetail == nil {
+	for _, c := range rec.Changes {
+		if c.Phase != event.ChangePlanned {
 			continue
 		}
-		if ev.CheckDetail.Result != spec.CheckUnsatisfied {
-			continue
-		}
-		if len(ev.CheckDetail.Drift) == 0 {
-			t.Fatal("expected drift detail on unsatisfied op, got nil")
-		}
-		d := ev.CheckDetail.Drift[0]
+		d := c.Drift
 		if d.Field != want[0].Field ||
 			d.Current != want[0].Current ||
 			d.Desired != want[0].Desired {
@@ -81,7 +75,7 @@ func TestCheckPlan_DriftEmitted(t *testing.T) {
 		found = true
 	}
 	if !found {
-		t.Fatal("no OpChecked event with CheckUnsatisfied found")
+		t.Fatal("no Change(Planned) event found")
 	}
 }
 

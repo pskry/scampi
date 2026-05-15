@@ -96,9 +96,10 @@ std.deploy(name = "test", targets = [host]) {
 	if !tgt.Containers["app"].Running {
 		t.Error("container should still be running")
 	}
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions on idempotent run")
+			break
 		}
 	}
 }
@@ -231,9 +232,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions on idempotent run")
+			break
 		}
 	}
 }
@@ -431,9 +433,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions on idempotent run")
+			break
 		}
 	}
 }
@@ -521,9 +524,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions — image default args should not cause drift")
+			break
 		}
 	}
 }
@@ -736,9 +740,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions — image healthcheck should not cause drift")
+			break
 		}
 	}
 }
@@ -852,9 +857,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions when already absent")
+			break
 		}
 	}
 }
@@ -944,9 +950,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions on idempotent run")
+			break
 		}
 	}
 }
@@ -1083,9 +1090,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply: %v\n%s", err, rec)
 	}
 
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
 			t.Error("expected no op executions on idempotent run")
+			break
 		}
 	}
 }

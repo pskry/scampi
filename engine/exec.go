@@ -90,12 +90,7 @@ type scheduler struct {
 	ctx     context.Context
 }
 
-func (s *scheduler) emitOp(e event.OpEvent) {
-	e.Step.HookID = s.hookID
-	s.em.EmitOpLifecycle(e)
-}
-
-// emitChanges fires v2 Change events for each drift item discovered
+// emitChanges fires Change events for each drift item discovered
 // by Check. Phase indicates whether this is a would-change report
 // (check-only) or a did-change report (after apply). One Change per
 // drift entry preserves field-level granularity in the consumer.
@@ -154,30 +149,13 @@ func (s *scheduler) schedule(n *opNode) {
 	}
 
 	s.grp.Go(func() error {
-		start := time.Now()
 		displayID := diagnostic.OpDisplayID(n.op)
-
-		s.emitOp(diagnostic.OpExecuteStarted(
-			s.actIdx,
-			s.actKind,
-			s.actDesc,
-			displayID,
-		))
 
 		opCtx, opCancel := context.WithTimeout(s.ctx, opTimeout(n.op))
 		defer opCancel()
 
 		res, err := n.op.Execute(opCtx, s.src, s.tgt)
 
-		s.emitOp(diagnostic.OpExecuted(
-			s.actIdx,
-			s.actKind,
-			s.actDesc,
-			displayID,
-			res.Changed,
-			time.Since(start),
-			err,
-		))
 		if err == nil && res.Changed {
 			s.emitExecuted(displayID)
 		}
@@ -220,12 +198,6 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 		n := n
 		g.Go(func() error {
 			displayID := diagnostic.OpDisplayID(n.op)
-			s.emitOp(diagnostic.OpCheckStarted(
-				s.actIdx,
-				s.actKind,
-				s.actDesc,
-				displayID,
-			))
 
 			opCtx, opCancel := context.WithTimeout(ctx, opTimeout(n.op))
 			defer opCancel()
@@ -236,32 +208,12 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 					s.mu.Lock()
 					n.outcome = model.OpWouldChange
 					s.mu.Unlock()
-					s.emitOp(diagnostic.OpChecked(
-						s.actIdx,
-						s.actKind,
-						s.actDesc,
-						displayID,
-						spec.CheckUnsatisfied,
-						nil,
-						s.checkOnly,
-						nil,
-					))
 					return nil
 				}
 
 				impact, consumed := emitOpDiagnostic(s.em, s.actIdx, s.actKind, s.actDesc, displayID, err)
 
 				if impact.ShouldAbort() {
-					s.emitOp(diagnostic.OpChecked(
-						s.actIdx,
-						s.actKind,
-						s.actDesc,
-						displayID,
-						res,
-						err,
-						s.checkOnly,
-						nil,
-					))
 					s.mu.Lock()
 					n.outcome = model.OpAborted
 					n.err = err
@@ -270,27 +222,17 @@ func (s *scheduler) runChecks(nodes []*opNode) error {
 				}
 
 				if !consumed {
-					// Raw error (not a diagnostic) — propagate.
+					// Raw error (not a diagnostic) - propagate.
 					return err
 				}
 
-				// Non-fatal diagnostic (warning) — proceed with the check result.
+				// Non-fatal diagnostic (warning) - proceed with the check result.
 			}
 
 			if !s.checkOnly {
 				drift = nil
 			}
 
-			s.emitOp(diagnostic.OpChecked(
-				s.actIdx,
-				s.actKind,
-				s.actDesc,
-				displayID,
-				res,
-				nil,
-				s.checkOnly,
-				drift,
-			))
 			if s.checkOnly && res == spec.CheckUnsatisfied {
 				s.emitChanges(displayID, event.ChangePlanned, drift)
 			}
@@ -466,29 +408,7 @@ func (e *Engine) checkAction(
 	act spec.Action,
 	promised map[spec.Resource]bool,
 ) (model.ActionReport, error) {
-	start := time.Now()
-	kind := act.Kind()
-	desc := act.Desc()
-	e.em.EmitActionLifecycle(diagnostic.ActionStarted(idx, kind, desc))
-
-	res, err := e.runCheckAction(ctx, idx, act, promised, "")
-
-	e.em.EmitActionLifecycle(
-		diagnostic.ActionFinished(
-			idx,
-			kind,
-			desc,
-			res.Summary,
-			time.Since(start),
-			err,
-		),
-	)
-
-	if err != nil {
-		return res, err
-	}
-
-	return res, nil
+	return e.runCheckAction(ctx, idx, act, promised, "")
 }
 
 func (e *Engine) runCheckAction(
@@ -653,28 +573,10 @@ func captureStepOutput(act spec.Action, report model.ActionReport, outputs *step
 }
 
 func (e *Engine) executeAction(ctx context.Context, idx int, act spec.Action) (model.ActionReport, error) {
-	start := time.Now()
-	kind := act.Kind()
-	desc := act.Desc()
-	e.em.EmitActionLifecycle(diagnostic.ActionStarted(idx, kind, desc))
-
 	res, err := e.runAction(ctx, idx, act, "")
-
-	e.em.EmitActionLifecycle(
-		diagnostic.ActionFinished(
-			idx,
-			kind,
-			desc,
-			res.Summary,
-			time.Since(start),
-			err,
-		),
-	)
-
 	if err != nil {
 		return res, err
 	}
-
 	return res, nil
 }
 

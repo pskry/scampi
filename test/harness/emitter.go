@@ -151,8 +151,8 @@ func (r *RecordingDisplayer) Dump(w io.Writer) {
 
 func (r *RecordingDisplayer) CountChangedOps() int {
 	count := 0
-	for _, ev := range r.OpEvents {
-		if ev.ExecuteDetail != nil && ev.ExecuteDetail.Changed {
+	for _, c := range r.Changes {
+		if c.Phase == event.ChangeExecuted {
 			count++
 		}
 	}

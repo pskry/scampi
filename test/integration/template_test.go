@@ -522,22 +522,9 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
 
-	// Check that all ops were skipped
-	var actionFinished *event.ActionDetail
-	for _, ev := range rec.ActionEvents {
-		if ev.Kind == event.ActionFinished {
-			actionFinished = ev.Detail
-			break
-		}
-	}
-
-	if actionFinished == nil {
-		t.Fatal("no ActionFinished event found")
-	}
-
-	if actionFinished.Summary.Skipped != actionFinished.Summary.Total {
-		t.Errorf("expected all ops skipped: got %d/%d skipped",
-			actionFinished.Summary.Skipped, actionFinished.Summary.Total)
+	// Idempotent run: no Change events should fire.
+	for _, c := range rec.Changes {
+		t.Errorf("unexpected Change event: phase=%v op=%s", c.Phase, c.DisplayID)
 	}
 }
 
@@ -605,21 +592,14 @@ std.deploy(name = "test", targets = [host]) {
 		t.Errorf("content not updated: got %q, want %q", tgt.Files["/out.txt"], "new content")
 	}
 
-	// Check that changes were made
-	var actionFinished *event.ActionDetail
-	for _, ev := range rec.ActionEvents {
-		if ev.Kind == event.ActionFinished {
-			actionFinished = ev.Detail
-			break
+	executed := 0
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
+			executed++
 		}
 	}
-
-	if actionFinished == nil {
-		t.Fatal("no ActionFinished event found")
-	}
-
-	if actionFinished.Summary.Changed == 0 {
-		t.Error("expected changes due to content update")
+	if executed == 0 {
+		t.Error("expected executed changes due to content update")
 	}
 }
 

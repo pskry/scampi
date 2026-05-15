@@ -166,33 +166,10 @@ std.deploy(name = "test", targets = [host]) {
 		t.Fatalf("Apply failed: %v\n%s", err, rec)
 	}
 
-	// Check that ActionFinished has all ops skipped (no changes, no failures)
-	var actionFinished *event.ActionDetail
-	for _, ev := range rec.ActionEvents {
-		if ev.Kind == event.ActionFinished {
-			actionFinished = ev.Detail
-			break
-		}
-	}
-
-	if actionFinished == nil {
-		t.Fatal("no ActionFinished event found")
-	}
-
-	// All ops should be skipped
-	if actionFinished.Summary.Skipped != actionFinished.Summary.Total {
-		t.Errorf("expected all ops skipped: got %d/%d skipped",
-			actionFinished.Summary.Skipped, actionFinished.Summary.Total)
-	}
-	if actionFinished.Summary.Changed != 0 {
-		t.Errorf("expected no changes, got %d", actionFinished.Summary.Changed)
-	}
-
-	// Verify no OpExecuted events (skipped ops don't execute)
-	for _, ev := range rec.OpEvents {
-		if ev.Kind == event.OpExecuted {
-			t.Error("unexpected OpExecuted event - skipped ops should not execute")
-		}
+	// Idempotent run: target state already matches source, so no ops
+	// should report a change.
+	for _, c := range rec.Changes {
+		t.Errorf("unexpected Change event: phase=%v op=%s", c.Phase, c.DisplayID)
 	}
 }
 
@@ -262,15 +239,16 @@ std.deploy(name = "test", targets = [host]) {
 		t.Errorf("file B mode: got %o, want %o", tgt.Modes["/dest-b.txt"], 0o600)
 	}
 
-	// Verify two ActionFinished events
-	actionCount := 0
-	for _, ev := range rec.ActionEvents {
-		if ev.Kind == event.ActionFinished {
-			actionCount++
+	// Both actions produced executed changes; the file-state checks
+	// above are the real proof that they ran with the right content.
+	steps := map[int]bool{}
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
+			steps[c.Step.Index] = true
 		}
 	}
-	if actionCount != 2 {
-		t.Errorf("expected 2 ActionFinished events, got %d", actionCount)
+	if len(steps) != 2 {
+		t.Errorf("expected 2 distinct step indexes with executed changes, got %d", len(steps))
 	}
 }
 
@@ -452,16 +430,6 @@ std.deploy(name = "test", targets = [host]) {
 		t.Error("second file should be written (independent action)")
 	}
 
-	// Both actions start in parallel (they have independent paths)
-	actionStartCount := 0
-	for _, ev := range rec.ActionEvents {
-		if ev.Kind == event.ActionStarted {
-			actionStartCount++
-		}
-	}
-	if actionStartCount != 2 {
-		t.Errorf("expected 2 ActionStarted events (parallel execution), got %d", actionStartCount)
-	}
 }
 
 // TestIntegration_ContentChange verifies that content changes are detected
@@ -517,22 +485,15 @@ std.deploy(name = "test", targets = [host]) {
 			tgt.Files["/dest.txt"], "new content")
 	}
 
-	// Check ActionFinished for changes
-	var actionFinished *event.ActionDetail
-	for _, ev := range rec.ActionEvents {
-		if ev.Kind == event.ActionFinished {
-			actionFinished = ev.Detail
-			break
+	// Should have changes (copy op executed)
+	executed := 0
+	for _, c := range rec.Changes {
+		if c.Phase == event.ChangeExecuted {
+			executed++
 		}
 	}
-
-	if actionFinished == nil {
-		t.Fatal("no ActionFinished event found")
-	}
-
-	// Should have changes (copy op executed)
-	if actionFinished.Summary.Changed == 0 {
-		t.Error("expected changes due to content update")
+	if executed == 0 {
+		t.Error("expected executed changes due to content update")
 	}
 }
 
@@ -1060,16 +1021,16 @@ std.deploy(name = "test", targets = [host]) {
 		t.Errorf("check mode should not restart, got %d", tgt.Restarts["nginx"])
 	}
 
-	// But the hook action should report WouldChange
-	hookTriggered := false
-	for _, ev := range rec.ActionEvents {
-		if ev.Kind == event.HookTriggered {
-			hookTriggered = true
+	// The hook fired and its ops reported a planned change.
+	hookChange := false
+	for _, c := range rec.Changes {
+		if c.Cause.Kind == event.CauseHook && c.Phase == event.ChangePlanned {
+			hookChange = true
 			break
 		}
 	}
-	if !hookTriggered {
-		t.Error("expected HookTriggered event in check mode")
+	if !hookChange {
+		t.Error("expected hook-triggered Change(Planned) in check mode")
 	}
 }
 
