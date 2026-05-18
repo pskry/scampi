@@ -15,6 +15,12 @@ signal.
 
 ## What survives
 
+The system emits **two distinct families**: streaming signals that fire
+during work, and command outputs that are the one-shot answer to a
+specific command. Only the first family rides the emit pipeline.
+
+### Streaming signals (event pipeline)
+
 1. **Diagnostics** - "your config / environment is wrong here, here's
    why, here's how to fix it". With source span, severity, hint, help.
 2. **Changes** - "this op would change X" (planned) or "this op did
@@ -23,13 +29,33 @@ signal.
 3. **Progress** - "currently connecting to host:foo", "currently
    checking action 3/12: posix.user(alice)". A status line, latest-
    wins on TTY; appended as one line per update on non-TTY.
-4. **Command-specific outputs** - `inspect` dumps resolved values,
-   `index` dumps the step catalog, `graph` dumps the cross-deploy
-   DAG. These are the actual output of those commands, not
-   lifecycle.
-5. **Summary** - at end of run: N changed, M failed, K skipped, time.
-   One line. Computed by the CLI from the final `ExecutionReport`;
-   not an event type.
+
+### Command outputs (return values, NOT events)
+
+These are the actual answer of a command invocation. They have no
+severity, no cause, no streaming semantics - they're one-shot per
+invocation, returned directly from the engine entry point, and the
+calling `cmd/scampi` handler renders them via a dedicated renderer.
+
+- **Plan output** - returned from `Engine.Plan`. Carries the action
+  DAG AND the cross-deploy graph (see below). Rendered by the plan
+  renderer.
+- **Inspect output** - returned from `Engine.Inspect`. Resolved field
+  values for each step.
+- **Index output** - returned from `Engine.IndexAll` /
+  `Engine.IndexStep`. Step catalog and per-step documentation.
+- **Deploy graph** - cross-deploy topology (who runs after whom and
+  why). NOT a standalone command; baked into `PlanResult`. Engine
+  builds it internally for scheduling on every run; only surfaced
+  when `scampi plan` returns it. Check/apply build it too but never
+  expose it.
+
+### Summary
+
+End-of-run one-liner ("N changed, M failed, time"). Computed by the
+CLI from the final `ExecutionReport` returned by `Engine.Check` /
+`Engine.Apply`. Not an event; not a return value of its own; just
+something the cmd renders after work finishes.
 
 ## What dies
 
@@ -163,27 +189,84 @@ Examples:
 ## Target Emitter
 
 ```go
-type Emitter interface {
-    EmitDiagnostic(d Diagnostic)
-    EmitChange(c Change)
-    EmitProgress(p Progress)
+type Event interface {
+    eventTag() // sealed via unexported method; only Diagnostic/Change/Progress satisfy it
+}
 
-    EmitInspect(e InspectEvent)
-    EmitIndexAll(e IndexAllEvent)
-    EmitIndexStep(e IndexStepEvent)
-    EmitGraph(e GraphEvent)
+type Emitter interface {
+    Emit(e Event)
 }
 ```
 
-Seven methods, down from twelve. The first three are the live event
-stream during normal runs. The last four are command-specific outputs
-that fire only when the corresponding command runs (`inspect`,
-`index`, the graph view); they stay split because their payloads are
-heterogeneous and the consumer wants strongly-typed access.
+One method. The closed set of event types (`Diagnostic`, `Change`,
+`Progress`) implements the sealed `Event` interface; consumers
+type-switch on the concrete type and `default: panic` on unknowns.
 
-If we later notice we never need command outputs in isolation, those
-four collapse into one `EmitResult(r CommandResult)` with a tagged
-union. Out of scope for this rework.
+The previous wide interface's compile-time exhaustiveness guarantee
+was useful when there were 12 heterogeneous methods. With 3 closely-
+related types that will rarely grow, a default-panic switch is fine
+and the one-method emitter gives us:
+
+- Trivial mocks (one method).
+- A single choke point for redaction, dedup, ordering, and `--json`
+  output.
+- Easy `WithCause` wrapping without re-stating every method.
+
+## Engine return types
+
+The command-output families that used to ride the emitter become
+return values of the engine entry points:
+
+```go
+type PlanResult struct {
+    Plan        spec.Plan       // action DAG
+    DeployGraph *DeployGraph    // cross-deploy topology, nil if trivial
+}
+
+type DeployGraph struct {
+    Levels []DeployLevel
+}
+type DeployLevel struct {
+    Index int
+    Nodes []DeployNode
+}
+type DeployNode struct {
+    DeployName, TargetName string
+    After                  []string  // deploys this one waits on
+    Needs                  []string  // resources that drove the edges
+}
+
+type InspectResult struct {
+    Entries []InspectEntry  // (kind, desc, fields)
+}
+
+type IndexAllResult struct {
+    Steps []StepIndexEntry  // (kind, desc)
+}
+
+type IndexStepResult struct {
+    Doc spec.StepDoc
+}
+```
+
+Engine entry points:
+
+```go
+func (e *Engine) Plan(ctx) (PlanResult, error)
+func (e *Engine) Inspect(ctx, opts) (InspectResult, error)
+func (e *Engine) IndexAll() (IndexAllResult, error)
+func (e *Engine) IndexStep(kind) (IndexStepResult, error)
+func (e *Engine) Check(ctx) (model.ExecutionReport, error)
+func (e *Engine) Apply(ctx) (model.ExecutionReport, error)
+```
+
+Check/Apply also start returning the `ExecutionReport` so the CLI
+can compute the summary line directly from the report instead of
+shoehorning it through `EmitProgress`.
+
+`cmd/scampi` handlers consume the return value and hand it to a
+dedicated renderer (the existing plan/inspect/index renderers stay
+where they are; only the calling pattern changes).
 
 ## Ordering, timestamps, threading
 
