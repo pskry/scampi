@@ -12,12 +12,10 @@ import (
 )
 
 type (
-	IndexAllEvents     []event.IndexAllEvent
 	EngineDiagnostics  []event.EngineDiagnostic
 	PlanDiagnostics    []event.PlanDiagnostic
 	ActionDiagnostics  []event.ActionDiagnostic
 	OpDiagnostics      []event.OpDiagnostic
-	IndexStepEvents    []event.IndexStepEvent
 	Diagnostics        []event.Diagnostic
 	Changes            []event.Change
 	ProgressEvents     []event.Progress
@@ -27,8 +25,6 @@ type (
 		PlanDiagnostics   PlanDiagnostics
 		ActionDiagnostics ActionDiagnostics
 		OpDiagnostics     OpDiagnostics
-		IndexAllEvents    IndexAllEvents
-		IndexStepEvents   IndexStepEvents
 		Diagnostics       Diagnostics
 		Changes           Changes
 		ProgressEvents    ProgressEvents
@@ -58,18 +54,6 @@ func (r *RecordingDisplayer) EmitOpDiagnostic(e event.OpDiagnostic) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.OpDiagnostics = append(r.OpDiagnostics, e)
-}
-
-func (r *RecordingDisplayer) EmitIndexAll(e event.IndexAllEvent) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.IndexAllEvents = append(r.IndexAllEvents, e)
-}
-
-func (r *RecordingDisplayer) EmitIndexStep(e event.IndexStepEvent) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.IndexStepEvents = append(r.IndexStepEvents, e)
 }
 
 func (r *RecordingDisplayer) EmitInspect(_ event.InspectEvent) {}
@@ -102,9 +86,7 @@ func (r *RecordingDisplayer) Interrupt() {}
 func (r *RecordingDisplayer) Close() {}
 
 func (r *RecordingDisplayer) String() string {
-	return r.IndexAllEvents.String() + "\n" +
-		r.IndexStepEvents.String() + "\n" +
-		r.EngineDiagnostics.String() + "\n" +
+	return r.EngineDiagnostics.String() + "\n" +
 		r.PlanDiagnostics.String() + "\n" +
 		r.ActionDiagnostics.String() + "\n" +
 		r.OpDiagnostics.String() + "\n" +
@@ -152,8 +134,6 @@ func MarshalSection(header string, v any) string {
 	return "----- " + header + " -----\n" + string(j)
 }
 
-func (e IndexAllEvents) String() string    { return MarshalSection("INDEX_ALL EVENTS", e) }
-func (e IndexStepEvents) String() string   { return MarshalSection("INDEX_STEP EVENTS", e) }
 func (e EngineDiagnostics) String() string { return MarshalSection("ENGINE DIAGNOSTICS", e) }
 func (e PlanDiagnostics) String() string   { return MarshalSection("PLAN DIAGNOSTICS", e) }
 func (e ActionDiagnostics) String() string { return MarshalSection("ACTION DIAGNOSTICS", e) }
@@ -166,8 +146,6 @@ func (NoopEmitter) EmitEngineDiagnostic(event.EngineDiagnostic) {}
 func (NoopEmitter) EmitPlanDiagnostic(event.PlanDiagnostic)     {}
 func (NoopEmitter) EmitActionDiagnostic(event.ActionDiagnostic) {}
 func (NoopEmitter) EmitOpDiagnostic(event.OpDiagnostic)         {}
-func (NoopEmitter) EmitIndexAll(event.IndexAllEvent)            {}
-func (NoopEmitter) EmitIndexStep(event.IndexStepEvent)          {}
 func (NoopEmitter) EmitInspect(event.InspectEvent)              {}
 func (NoopEmitter) EmitGraph(event.GraphEvent)                  {}
 func (NoopEmitter) EmitPlanOutput(event.PlanEvent)              {}

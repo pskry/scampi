@@ -42,22 +42,20 @@ shown, including fields, behavior, and examples.`,
 			em := diagnostic.NewEmitter(pol, displ)
 			args := cmd.Args()
 
-			var err error
 			if args.Len() == 0 {
-				err = engine.IndexAll(ctx, em)
-			} else {
-				err = engine.IndexStep(ctx, args.First(), em)
+				displ.RenderIndexAll(engine.IndexAll(ctx))
+				return nil
 			}
 
+			doc, err := engine.IndexStep(ctx, args.First(), em)
 			if err != nil {
 				var abort engine.AbortError
 				if !errors.As(err, &abort) {
-					// Engine violated its contract: unexpected error
-					panic(errs.BUG("engine.Index returned unexpected error: %w", err))
+					panic(errs.BUG("engine.IndexStep returned unexpected error: %w", err))
 				}
-
 				return cli.Exit("", exitUserError)
 			}
+			displ.RenderIndexStep(doc)
 
 			return nil
 		},

@@ -4,34 +4,40 @@ package engine
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"scampi.dev/scampi/diagnostic"
 	"scampi.dev/scampi/spec"
 )
 
-func IndexAll(_ context.Context, em diagnostic.Emitter) error {
+// IndexAll returns the catalog of all registered step types, sorted
+// by Kind ascending so the caller can render deterministically.
+func IndexAll(_ context.Context) []spec.StepDoc {
 	reg := NewRegistry()
 	types := reg.StepTypes()
-
 	docs := make([]spec.StepDoc, 0, len(types))
 	for _, t := range types {
 		docs = append(docs, loadStepDoc(reg, t.Kind()))
 	}
-
-	em.EmitIndexAll(diagnostic.IndexAllProduced(docs))
-	return nil
+	slices.SortStableFunc(docs, func(a, b spec.StepDoc) int {
+		return strings.Compare(a.Kind, b.Kind)
+	})
+	return docs
 }
 
-func IndexStep(_ context.Context, stepKind string, em diagnostic.Emitter) error {
+// IndexStep returns the documentation for a single step kind. If
+// stepKind isn't registered, fires UnknownIndexKindError as a
+// diagnostic through em and returns AbortError so the caller can
+// shape the exit code.
+func IndexStep(_ context.Context, stepKind string, em diagnostic.Emitter) (spec.StepDoc, error) {
 	reg := NewRegistry()
 	_, ok := reg.StepType(stepKind)
 	if !ok {
 		emitIndexDiagnostic(em, UnknownIndexKindError{Kind: stepKind})
-		return AbortError{}
+		return spec.StepDoc{}, AbortError{}
 	}
-
-	em.EmitIndexStep(diagnostic.IndexStepProduced(loadStepDoc(reg, stepKind)))
-	return nil
+	return loadStepDoc(reg, stepKind), nil
 }
 
 func emitIndexDiagnostic(em diagnostic.Emitter, d diagnostic.Diagnostic) {

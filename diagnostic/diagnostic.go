@@ -5,7 +5,6 @@ package diagnostic
 
 import (
 	"reflect"
-	"slices"
 	"strings"
 	"time"
 
@@ -52,8 +51,6 @@ type Deferrable interface {
 
 type (
 	Emitter interface {
-		EmitIndexAll(e event.IndexAllEvent)
-		EmitIndexStep(e event.IndexStepEvent)
 		EmitInspect(e event.InspectEvent)
 		EmitGraph(e event.GraphEvent)
 		EmitPlanOutput(e event.PlanEvent)
@@ -194,36 +191,6 @@ func InspectProduced(detail event.InspectDetail) event.InspectEvent {
 		Detail:     detail,
 		Severity:   signal.Notice,
 		Chattiness: event.Normal,
-	}
-}
-
-func IndexAllProduced(docs []spec.StepDoc) event.IndexAllEvent {
-	steps := make([]event.StepIndexDetail, len(docs))
-	for i, doc := range docs {
-		steps[i] = event.StepIndexDetail{
-			Kind: doc.Kind,
-			Desc: doc.Summary,
-		}
-	}
-
-	slices.SortStableFunc(steps, func(a event.StepIndexDetail, b event.StepIndexDetail) int {
-		return strings.Compare(a.Kind, b.Kind)
-	})
-
-	return event.IndexAllEvent{
-		Time:       time.Now(),
-		Steps:      steps,
-		Severity:   signal.Notice,
-		Chattiness: event.Subtle,
-	}
-}
-
-func IndexStepProduced(doc spec.StepDoc) event.IndexStepEvent {
-	return event.IndexStepEvent{
-		Time:       time.Now(),
-		Doc:        doc,
-		Severity:   signal.Notice,
-		Chattiness: event.Subtle,
 	}
 }
 

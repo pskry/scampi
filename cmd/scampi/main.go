@@ -248,7 +248,7 @@ func mustGlobalOpts(ctx context.Context) globalOpts {
 // Displayer
 // -----------------------------------------------------------------------------
 
-func newDisplayer(ctx context.Context, opts globalOpts, store *diagnostic.SourceStore) diagnostic.Displayer {
+func newDisplayer(ctx context.Context, opts globalOpts, store *diagnostic.SourceStore) *clir.CLI {
 	d := clir.New(
 		clir.Options{
 			ColorMode:  opts.colorMode,
@@ -267,7 +267,7 @@ func newDisplayer(ctx context.Context, opts globalOpts, store *diagnostic.Source
 // withDisplayer creates a displayer and returns a cleanup function that
 // should be deferred. The cleanup function closes the displayer and
 // recovers from panics.
-func withDisplayer(ctx context.Context, opts globalOpts, store *diagnostic.SourceStore) (diagnostic.Displayer, func()) {
+func withDisplayer(ctx context.Context, opts globalOpts, store *diagnostic.SourceStore) (*clir.CLI, func()) {
 	d := newDisplayer(ctx, opts, store)
 	return d, func() {
 		d.Close()

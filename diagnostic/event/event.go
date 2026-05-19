@@ -71,20 +71,6 @@ type OpEvent struct {
 	Chattiness    Chattiness
 }
 
-type IndexAllEvent struct {
-	Time       time.Time
-	Steps      []StepIndexDetail
-	Severity   signal.Severity
-	Chattiness Chattiness
-}
-
-type IndexStepEvent struct {
-	Time       time.Time
-	Doc        spec.StepDoc
-	Severity   signal.Severity
-	Chattiness Chattiness
-}
-
 // GraphEvent surfaces the cross-deploy resource graph topology
 // before any plan starts. Emitted once per scampi run when the
 // graph is non-trivial (more than one level OR any explicit dep);

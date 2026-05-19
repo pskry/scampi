@@ -31,8 +31,6 @@ func (noopEmitter) EmitEngineLifecycle(event.EngineEvent)       {}
 func (noopEmitter) EmitPlanLifecycle(event.PlanEvent)           {}
 func (noopEmitter) EmitActionLifecycle(event.ActionEvent)       {}
 func (noopEmitter) EmitOpLifecycle(event.OpEvent)               {}
-func (noopEmitter) EmitIndexAll(event.IndexAllEvent)            {}
-func (noopEmitter) EmitIndexStep(event.IndexStepEvent)          {}
 func (noopEmitter) EmitInspect(event.InspectEvent)              {}
 func (noopEmitter) EmitGraph(event.GraphEvent)                  {}
 func (noopEmitter) EmitEngineDiagnostic(event.EngineDiagnostic) {}

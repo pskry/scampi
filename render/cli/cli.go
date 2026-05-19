@@ -30,7 +30,10 @@ type Options struct {
 	Redactor *secret.Redactor
 }
 
-type cli struct {
+// CLI is the terminal renderer. It implements diagnostic.Displayer
+// for streaming events; the public Render* methods serve command
+// outputs that the engine returns directly (Plan, Inspect, Index).
+type CLI struct {
 	opts   Options
 	render *renderer
 	glyphs glyphSet
@@ -44,7 +47,7 @@ type cli struct {
 }
 
 // New creates a new CLI renderer.
-func New(opts Options, store *diagnostic.SourceStore) diagnostic.Displayer {
+func New(opts Options, store *diagnostic.SourceStore) *CLI {
 	glyphs := fancyGlyphs
 	if opts.ForceASCII {
 		glyphs = asciiGlyphs
@@ -66,7 +69,7 @@ func New(opts Options, store *diagnostic.SourceStore) diagnostic.Displayer {
 	useColor := shouldUseColor(opts.ColorMode, isTTY)
 	fmt := newFormatter(glyphs, useColor, store, opts.Redactor)
 
-	return &cli{
+	return &CLI{
 		opts:         opts,
 		store:        store,
 		render:       newRenderer(os.Stdout, os.Stderr, isTTY, glyphs, fmt),
@@ -78,7 +81,7 @@ func New(opts Options, store *diagnostic.SourceStore) diagnostic.Displayer {
 	}
 }
 
-func (c *cli) shouldRender(chatty event.Chattiness) bool {
+func (c *CLI) shouldRender(chatty event.Chattiness) bool {
 	v := c.opts.Verbosity
 	switch chatty {
 	case event.Yappy:
@@ -94,7 +97,7 @@ func (c *cli) shouldRender(chatty event.Chattiness) bool {
 	}
 }
 
-func (c *cli) commitRenderEvents(events []renderEvent) {
+func (c *CLI) commitRenderEvents(events []renderEvent) {
 	for i := range events {
 		// Redact at the central choke point so every line — diagnostic,
 		// inspect, plan render, status update — passes through the
@@ -113,18 +116,16 @@ func (c *cli) commitRenderEvents(events []renderEvent) {
 	c.render.emitEvents(events)
 }
 
-func (c *cli) EmitPlanOutput(e event.PlanEvent) {
+func (c *CLI) EmitPlanOutput(e event.PlanEvent) {
 	c.commitRenderEvents(c.planRenderer.renderPlan(e))
 }
 
-func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
-	if !c.shouldRender(e.Chattiness) {
-		return
-	}
-
+// RenderIndexAll prints the step catalog (`scampi index`). Docs are
+// expected to be sorted by Kind ascending by the caller.
+func (c *CLI) RenderIndexAll(docs []spec.StepDoc) {
 	kindWidth := 0
-	for _, step := range e.Steps {
-		if w := layout.VisibleLen(step.Kind); w > kindWidth {
+	for _, doc := range docs {
+		if w := layout.VisibleLen(doc.Kind); w > kindWidth {
 			kindWidth = w
 		}
 	}
@@ -137,8 +138,8 @@ func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
 	})
 	events = append(events, renderEvent{line: "", stream: streamOut})
 
-	for _, step := range e.Steps {
-		kind := c.formatter.fmtMsg(ansi.BrightCyan().Bold(), step.Kind)
+	for _, doc := range docs {
+		kind := c.formatter.fmtMsg(ansi.BrightCyan().Bold(), doc.Kind)
 		pad := kindWidth - layout.VisibleLen(kind)
 		if pad < 0 {
 			pad = 0
@@ -148,10 +149,10 @@ func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
 
 		descWidth := c.width - indent
 		if descWidth <= 10 || c.width <= 0 {
-			line := prefix + c.formatter.fmtMsg(ansi.White(), step.Desc)
+			line := prefix + c.formatter.fmtMsg(ansi.White(), doc.Summary)
 			events = append(events, renderEvent{line: line, stream: streamOut, wrap: true})
 		} else {
-			for i, dl := range layout.WrapText(step.Desc, descWidth) {
+			for i, dl := range layout.WrapText(doc.Summary, descWidth) {
 				var line string
 				if i == 0 {
 					line = prefix + c.formatter.fmtMsg(ansi.White(), dl)
@@ -177,7 +178,7 @@ func (c *cli) EmitIndexAll(e event.IndexAllEvent) {
 // + one entry per node, grouped by level. Indentation visualizes
 // dependency depth; "after" / "needs" annotations show the edges
 // that drove ordering.
-func (c *cli) EmitGraph(e event.GraphEvent) {
+func (c *CLI) EmitGraph(e event.GraphEvent) {
 	f := c.formatter
 	var out []renderEvent
 
@@ -208,7 +209,7 @@ func (c *cli) EmitGraph(e event.GraphEvent) {
 	c.commitRenderEvents(out)
 }
 
-func (c *cli) EmitInspect(e event.InspectEvent) {
+func (c *CLI) EmitInspect(e event.InspectEvent) {
 	f := c.formatter
 	var out []renderEvent
 
@@ -243,12 +244,9 @@ func (c *cli) EmitInspect(e event.InspectEvent) {
 	c.commitRenderEvents(out)
 }
 
-func (c *cli) EmitIndexStep(e event.IndexStepEvent) {
-	if !c.shouldRender(e.Chattiness) {
-		return
-	}
-
-	doc := e.Doc
+// RenderIndexStep prints the detailed documentation for a single
+// step (`scampi index <kind>`).
+func (c *CLI) RenderIndexStep(doc spec.StepDoc) {
 	var events []renderEvent
 
 	events = append(events, renderEvent{
@@ -384,7 +382,7 @@ func partitionFields(fields []spec.FieldDoc) (groups [][]spec.FieldDoc, required
 	return groups, required, optional
 }
 
-func (c *cli) renderFieldRows(fields []spec.FieldDoc) []renderEvent {
+func (c *CLI) renderFieldRows(fields []spec.FieldDoc) []renderEvent {
 	nameW, typeW := 0, 0
 	for _, f := range fields {
 		if len(f.Name) > nameW {
@@ -426,7 +424,7 @@ func (c *cli) renderFieldRows(fields []spec.FieldDoc) []renderEvent {
 	return events
 }
 
-func (c *cli) renderFieldExamples(fields []spec.FieldDoc) []renderEvent {
+func (c *CLI) renderFieldExamples(fields []spec.FieldDoc) []renderEvent {
 	var events []renderEvent
 	events = append(events, renderEvent{line: "", stream: streamOut})
 	events = append(events, renderEvent{
@@ -458,7 +456,7 @@ func (c *cli) renderFieldExamples(fields []spec.FieldDoc) []renderEvent {
 	return events
 }
 
-func (c *cli) renderSnippets(snippets []string) []renderEvent {
+func (c *CLI) renderSnippets(snippets []string) []renderEvent {
 	var events []renderEvent
 	events = append(events, renderEvent{line: "", stream: streamOut})
 	events = append(events, renderEvent{
@@ -487,7 +485,7 @@ type legendEntry struct {
 	desc  string
 }
 
-func (c *cli) legendSection(header string, entries []legendEntry) []renderEvent {
+func (c *CLI) legendSection(header string, entries []legendEntry) []renderEvent {
 	var events []renderEvent
 
 	events = append(events, renderEvent{
@@ -537,7 +535,7 @@ func (c *cli) legendSection(header string, entries []legendEntry) []renderEvent 
 	return events
 }
 
-func (c *cli) EmitLegend() {
+func (c *CLI) EmitLegend() {
 	var events []renderEvent
 
 	events = append(events, c.legendSection("STATE", []legendEntry{
@@ -591,15 +589,15 @@ func (c *cli) EmitLegend() {
 	c.commitRenderEvents(events)
 }
 
-func (c *cli) Interrupt() {
+func (c *CLI) Interrupt() {
 	c.render.interrupted.Store(true)
 }
 
-func (c *cli) Close() {
+func (c *CLI) Close() {
 	c.render.close()
 }
 
-func (c *cli) EmitEngineDiagnostic(e event.EngineDiagnostic) {
+func (c *CLI) EmitEngineDiagnostic(e event.EngineDiagnostic) {
 	if !c.shouldRender(e.Chattiness) {
 		return
 	}
@@ -610,21 +608,21 @@ func (c *cli) EmitEngineDiagnostic(e event.EngineDiagnostic) {
 	c.renderDiagnostic(e.Severity, "engine", context, e.Detail.Template)
 }
 
-func (c *cli) EmitPlanDiagnostic(e event.PlanDiagnostic) {
+func (c *CLI) EmitPlanDiagnostic(e event.PlanDiagnostic) {
 	if !c.shouldRender(e.Chattiness) {
 		return
 	}
 	c.renderDiagnostic(e.Severity, "plan", stepScope(e.Step), e.Detail.Template)
 }
 
-func (c *cli) EmitActionDiagnostic(e event.ActionDiagnostic) {
+func (c *CLI) EmitActionDiagnostic(e event.ActionDiagnostic) {
 	if !c.shouldRender(e.Chattiness) {
 		return
 	}
 	c.renderDiagnostic(e.Severity, "action", stepScope(e.Step), e.Detail.Template)
 }
 
-func (c *cli) EmitOpDiagnostic(e event.OpDiagnostic) {
+func (c *CLI) EmitOpDiagnostic(e event.OpDiagnostic) {
 	if !c.shouldRender(e.Chattiness) {
 		return
 	}
@@ -639,7 +637,7 @@ func (c *cli) EmitOpDiagnostic(e event.OpDiagnostic) {
 // New diagnostic surface - see doc/design/diagnostics.md.
 // -----------------------------------------------------------------------------
 
-func (c *cli) EmitDiagnostic(e event.Diagnostic) {
+func (c *CLI) EmitDiagnostic(e event.Diagnostic) {
 	scope := ""
 	if e.Cause.Kind == event.CauseHook && e.Cause.Ref != "" {
 		scope = fmt.Sprintf(" in hook '%s'", e.Cause.Ref)
@@ -647,7 +645,7 @@ func (c *cli) EmitDiagnostic(e event.Diagnostic) {
 	c.renderDiagnostic(eventSeverityToSignal(e.Severity), "", scope, e.Template)
 }
 
-func (c *cli) EmitChange(e event.Change) {
+func (c *CLI) EmitChange(e event.Change) {
 	var verb string
 	var col ansi.ANSI
 	switch e.Phase {
@@ -679,7 +677,7 @@ func (c *cli) EmitChange(e event.Change) {
 	}})
 }
 
-func (c *cli) EmitProgress(e event.Progress) {
+func (c *CLI) EmitProgress(e event.Progress) {
 	c.commitRenderEvents([]renderEvent{{
 		stream: streamOut,
 		line:   c.formatter.fmtfMsg(colEngineStarted, "[~] %s", e.Text),
@@ -727,7 +725,7 @@ func stepScope(s event.StepDetail) string {
 	return fmt.Sprintf(` in step [%s]`, tag)
 }
 
-func (c *cli) renderDiagnostic(sev signal.Severity, scope, msg string, tmpl event.Template) {
+func (c *CLI) renderDiagnostic(sev signal.Severity, scope, msg string, tmpl event.Template) {
 	var glyph, suffix string
 	var col ansi.ANSI
 
@@ -769,7 +767,7 @@ func (c *cli) renderDiagnostic(sev signal.Severity, scope, msg string, tmpl even
 	c.commitRenderEvents(events)
 }
 
-func (c *cli) shouldUseColor() bool {
+func (c *CLI) shouldUseColor() bool {
 	return shouldUseColor(c.opts.ColorMode, c.isTTY)
 }
 

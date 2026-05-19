@@ -12,32 +12,17 @@ import (
 	"scampi.dev/scampi/test/harness"
 )
 
-func TestIndexAll_EmitsWellFormedEvent(t *testing.T) {
-	rec := &harness.RecordingDisplayer{}
-	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
+func TestIndexAll_ReturnsWellFormedCatalog(t *testing.T) {
+	docs := engine.IndexAll(context.Background())
 
-	err := engine.IndexAll(context.Background(), em)
-	if err != nil {
-		t.Fatalf("IndexAll failed: %v", err)
+	if len(docs) == 0 {
+		t.Fatal("IndexAll returned no docs")
 	}
 
-	if len(rec.IndexAllEvents) == 0 {
-		t.Fatal("no IndexAllEvent emitted")
-	}
-
-	if len(rec.IndexAllEvents) != 1 {
-		t.Fatalf("too many IndexAllEvent emitted - have %d, want 1", len(rec.IndexAllEvents))
-	}
-
-	e := rec.IndexAllEvents[0]
-	if len(e.Steps) == 0 {
-		t.Fatal("IndexAllEvent has no steps")
-	}
-
-	// Verify known steps are present with summaries
+	// Verify known steps are present with summaries.
 	found := make(map[string]string)
-	for _, s := range e.Steps {
-		found[s.Kind] = s.Desc
+	for _, d := range docs {
+		found[d.Kind] = d.Summary
 	}
 
 	for _, kind := range []string{"copy", "symlink", "unarchive"} {
@@ -102,20 +87,10 @@ func TestIndexStep_EmitsWellFormedEvent(t *testing.T) {
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-			err := engine.IndexStep(context.Background(), tt.kind, em)
+			doc, err := engine.IndexStep(context.Background(), tt.kind, em)
 			if err != nil {
 				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
 			}
-
-			if len(rec.IndexStepEvents) == 0 {
-				t.Fatal("no IndexStepEvent emitted")
-			}
-
-			if len(rec.IndexStepEvents) != 1 {
-				t.Fatalf("too many IndexStepEvent emitted - have %d, want 1", len(rec.IndexStepEvents))
-			}
-
-			doc := rec.IndexStepEvents[0].Doc
 
 			if doc.Kind != tt.kind {
 				t.Errorf("Kind = %q, want %q", doc.Kind, tt.kind)
@@ -151,7 +126,7 @@ func TestIndexStep_UnknownKind_Aborts(t *testing.T) {
 	rec := &harness.RecordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-	err := engine.IndexStep(context.Background(), "nonexistent", em)
+	_, err := engine.IndexStep(context.Background(), "nonexistent", em)
 	if err == nil {
 		t.Fatal("expected error for unknown kind")
 	}
@@ -166,17 +141,9 @@ func TestIndexStep_FieldsHaveDocumentation(t *testing.T) {
 	rec := &harness.RecordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-	_ = engine.IndexStep(context.Background(), "symlink", em)
+	doc, _ := engine.IndexStep(context.Background(), "symlink", em)
 
-	if len(rec.IndexStepEvents) == 0 {
-		t.Fatal("no IndexStepEvent emitted")
-	}
-
-	if len(rec.IndexStepEvents) != 1 {
-		t.Fatalf("too many IndexStepEvent emitted - have %d, want 1", len(rec.IndexStepEvents))
-	}
-
-	for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+	for _, f := range doc.Fields {
 		if f.Desc == "" {
 			t.Errorf("field %q has no description", f.Name)
 		}
@@ -204,17 +171,13 @@ func TestIndexStep_DefaultsPopulated(t *testing.T) {
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-			err := engine.IndexStep(context.Background(), tt.kind, em)
+			doc, err := engine.IndexStep(context.Background(), tt.kind, em)
 			if err != nil {
 				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
 			}
 
-			if len(rec.IndexStepEvents) != 1 {
-				t.Fatalf("expected 1 IndexStepEvent, got %d", len(rec.IndexStepEvents))
-			}
-
 			var found bool
-			for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+			for _, f := range doc.Fields {
 				if f.Name == tt.field {
 					found = true
 					if f.Default != tt.wantDef {
@@ -234,18 +197,14 @@ func TestIndexStep_RequiredFieldsMarkedCorrectly(t *testing.T) {
 	rec := &harness.RecordingDisplayer{}
 	em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-	_ = engine.IndexStep(context.Background(), "symlink", em)
+	doc, _ := engine.IndexStep(context.Background(), "symlink", em)
 
-	if len(rec.IndexStepEvents) == 0 {
-		t.Fatal("no IndexStepEvent emitted")
-	}
-
-	if len(rec.IndexStepEvents) != 1 {
-		t.Fatalf("too many IndexStepEvent emitted - have %d, want 1", len(rec.IndexStepEvents))
+	if doc.Kind == "" {
+		t.Fatal("IndexStep returned empty doc")
 	}
 
 	fields := make(map[string]bool)
-	for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+	for _, f := range doc.Fields {
 		fields[f.Name] = f.Required
 	}
 
@@ -275,17 +234,13 @@ func TestIndexStep_ExclusiveFieldsPopulated(t *testing.T) {
 			rec := &harness.RecordingDisplayer{}
 			em := diagnostic.NewEmitter(diagnostic.Policy{}, rec)
 
-			err := engine.IndexStep(context.Background(), tt.kind, em)
+			doc, err := engine.IndexStep(context.Background(), tt.kind, em)
 			if err != nil {
 				t.Fatalf("IndexStep(%q) failed: %v", tt.kind, err)
 			}
 
-			if len(rec.IndexStepEvents) != 1 {
-				t.Fatalf("expected 1 IndexStepEvent, got %d", len(rec.IndexStepEvents))
-			}
-
 			var got []string
-			for _, f := range rec.IndexStepEvents[0].Doc.Fields {
+			for _, f := range doc.Fields {
 				if f.Exclusive == tt.group {
 					got = append(got, f.Name)
 				}
